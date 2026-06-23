@@ -63,6 +63,7 @@ import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions
 import { ClarifyTool } from '@/components/assistant-ui/clarify-tool'
 import { DirectiveContent, hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
 import { MarkdownText, MarkdownTextContent } from '@/components/assistant-ui/markdown-text'
+import { SubagentActivityCard } from '@/components/assistant-ui/subagent-activity-card'
 import { ThreadMessageList } from '@/components/assistant-ui/thread-list'
 import { ThreadTimeline } from '@/components/assistant-ui/thread-timeline'
 import { ToolFallback, ToolGroupSlot } from '@/components/assistant-ui/tool-fallback'
@@ -100,7 +101,7 @@ import { playSpeechText, stopVoicePlayback } from '@/lib/voice-playback'
 import { $compactionActive } from '@/store/compaction'
 import type { ComposerAttachment } from '@/store/composer'
 import { notifyError } from '@/store/notifications'
-import { $connection } from '@/store/session'
+import { $activeSessionId, $connection } from '@/store/session'
 import { notifyThreadEditClose, notifyThreadEditOpen } from '@/store/thread-scroll'
 import { $voicePlayback } from '@/store/voice-playback'
 
@@ -256,6 +257,7 @@ const AssistantMessage: FC<{
   const messageId = useAuiState(s => s.message.id)
   const messageRuntime = useMessageRuntime()
   const { t } = useI18n()
+  const activeSessionId = useStore($activeSessionId)
 
   // PERF: this component must NOT subscribe to the streaming text. Every
   // selector here returns a value that stays referentially stable across
@@ -304,6 +306,7 @@ const AssistantMessage: FC<{
       >
         {/* Todos render in the composer status stack now, not inline. */}
         <MessagePrimitive.Parts components={MESSAGE_PARTS_COMPONENTS} />
+        <SubagentActivityCard sessionId={activeSessionId} />
         {isRunning && <StreamStallIndicator />}
         {previewTargets.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

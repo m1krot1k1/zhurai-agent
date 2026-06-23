@@ -373,7 +373,7 @@ const BOOT_FAKE_STEP_MS = (() => {
   if (!Number.isFinite(raw) || raw <= 0) return 650
   return Math.max(120, raw)
 })()
-const APP_NAME = 'Hermes'
+const APP_NAME = 'ZhurAI Agent'
 const TITLEBAR_HEIGHT = 34
 const MACOS_TRAFFIC_LIGHTS_HEIGHT = 14
 const WINDOW_BUTTON_POSITION = {
@@ -636,7 +636,7 @@ app.setName(APP_NAME)
 // need this, so gate it on Windows. (Fixes: desktop approval/turn notifications
 // never firing on Windows.)
 if (IS_WINDOWS) {
-  app.setAppUserModelId('com.nousresearch.hermes')
+  app.setAppUserModelId('com.m1krot1k1.zhurai-agent')
 }
 // Seed the native About panel with the live Hermes version. This is refreshed
 // on every open via the explicit "About" menu handler (refreshAboutPanel), so
@@ -645,7 +645,7 @@ if (IS_WINDOWS) {
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
   applicationVersion: resolveHermesVersion(),
-  copyright: 'Copyright © 2026 Nous Research'
+  copyright: 'Copyright © 2026 m1krot1k1'
 })
 
 // Custom scheme for streaming local media (video/audio) into the renderer.
@@ -6444,7 +6444,7 @@ function showAboutPanelFresh() {
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: resolveHermesVersion(),
-    copyright: 'Copyright © 2026 Nous Research'
+    copyright: 'Copyright © 2026 m1krot1k1'
   })
   app.showAboutPanel()
 }

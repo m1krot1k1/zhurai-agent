@@ -43,25 +43,25 @@ export const en: Translations = {
   },
 
   boot: {
-    ready: 'Hermes Desktop is ready',
+    ready: 'ZhurAI Desktop is ready',
     desktopBootFailedWithMessage: message => `Desktop boot failed: ${message}`,
     steps: {
       connectingGateway: 'Connecting live desktop gateway',
-      loadingSettings: 'Loading Hermes settings',
+      loadingSettings: 'Loading ZhurAI settings',
       loadingSessions: 'Loading recent sessions',
       startingDesktopConnection: 'Starting desktop connection',
-      startingHermesDesktop: 'Starting Hermes Desktop…'
+      startingHermesDesktop: 'Starting ZhurAI Desktop…'
     },
     errors: {
-      backgroundExited: 'Hermes background process exited.',
-      backgroundExitedDuringStartup: 'Hermes background process exited during startup.',
+      backgroundExited: 'ZhurAI background process exited.',
+      backgroundExitedDuringStartup: 'ZhurAI background process exited during startup.',
       backendStopped: 'Backend stopped',
       desktopBootFailed: 'Desktop boot failed',
       gatewaySignInRequired: 'Gateway sign-in required',
       ipcBridgeUnavailable: 'Desktop IPC bridge is unavailable.'
     },
     failure: {
-      title: "Hermes couldn't start",
+      title: "ZhurAI couldn't start",
       description:
         "The background gateway didn't come up. Try one of the recovery steps below. Nothing here deletes your chats or settings.",
       remoteTitle: 'Remote gateway sign-in required',
@@ -98,8 +98,8 @@ export const en: Translations = {
     copyDetailFailed: 'Could not copy notification detail',
     backendOutOfDateTitle: 'Backend out of date',
     backendOutOfDateMessage:
-      'Your Hermes backend is older than this desktop build and may not work correctly. Update to align them.',
-    updateHermes: 'Update Hermes',
+      'Your backend is older than this desktop build and may not work correctly. Update to align them.',
+    updateHermes: 'Update ZhurAI',
     updateReadyTitle: 'Update ready',
     updateReadyMessage: count => `${count} new change${count === 1 ? '' : 's'} available.`,
     seeWhatsNew: "See what's new",
@@ -107,7 +107,7 @@ export const en: Translations = {
       elevenLabsNeedsKey: 'ElevenLabs STT needs ELEVENLABS_API_KEY.',
       elevenLabsRejectedKey: 'ElevenLabs rejected the API key (401).',
       methodNotAllowed:
-        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting Hermes Desktop.',
+        'The desktop backend rejected that request (405 Method Not Allowed). Try restarting ZhurAI Desktop.',
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: 'OpenAI rejected the API key.',
       openaiRejectedApiKeyWithStatus: status => `OpenAI rejected the API key (${status} invalid_api_key).`,
@@ -334,7 +334,7 @@ export const en: Translations = {
       advanced: 'Advanced'
     },
     searchPlaceholder: {
-      about: 'About Hermes Desktop',
+      about: 'About ZhurAI Desktop',
       config: 'Search settings...',
       gateway: 'Gateway connection...',
       keys: 'Search API keys...',
@@ -377,7 +377,7 @@ export const en: Translations = {
     fieldLabels: FIELD_LABELS,
     fieldDescriptions: FIELD_DESCRIPTIONS,
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'ZhurAI Agent',
       version: value => `Version ${value}`,
       versionUnavailable: 'Version unavailable',
       updates: 'Updates',
@@ -446,7 +446,7 @@ export const en: Translations = {
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
-        'Hermes Desktop starts its own local gateway by default. Use a remote gateway when you want this app to control an already-running Hermes backend on another machine or behind a trusted proxy. Pick a profile below to give it its own remote host.',
+        'ZhurAI Desktop starts its own local gateway by default. Use a remote gateway when you want this app to control an already-running Hermes backend on another machine or behind a trusted proxy. Pick a profile below to give it its own remote host.',
       appliesTo: 'Applies to',
       allProfiles: 'All profiles',
       defaultConnection: 'Default connection for every profile that has no override of its own.',
@@ -493,9 +493,9 @@ export const en: Translations = {
       enterUrlFirst: 'Enter a remote URL first.',
       restartingTitle: 'Gateway connection restarting',
       savedTitle: 'Gateway settings saved',
-      restartingMessage: 'Hermes Desktop will reconnect using the saved settings.',
+      restartingMessage: 'ZhurAI Desktop will reconnect using the saved settings.',
       savedMessage: 'Saved for the next restart.',
-      connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · ZhurAI ${version}` : ''}`,
       reachableTitle: 'Remote gateway reachable',
       signedOutTitle: 'Signed out',
       signedOutMessage: 'Cleared the remote gateway session.',
@@ -753,7 +753,7 @@ export const en: Translations = {
     },
     nav: {
       newChat: { title: 'New session', detail: 'Start a fresh session' },
-      settings: { title: 'Settings', detail: 'Configure Hermes desktop' },
+      settings: { title: 'Settings', detail: 'Configure ZhurAI desktop' },
       skills: { title: 'Skills & Tools', detail: 'Enable skills, toolsets, and providers' },
       messaging: { title: 'Messaging', detail: 'Set up Telegram, Slack, Discord, and more' },
       artifacts: { title: 'Artifacts', detail: 'Browse generated outputs' }
@@ -775,10 +775,10 @@ export const en: Translations = {
     noSessions: 'No sessions yet.',
     gatewayRunning: 'Messaging gateway running',
     gatewayStopped: 'Messaging gateway stopped',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · Active sessions ${count}`,
+    hermesActiveSessions: (version, count) => `ZhurAI ${version} · Active sessions ${count}`,
     restartGateway: 'Restart gateway',
     gatewayRestartFailed: 'Gateway restart failed.',
-    updateHermes: 'Update Hermes',
+    updateHermes: 'Update ZhurAI',
     actionRunning: 'running',
     actionDone: 'done',
     actionFailed: 'failed',
@@ -1391,7 +1391,7 @@ export const en: Translations = {
     manualPickedUp: 'Hermes will pick up the new version next time you launch it.',
     guiSkewTitle: 'Update the desktop app',
     guiSkewBody:
-      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the Hermes desktop app (your AppImage / .deb / .rpm) to match.',
+      'The backend was updated, but this desktop app package wasn’t changed. Update or reinstall the ZhurAI desktop app (your AppImage / .deb / .rpm) to match.',
     copy: 'Copy',
     copied: 'Copied',
     done: 'Done',
@@ -1433,7 +1433,7 @@ export const en: Translations = {
     settingUpTitle: 'Setting up Hermes Agent',
     finishingTitle: 'Finishing up',
     failedDesc:
-      'One of the install steps failed. On Windows, this can happen if another Hermes CLI or desktop instance is running. Stop any running Hermes instances, then retry. Check the details below or the desktop log for the full transcript.',
+      'One of the install steps failed. On Windows, this can happen if another Hermes CLI or desktop instance is running. Stop any running ZhurAI instances, then retry. Check the details below or the desktop log for the full transcript.',
     activeDesc:
       'This is a one-time setup. The Hermes installer is downloading dependencies and configuring your machine. Subsequent launches will skip this step.',
     progress: (completed, total) => `${completed} of ${total} steps complete`,
@@ -1595,7 +1595,7 @@ export const en: Translations = {
       update: 'update',
       updateInProgress: 'Update in progress',
       commitsBehind: (count, branch) => `${count} commit${count === 1 ? '' : 's'} behind ${branch}`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `ZhurAI Agent v${version}`,
       backendVersion: version => `Backend v${version}`,
       clientLabel: version => `client v${version}`,
       backendLabel: version => `backend v${version}`,
@@ -1891,8 +1891,8 @@ export const en: Translations = {
     sessionExportFailed: 'Could not export session',
     imageSaved: 'Image saved',
     downloadStarted: 'Download started',
-    restartToUseSaveImage: 'Restart Hermes Desktop to use Save Image.',
-    restartToSaveImages: 'Restart Hermes Desktop to save images',
+    restartToUseSaveImage: 'Restart ZhurAI Desktop to use Save Image.',
+    restartToSaveImages: 'Restart ZhurAI Desktop to save images',
     imageDownloadFailed: 'Image download failed',
     openImage: 'Open image',
     downloadImage: 'Download image',

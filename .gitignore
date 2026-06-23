@@ -50,7 +50,7 @@ agent-browser/
 privvy*
 images/
 __pycache__/
-hermes_agent.egg-info/
+zhurai_agent.egg-info/
 wandb/
 testlogs
 
