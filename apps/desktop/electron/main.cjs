@@ -57,6 +57,11 @@ const { gitRootForIpc } = require('./git-root.cjs')
 const { discoverRepoAgents } = require('./agent-ecosystem.cjs')
 const { worktreesForIpc } = require('./git-worktrees.cjs')
 const { OFFICIAL_REPO_HTTPS_URL, isOfficialSshRemote } = require('./update-remote.cjs')
+const {
+  normalizeDesktopUpdateConfig,
+  resolveDefaultUpdateBranch,
+  serializeDesktopUpdateConfig
+} = require('./update-config.cjs')
 const { runRebuildWithRetry } = require('./update-rebuild.cjs')
 const {
   buildPosixCleanupScript,
@@ -331,10 +336,12 @@ const DESKTOP_PROFILE_CONFIG_PATH = path.join(app.getPath('userData'), 'active-p
 // Mirrors hermes_cli.profiles._PROFILE_ID_RE so we never hand the backend a
 // value its profile resolver would reject and exit on.
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
-// Branch we track for self-update. The GUI work has merged to main, so this
-// tracks main. User can also override at runtime via
-// hermesDesktop.updates.setBranch().
-const DEFAULT_UPDATE_BRANCH = 'main'
+// Branch we track for self-update. ZhurAI Agent ships active work on `dev`.
+// User can override at runtime via hermesDesktop.updates.setBranch().
+const DEFAULT_UPDATE_BRANCH = resolveDefaultUpdateBranch({
+  installStampBranch: INSTALL_STAMP?.branch || null,
+  originUrl: OFFICIAL_REPO_HTTPS_URL
+})
 // desktop.log lives under HERMES_HOME/logs/ so it sits next to agent.log,
 // errors.log, gateway.log produced by hermes_logging.setup_logging — one log
 // directory per user, regardless of which UI surface produced the line.
@@ -1501,12 +1508,28 @@ function recentHermesLog() {
 // ─── Self-update (git-pull against the running backend's hermes root) ──────
 
 function readDesktopUpdateConfig() {
+  const stampBranch = INSTALL_STAMP?.branch || null
   try {
     const parsed = JSON.parse(fs.readFileSync(DESKTOP_UPDATE_CONFIG_PATH, 'utf8'))
-    const branch = typeof parsed?.branch === 'string' ? parsed.branch.trim() : ''
-    return { branch: branch || DEFAULT_UPDATE_BRANCH }
+    const normalized = normalizeDesktopUpdateConfig(parsed, {
+      installStampBranch: stampBranch,
+      originUrl: OFFICIAL_REPO_HTTPS_URL
+    })
+    if (normalized.migrated) {
+      writeDesktopUpdateConfig({
+        branch: normalized.branch,
+        branchSource: normalized.branchSource
+      })
+    }
+    return { branch: normalized.branch, branchSource: normalized.branchSource }
   } catch {
-    return { branch: DEFAULT_UPDATE_BRANCH }
+    return {
+      branch: resolveDefaultUpdateBranch({
+        installStampBranch: stampBranch,
+        originUrl: OFFICIAL_REPO_HTTPS_URL
+      }),
+      branchSource: 'default'
+    }
   }
 }
 
@@ -1520,7 +1543,13 @@ function writeFileAtomic(targetPath, data, encoding) {
 
 function writeDesktopUpdateConfig(config) {
   fs.mkdirSync(path.dirname(DESKTOP_UPDATE_CONFIG_PATH), { recursive: true })
-  writeFileAtomic(DESKTOP_UPDATE_CONFIG_PATH, JSON.stringify(config, null, 2))
+  writeFileAtomic(
+    DESKTOP_UPDATE_CONFIG_PATH,
+    serializeDesktopUpdateConfig({
+      branch: config.branch || DEFAULT_UPDATE_BRANCH,
+      branchSource: config.branchSource || 'default'
+    })
+  )
 }
 
 // Match the backend's source resolution but bias toward a real git checkout.
@@ -1587,8 +1616,9 @@ function emitUpdateProgress(payload) {
 // "ref absent" (exit 2), never on a transient network error, so a flaky
 // connection can't strand a user on the wrong branch.
 async function resolveHealedBranch(updateRoot, branch) {
-  if (!branch || branch === 'main') {
-    return branch || 'main'
+  const fallback = DEFAULT_UPDATE_BRANCH || 'dev'
+  if (!branch || branch === fallback) {
+    return branch || fallback
   }
 
   const originUrl = await getOriginUrl(updateRoot)
@@ -1598,12 +1628,12 @@ async function resolveHealedBranch(updateRoot, branch) {
     return branch
   }
 
-  rememberLog(`[updates] origin/${branch} is gone (merged?); falling back to main`)
+  rememberLog(`[updates] origin/${branch} is gone (merged?); falling back to ${fallback}`)
   const config = readDesktopUpdateConfig()
-  if (config.branch !== 'main') {
-    writeDesktopUpdateConfig({ ...config, branch: 'main' })
+  if (config.branch !== fallback) {
+    writeDesktopUpdateConfig({ ...config, branch: fallback })
   }
-  return 'main'
+  return fallback
 }
 
 async function checkUpdates() {
@@ -1641,14 +1671,21 @@ async function checkUpdates() {
         fetchedAt: Date.now()
       }
     }
+    let behind = 0
+    if (currentSha && targetSha && currentSha !== targetSha) {
+      const count = await runGit(['rev-list', `${currentSha}..${targetSha}`, '--count'], {
+        cwd: updateRoot
+      })
+      behind = Number.parseInt(firstLine(count.stdout), 10) || 1
+    }
     return {
       supported: true,
       branch,
       currentBranch,
-      behind: currentSha && currentSha === targetSha ? 0 : 1,
+      behind,
       currentSha,
       targetSha,
-      commits: [],
+      commits: behind > 0 ? await readCommitLog(updateRoot, branch, currentSha, targetSha) : [],
       dirty: dirtyStr.length > 0,
       hermesRoot: updateRoot,
       fetchedAt: Date.now()
@@ -1693,11 +1730,12 @@ async function checkUpdates() {
   }
 }
 
-async function readCommitLog(cwd, branch) {
+async function readCommitLog(cwd, branch, baseSha = null, headSha = null) {
   const SEP = '\x1f'
   const REC = '\x1e'
+  const range = baseSha && headSha ? `${baseSha}..${headSha}` : `HEAD..origin/${branch}`
   const { stdout } = await runGit(
-    ['log', `HEAD..origin/${branch}`, `--pretty=format:%H${SEP}%s${SEP}%an${SEP}%at${REC}`, '-n', '40'],
+    ['log', range, `--pretty=format:%H${SEP}%s${SEP}%an${SEP}%at${REC}`, '-n', '40'],
     { cwd }
   )
 
@@ -6372,7 +6410,7 @@ ipcMain.handle('hermes:updates:branch:get', async () => readDesktopUpdateConfig(
 
 ipcMain.handle('hermes:updates:branch:set', async (_event, name) => {
   const branch = typeof name === 'string' && name.trim() ? name.trim() : DEFAULT_UPDATE_BRANCH
-  writeDesktopUpdateConfig({ branch })
+  writeDesktopUpdateConfig({ branch, branchSource: 'user' })
   return { branch }
 })
 

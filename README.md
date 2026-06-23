@@ -182,11 +182,13 @@ scripts/run_tests.sh
 | `dev` | **minor** (0.17.0 → 0.18.0) | prerelease |
 | `main` | **major** (0.x → 1.0.0) | stable |
 
-При push в `dev` или `main` (с изменениями в `apps/desktop/`) CI автоматически:
+При push в **`dev`** (изменения в `apps/desktop/`, `skills/`, `agents/`, `commands/` и др.) CI автоматически:
 
 1. Поднимает версию в `apps/desktop/package.json`
 2. Собирает `.dmg` и `.zip` на macOS ARM64
 3. Публикует в [Releases](https://github.com/m1krot1k1/zhurai-agent/releases)
+
+**In-app обновления** смотрят на ветку **`dev`** (не `main`). Если About пишет «latest», а в GitHub уже есть коммиты — см. [docs/desktop-updates.md](docs/desktop-updates.md).
 
 **Локальная сборка** (автоустановка Node 22 через nvm):
 
