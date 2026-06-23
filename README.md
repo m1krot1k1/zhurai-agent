@@ -175,6 +175,29 @@ scripts/run_tests.sh
 
 ---
 
+## Релизы desktop (macOS)
+
+| Ветка | Версионирование | GitHub Release |
+|-------|-----------------|----------------|
+| `dev` | **minor** (0.17.0 → 0.18.0) | prerelease |
+| `main` | **major** (0.x → 1.0.0) | stable |
+
+При push в `dev` или `main` (с изменениями в `apps/desktop/`) CI автоматически:
+
+1. Поднимает версию в `apps/desktop/package.json`
+2. Собирает `.dmg` и `.zip` на macOS ARM64
+3. Публикует в [Releases](https://github.com/m1krot1k1/zhurai-agent/releases)
+
+**Локальная сборка** (автоустановка Node 22 через nvm):
+
+```bash
+bash scripts/build-desktop-macos.sh
+```
+
+**Ручной релиз** (Actions → Release Desktop macOS → Run workflow).
+
+---
+
 ## Лицензия
 
 Проект распространяется под лицензией [MIT](https://github.com/m1krot1k1/zhurai-agent/blob/main/LICENSE).
