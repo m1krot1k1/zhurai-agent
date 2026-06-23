@@ -50,10 +50,18 @@ bash scripts/release-desktop-github.sh minor
 
 Workflow: `.github/workflows/release-desktop-macos.yml`
 
-- Push в **`dev`** (в т.ч. `skills/`, `agents/`, `commands/`) → minor bump + prerelease `.dmg`/`.zip`
-- **workflow_dispatch** на `main`/`dev` → major/minor вручную
+- Push в **`dev`** → minor bump + prerelease `.dmg`/`.zip`
+- **workflow_dispatch** → ручной запуск
 
-Если Actions падает на «Set up job» — проверьте billing и macOS runners в Settings → Actions.
+**Если CI падает на «Set up job» (macOS runner):** метка `macos-14` могла быть недоступна — workflow использует `macos-latest`. Локальная публикация:
+
+```bash
+bash scripts/build-desktop-macos.sh
+export PATH="/opt/homebrew/bin:$PATH"   # gh
+bash scripts/publish-release-assets.sh
+```
+
+Текущий релиз: https://github.com/m1krot1k1/zhurai-agent/releases
 
 ## Ссылки
 

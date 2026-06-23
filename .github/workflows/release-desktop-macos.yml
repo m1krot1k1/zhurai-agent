@@ -28,6 +28,9 @@ on:
       - 'package.json'
       - 'package-lock.json'
 
+permissions:
+  contents: write
+
 concurrency:
   group: release-desktop-${{ github.ref }}
   cancel-in-progress: false
@@ -37,15 +40,20 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
-    runs-on: macos-14
-    permissions:
-      contents: write
+    runs-on: macos-latest
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Runner diagnostics
+        run: |
+          sw_vers
+          uname -m
+          node --version 2>/dev/null || true
+
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -93,6 +101,7 @@ jobs:
             unset CSC_IDENTITY_AUTO_DISCOVERY
           fi
           npm run --prefix apps/desktop dist:mac
+          ls -lh apps/desktop/release/
 
       - name: Создать git tag
         run: |
@@ -100,7 +109,7 @@ jobs:
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Опубликовать GitHub Release
-        uses: softprops/action-gh-release@a06a5133129e8ebae3d4e4e3250f92d646800add # v2.2.0
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ZhurAI Agent ${{ steps.version.outputs.tag }}
