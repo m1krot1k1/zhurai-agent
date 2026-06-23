@@ -899,7 +899,13 @@ export const zh: Translations = {
     durationSeconds: seconds => `${seconds} 秒`,
     durationMinutes: (minutes, seconds) => `${minutes} 分 ${seconds} 秒`,
     tokensK: k => `${k}k 词元`,
-    tokens: value => `${value} 词元`
+    tokens: value => `${value} 词元`,
+    repoTitle: '仓库代理',
+    repoLoading: '正在加载仓库代理…',
+    repoEmptyHint:
+      '未找到仓库代理。将 agents/ 放入项目，或设置 ZHUR_AI_AGENT_ROOT 指向 zhur.ai-agent。',
+    repoCount: count => `${count} 个可用`,
+    repoFrom: count => `${count} 个来自仓库`
   },
 
   commandCenter: {
