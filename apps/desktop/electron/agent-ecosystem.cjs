@@ -51,6 +51,12 @@ function parseAgentFrontmatter(text) {
   return fields
 }
 
+function isPathInside(child, parent) {
+  const rel = path.relative(parent, child)
+
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+}
+
 function resolveEcosystemRoot({ hermesRoot, env = process.env, fsImpl = fs } = {}) {
   const overrideRaw = env.ZHUR_AI_AGENT_ROOT && String(env.ZHUR_AI_AGENT_ROOT).trim()
   const override = overrideRaw ? path.resolve(overrideRaw.replace(/^~(?=$|[\\/])/, env.HOME || '')) : null
@@ -94,18 +100,46 @@ async function listAgentsFromRepo(root, options = {}) {
     return { root, agents: [], error: 'agents-dir-unreadable' }
   }
 
+  let resolvedAgentsDir = agentsDir
+
+  try {
+    resolvedAgentsDir = await fsImpl.promises.realpath(agentsDir)
+  } catch {
+    return { root, agents: [], error: 'agents-dir-unreadable' }
+  }
+
   const agents = []
 
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith('.md') || entry.name.startsWith('.')) {
+    if (entry.isDirectory() || !entry.name.endsWith('.md') || entry.name.startsWith('.')) {
+      continue
+    }
+
+    if (!entry.isFile() && !entry.isSymbolicLink()) {
+      continue
+    }
+
+    if (entry.name.toLowerCase() === 'readme.md') {
       continue
     }
 
     const filePath = path.join(agentsDir, entry.name)
+    let resolvedFile = ''
+
+    try {
+      resolvedFile = await fsImpl.promises.realpath(filePath)
+
+      if (!isPathInside(resolvedFile, resolvedAgentsDir)) {
+        continue
+      }
+    } catch {
+      continue
+    }
+
     let text = ''
 
     try {
-      text = await fsImpl.promises.readFile(filePath, 'utf8')
+      text = await fsImpl.promises.readFile(resolvedFile, 'utf8')
     } catch {
       continue
     }
@@ -117,7 +151,6 @@ async function listAgentsFromRepo(root, options = {}) {
       id,
       name: frontmatter.name || id,
       description: frontmatter.description || '',
-      path: filePath,
       fileName: entry.name
     })
   }

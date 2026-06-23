@@ -64,6 +64,39 @@ description: Writes and refactors code.
   assert.equal(result.agents[0].id, 'code')
   assert.equal(result.agents[0].name, 'code')
   assert.match(result.agents[0].description, /refactors code/)
+  assert.equal('path' in result.agents[0], false)
+})
+
+test('listAgentsFromRepo skips symlinks that resolve outside agents/', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'eco-symlink-'))
+  const agentsDir = path.join(root, 'agents')
+  const outsideDir = path.join(root, 'outside')
+  fs.mkdirSync(agentsDir)
+  fs.mkdirSync(outsideDir)
+  fs.writeFileSync(
+    path.join(outsideDir, 'escape.md'),
+    `---
+name: escape
+description: Outside agents dir.
+---
+`,
+    'utf8'
+  )
+  fs.symlinkSync(path.join(outsideDir, 'escape.md'), path.join(agentsDir, 'escape.md'))
+  fs.writeFileSync(
+    path.join(agentsDir, 'code.md'),
+    `---
+name: code
+description: Inside agents dir.
+---
+`,
+    'utf8'
+  )
+
+  const result = await listAgentsFromRepo(root)
+
+  assert.equal(result.agents.length, 1)
+  assert.equal(result.agents[0].id, 'code')
 })
 
 test('discoverRepoAgents returns agents-dir-missing when root has no agents/', async () => {
