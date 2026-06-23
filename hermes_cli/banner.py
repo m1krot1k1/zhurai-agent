@@ -463,8 +463,8 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
     """Return ``(tag, release_url)`` for the latest git tag, or None.
 
     Local-only — runs ``git describe --tags --abbrev=0`` against the
-    Hermes checkout. Cached per-process. Release URL always points at the
-    canonical NousResearch/hermes-agent repo (forks don't get a link).
+    ZhurAI Agent checkout. Cached per-process. Release URL points at
+    https://github.com/m1krot1k1/zhurai-agent/releases.
     """
     global _latest_release_cache
     if _latest_release_cache is not None:
