@@ -6,7 +6,7 @@ Desktop обновляется **через git** (backend `~/.hermes/hermes-age
 
 | Что видите | Что это значит |
 |------------|----------------|
-| `v0.17.0 0ef7096` в углу | Версия **собранного .app** (install-stamp при сборке) |
+| `v0.17.0 64846a1` в углу (старые сборки) | UI читал `hermes_cli/__version__` (0.17.0), а не `.app` (0.21.0). SHA — backend git, мог быть свежим при «старом» номере. С fix: packaged app показывает `app.getVersion()` = тег Release. |
 | «Latest version» в About | Backend на выбранной ветке **совпадает** с `origin/<ветка>` |
 | Нет .dmg в Releases | CI-релиз ещё не отработал или Actions/macOS runner недоступен |
 
