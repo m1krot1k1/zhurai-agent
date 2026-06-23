@@ -176,6 +176,7 @@
       }
     ],
     "asar": true,
+    "publish": null,
     "afterSign": "scripts/notarize.cjs",
     "asarUnpack": [
       "**/*.node",

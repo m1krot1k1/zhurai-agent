@@ -8,20 +8,14 @@ cd "$ROOT"
 
 # shellcheck source=scripts/ensure-node.sh
 source "${ROOT}/scripts/ensure-node.sh"
+# shellcheck source=scripts/desktop-signing-env.sh
+source "${ROOT}/scripts/desktop-signing-env.sh"
 
 echo "→ npm ci (корень monorepo)..."
 npm ci
 
 echo "→ Сборка ZhurAI Agent desktop (dmg + zip)..."
-if [[ -n "${CSC_LINK:-}" || -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
-  echo "   (Developer ID: подпись + notarize при наличии APPLE_*)"
-  npm run --prefix apps/desktop dist:mac
-else
-  echo "   (ad-hoc подпись — без Apple Developer ID)"
-  export CSC_IDENTITY="-"
-  unset CSC_IDENTITY_AUTO_DISCOVERY
-  npm run --prefix apps/desktop dist:mac
-fi
+npm run --prefix apps/desktop dist:mac
 
 echo ""
 echo "Готово. Артефакты:"

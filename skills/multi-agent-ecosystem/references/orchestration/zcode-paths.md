@@ -73,7 +73,7 @@ bash ~/.zcode/commands/scripts/install-skill-discovery.sh
 Then start a **new ZCode chat** (skills are resolved at session bootstrap).
 
 **Fallback (no install):** `commands/start.md` instructs the agent to Read
-`/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/SKILL.md` directly when the Skill tool is unavailable.
+`skills/multi-agent-ecosystem/SKILL.md` directly when the Skill tool is unavailable (or `ZHUR_AI_AGENT_ROOT/skills/multi-agent-ecosystem/SKILL.md`).
 
 ## Path resolution for agents
 

@@ -3,7 +3,7 @@
 **Branch:** B0-8  
 **Migration date:** 2026-06-23  
 **Source root:** `/Users/ndppd/Desktop/git/.cursor/`  
-**Target root:** `skills/multi-agent-ecosystem/` (relative to ZCode plugin root `/Users/ndppd/.zcode/commands/`)
+**Target root:** `skills/multi-agent-ecosystem/` (repo root or `ZHUR_AI_AGENT_ROOT`)
 
 This manifest maps every primary artifact from the Cursor-era `.cursor/` tree into the ZCode `multi-agent-ecosystem` skill layout. Target files may be **pending** until sibling migration branches complete; status is noted per row.
 

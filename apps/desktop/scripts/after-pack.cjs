@@ -18,7 +18,12 @@ async function adhocSignMacApp(appPath) {
   if (!fs.existsSync(appPath)) {
     return
   }
-  if (process.env.CSC_LINK || process.env.APPLE_SIGNING_IDENTITY) {
+  const link = process.env.CSC_LINK
+  const pw = process.env.CSC_KEY_PASSWORD
+  const hasDevSigning =
+    Boolean(process.env.APPLE_SIGNING_IDENTITY) ||
+    (Boolean(link && pw) && (link.includes('BEGIN') || fs.existsSync(link)))
+  if (hasDevSigning) {
     return
   }
   try {
