@@ -830,7 +830,13 @@ export const ja = defineLocale({
     durationSeconds: seconds => `${seconds}秒`,
     durationMinutes: (minutes, seconds) => `${minutes}分 ${seconds}秒`,
     tokensK: k => `${k}k トーク`,
-    tokens: value => `${value} トーク`
+    tokens: value => `${value} トーク`,
+    repoTitle: 'リポジトリエージェント',
+    repoLoading: 'リポジトリエージェントを読み込み中…',
+    repoEmptyHint:
+      'リポジトリエージェントが見つかりません。agents/ を配置するか ZHUR_AI_AGENT_ROOT を設定してください。',
+    repoCount: count => `${count} 件利用可能`,
+    repoFrom: count => `リポジトリから ${count} 件`
   },
 
   commandCenter: {

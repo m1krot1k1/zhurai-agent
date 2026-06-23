@@ -802,7 +802,13 @@ export const zhHant = defineLocale({
     durationSeconds: seconds => `${seconds} 秒`,
     durationMinutes: (minutes, seconds) => `${minutes} 分 ${seconds} 秒`,
     tokensK: k => `${k}k 詞元`,
-    tokens: value => `${value} 詞元`
+    tokens: value => `${value} 詞元`,
+    repoTitle: '倉庫代理',
+    repoLoading: '正在載入倉庫代理…',
+    repoEmptyHint:
+      '未找到倉庫代理。將 agents/ 放入專案，或設定 ZHUR_AI_AGENT_ROOT 指向 zhur.ai-agent。',
+    repoCount: count => `${count} 個可用`,
+    repoFrom: count => `${count} 個來自倉庫`
   },
 
   commandCenter: {
