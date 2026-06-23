@@ -95,12 +95,15 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_PROFILE }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -z "${CSC_LINK:-}" ]; then
-            export CSC_IDENTITY="-"
-            unset CSC_IDENTITY_AUTO_DISCOVERY
+          export CSC_IDENTITY="-"
+          unset CSC_IDENTITY_AUTO_DISCOVERY
+          if [ -n "${CSC_LINK:-}" ]; then
+            unset CSC_IDENTITY
           fi
-          npm run --prefix apps/desktop dist:mac
+          bash scripts/build-desktop-macos.sh
           ls -lh apps/desktop/release/
 
       - name: Создать git tag
