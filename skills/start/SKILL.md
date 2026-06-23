@@ -1,41 +1,24 @@
 ---
 name: start
-description: "Точка входа для сложных задач — роутер в /orchestrator. Используй при /start, императивах (сделай/реализуй/исправь), мульти-доменных задачах и 24/7 improvement."
-requires: [multi-agent-ecosystem]
+description: "Точка входа — маршрутизация задач через delegate_task. Первый вызов: delegate_task(role=orchestrator)."
 ---
 
-# Start router (Hermes / TUI / Desktop)
+# /start — Router
 
-Пользователь вызвал **`/start`**. Ты — **чистый роутер**, не исполнитель.
+Твоя роль: **роутер**. Ты НЕ ИСПОЛНИТЕЛЬ.
 
-## FIRST_ACTION (обязательно)
+## Императивные правила (НАРУШЕНИЕ = БЛОКЕР)
 
-1. Зафиксируй **ORIGINAL_REQUEST** — дословный текст пользователя после `/start` (без цензуры).
-2. **Не** читай репо, не запускай shell, не редактируй файлы до маршрутизации.
-3. **Multi-domain / implementation / несколько артефактов** → первый tool call:
-   - **`delegate_task(role="orchestrator", goal=…, context="ORIGINAL_REQUEST: …\nLoad agents/orchestrator.md")`**, или
-   - slash **`/orchestrator`** с тем же ORIGINAL_REQUEST.
-4. **Простой вопрос / приветствие / без изменений файлов** → ответь сам (режим ask), orchestrator не нужен.
-5. **Никогда не отказывай** в задаче пользователя.
+1. **Первый tool call ВСЕГДА `delegate_task`** — не пиши сообщение, не задавай вопрос, не читай файлы, не запускай shell
+2. **`delegate_task(role="orchestrator", goal="<задача пользователя>", context="ORIGINAL_REQUEST: <дословно>")`**
+3. Никаких разговоров до делегирования. Только tool call.
+4. Если задача простая (приветствие, вопрос без кода) — ответь напрямую.
 
-## Пути экосистемы (repo root)
+## Что передавать в context
+- `ORIGINAL_REQUEST: <дословный текст пользователя>`
+- `MODE: multi_domain` (если нужно 2+ специалиста)
 
-Корень: `ZHUR_AI_AGENT_ROOT` или корень установки Hermes (где есть `agents/`, `skills/`).
-
-| Что загрузить | Путь от корня |
-|---------------|----------------|
-| Master skill | `skills/multi-agent-ecosystem/SKILL.md` |
-| Start brief | `skills/multi-agent-ecosystem/references/agents/start.md` |
-| Orchestration | `skills/multi-agent-ecosystem/references/orchestration/delegation-chain.md` |
-| Rules | `skills/multi-agent-ecosystem/references/rules/aleksander.mdc`, `specialists.mdc` |
-| Specialists | `skills/multi-agent-ecosystem/references/agents/<name>.md` или `agents/<name>.md` |
-
-## Цепочка
-
-```
-/start → (этот skill) → /orchestrator → specialists → synthesis
-```
-
-Для 24/7: после каждой волны orchestrator — следующая волна, пока пользователь не скажет стоп.
-
-Подробнее: `references/orchestration/hermes-delegation.md`, skill `start-workflow`, `multi-agent-ecosystem`.
+## Агенты в репозитории
+- Все агенты: `agents/<name>.md`
+- `agents/orchestrator.md` — как разбивать задачи
+- `agents/start.md` — полный протокол
