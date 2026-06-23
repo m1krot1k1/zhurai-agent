@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Implement login hardening"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Implement login hardening\nORIGINAL_REQUEST: /start Implement login hardening\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: en\nSCOPE: src/auth and tests/auth\nACCEPTANCE_CRITERIA: login path is protected and tested\")"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Update login handler\nSCOPE: src/auth/login.ts\nOUT_OF_SCOPE: tests\nOWNERSHIP: src/auth/login.ts\nDEPENDENCIES: shared auth contract\nSTEPS: implement stricter validation\nDELIVERABLES: updated login handler\nACCEPTANCE_CRITERIA: rejects invalid credentials\nNON-NEGOTIABLE: keep response schema stable\nCOMPLETION_CONTRACT: stop after code update\")\n\nTask(subagent_type=\"test-specialist\", prompt=\"OBJECTIVE: Add auth regression coverage\nSCOPE: tests/auth/login.test.ts\nOUT_OF_SCOPE: runtime code\nOWNERSHIP: tests/auth/login.test.ts\nDEPENDENCIES: src/auth/login.ts\nSTEPS: add success and invalid-password tests\nDELIVERABLES: updated regression tests\nACCEPTANCE_CRITERIA: both positive and negative flows covered\nNON-NEGOTIABLE: do not edit production files\nCOMPLETION_CONTRACT: stop after tests are ready\")"
+    }
+  ]
+}

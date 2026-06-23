@@ -1,0 +1,32 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Run this as a swarm and keep coordinating until the acceptance criteria are met"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Run a supervised swarm-style execution\nORIGINAL_REQUEST: /start Run this as a swarm and keep coordinating until the acceptance criteria are met\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: en\nEXPECTATION: return COMPLETION_CONTRACT\")"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Run a supervised swarm-style execution\nORIGINAL_REQUEST: /start Run this as a swarm and keep coordinating until the acceptance criteria are met\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\nEXECUTION_STYLE: B0 supervisor\nACCEPTANCE_CRITERIA: nested branches coordinate safely with explicit ownership\")"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: pause\nruntime_boundary: turn_boundary\npause_reason: PAUSED_FOR_RUNTIME_BUDGET\nwatchdog:\n  retry_attempt: 1\n  retry_backoff_seconds: 3\n  no_progress_waves: 0\n  no_progress_limit: 2\norchestrator_summary: Wave 1 created a safe swarm layout with explicit ownership.\nnet_new_evidence:\n  - delegation tree established\n  - ownership boundaries remain disjoint\nresume_packet: run one more supervised wave and keep refining until steady_state\nrecommended_action: continue"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Continue supervised swarm execution\nORIGINAL_REQUEST: /start Run this as a swarm and keep coordinating until the acceptance criteria are met\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 2\nCONTINUATION_PACKET: run one more supervised wave and keep refining until steady_state\nEXECUTION_STYLE: B0 supervisor\nACCEPTANCE_CRITERIA: nested branches continue safely with explicit ownership\")"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Backend subtree\nSCOPE: API and persistence\nOUT_OF_SCOPE: frontend\nOWNERSHIP: src/backend/**\nDEPENDENCIES: none\nSTEPS: coordinate backend implementation safely\nDELIVERABLES: backend subtree synthesis\nACCEPTANCE_CRITERIA: backend branch coordinates its own child work\nNON-NEGOTIABLE: narrower subtree only\nCOMPLETION_CONTRACT: stop after backend subtree synthesis\")\n\nTask(subagent_type=\"frontend-specialist\", prompt=\"OBJECTIVE: Frontend subtree\nSCOPE: app shell and styles\nOUT_OF_SCOPE: backend\nOWNERSHIP: src/ui/App.tsx, src/ui/app.css\nDEPENDENCIES: none\nSTEPS: coordinate UI implementation\nDELIVERABLES: updated UI files\nACCEPTANCE_CRITERIA: UI subtree lands with disjoint ownership\nNON-NEGOTIABLE: keep backend untouched\nCOMPLETION_CONTRACT: stop after frontend subtree synthesis\")"
+    },
+    {
+      "speaker": "frontend-specialist",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: App shell\nSCOPE: React shell only\nOUT_OF_SCOPE: CSS\nOWNERSHIP: src/ui/App.tsx\nDEPENDENCIES: none\nSTEPS: implement shell structure\nDELIVERABLES: updated app shell\nACCEPTANCE_CRITERIA: shell changes land in App.tsx\nNON-NEGOTIABLE: do not edit CSS\nCOMPLETION_CONTRACT: stop after shell implementation\")\n\nTask(subagent_type=\"code\", prompt=\"OBJECTIVE: Styles\nSCOPE: CSS only\nOUT_OF_SCOPE: TSX\nOWNERSHIP: src/ui/app.css\nDEPENDENCIES: none\nSTEPS: implement styling\nDELIVERABLES: updated CSS\nACCEPTANCE_CRITERIA: style changes land in app.css\nNON-NEGOTIABLE: do not edit TSX\nCOMPLETION_CONTRACT: stop after style implementation\")"
+    }
+  ]
+}

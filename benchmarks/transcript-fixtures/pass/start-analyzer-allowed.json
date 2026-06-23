@@ -1,0 +1,8 @@
+{
+  "messages": [
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"start\", prompt=\"ANALYZER ROLE ONLY\nOBJECTIVE: compare deliverables vs acceptance criteria\nSCOPE: verdict only\nDELIVERABLES: done or continue verdict\nNON-NEGOTIABLE: analyzer only, no rerouting\")"
+    }
+  ]
+}

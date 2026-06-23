@@ -1,0 +1,140 @@
+---
+description: Правила для Agent Manager — протоколы создания, обновления и управления жизненным циклом агентов в экосистеме (ZCode: load on demand per SKILL.md routing)
+---
+
+> **ZCode loading**: load when relevant per master `SKILL.md` routing — not auto-injected at skill install. On-demand only.
+
+> **ZCode delegation**: `Task(subagent_type=...)` in this file maps to `/orchestrator`, specialist slash commands, or sub-sessions per `../orchestration/delegation-chain.md`. `Task()` tool is **not assumed** in ZCode runtime.
+
+
+# Agent Manager Rules
+
+## Purpose
+Rules governing the Agent Manager agent and its operations within the agent ecosystem.
+
+### Primary Functions
+- Define agent creation and modification protocols
+- Establish agent lifecycle management procedures
+- Govern agent capability evolution and specialization
+- Ensure consistency across agent implementations
+
+## Creation & Modification Protocol
+
+### Security Requirements
+1. All agent management operations require authentication and authorization
+2. Role-based access control (RBAC) governs all operations
+3. Cryptographic signatures verify system integrity
+4. Goal integrity checks prevent hijacking attacks
+5. All operations require appropriate permissions based on sensitivity
+
+### Agent Blueprint Requirements
+1. Must include clear objective and scope definition
+2. Requires defined capabilities and limitations
+3. Must specify delegation patterns and relationships
+4. Requires output format specification
+5. Must document dependencies and integration points
+
+### Naming Convention
+- Single purpose: `agent-name` (e.g., `debug`, `code-reviewer`)
+- Multi-purpose: `domain-specialist` (e.g., `frontend-specialist`, `database-specialist`)
+- Ecosystem management: `meta-agent-{function}` (e.g., `meta-agent-architect`)
+
+## Modification Protocol
+
+### Versioning
+- Major version change: API/contract breaking changes
+- Minor version change: New capabilities, backward compatible
+- Patch version change: Bug fixes, documentation updates
+
+### Backward Compatibility
+- Must maintain existing delegation patterns
+- Cannot remove existing capabilities without deprecation period
+- Must provide migration path for deprecated features
+
+## Authentication & Authorization
+
+### Role-Based Access Control (RBAC)
+- Define roles with specific permissions for agent management
+- Implement hierarchical role structure: Admin, Editor, Viewer
+- Admin: Full access to create, modify, delete agents
+- Editor: Create and modify agents, cannot delete
+- Viewer: Read-only access to agent specifications
+
+### Permission System
+- agent.create: Create new agents
+- agent.update: Modify existing agents
+- agent.delete: Delete agents (requires dual approval)
+- agent.read: View agent specifications
+- system.config: Modify system-level configurations
+
+### Authentication Requirements
+- All agent management operations require valid authentication token
+- Tokens must be cryptographically signed and have limited lifespan
+- Multi-factor authentication required for admin operations
+- All authentication attempts logged for audit purposes
+
+## Ownership and Delegation
+
+### Exclusive Ownership
+- `../agents/{name}.md`: Agent specification
+- `./{name}/`: Agent-specific rules
+- `../skills/{name}/`: Agent-specific skills
+
+### Delegation Rules
+- Agent creation: `../skills/subagent-factory` (requires agent.create permission)
+- Agent updates: `agent-architect` (requires agent.update permission)
+- Agent deprecation: `agent-manager` + `orchestrator` (requires agent.delete and dual approval)
+
+## Security Controls
+
+### Goal Integrity Verification
+- All system prompts must be cryptographically signed
+- Goal integrity checks at each planning step verify alignment with original objectives
+- System instructions isolated from user-supplied content
+- Monitor for goal drift by comparing current actions against signed objectives
+- Reject any operations that deviate from approved goals without explicit approval
+
+### System Protection
+- Signed system prompts cannot be overridden by user input
+- Parameterized tool inputs prevent injection attacks
+- Allow-lists for tool parameters with valid ranges and formats
+- Tool-level authorization validates permissions independently
+- Sandboxed execution environment with principle of least privilege
+- Validate and sanitize all outputs before consumption
+- Structured output formats with JSON schema validation
+
+## Quality Gates
+
+### Pre-Creation Checklist
+- [ ] Clear use case justification
+- [ ] No existing agent can fulfill the requirement
+- [ ] Well-defined scope and boundaries
+- [ ] Documented capabilities and limitations
+- [ ] Integration plan with existing agents
+- [ ] Security review completed
+- [ ] Appropriate permissions identified
+
+### Pre-Modification Checklist
+- [ ] Impact assessment on existing workflows
+- [ ] Backward compatibility analysis
+- [ ] Migration path definition
+- [ ] Deprecation plan for removed features
+- [ ] Documentation update plan
+- [ ] Security implications analyzed
+- [ ] Permission changes documented
+
+## Anti-Patterns
+
+### Forbidden Practices
+- Creating agents for one-off tasks
+- Duplicating existing agent capabilities
+- Overlapping ownership with other agents
+- Creating circular dependencies between agents
+- Violating backward compatibility without proper deprecation
+
+### Code Smells
+- Agents with too broad capabilities (God objects)
+- Agents with overlapping responsibilities
+- Agents without clear ownership boundaries
+- Agents without proper versioning strategy
+- Agents without documented deprecation policy

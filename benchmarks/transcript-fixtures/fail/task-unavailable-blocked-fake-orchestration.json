@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "speaker": "orchestrator",
+      "text": "MULTI_AGENT_PIPELINE_BLOCKED: Task tool unavailable in this runtime."
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Executing the orchestration plan ourselves and running validators."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "messages": [
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Branch 1\nOWNERSHIP: src/a.ts\nDEPENDENCIES: none\")\nTask(subagent_type=\"frontend-specialist\", prompt=\"OBJECTIVE: Branch 2\nOWNERSHIP: web/a.tsx\nDEPENDENCIES: none\")\nTask(subagent_type=\"test-specialist\", prompt=\"OBJECTIVE: Branch 3\nOWNERSHIP: tests/a.test.ts\nDEPENDENCIES: src/a.ts\")\nTask(subagent_type=\"docs-specialist\", prompt=\"OBJECTIVE: Branch 4\nOWNERSHIP: docs/a.md\nDEPENDENCIES: none\")\nTask(subagent_type=\"database-specialist\", prompt=\"OBJECTIVE: Branch 5\nOWNERSHIP: db/migrations/001.sql\nDEPENDENCIES: none\")\nTask(subagent_type=\"devops-specialist\", prompt=\"OBJECTIVE: Branch 6\nOWNERSHIP: .github/workflows/a.yml\nDEPENDENCIES: none\")\nTask(subagent_type=\"mobile-specialist\", prompt=\"OBJECTIVE: Branch 7\nOWNERSHIP: mobile/a.swift\nDEPENDENCIES: none\")"
+    }
+  ]
+}

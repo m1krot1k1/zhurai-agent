@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Продолжай улучшение 24/7, пока не скажу стоп"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Продолжай улучшение 24/7, пока не скажу стоп\nORIGINAL_REQUEST: /start Продолжай улучшение 24/7, пока не скажу стоп\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: ru\nPARENT_TASK_RELAY_ALLOWED: yes\nEXPECTATION: return status: pause with pause_reason: RELAY_REQUIRED and resume_packet or COMPLETION_CONTRACT\")"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\n  status: pause\n  pause_reason: RELAY_REQUIRED\n  orchestrator_summary: relay required before execution\n  net_new_evidence:\n    - nested Task unavailable inside orchestrator runtime\n    - zero-repo-touch contract preserved\n  proxy_orchestrator_packet: |\n    RELAY_MODE: root_task_proxy\n    CONTINUOUS_MODE: until_user_stop\n    WAVE_NUMBER: 1\n    ORIGINAL_REQUEST: /start Продолжай улучшение 24/7, пока не скажу стоп\n    CONTINUATION_PACKET: none\n    RESPONSE_LANGUAGE: ru\n    OWNERSHIP: orchestrator refines exact paths\n    DEPENDENCIES: none\n  resume_packet: tighten acceptance criteria after relayed wave\n  recommended_action: relay_orchestrator"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"RELAY_MODE: root_task_proxy\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\nORIGINAL_REQUEST: /start Продолжай улучшение 24/7, пока не скажу стоп\nCONTINUATION_PACKET: none\nRESPONSE_LANGUAGE: ru\nOWNERSHIP: orchestrator refines exact paths\nDEPENDENCIES: none\")"
+    }
+  ]
+}

@@ -1,0 +1,869 @@
+{
+  "scenarios": [
+    {
+      "id": "start_single_hop",
+      "description": "Root start delegates directly to orchestrator (no worker-start). Worker-start remains deprecated as legacy routing drift; the active canon is a flat handoff from root start into orchestrator.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "Task\\(subagent_type=\\\"orchestrator\\\""
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "НАПРЯМУЮ"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Worker-start.*УДАЛЁН|worker.*УДАЛЁН|DEPRECATED"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "MUST NOT.*Task\\(orchestrator\\)"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "УПЛОЩЁННАЯ"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "Task\\(orchestrator.*НАПРЯМУЮ|orchestrator.*НАПРЯМУЮ"
+        },
+        {
+          "file": "skills/start-workflow/SKILL.md",
+          "pattern": "root-start вызывает orchestrator НАПРЯМУЮ|flat-chain|flat.chain"
+        },
+        {
+          "file": "docs/start-workflow.md",
+          "pattern": "Task\\(orchestrator.*directly|launches .*Task\\(orchestrator"
+        },
+        {
+          "file": "docs/quick-start-orchestration.md",
+          "pattern": "Task\\(orchestrator, ORIGINAL_REQUEST"
+        }
+      ],
+      "forbidden_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "Task\\(subagent_type=\\\"code\\\""
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "STRUCTURAL PRE-FLIGHT"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "AGENT COUNCIL"
+        },
+        {
+          "file": "skills/start-workflow/SKILL.md",
+          "pattern": "Cursor не даёт `Task` tool вложенным subagent'ам|Worker не имеет Task tool"
+        },
+        {
+          "file": "docs/start-workflow.md",
+          "pattern": "Cursor does not give the `Task` tool to nested subagents"
+        },
+        {
+          "file": "docs/autonomous-task-with-verification.md",
+          "pattern": "Cursor не отдаёт инструмент `Task`"
+        },
+        {
+          "file": "docs/autonomous-self-improvement-loop.md",
+          "pattern": "Cursor не даёт инструмент `Task`"
+        }
+      ]
+    },
+    {
+      "id": "start_relay_mode_documented",
+      "description": "Legacy worker-start mode is deprecated. Root-start calls orchestrator directly.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "DEPRECATED|УДАЛЁН"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "Worker-start УДАЛЁН|worker.*УДАЛЁН"
+        }
+      ]
+    },
+    {
+      "id": "orchestrator_child_relay_documented",
+      "description": "Orchestrator relay pattern is documented. When orchestrator lacks Task, it reports MULTI_AGENT_PIPELINE_BLOCKED.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        }
+      ]
+    },
+    {
+      "id": "orchestrator_never_self_executes",
+      "description": "Orchestrator remains a coordinator: direct execution applies only to leaf specialists, `.plan/**` updates are delegated, and git merges stay delegated rather than hands-on supervisor work.",
+      "required_regex": [
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "ЖЕСТКО ЗАПРЕЩЕНО ВЫПОЛНЯТЬ РАБОТУ САМОСТОЯТЕЛЬНО"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "не для orchestrator/supervisor"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "hands-on mode не переключается"
+        },
+        {
+          "file": "skills/project-plan-dot-plan/SKILL.md",
+          "pattern": "не пишет `\\.plan/napravlenie-\\*\\.md` сам"
+        },
+        {
+          "file": "skills/caid-worktrees/SKILL.md",
+          "pattern": "devops-specialist"
+        },
+        {
+          "file": "skills/caid-worktrees/SKILL.md",
+          "pattern": "не orchestrator напрямую"
+        }
+      ],
+      "forbidden_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "при глубине 10 уровней делегирования — стоп, выполнять напрямую"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "При 0 — execute directly"
+        },
+        {
+          "file": "skills/project-plan-dot-plan/SKILL.md",
+          "pattern": "Orchestrator пишет `\\.plan/napravlenie-\\*\\.md`"
+        },
+        {
+          "file": "skills/caid-worktrees/SKILL.md",
+          "pattern": "Sequential merge в main branch"
+        }
+      ]
+    },
+    {
+      "id": "canonical_runtime_contour_documented",
+      "description": "Runtime contour must use status approval|pause|blocked|resume, the canonical approval/execution pair, and explicit resume_packet -> CONTINUATION_PACKET translation.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "approval \\| blocked \\| pause \\| resume"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "status: pause.*resume_packet|resume_packet"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "approval.*blocked.*pause.*resume"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "approval_state.*execution_state"
+        },
+        {
+          "file": "docs/start-workflow.md",
+          "pattern": "\"status\": \"approval\\|pause\\|blocked\\|resume\"|status.*approval\\|pause\\|blocked\\|resume"
+        },
+        {
+          "file": "docs/start-workflow.md",
+          "pattern": "resume_packet.*CONTINUATION_PACKET|CONTINUATION_PACKET.*resume_packet"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "resume_packet.*CONTINUATION_PACKET|CONTINUATION_PACKET.*resume_packet"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "resume_packet"
+        },
+        {
+          "file": "skills/delegation-contracts/SKILL.md",
+          "pattern": "status: approval\\|pause\\|blocked\\|resume"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "Agreed.*approval_state=approved.*execution_state=paused|Agreed.*paused"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "Review.*approval_state=requested.*execution_state=paused|Review.*requested.*paused"
+        }
+      ],
+      "forbidden_regex": [
+        {
+          "file": "skills/delegation-contracts/SKILL.md",
+          "pattern": "status: done\\|rework\\|blocked\\|aborted"
+        }
+      ]
+    },
+    {
+      "id": "coding_guardrails_documented",
+      "description": "Coding tasks must surface ambiguity, prefer the simplest scoped change, avoid speculative abstractions/dependencies, and verify against explicit success criteria.",
+      "required_paths": [
+        "rules/coding-guardrails.mdc"
+      ],
+      "required_regex": [
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "coding-guardrails\\.mdc"
+        },
+        {
+          "file": "rules/coding-guardrails.mdc",
+          "pattern": "implementation, debugging, refactor, test-writing"
+        },
+        {
+          "file": "rules/coding-guardrails.mdc",
+          "pattern": "Не выбирай молча"
+        },
+        {
+          "file": "rules/coding-guardrails.mdc",
+          "pattern": "Не добавляй новые абстракции, конфиг, расширяемость или зависимости без явного запроса"
+        },
+        {
+          "file": "rules/coding-guardrails.mdc",
+          "pattern": "Трогай только файлы и строки, которые нужны для запроса"
+        },
+        {
+          "file": "rules/coding-guardrails.mdc",
+          "pattern": "проверяемый success criterion"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "не выбирай молча"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "самый простой diff"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "абстракции, конфиг или зависимости без запроса"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "проверяемый success criterion"
+        }
+      ]
+    },
+    {
+      "id": "same_type_delegation_enabled",
+      "description": "Same-type delegation is allowed only with narrowing and anti-loop controls.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Same-type delegation is ALLOWED"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "strictly narrower"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Same-type chain soft cap: 3 levels"
+        }
+      ]
+    },
+    {
+      "id": "parallel_writer_safety",
+      "description": "Parallel write branches require explicit ownership and conflict avoidance. Reader branches are exempt from limits.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Parallel writer safety"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "OWNERSHIP"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "disjoint"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Reader.*не считаются writers|Reader.*без лимита"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "Local Coordination & Smart Delegation"
+        }
+      ]
+    },
+    {
+      "id": "large_same_type_fanout_escalates",
+      "description": "Large writer fan-out (3+) escalates to orchestrator. Reader branches are exempt from this limit.",
+      "required_regex": [
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "3\\+.*parallel.*writer.*children.*orchestrator"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "3\\+.*writer|writer.*orchestrator|ESCALATE.*orchestrator"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Reader.*без лимита|Reader.*не ограничен|Reader.*exempt"
+        }
+      ]
+    },
+    {
+      "id": "ownership_and_dependencies_in_contracts",
+      "description": "Delegation contracts must include ownership and dependency sections.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "`OWNERSHIP`"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "`DEPENDENCIES`"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "`OWNERSHIP`"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "`DEPENDENCIES`"
+        }
+      ]
+    },
+    {
+      "id": "optional_profile_isolated",
+      "description": "Project-specific pentest profile is isolated from universal core.",
+      "required_paths": [
+        "profiles/msnmp/agents/pentest-pipeline.md",
+        "profiles/msnmp/rules/pentest-pipeline.mdc"
+      ],
+      "missing_paths": [
+        "agents/pentest-pipeline.md",
+        "rules/pentest-pipeline.mdc"
+      ]
+    },
+    {
+      "id": "council_for_core_rule_changes",
+      "description": "Core rule changes still require council/judge logic.",
+      "required_regex": [
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "Agent Council"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Agent Council Protocol"
+        }
+      ]
+    },
+    {
+      "id": "task_unavailable_blocks_or_marks_degraded",
+      "description": "If Task is unavailable the system must hard-fail with MULTI_AGENT_PIPELINE_BLOCKED.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "HARD FAIL.*MULTI_AGENT_PIPELINE_BLOCKED|MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        }
+      ]
+    },
+    {
+      "id": "degraded_mode_forbidden_for_start_swarm_open_ended",
+      "description": "Single-agent degraded mode is forbidden everywhere. SINGLE_AGENT_FALLBACK/DEGRADED_MODE are banned.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "SINGLE_AGENT.*ЗАПРЕЩЁН|ЗАПРЕЩЁН.*SINGLE_AGENT"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "SINGLE_AGENT.*ЗАПРЕЩЕН|ЗАПРЕЩЕН.*SINGLE_AGENT"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "SINGLE_AGENT_FALLBACK|MULTI_AGENT_PIPELINE_BLOCKED"
+        }
+      ]
+    },
+    {
+      "id": "autonomous_self_improvement_loop_documented",
+      "description": "Multi-iteration autonomous self-improvement spiral for this repo is documented (orchestrator-owned; start as analyzer only).",
+      "required_paths": [
+        "docs/autonomous-self-improvement-loop.md"
+      ],
+      "required_regex": [
+        {
+          "file": "docs/autonomous-self-improvement-loop.md",
+          "pattern": "run-full-repo-benchmark"
+        },
+        {
+          "file": "docs/autonomous-self-improvement-loop.md",
+          "pattern": "ENTRY_MODE: analyzer_only"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "docs/autonomous-self-improvement-loop\\.md"
+        }
+      ]
+    },
+    {
+      "id": "swarm_supervisor_mode_documented",
+      "description": "Swarm/24-7 mode: root-start calls orchestrator directly in a loop for each wave.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "until_user_stop|24/7"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "while True|WAVE_NUMBER"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "24/7|until_user_stop"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Swarm|supervisor"
+        }
+      ]
+    },
+    {
+      "id": "open_ended_until_stop_cannot_stop_on_micro_packet",
+      "description": "Open-ended improvement: closing a micro-packet is not enough to stop the 24/7 cycle.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "micro.?packet.*НЕ стоп|НЕ.*стоп.*micro.?packet|закрытие.*micro.?packet"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "OPEN_ENDED_IMPROVEMENT"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "micro.?packet|open.?ended"
+        }
+      ]
+    },
+    {
+      "id": "mandatory_web_before_implementation_and_council",
+      "description": "Web fact-pass is mandatory before non-trivial implementation and Council consumes one shared cited fact-pack.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "web.*fact.?pass.*mandatory|mandatory.*web.*fact.?pass|Web.*fact.?pass.*mandatory"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "web_research"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "UNTRUSTED_EXTERNAL"
+        }
+      ]
+    },
+    {
+      "id": "start_full_force_completion_hardening",
+      "description": "Default /start full-force profile includes anti-underdelivery ledger, claim/evidence mapping, and challenge-pass requirements.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "delivery_ledger"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "claim_to_evidence"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "challenge-pass"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Completion debt gate"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Claim-to-evidence matrix"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Web noise budget"
+        }
+      ]
+    },
+    {
+      "id": "agent_registry_completeness",
+      "description": "Registry-facing agents must be registered in rules/specialists.mdc routing table and agents/README.md.",
+      "required_regex": [
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "benchmark-specialist"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "agent-manager"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "rules-specialist"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "skills-specialist"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "profile-manager"
+        },
+        {
+          "file": "agents/README.md",
+          "pattern": "benchmark-specialist"
+        },
+        {
+          "file": "agents/README.md",
+          "pattern": "agent-manager"
+        }
+      ]
+    },
+    {
+      "id": "branch_count_cap_before_suborchestrator",
+      "description": "When fan-out exceeds 6 branches, orchestrator must restructure into sub-orchestrators before delegation.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "branches.*>.*6|6.*branches|fan.out.*sub.orchestrator|sub.orchestrator.*branches"
+        }
+      ]
+    },
+    {
+      "id": "vcs_preflight_cross_platform",
+      "description": "VCS preflight script must exist in all three platform versions: .sh, .py, .ps1.",
+      "required_paths": [
+        "scripts/iteration-vcs-preflight.sh",
+        "scripts/iteration-vcs-preflight.py",
+        "scripts/iteration-vcs-preflight.ps1"
+      ]
+    },
+    {
+      "id": "policy_encoding_utf8_canonical",
+      "description": "Core policy text is stored as valid UTF-8 and encoding checks are wired into the benchmark pipeline.",
+      "required_paths": [
+        "scripts/check-policy-encoding.py"
+      ],
+      "required_regex": [
+        {
+          "file": "scripts/check-policy-encoding.py",
+          "pattern": "encoding=\\\"utf-8\\\""
+        },
+        {
+          "file": "scripts/check-policy-encoding.py",
+          "pattern": "MOJIBAKE_TOKENS"
+        },
+        {
+          "file": "scripts/README.md",
+          "pattern": "check-policy-encoding"
+        },
+        {
+          "file": "docs/security-governance-checklist.md",
+          "pattern": "check-policy-encoding"
+        }
+      ]
+    },
+    {
+      "id": "profile_isolation_enforced",
+      "description": "Profile-specific agents must not appear in core agents/ registry and must have their own profiles/ subtree.",
+      "required_paths": [
+        "profiles/msnmp/agents/pentest-pipeline.md",
+        "profiles/msnmp/rules/pentest-pipeline.mdc"
+      ],
+      "missing_paths": [
+        "agents/pentest-pipeline.md",
+        "rules/pentest-pipeline.mdc"
+      ]
+    },
+    {
+      "id": "code_auto_orchestrates",
+      "description": "code agent must document conditions under which it delegates to orchestrator (multi-domain spans, 3+ artifacts).",
+      "required_regex": [
+        {
+          "file": "agents/code.md",
+          "pattern": "orchestrat|AUTO-ORCHESTRAT|delegate.*orchestrator|orchestrator.*delegate"
+        }
+      ]
+    },
+    {
+      "id": "start_first_action_gate",
+      "description": "Root start first tool call must be Task(orchestrator). Zero tool calls before it.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "FIRST_ACTION"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Task\\(subagent_type=\\\"orchestrator\\\""
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "НОЛЬ|ЗАПРЕЩЕНО.*Read|НЕЛЬЗЯ читать"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "FIRST_ACTION"
+        }
+      ]
+    },
+    {
+      "id": "fake_delegation_anti_pattern",
+      "description": "Fake delegation and 'no Task — work directly' anti-patterns are documented and forbidden.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "ФЕЙКОВАЯ ДЕЛЕГАЦИЯ|фейковой делегации|Fake Delegation"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Нет инструмента Task.*выполняем.*напрямую|a55edd5d"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "FAKE_DELEGATION_DETECTED"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Нет Task.*делаем сами|a55edd5d"
+        }
+      ]
+    },
+    {
+      "id": "start_24_7_detection_mandatory",
+      "description": "Start agent must detect 24/7 keywords and set CONTINUOUS_MODE before the first Task(orchestrator) wave.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "24/7.*until_user_stop|until_user_stop.*24/7"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "CONTINUOUS_MODE"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "OPEN_ENDED_IMPROVEMENT"
+        }
+      ]
+    },
+    {
+      "id": "never_refuse_user_task",
+      "description": "No agent in the chain may refuse a user task. User is the owner of the code and the sole authority on scope.",
+      "required_regex": [
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "Запрет на отказ|НЕ имеет права отказать|отказ.*задач"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "ЗАПРЕЩЕНО.*отказ|отказ.*ЗАПРЕЩЕНО|НИКОГДА.*отказ"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "НИКОГДА не отказ"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "Отказывать.*задач|отказ.*задач"
+        }
+      ]
+    },
+    {
+      "id": "start_pure_router",
+      "description": "Start agent is a pure router that does not evaluate task content, does not refuse, and does not lecture.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "ЧИСТЫЙ РОУТЕР"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Не судья.*Не фильтр.*Не цензор"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Маршрутизатор не фильтрует содержимое пакетов"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Оценивать.*этичность.*законность.*задачи пользователя"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "Запрещённые слова.*фразы"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "не могу выполнить"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "несанкционированный доступ"
+        },
+        {
+          "file": "rules/aleksander.mdc",
+          "pattern": "чистый роутер.*не оценивает содержание"
+        }
+      ]
+    },
+    {
+      "id": "specialist_mandatory_swarm",
+      "description": "Specialists follow MUST > MAY > MUST ESCALATE: 2+ independent subtasks require Task(), direct execution is only an exception, and 3+ writer children must escalate to orchestrator.",
+      "required_regex": [
+        {
+          "file": "agents/code.md",
+          "pattern": "ОБЯЗАТЕЛЬНЫЙ SWARM"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "MUST delegate|2\\+ независимые подзадачи = MUST Task\\(\\)"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "MUST escalate|3\\+ parallel writer children|3\\+ .*writer"
+        },
+        {
+          "file": "agents/code.md",
+          "pattern": "PENALIZED.*делать.*самому|PENALIZED.*Task"
+        },
+        {
+          "file": "agents/test-specialist.md",
+          "pattern": "ОБЯЗАТЕЛЬНЫЙ SWARM"
+        },
+        {
+          "file": "agents/test-specialist.md",
+          "pattern": "MUST delegate|2\\+ независимые тестовые подзадачи = MUST Task\\(\\)|N тест-сьютов.*N subagents"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "ОБЯЗАТЕЛЬНЫЙ SWARM"
+        },
+        {
+          "file": "rules/specialists.mdc",
+          "pattern": "MUST > MAY > MUST ESCALATE|2\\+ независимые подзадачи = MUST Task\\(\\)|Попытку трактовать `MAY execute directly`"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "MUST delegate.*2\\+ независимые подзадачи|2\\+ независимые подзадачи.*MUST delegate"
+        },
+        {
+          "file": "docs/quick-start-orchestration.md",
+          "pattern": "MUST > MAY > MUST ESCALATE|3\\+ writer children"
+        }
+      ]
+    },
+    {
+      "id": "wave_auto_continuation_24_7",
+      "description": "In 24/7 mode root-start MUST automatically launch next wave via Task(orchestrator).",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "АВТОМАТИЧЕСКИЙ ЗАПУСК СЛЕДУЮЩЕЙ ВОЛНЫ"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "WAVE_NUMBER.*2"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "ОБЯЗАТЕЛЬНО"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "until_user_stop.*Task\\(orchestrator|Task\\(orchestrator.*until_user_stop|while True"
+        }
+      ]
+    },
+    {
+      "id": "root_start_no_tools_after_delegation",
+      "description": "Root-start must not run Read/Grep/Shell after orchestrator returns. Only relay results or launch next wave.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "ЗАПРЕЩЕНО.*Read.*Grep.*Shell.*ПОСЛЕ|ЗАПРЕЩЕНО.*Grep.*Glob.*Shell.*Read.*ПОСЛЕ|ПОСЛЕ.*делегирования"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "ПОСЛЕ.*результат|результат.*ТОЛЬКО"
+        }
+      ]
+    },
+    {
+      "id": "no_single_agent_fallback_ever",
+      "description": "SINGLE_AGENT_FALLBACK is forbidden everywhere. 'No Task — work directly' phrase is a critical failure.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "SINGLE_AGENT.*ЗАПРЕЩЁН|ЗАПРЕЩЁН.*SINGLE_AGENT|MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "SINGLE_AGENT.*ЗАПРЕЩЕН|ЗАПРЕЩЕН.*SINGLE_AGENT|MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "agents/orchestrator.md",
+          "pattern": "MULTI_AGENT_PIPELINE_BLOCKED"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Нет Task.*HARD FAIL|HARD FAIL.*Нет Task|НЕТ TASK.*HARD FAIL"
+        }
+      ]
+    },
+    {
+      "id": "worker_start_deprecated",
+      "description": "Worker-start is not used in flat chain. Root-start calls Task(orchestrator) directly.",
+      "required_regex": [
+        {
+          "file": "agents/start.md",
+          "pattern": "УДАЛЁН|не входит в цепочку|не используется|лишний hop"
+        },
+        {
+          "file": "agents/start.md",
+          "pattern": "Task\\(orchestrator\\)|Task\\(subagent_type=.orchestrator"
+        },
+        {
+          "file": "docs/delegation-chain.md",
+          "pattern": "УДАЛЁН|flat.chain|НАПРЯМУЮ|лишний hop"
+        },
+        {
+          "file": "rules/orchestrator-core.mdc",
+          "pattern": "flat.chain|НАПРЯМУЮ|лишний hop|без промежуточн"
+        }
+      ],
+      "forbidden_regex": []
+    }
+  ]
+}

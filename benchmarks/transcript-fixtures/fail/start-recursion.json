@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Redesign dashboard"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Redesign dashboard\nORIGINAL_REQUEST: /start Redesign dashboard\nCONTINUOUS_MODE: single_wave\nWAVE_NUMBER: 1\")"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Redesign dashboard\nORIGINAL_REQUEST: /start Redesign dashboard\nCONTINUOUS_MODE: single_wave\nWAVE_NUMBER: 1\nSCOPE: dashboard surfaces\nACCEPTANCE_CRITERIA: coordinated plan exists\")"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Open another root routing cycle and plan everything from scratch\nORIGINAL_REQUEST: /start Redesign dashboard\")"
+    }
+  ]
+}

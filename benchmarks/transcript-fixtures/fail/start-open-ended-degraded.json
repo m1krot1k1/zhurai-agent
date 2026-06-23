@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: выполни векторы улучшений и продолжай работать 24/7\nORIGINAL_REQUEST: /start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7\nCONTINUOUS_MODE: until_user_stop\nOPEN_ENDED_IMPROVEMENT: yes\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: ru\")"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: выполни векторы улучшений и продолжай работать 24/7\nORIGINAL_REQUEST: /start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7\nROOT_START_PROFILE: FULL_FORCE_START_PROFILE\nCONTINUOUS_MODE: until_user_stop\nOPEN_ENDED_IMPROVEMENT: yes\nWAVE_NUMBER: 1\")"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Task tool unavailable in this runtime. Working in SINGLE_AGENT_DEGRADED_MODE and continuing the open-ended improvement wave ourselves."
+    }
+  ]
+}

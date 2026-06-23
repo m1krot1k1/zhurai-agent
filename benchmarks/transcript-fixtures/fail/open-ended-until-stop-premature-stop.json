@@ -1,0 +1,20 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: выполни векторы улучшений и продолжай работать 24/7\nORIGINAL_REQUEST: /start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7\nCONTINUOUS_MODE: until_user_stop\nOPEN_ENDED_IMPROVEMENT: yes\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: ru\nEXPECTATION: return COMPLETION_CONTRACT\")"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: close one safe backlog packet\nORIGINAL_REQUEST: /start выполни векторы улучшений что ты предлагаешь и продолжай работать 24/7\nCONTINUOUS_MODE: until_user_stop\nOPEN_ENDED_IMPROVEMENT: yes\nWAVE_NUMBER: 1\nACCEPTANCE_CRITERIA: one safe packet lands\")"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: approval\norchestrator_summary: Closed the current packet.\nnet_new_evidence:\n  - rules/orchestrator.mdc updated\n  - python3 scripts/run-full-repo-benchmark.py exit 0\nremaining_vectors: >=1\nresume_packet: none\nrecommended_action: stop"
+    }
+  ]
+}

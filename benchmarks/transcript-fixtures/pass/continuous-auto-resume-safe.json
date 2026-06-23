@@ -1,0 +1,24 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start continue working 24/7 until I say stop"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: continue working 24/7 until user says stop\nORIGINAL_REQUEST: /start continue working 24/7 until I say stop\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\")"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: deliver one packet safely\nORIGINAL_REQUEST: /start continue working 24/7 until I say stop\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 1\")"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: pause\nruntime_boundary: turn_boundary\npause_reason: PAUSED_FOR_RUNTIME_BUDGET\nwatchdog:\n  retry_attempt: 1\n  retry_backoff_seconds: 3\n  no_progress_waves: 0\n  no_progress_limit: 2\nresume_packet: continue packet B0-2\nrecommended_action: continue"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: continue safely\nORIGINAL_REQUEST: /start continue working 24/7 until I say stop\nCONTINUOUS_MODE: until_user_stop\nWAVE_NUMBER: 2\nCONTINUATION_PACKET: continue packet B0-2\")"
+    }
+  ]
+}

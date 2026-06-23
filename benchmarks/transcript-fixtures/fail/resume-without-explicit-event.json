@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Continue after approval"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "WAVE_RESULT:\nstatus: pause\npause_reason: AWAITING_APPROVAL\napproval_state: requested\nexecution_state: paused\nresume_packet: deploy packet RC-2"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: resume\napproval_state: approved\nexecution_state: in_progress\nresume_packet: deploy packet RC-2"
+    }
+  ]
+}

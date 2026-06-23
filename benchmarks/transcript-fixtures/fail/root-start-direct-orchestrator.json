@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Implement login hardening"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Implement login hardening\nSCOPE: src/auth and tests/auth\nACCEPTANCE_CRITERIA: login path is protected and tested\")"
+    }
+  ]
+}

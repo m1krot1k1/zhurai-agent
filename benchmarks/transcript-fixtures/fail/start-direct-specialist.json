@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Fix login flow"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Fix login flow\nOWNERSHIP: src/auth/login.ts\nDEPENDENCIES: none\")"
+    }
+  ]
+}

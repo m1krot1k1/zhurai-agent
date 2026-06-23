@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Resume work now"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: resume\nresume_event: input_received\napproval_state: approved\nexecution_state: in_progress\nresume_packet: packet-2"
+    }
+  ]
+}
