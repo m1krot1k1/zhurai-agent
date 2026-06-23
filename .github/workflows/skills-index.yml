@@ -13,7 +13,6 @@ on:
 
 permissions:
   contents: read
-  actions: write   # to trigger deploy-site.yml on schedule
 
 jobs:
   build-index:
@@ -41,16 +40,3 @@ jobs:
           name: skills-index
           path: website/static/api/skills-index.json
           retention-days: 7
-
-  # Re-trigger the docs deploy so the refreshed index lands on the live site.
-  # The deploy itself is owned by deploy-site.yml (which crawls and deploys
-  # everything in one pipeline); we just kick it on a schedule.
-  trigger-deploy:
-    needs: build-index
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Deploy Site workflow
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-site.yml --repo ${{ github.repository }} -f skills_index_run_id=${{ github.run_id }}
