@@ -182,7 +182,7 @@ class TestFallbackChain:
 
     PRIMARY = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
     FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent"
+        "https://raw.githubusercontent.com/m1krot1k1/zhurai-agent"
         "/main/website/static/api/model-catalog.json"
     )
 
