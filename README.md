@@ -194,7 +194,16 @@ scripts/run_tests.sh
 bash scripts/build-desktop-macos.sh
 ```
 
-**Ручной релиз** (Actions → Release Desktop macOS → Run workflow).
+Артефакты: `apps/desktop/release/ZhurAI-Agent-*-mac-arm64.dmg`
+
+**Публикация в GitHub Releases** (нужен [GitHub CLI](https://cli.github.com/): `brew install gh && gh auth login`):
+
+```bash
+bash scripts/release-desktop-github.sh minor   # dev / prerelease
+bash scripts/release-desktop-github.sh major    # stable на main
+```
+
+**CI** (ветка `dev` → minor, Actions → Run workflow на `main` → major): см. `.github/workflows/release-desktop-macos.yml`. Если job падает на *Set up job* — в Settings → Actions включите runners и проверьте лимит macOS-минут.
 
 ---
 
