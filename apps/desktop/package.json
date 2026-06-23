@@ -3,7 +3,7 @@
   "productName": "ZhurAI Agent",
   "private": true,
   "version": "0.17.0",
-  "description": "Нативное десктопное приложение ZhurAI Agent.",
+  "description": "Нативное десктопное приложение ZhurAI Agent. Сборка: scripts/build-desktop-macos.sh",
   "author": "m1krot1k1",
   "type": "module",
   "main": "electron/main.cjs",
