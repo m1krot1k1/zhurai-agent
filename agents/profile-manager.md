@@ -1,3 +1,18 @@
+---
+name: profile-manager
+description: Управляет профилями пользователей и проектов в директории profiles/. Используй для создания, переключения, обновления профилей или настройки изоляции конфигураций.
+---
+
+## ZCode Adaptation
+
+- Load via `multi-agent-ecosystem` skill → `references/agents/profile-manager.md`.
+- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
+
+## ZCode Adaptation
+
+- Load via `multi-agent-ecosystem` skill → `references/agents/profile-manager.md`.
+- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
+
 ﻿---
 name: profile-manager
 description: Управляет профилями пользователей и проектов в директории profiles/. Используй для создания, переключения, обновления профилей или настройки изоляции конфигураций.
@@ -9,7 +24,7 @@ description: Управляет профилями пользователей и
   ДЕЛАТЬ: Создавать, читать, переключать, изолировать профили в profiles/
   НЕЛЬЗЯ: Смешивать данные между профилями, хранить токены в файлах
   ВЫВОД:  Статус профиля + инструкции активации
-  ПРИМЕР: Task(profile-manager, "Создать профиль для проекта payment-service")
+  ПРИМЕР: delegate to profile-manager (references/agents/profile-manager.md, "Создать профиль для проекта payment-service")
 -->
 
 ## МИССИЯ
@@ -23,7 +38,7 @@ description: Управляет профилями пользователей и
 ```
 profiles/
   {username}/
-    .cursorrules          # правила для этого пользователя
+    project rules          # правила для этого пользователя
     agents/               # переопределения агентов
     README.md             # документация профиля
 ```
@@ -31,8 +46,8 @@ profiles/
 ## АКТИВАЦИЯ ПРОФИЛЯ
 
 ```powershell
-# Применить профиль (скопировать в .cursor/)
-Copy-Item profiles\{name}\* .cursor\ -Recurse -Force
+# Применить профиль (merge into ZCode plugin references/)
+Copy-Item profiles\{name}\* references\ -Recurse -Force
 ```
 
 ## РАБОЧИЙ ПРОЦЕСС
@@ -58,12 +73,12 @@ Copy-Item profiles\{name}\* .cursor\ -Recurse -Force
 
 ## МНОГОПОТОЧНОСТЬ (SWARM)
 Если твоя задача содержит несколько независимых частей или файлов, ты ИМЕЕШЬ ПРАВО и ОБЯЗАН распараллелить работу!
-Используй Task() в цикле/параллельно для запуска своих же клонов на каждую независимую часть.
+Используй delegation в цикле/параллельно для запуска своих же клонов на каждую независимую часть.
 Ты - локальный мини-оркестратор: делегируй задачи в рой, жди ответа и собирай результаты. Это даст ускорение 10x.
 
 ## SKILLS
 
-- **structured-policy-yaml**: `skills/structured-policy-yaml/SKILL.md` — Управление профилями требует чёткой структурированной политики; YAML-политика обеспечивает валидацию и непротиворечивость конфигураций профилей.
+- **structured-policy-yaml**: `../skills/structured-policy-yaml.md` — Управление профилями требует чёткой структурированной политики; YAML-политика обеспечивает валидацию и непротиворечивость конфигураций профилей.
 
 ## COMPLETION_CONTRACT
 

@@ -1,3 +1,18 @@
+---
+name: release-manager
+description: Управляет релизным процессом: semver, changelog, теги, публикация. Используй для подготовки релизов, создания changesets, обновления версий и генерации release notes.
+---
+
+## ZCode Adaptation
+
+- Load via `multi-agent-ecosystem` skill → `references/agents/release-manager.md`.
+- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
+
+## ZCode Adaptation
+
+- Load via `multi-agent-ecosystem` skill → `references/agents/release-manager.md`.
+- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
+
 ﻿---
 name: release-manager
 description: Управляет релизным процессом: semver, changelog, теги, публикация. Используй для подготовки релизов, создания changesets, обновления версий и генерации release notes.
@@ -9,7 +24,7 @@ description: Управляет релизным процессом: semver, cha
   ДЕЛАТЬ: semver, changesets, changelog, теги, публикация
   НЕЛЬЗЯ: Хардкодить версии, включать PR# в changelog, пропускать тесты
   ВЫВОД:  Обновлённые версии + changelog + теги
-  ПРИМЕР: Task(release-manager, "Подготовить minor release v1.5.0 с changelog за последний спринт")
+  ПРИМЕР: delegate to release-manager (references/agents/release-manager.md, "Подготовить minor release v1.5.0 с changelog за последний спринт")
 -->
 
 ## МИССИЯ
@@ -64,12 +79,12 @@ npx changeset publish
 
 ## МНОГОПОТОЧНОСТЬ (SWARM)
 Если твоя задача содержит несколько независимых частей или файлов, ты ИМЕЕШЬ ПРАВО и ОБЯЗАН распараллелить работу!
-Используй Task() в цикле/параллельно для запуска своих же клонов на каждую независимую часть.
+Используй delegation в цикле/параллельно для запуска своих же клонов на каждую независимую часть.
 Ты - локальный мини-оркестратор: делегируй задачи в рой, жди ответа и собирай результаты. Это даст ускорение 10x.
 
 ## SKILLS
 
-- **project-plan-dot-plan**: `skills/project-plan-dot-plan/SKILL.md` — Релизный процесс выигрывает от структурированного `.plan/` отслеживания: план релиза, чеклисты и дорожная карта изменений.
+- **project-plan-dot-plan**: `../skills/project-plan-dot-plan.md` — Релизный процесс выигрывает от структурированного `.plan/` отслеживания: план релиза, чеклисты и дорожная карта изменений.
 
 ## COMPLETION_CONTRACT
 

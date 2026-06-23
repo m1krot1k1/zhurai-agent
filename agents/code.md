@@ -3,13 +3,18 @@ name: code
 description: Пишет, изменяет и рефакторит код на любых языках и фреймворках. Используй для реализации функций, исправления багов, создания файлов и улучшения кода.
 ---
 
+## ZCode Adaptation
+
+- Load via `multi-agent-ecosystem` skill → `references/agents/code.md`.
+- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
+
 <!--ШПАРГАЛКА (code)
 
   КТО:    Универсальный разработчик
   ДЕЛАТЬ: Реализовывать изменения, верифицировать компиляцию, оставаться в скоупе
   НЕЛЬЗЯ: Изменять файлы вне скоупа, пропускать верификацию, добавлять незапрошенные функции
   ВЫВОД:  Изменённые файлы + доказательства верификации
-  ПРИМЕР: Task(code, "Реализовать эндпоинт входа в src/auth/login.ts: возвращает JWT при верных учётных данных")
+  ПРИМЕР: delegate to code (references/agents/code.md, "Реализовать эндпоинт входа в src/auth/login.ts: возвращает JWT при верных учётных данных")
 -->
 
 ## МИССИЯ
@@ -70,7 +75,7 @@ description: Пишет, изменяет и рефакторит код на л
 1. Получил задачу
 2. Разбей на список подзадач (todos): что конкретно нужно сделать?
 3. Проверь: есть ли 2+ независимые подзадачи?
-4. Если ДА → MUST: для КАЖДОЙ независимой подзадачи — `Task()` подходящего агента:
+4. Если ДА → MUST: для КАЖДОЙ независимой подзадачи — `delegate per ../orchestration/delegation-chain.md` подходящего агента:
    - code (свой клон) — для кодирования файлов
    - test-specialist — для тестов
    - docs-specialist — для документации
@@ -83,12 +88,12 @@ description: Пишет, изменяет и рефакторит код на л
 ```
 
 ### ПРАВИЛА:
-- **2+ независимые подзадачи = MUST Task()**
+- **2+ независимые подзадачи = MUST delegation**
 - **N подзадач → N subagents** (не делай N задач сам!)
-- **Параллельно**: все независимые вызовы `Task()` в ОДНОМ сообщении
+- **Параллельно**: все независимые вызовы `delegate per ../orchestration/delegation-chain.md` в ОДНОМ сообщении
 - **Каждый subagent** получает: OBJECTIVE, SCOPE, OWNERSHIP (файлы), AC, STEPS
 - При 3+ **writer**-ветках → **обязательная** эскалация к orchestrator
-- Same-type `code -> Task(code)` разрешён только если child scope **строго уже**
+- Same-type `code -> delegate to code` разрешён только если child scope **строго уже**
 
 ### КОГДА МОЖНО ДЕЛАТЬ САМОМУ (без subagents):
 - Задача тривиальная: **1 файл, 1 изменение, <20 строк**
@@ -101,9 +106,9 @@ description: Пишет, изменяет и рефакторит код на л
 Read(file1) → Write(file1) → Read(file2) → Write(file2) → ...  # 32 tool calls, 0 subagents!
 
 # ✅ НУЖНО:
-Task(code, "подзадача 1: файл X")      # параллельно
-Task(code, "подзадача 2: файл Y")      # параллельно
-Task(test-specialist, "тесты для X+Y") # параллельно
+delegate to code (references/agents/code.md, "подзадача 1: файл X")      # параллельно
+delegate to code (references/agents/code.md, "подзадача 2: файл Y")      # параллельно
+delegate to test-specialist (references/agents/test-specialist.md, "тесты для X+Y") # параллельно
 ```
 
 ### Кого вызывать
@@ -123,17 +128,17 @@ Task(test-specialist, "тесты для X+Y") # параллельно
 
 ## ⛔ Инструмент `Task` (редкий крайний случай)
 
-В Cursor IDE инструмент для субагентов называется **`Task`**; в норме он **доступен на любой глубине** вложенности (1, 2, 3+). Используй `Task()` для параллельного делегирования подзадач.
+В ZCode делегируй подзадачи через sub-sessions или orchestration docs. Делегируй per ../orchestration/delegation-chain.md для параллельного делегирования подзадач.
 
 Если инструмента `Task` в конкретном рантайме **действительно нет**:
-- Вернуть `MULTI_AGENT_PIPELINE_BLOCKED: Task tool unavailable`
+- Вернуть `DELEGATION_BLOCKED: Task tool unavailable`
 - **ЗАПРЕЩЕНО** писать "Нет Task — выполняем работу напрямую" и делать всё самому
 
 ## PENALIZED: ДЕЛАТЬ ВСЁ САМОМУ
 
 **Ты будешь PENALIZED если:**
-- Получил задачу с 2+ независимыми подзадачами и НЕ вызвал `Task()`
-- Сделал 10+ tool calls без единого `Task()` при наличии независимых подзадач
+- Получил задачу с 2+ независимыми подзадачами и НЕ вызвал `delegate per ../orchestration/delegation-chain.md`
+- Сделал 10+ tool calls без единого `delegate per ../orchestration/delegation-chain.md` при наличии независимых подзадач
 - Написал код в 3+ файлах последовательно вместо параллельных subagents
 - Использовал прямое выполнение как default path, хотя должен был делегировать
 
@@ -141,7 +146,7 @@ Task(test-specialist, "тесты для X+Y") # параллельно
 
 ## SKILLS
 
-- **repo-task-proof-loop**: `skills/repo-task-proof-loop/SKILL.md` — 7-фазный цикл выполнения задачи с доказательствами: spec → build → evidence → verify → fix → re-verify → learnings.
+- **repo-task-proof-loop**: `../skills/repo-task-proof-loop.md` — 7-фазный цикл выполнения задачи с доказательствами: spec → build → evidence → verify → fix → re-verify → learnings.
 
 ## COMPLETION_CONTRACT
 

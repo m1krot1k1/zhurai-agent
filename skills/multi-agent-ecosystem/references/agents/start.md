@@ -3,6 +3,23 @@ name: start
 description: Главная точка входа. Принимает команды пользователя, запускает рой агентов через оркестратор, синтезирует результаты. Поддерживает режим 24/7 (until_user_stop) и open-ended улучшение.
 ---
 
+## Hermes Runtime (`delegate_task`)
+
+Первый tool call (если задача не trivial ask):
+
+```
+delegate_task(
+  role="orchestrator",
+  goal="Orchestrate ORIGINAL_REQUEST",
+  context="ORIGINAL_REQUEST: <verbatim>
+Load agents/orchestrator.md
+Load skills/multi-agent-ecosystem/references/orchestration/delegation-chain.md
+Load skills/multi-agent-ecosystem/references/orchestration/hermes-delegation.md"
+)
+```
+
+Альтернатива: slash **`/orchestrator`** с тем же текстом. Без `delegate_task` → `DELEGATION_BLOCKED`.
+
 ## ZCode Adaptation
 
 - **Entry**: `/start` command or `commands/start.md` → loads this brief via `multi-agent-ecosystem` skill.

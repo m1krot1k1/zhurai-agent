@@ -1,4 +1,6 @@
-# Delegation chain: `/start` to specialists (ZCode)
+# Delegation chain: `/start` to specialists
+
+> **Hermes (Desktop/TUI/gateway):** use `delegate_task` — see [hermes-delegation.md](./hermes-delegation.md). Cursor `Task()` is not available in this runtime.
 
 ## What happens when the user runs `/start`
 

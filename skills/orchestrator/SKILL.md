@@ -17,18 +17,25 @@ requires: [agent-prompt-quality, structured-policy-yaml]
 
 ## ШАГИ
 
-1. Decompose задачу  независимые ветки
-2. Parallel-first: запустить все независимые в параллель
-3. Builder строит; Skeptic оспаривает; Verifier проверяет AC
-4. При open-ended или security  добавить Explorer / Security голос
-5. Синтез: Verifier выносит вердикт, не усредняет
-6. Написать completion contract с evidence
+1. Decompose задачу → независимые ветки
+2. Parallel-first: `delegate_task(tasks=[...])` для независимых веток (см. `references/orchestration/hermes-delegation.md`)
+3. Каждая ветка: `AGENT_BRIEF_PATH: agents/<specialist>.md` в context
+4. Builder строит; Skeptic оспаривает; Verifier проверяет AC
+5. При open-ended или security → Explorer / Security голос
+6. Синтез + completion contract с evidence
+
+## HERMES DELEGATION
+
+- Инструмент: **`delegate_task`** (`role="orchestrator"` для суб-оркестраторов, `role="leaf"` для специалистов)
+- Параллель: `delegate_task(tasks=[{goal, context}, ...])`
+- Без `delegate_task` на multi-branch задаче → `DELEGATION_BLOCKED`, не делать работу inline
+- Подробно: `skills/multi-agent-ecosystem/references/orchestration/hermes-delegation.md`
 
 ## QUICK RULES
 
 | Правило | Значение |
 |---------|----------|
-| Task chain | Sub-orchestrator MAX 3 уровня глубины |
+| Task chain | `delegate_task` sub-orchestrator MAX 3 уровня глубины |
 | Parallel first | Все независимые ветки  одновременно |
 | L1 budget | ≤6 **writer**-веток стандарт; reader-ветки без лимита |
 | Anti-loop | 3 итерации без прогресса  stop |

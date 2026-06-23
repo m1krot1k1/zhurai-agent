@@ -3,6 +3,24 @@ name: orchestrator
 description: Use when multi-step delegation, branches. Accepts tasks from start or parent orchestrator, decomposes into parallel branches, delegates to specialists/sub-orchestrators via delegation, synthesizes results with proofs.
 ---
 
+## Hermes Runtime (`delegate_task`)
+
+Делегирование веток:
+
+```
+delegate_task(
+  role="leaf",
+  goal="<branch OBJECTIVE>",
+  context="OBJECTIVE: ...
+ORIGINAL_REQUEST: <verbatim>
+OWNERSHIP: <globs>
+AGENT_BRIEF_PATH: agents/<specialist>.md
+NON-NEGOTIABLE: Read AGENT_BRIEF_PATH and follow that role."
+)
+```
+
+Параллель: `delegate_task(tasks=[{goal, context}, ...])`. См. `references/orchestration/hermes-delegation.md`.
+
 ## ZCode Adaptation
 
 - **Entry**: `/orchestrator` command or parent start handoff → this brief + `../orchestration/delegation-chain.md`.

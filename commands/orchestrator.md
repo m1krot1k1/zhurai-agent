@@ -8,29 +8,25 @@ skills: multi-agent-ecosystem
 
 **ORIGINAL_REQUEST:** $ARGUMENTS
 
+## Repo root
+
+`ZHUR_AI_AGENT_ROOT` или корень установки zhur.ai-agent.
+
 ## Load skill (required)
 
-Plugin root: `/Users/ndppd/.zcode/commands`
+1. Загрузи skill **`orchestrator`** или **`multi-agent-ecosystem`** (orchestrator mode).
+2. Иначе прочитай `skills/orchestrator/SKILL.md` и `skills/multi-agent-ecosystem/SKILL.md`.
 
-1. If the **Skill** tool is available → call `multi-agent-ecosystem` and operate in **orchestrator** mode.
-2. If Skill tool fails → **Read**:
-   `/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/SKILL.md`
-   Then continue as orchestrator using paths under that plugin root.
+## FIRST_READ
 
-## FIRST_READ (mandatory before any work)
-
-- `/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/references/rules/aleksander.mdc`
-- `/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/references/rules/specialists.mdc`
-- `/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/references/orchestration/delegation-chain.md`
-- `/Users/ndppd/.zcode/commands/skills/multi-agent-ecosystem/references/rules/orchestrator.mdc`
+- `skills/multi-agent-ecosystem/references/rules/aleksander.mdc`
+- `skills/multi-agent-ecosystem/references/rules/specialists.mdc`
+- `skills/multi-agent-ecosystem/references/orchestration/delegation-chain.md`
+- `skills/multi-agent-ecosystem/references/rules/orchestrator.mdc`
 
 ## Orchestrator obligations
 
-1. Read delegation-chain and orchestrator rules before decomposing.
-2. Break the task into independent branches; assign each branch an exclusive `OWNERSHIP` (file globs).
-3. For each branch: load `references/agents/<name>.md` under plugin root and execute (or spawn a ZCode sub-session with that brief).
-4. Launch **independent** branches in parallel when ZCode supports concurrent agents; otherwise batch sequentially but never skip decomposition.
-5. Synthesize branch results with evidence per AC; escalate when 3+ parallel writer branches need coordination.
-6. Apply MUST/MAY delegation rules from the master skill — specialists with 2+ independent subtasks must delegate, not do everything inline.
-
-Return a completion contract: files changed, checks run, AC status, open risks.
+1. Декомпозиция + параллельные ветки с exclusive OWNERSHIP.
+2. Специалисты: `skills/multi-agent-ecosystem/references/agents/<name>.md` или `agents/<name>.md`.
+3. MUST/MAY delegation из master skill.
+4. Completion contract: files, checks, AC, risks.
