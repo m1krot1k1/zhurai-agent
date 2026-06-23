@@ -194,7 +194,7 @@
         "NSMicrophoneUsageDescription": "ZhurAI Agent использует микрофон для голосового ввода."
       },
       "gatekeeperAssess": false,
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "target": [
         "dmg",
         "zip"

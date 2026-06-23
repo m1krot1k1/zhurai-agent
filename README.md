@@ -196,6 +196,14 @@ bash scripts/build-desktop-macos.sh
 
 Артефакты: `apps/desktop/release/ZhurAI-Agent-*-mac-arm64.dmg`
 
+**macOS «приложение повреждено» после скачивания?** Это Gatekeeper + quarantine, не битый файл. Оригинальный Hermes подписан Apple; наши open-source релизы — ad-hoc. После установки:
+
+```bash
+bash scripts/fix-macos-gatekeeper.sh "/Applications/ZhurAI Agent.app"
+```
+
+Подробнее: [docs/desktop-macos-signing.md](docs/desktop-macos-signing.md)
+
 **Публикация в GitHub Releases** (нужен [GitHub CLI](https://cli.github.com/): `brew install gh && gh auth login`):
 
 ```bash

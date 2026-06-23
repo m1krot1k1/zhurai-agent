@@ -35,7 +35,7 @@ git push origin "${TAG}"
 gh release create "${TAG}" \
   ${PRERELEASE_FLAG} \
   --title "ZhurAI Agent ${TAG}" \
-  --generate-notes \
+  --notes "После установки на macOS (если «приложение повреждено»): \`bash scripts/fix-macos-gatekeeper.sh \"/Applications/ZhurAI Agent.app\"\` — см. docs/desktop-macos-signing.md" \
   apps/desktop/release/*.dmg \
   apps/desktop/release/*.zip
 

@@ -1,41 +1,56 @@
 /**
  * after-pack.cjs — electron-builder afterPack hook.
  *
- * Stamps the Hermes icon + identity onto the packed Windows Hermes.exe via
- * rcedit (delegated to set-exe-identity.cjs). This runs for EVERY packed build
- * — first install, `hermes desktop`, the installer's --update rebuild, and a
- * dev's manual `npm run pack` — so the branded exe can never silently revert
- * to the stock "Electron" icon/name (the bug when the stamp lived only in
- * install.ps1, which the update path doesn't use).
- *
- * Windows-only: rcedit edits PE resources, irrelevant on macOS/Linux where the
- * app identity comes from the bundle Info.plist / desktop entry. Best-effort:
- * a stamp failure must never fail an otherwise-good build (worst case is the
- * stock icon, not a broken app), so we log and resolve rather than throw.
- *
- * electron-builder passes a context with:
- *   - electronPlatformName: 'win32' | 'darwin' | 'linux'
- *   - appOutDir:            the unpacked app directory for this target
- *   - packager.appInfo.productFilename: the exe basename (e.g. 'Hermes')
+ * Windows: stamp Hermes/ZhurAI exe identity via rcedit.
+ * macOS: ad-hoc codesign when no Developer ID (CSC_LINK / APPLE_SIGNING_IDENTITY).
  */
 
+const fs = require('node:fs')
 const path = require('node:path')
+const { execFile } = require('node:child_process')
+const { promisify } = require('node:util')
 
 const { stampExeIdentity } = require('./set-exe-identity.cjs')
 
+const execFileAsync = promisify(execFile)
+
+async function adhocSignMacApp(appPath) {
+  if (!fs.existsSync(appPath)) {
+    return
+  }
+  if (process.env.CSC_LINK || process.env.APPLE_SIGNING_IDENTITY) {
+    return
+  }
+  try {
+    await execFileAsync('xattr', ['-cr', appPath]).catch(() => {})
+    await execFileAsync('codesign', ['--force', '--deep', '--sign', '-', appPath])
+    console.log(`[after-pack] ad-hoc signed ${appPath}`)
+  } catch (err) {
+    console.warn(`[after-pack] macOS ad-hoc sign failed (${err.message})`)
+  }
+}
+
 exports.default = async function afterPack(context) {
+  const productName = context.packager?.appInfo?.productFilename || 'ZhurAI Agent'
+
+  if (context.electronPlatformName === 'darwin') {
+    const appPath = path.join(context.appOutDir, `${productName}.app`)
+    await adhocSignMacApp(appPath)
+    return
+  }
+
   if (context.electronPlatformName !== 'win32') {
     return
   }
 
-  const productName = context.packager?.appInfo?.productFilename || 'Hermes'
   const exe = path.join(context.appOutDir, `${productName}.exe`)
   const desktopRoot = path.resolve(__dirname, '..')
 
   try {
     await stampExeIdentity(exe, desktopRoot)
   } catch (err) {
-    // Never fail the build over a cosmetic stamp.
-    console.warn(`[after-pack] exe identity stamp failed (${err.message}); Hermes.exe keeps the stock Electron icon`)
+    console.warn(
+      `[after-pack] exe identity stamp failed (${err.message}); exe keeps the stock Electron icon`
+    )
   }
 }
