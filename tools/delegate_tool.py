@@ -2170,13 +2170,14 @@ def delegate_task(
         tasks = recovered_tasks
 
     if tasks and isinstance(tasks, list):
+        # No hard rejection — ThreadPoolExecutor queues excess tasks
+        # beyond max_concurrent_children. The pool size caps simultaneous
+        # LLM API calls; extra tasks wait for a free worker.
         if len(tasks) > max_children:
-            return tool_error(
-                f"Too many tasks: {len(tasks)} provided, but "
-                f"max_concurrent_children is {max_children}. "
-                f"Either reduce the task count, split into multiple "
-                f"delegate_task calls, or increase "
-                f"delegation.max_concurrent_children in config.yaml."
+            logger.info(
+                "delegate_task: %d tasks for max_concurrent_children=%d — "
+                "excess will queue and run as workers free up",
+                len(tasks), max_children,
             )
         task_list = tasks
     elif goal and isinstance(goal, str) and goal.strip():
@@ -2254,11 +2255,15 @@ def delegate_task(
             result = _run_single_child(_i, _t["goal"], child, parent_agent)
             results.append(result)
         else:
-            # Batch -- run in parallel with per-task progress lines
+            # Batch -- run in parallel with per-task progress lines.
+            # Pool size caps simultaneous LLM calls; excess tasks queue
+            # in ThreadPoolExecutor's internal work queue and start as
+            # workers free up.
+            pool_cap = min(max_children, max(1, n_tasks))
             completed_count = 0
             spinner_ref = getattr(parent_agent, "_delegate_spinner", None)
 
-            with ThreadPoolExecutor(max_workers=max_children) as executor:
+            with ThreadPoolExecutor(max_workers=pool_cap) as executor:
                 futures = {}
                 for i, t, child in children:
                     future = executor.submit(
@@ -2874,8 +2879,9 @@ def _build_top_level_description() -> str:
         "never enter your context window.\n\n"
         "TWO MODES (one of 'goal' or 'tasks' is required):\n"
         "1. Single task: provide 'goal' (+ optional context, toolsets).\n"
-        f"2. Batch (parallel): provide 'tasks' array with up to {max_children} "
-        f"items concurrently for this user (configured via "
+        f"2. Batch (parallel): provide 'tasks' array. Up to {max_children} run "
+        f"concurrently for this user; additional tasks queue and start as "
+        f"workers free up (configured via "
         f"delegation.max_concurrent_children in config.yaml). {nesting_clause}\n\n"
         "BOTH MODES RUN IN THE BACKGROUND. delegate_task returns immediately — "
         "you and the user keep working, and each subagent's full result "

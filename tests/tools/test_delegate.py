@@ -95,7 +95,7 @@ class TestDelegateRequirements(unittest.TestCase):
         role_desc = overrides["parameters"]["properties"]["role"]["description"]
 
         # Top-level description names the user's concurrency limit explicitly.
-        self.assertIn(f"up to {max_children}", desc)
+        self.assertIn(f"Up to {max_children} run concurrently", desc)
         # Top-level description names the user's spawn-depth limit explicitly.
         self.assertIn(f"max_spawn_depth={max_depth}", desc)
         # tasks parameter description repeats the concurrency cap.
@@ -121,7 +121,7 @@ class TestDelegateRequirements(unittest.TestCase):
             _get_max_concurrent_children,
             _get_max_spawn_depth,
         )
-        self.assertIn(f"up to {_get_max_concurrent_children()}", fn["description"])
+        self.assertIn(f"Up to {_get_max_concurrent_children()} run concurrently", fn["description"])
         self.assertIn(f"max_spawn_depth={_get_max_spawn_depth()}", fn["description"])
 
 
@@ -274,7 +274,9 @@ class TestDelegateTask(unittest.TestCase):
         mock_run.assert_not_called()
 
     @patch("tools.delegate_tool._run_single_child")
-    def test_batch_capped_at_3(self, mock_run):
+    def test_batch_queues_excess_tasks(self, mock_run):
+        """When tasks exceed max_concurrent_children, excess must queue
+        (not error). ThreadPoolExecutor handles queuing internally."""
         mock_run.return_value = {
             "task_index": 0, "status": "completed",
             "summary": "Done", "api_calls": 1, "duration_seconds": 1.0
@@ -283,10 +285,11 @@ class TestDelegateTask(unittest.TestCase):
         limit = _get_max_concurrent_children()
         tasks = [{"goal": f"Task {i}"} for i in range(limit + 2)]
         result = json.loads(delegate_task(tasks=tasks, parent_agent=parent))
-        # Should return an error instead of silently truncating
-        self.assertIn("error", result)
-        self.assertIn("Too many tasks", result["error"])
-        mock_run.assert_not_called()
+        # Should succeed (queue excess) instead of erroring
+        self.assertNotIn("error", result)
+        self.assertIn("results", result)
+        self.assertEqual(len(result["results"]), limit + 2)
+        self.assertEqual(mock_run.call_count, limit + 2)
 
     @patch("tools.delegate_tool._run_single_child")
     def test_batch_ignores_toplevel_goal(self, mock_run):
