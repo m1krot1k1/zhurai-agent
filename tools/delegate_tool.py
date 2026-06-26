@@ -1542,12 +1542,23 @@ def _run_single_child(
                 if _stale_count[0] >= stale_limit:
                     logger.warning(
                         "Subagent %d appears stale (no progress for %d "
-                        "heartbeat cycles, tool=%s) — stopping heartbeat",
+                        "heartbeat cycles, tool=%s) — interrupting",
                         task_index,
                         _stale_count[0],
                         child_tool or "<none>",
                     )
-                    break  # stop touching parent, let gateway timeout fire
+                    # Actively interrupt the child so it doesn't hang until
+                    # gateway timeout. The interrupt propagates to in-flight
+                    # tools and grandchildren; the child's run_conversation()
+                    # returns with interrupted=True.
+                    try:
+                        if hasattr(child, "interrupt"):
+                            child.interrupt("Stale — no progress detected")
+                        elif hasattr(child, "_interrupt_requested"):
+                            child._interrupt_requested = True
+                    except Exception:
+                        pass
+                    break
 
                 if child_tool:
                     desc = (

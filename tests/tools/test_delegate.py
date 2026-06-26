@@ -912,7 +912,7 @@ class TestBlockedTools(unittest.TestCase):
             _get_max_spawn_depth, _get_orchestrator_enabled,
             _MIN_SPAWN_DEPTH,
         )
-        self.assertEqual(_get_max_concurrent_children(), 3)
+        self.assertEqual(_get_max_concurrent_children(), 5)
         self.assertEqual(MAX_DEPTH, 1)
         self.assertEqual(_get_max_spawn_depth(), 1)       # default: flat
         self.assertTrue(_get_orchestrator_enabled())      # default
@@ -2169,10 +2169,10 @@ class TestConcurrencyDefaults(unittest.TestCase):
     """Tests for the concurrency default and no hard ceiling."""
 
     @patch("tools.delegate_tool._load_config", return_value={})
-    def test_default_is_three(self, mock_cfg):
+    def test_default_is_five(self, mock_cfg):
         # Clear env var if set
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(_get_max_concurrent_children(), 3)
+            self.assertEqual(_get_max_concurrent_children(), 5)
 
     @patch("tools.delegate_tool._load_config",
            return_value={"max_concurrent_children": 10})
