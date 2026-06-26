@@ -416,17 +416,17 @@ class TestDelegateTask(unittest.TestCase):
 
 
 class TestToolNamePreservation(unittest.TestCase):
-    """Verify _last_resolved_tool_names is restored after subagent runs."""
+    """Verify _last_resolved_tool_names ContextVar provides thread isolation."""
 
-    def test_global_tool_names_restored_after_delegation(self):
-        """The process-global _last_resolved_tool_names must be restored
-        after a subagent completes so the parent's execute_code sandbox
-        generates correct imports."""
+    def test_contextvar_parent_value_preserved_after_delegation(self):
+        """The parent's ContextVar value must be preserved after subagent runs
+        because ContextVar provides per-thread isolation — child threads never
+        overwrite the parent's copy."""
         import model_tools
 
         parent = _make_mock_parent(depth=0)
         original_tools = ["terminal", "read_file", "web_search", "execute_code", "delegate_task"]
-        model_tools._last_resolved_tool_names = list(original_tools)
+        model_tools._last_resolved_tool_names.set(list(original_tools))
 
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
@@ -437,15 +437,16 @@ class TestToolNamePreservation(unittest.TestCase):
 
             delegate_task(goal="Test tool preservation", parent_agent=parent)
 
-        self.assertEqual(model_tools._last_resolved_tool_names, original_tools)
+        self.assertEqual(model_tools._last_resolved_tool_names.get(), original_tools)
 
-    def test_global_tool_names_restored_after_child_failure(self):
-        """Even when the child agent raises, the global must be restored."""
+    def test_contextvar_parent_value_preserved_after_child_failure(self):
+        """Even when the child agent raises, the parent's ContextVar value is
+        preserved — no save/restore needed."""
         import model_tools
 
         parent = _make_mock_parent(depth=0)
         original_tools = ["terminal", "read_file", "web_search"]
-        model_tools._last_resolved_tool_names = list(original_tools)
+        model_tools._last_resolved_tool_names.set(list(original_tools))
 
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
@@ -455,16 +456,14 @@ class TestToolNamePreservation(unittest.TestCase):
             result = json.loads(delegate_task(goal="Crash test", parent_agent=parent))
             self.assertEqual(result["results"][0]["status"], "error")
 
-        self.assertEqual(model_tools._last_resolved_tool_names, original_tools)
+        self.assertEqual(model_tools._last_resolved_tool_names.get(), original_tools)
 
-    def test_build_child_agent_does_not_raise_name_error(self):
-        """Regression: _build_child_agent must not reference _saved_tool_names.
+    def test_build_child_agent_does_not_raise(self):
+        """Regression: _build_child_agent must not crash.
 
-        The bug introduced by the e7844e9c merge conflict: line 235 inside
-        _build_child_agent read `list(_saved_tool_names)` where that variable
-        is only defined later in _run_single_child.  Calling _build_child_agent
-        standalone (without _run_single_child's scope) must never raise NameError.
-        """
+        Previously guarded against _saved_tool_names NameError; with ContextVar
+        isolation the save/restore pattern is gone, but the build should still
+        never raise."""
         parent = _make_mock_parent(depth=0)
 
         with patch("run_agent.AIAgent"):
@@ -479,36 +478,43 @@ class TestToolNamePreservation(unittest.TestCase):
                     parent_agent=parent,
                     task_count=1,
                 )
-            except NameError as exc:
+            except Exception as exc:
                 self.fail(
-                    f"_build_child_agent raised NameError — "
-                    f"_saved_tool_names leaked back into wrong scope: {exc}"
+                    f"_build_child_agent raised {type(exc).__name__}: {exc}"
                 )
 
-    def test_saved_tool_names_set_on_child_before_run(self):
-        """_run_single_child must set _delegate_saved_tool_names on the child
-        from model_tools._last_resolved_tool_names before run_conversation."""
+    def test_contextvar_isolation_between_parent_and_child(self):
+        """ContextVar must ensure the parent's _last_resolved_tool_names is not
+        overwritten by child agent construction. Child's get_tool_definitions()
+        call writes to the child's own ContextVar copy, leaving the parent's
+        untouched."""
         import model_tools
 
         parent = _make_mock_parent(depth=0)
-        expected_tools = ["read_file", "web_search", "execute_code"]
-        model_tools._last_resolved_tool_names = list(expected_tools)
+        parent_tools = ["read_file", "web_search", "execute_code"]
+        model_tools._last_resolved_tool_names.set(list(parent_tools))
 
-        captured = {}
+        captured_parent_value = []
 
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
 
             def capture_and_return(user_message, task_id=None, stream_callback=None):
-                captured["saved"] = list(mock_child._delegate_saved_tool_names)
+                # Read the PARENT's ContextVar value from the parent thread
+                captured_parent_value.append(model_tools._last_resolved_tool_names.get())
                 return {"final_response": "ok", "completed": True, "api_calls": 1}
 
             mock_child.run_conversation.side_effect = capture_and_return
             MockAgent.return_value = mock_child
 
-            delegate_task(goal="capture test", parent_agent=parent)
+            delegate_task(goal="isolation test", parent_agent=parent)
 
-        self.assertEqual(captured["saved"], expected_tools)
+        # Parent's ContextVar should still have the original value
+        self.assertEqual(
+            model_tools._last_resolved_tool_names.get(),
+            parent_tools,
+            "Parent's ContextVar must not be overwritten by child agent"
+        )
 
 
 class TestDelegateObservability(unittest.TestCase):

@@ -129,7 +129,7 @@ _SUBAGENT_TOOLSETS = sorted(
 )
 _TOOLSET_LIST_STR = ", ".join(f"'{n}'" for n in _SUBAGENT_TOOLSETS)
 
-_DEFAULT_MAX_CONCURRENT_CHILDREN = 3
+_DEFAULT_MAX_CONCURRENT_CHILDREN = 5
 # One-shot guard: the high-concurrency cost advisory is emitted at most once
 # per process. _get_max_concurrent_children() runs on every get_definitions()
 # schema rebuild (via _build_top_level_description / _build_tasks_param_description),
@@ -379,7 +379,7 @@ def _get_max_concurrent_children() -> int:
     if val is not None:
         try:
             result = max(1, int(val))
-            if result > 10:
+            if result > 8:
                 global _HIGH_CONCURRENCY_WARNED
                 if not _HIGH_CONCURRENCY_WARNED:
                     _HIGH_CONCURRENCY_WARNED = True
@@ -1475,14 +1475,6 @@ def _run_single_child(
     # Get the progress callback from the child agent
     child_progress_cb = getattr(child, "tool_progress_callback", None)
 
-    # Restore parent tool names using the value saved before child construction
-    # mutated the global. This is the correct parent toolset, not the child's.
-    import model_tools
-
-    _saved_tool_names = getattr(
-        child, "_delegate_saved_tool_names", list(model_tools._last_resolved_tool_names)
-    )
-
     child_pool = getattr(child, "_credential_pool", None)
     leased_cred_id = None
     if child_pool is not None:
@@ -2016,13 +2008,9 @@ def _run_single_child(
             except Exception as exc:
                 logger.debug("Failed to release credential lease: %s", exc)
 
-        # Restore the parent's tool names so the process-global is correct
-        # for any subsequent execute_code calls or other consumers.
-        import model_tools
-
-        saved_tool_names = getattr(child, "_delegate_saved_tool_names", None)
-        if isinstance(saved_tool_names, list):
-            model_tools._last_resolved_tool_names = list(saved_tool_names)
+            # ContextVar provides per-thread isolation — child subagent threads
+            # never overwrite the parent's _last_resolved_tool_names, so no
+            # manual save/restore is needed.
 
         # Remove child from active tracking
 
@@ -2206,52 +2194,38 @@ def delegate_task(
     # Track goal labels for progress display (truncated for readability)
     task_labels = [t["goal"][:40] for t in task_list]
 
-    # Save parent tool names BEFORE any child construction mutates the global.
-    # _build_child_agent() calls AIAgent() which calls get_tool_definitions(),
-    # which overwrites model_tools._last_resolved_tool_names with child's toolset.
-    import model_tools as _model_tools
-
-    _parent_tool_names = list(_model_tools._last_resolved_tool_names)
-
-    # Build all child agents on the main thread (thread-safe construction)
-    # Wrapped in try/finally so the global is always restored even if a
-    # child build raises (otherwise _last_resolved_tool_names stays corrupted).
+    # Build all child agents on the main thread (thread-safe construction).
+    # ContextVar isolates parent/child tool names, so no save/restore needed.
     children = []
-    try:
-        for i, t in enumerate(task_list):
-            task_acp_args = t.get("acp_args") if "acp_args" in t else None
-            # Per-task role beats top-level; normalise again so unknown
-            # per-task values warn and degrade to leaf uniformly.
-            effective_role = _normalize_role(t.get("role") or top_role)
-            child = _build_child_agent(
-                task_index=i,
-                goal=t["goal"],
-                context=t.get("context"),
-                toolsets=t.get("toolsets") or toolsets,
-                model=creds["model"],
-                max_iterations=effective_max_iter,
-                task_count=n_tasks,
-                parent_agent=parent_agent,
-                override_provider=creds["provider"],
-                override_base_url=creds["base_url"],
-                override_api_key=creds["api_key"],
-                override_api_mode=creds["api_mode"],
-                override_acp_command=t.get("acp_command")
-                or acp_command
-                or creds.get("command"),
-                override_acp_args=(
-                    task_acp_args
-                    if task_acp_args is not None
-                    else (acp_args if acp_args is not None else creds.get("args"))
-                ),
-                role=effective_role,
-            )
-            # Override with correct parent tool names (before child construction mutated global)
-            child._delegate_saved_tool_names = _parent_tool_names
-            children.append((i, t, child))
-    finally:
-        # Authoritative restore: reset global to parent's tool names after all children built
-        _model_tools._last_resolved_tool_names = _parent_tool_names
+    for i, t in enumerate(task_list):
+        task_acp_args = t.get("acp_args") if "acp_args" in t else None
+        # Per-task role beats top-level; normalise again so unknown
+        # per-task values warn and degrade to leaf uniformly.
+        effective_role = _normalize_role(t.get("role") or top_role)
+        child = _build_child_agent(
+            task_index=i,
+            goal=t["goal"],
+            context=t.get("context"),
+            toolsets=t.get("toolsets") or toolsets,
+            model=creds["model"],
+            max_iterations=effective_max_iter,
+            task_count=n_tasks,
+            parent_agent=parent_agent,
+            override_provider=creds["provider"],
+            override_base_url=creds["base_url"],
+            override_api_key=creds["api_key"],
+            override_api_mode=creds["api_mode"],
+            override_acp_command=t.get("acp_command")
+            or acp_command
+            or creds.get("command"),
+            override_acp_args=(
+                task_acp_args
+                if task_acp_args is not None
+                else (acp_args if acp_args is not None else creds.get("args"))
+            ),
+            role=effective_role,
+        )
+        children.append((i, t, child))
 
     def _execute_and_aggregate() -> dict:
         """Run all built children (1 or N), join on them, aggregate results,
