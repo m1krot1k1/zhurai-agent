@@ -1143,19 +1143,19 @@ def _build_child_agent(
     # TUI can reconstruct the spawn tree and route per-branch controls.
     child_session_ref: Dict[str, Any] = {}
     # Resolve ecosystem agent id for spawn-tree labels (AGENT_ID in context).
-        try:
-            from agent.orchestrator_router import (
-                infer_agent_id_from_text,
-                parse_agent_id_from_envelope,
-            )
+    try:
+        from agent.orchestrator_router import (
+            infer_agent_id_from_text,
+            parse_agent_id_from_envelope,
+        )
 
-            agent_id_for_cb = (
-                parse_agent_id_from_envelope(context or "")
-                or parse_agent_id_from_envelope(goal or "")
-                or infer_agent_id_from_text(f"{goal or ''}\n{context or ''}")
-            )
-        except Exception:
-            agent_id_for_cb = None
+        agent_id_for_cb = (
+            parse_agent_id_from_envelope(context or "")
+            or parse_agent_id_from_envelope(goal or "")
+            or infer_agent_id_from_text(f"{goal or ''}\n{context or ''}")
+        )
+    except Exception:
+        agent_id_for_cb = None
 
     child_progress_cb = _build_child_progress_callback(
         task_index,
