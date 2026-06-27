@@ -19,6 +19,10 @@ export interface SubagentProgress {
   sessionId?: string
   model?: string
   status: SubagentStatus
+  /** Spawn depth, 0 = top-level. Required for @hermes/shared tree builder. */
+  depth: number
+  /** Index within siblings. Required for @hermes/shared tree builder. */
+  index: number
   taskCount: number
   taskIndex: number
   startedAt: number
@@ -27,10 +31,11 @@ export interface SubagentProgress {
   costUsd?: number
   inputTokens?: number
   outputTokens?: number
-  toolCount?: number
+  toolCount: number
   filesRead: string[]
   filesWritten: string[]
   stream: SubagentStreamEntry[]
+  reasoningTokens?: number
   summary?: string
   /** Active tool while running — cleared on terminal status. */
   currentTool?: string
@@ -172,6 +177,8 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     sessionId: str(payload.child_session_id) || prev?.sessionId,
     model: str(payload.model) || prev?.model,
     status,
+    depth: num(payload.depth) ?? prev?.depth ?? 0,
+    index: num(payload.task_index) ?? prev?.index ?? 0,
     taskCount: num(payload.task_count) ?? prev?.taskCount ?? 1,
     taskIndex: num(payload.task_index) ?? prev?.taskIndex ?? 0,
     startedAt: prev?.startedAt ?? at,
@@ -180,10 +187,11 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     costUsd: num(payload.cost_usd) ?? prev?.costUsd,
     inputTokens: num(payload.input_tokens) ?? prev?.inputTokens,
     outputTokens: num(payload.output_tokens) ?? prev?.outputTokens,
-    toolCount: num(payload.tool_count) ?? prev?.toolCount,
+    toolCount: num(payload.tool_count) ?? prev?.toolCount ?? 0,
     filesRead: filesRead.length ? filesRead : (prev?.filesRead ?? []),
     filesWritten: filesWritten.length ? filesWritten : (prev?.filesWritten ?? []),
     stream,
+    reasoningTokens: num(payload.reasoning_tokens) ?? prev?.reasoningTokens,
     summary: str(payload.summary) || prev?.summary,
     currentTool: TERMINAL.has(status) ? undefined : tool || prev?.currentTool
   }
