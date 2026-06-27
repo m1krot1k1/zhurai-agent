@@ -16,6 +16,9 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+# Disable the spawn rate limiter for tests (tests share a single process)
+os.environ.setdefault("HERMES_SPAWN_RATE_LIMIT", "100000")
+
 from tools.delegate_tool import (
     DELEGATE_BLOCKED_TOOLS,
     DELEGATE_TASK_SCHEMA,
@@ -158,6 +161,11 @@ class TestStripBlockedTools(unittest.TestCase):
 
 
 class TestDelegateTask(unittest.TestCase):
+    def setUp(self):
+        """Reset spawn rate limiter between tests."""
+        from tools.delegate_tool import _reset_spawn_rate
+        _reset_spawn_rate()
+
     def test_no_parent_agent(self):
         result = json.loads(delegate_task(goal="test"))
         self.assertIn("error", result)

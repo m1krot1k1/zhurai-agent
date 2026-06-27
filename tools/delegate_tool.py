@@ -40,6 +40,40 @@ from tools import file_state
 from tools.terminal_tool import set_approval_callback as _set_subagent_approval_cb
 from utils import base_url_hostname, is_truthy_value
 
+from collections import deque
+import time
+
+# ── Subagent spawn rate limiter ────────────────────────────────────────────
+# Sliding-window rate limiter that prevents orchestrator from spawning too
+# many subagents in rapid succession. Default: max 10 spawns per 60 seconds.
+# Configured via delegation.spawn_rate_limit in config.yaml.
+# Override via env HERMES_SPAWN_RATE_LIMIT for testing.
+_SPAWN_RATE_WINDOW_SEC = 60
+_SPAWN_RATE_MAX = int(os.environ.get("HERMES_SPAWN_RATE_LIMIT", "10"))
+_spawn_timestamps: "deque[float]" = deque()
+
+def _check_spawn_rate() -> bool:
+    """Return True if spawning is allowed, False if rate-limited.
+
+    Tracks spawn timestamps in a sliding window.  When the window is full,
+    the oldest timestamp is evicted and the caller is blocked.
+    """
+    global _spawn_timestamps
+    now = time.monotonic()
+    # Prune old entries outside the window
+    while _spawn_timestamps and _spawn_timestamps[0] < now - _SPAWN_RATE_WINDOW_SEC:
+        _spawn_timestamps.popleft()
+    if len(_spawn_timestamps) >= _SPAWN_RATE_MAX:
+        return False
+    _spawn_timestamps.append(now)
+    return True
+
+
+def _reset_spawn_rate() -> None:
+    """Clear the spawn rate limiter state.  Intended for test teardown."""
+    global _spawn_timestamps
+    _spawn_timestamps.clear()
+
 
 # Tools that children must never have access to
 DELEGATE_BLOCKED_TOOLS = frozenset(
@@ -1960,6 +1994,25 @@ def _run_single_child(
             "files_written": _files_written,
             "output_tail": _output_tail,
         }
+
+        # ── Structured monitoring event ────────────────────────────────
+        # JSON-logged for external observability pipelines (Datadog, ELK, etc.)
+        logger.info(
+            "subagent_complete task_index=%d goal=%.64s status=%s "
+            "duration=%.2fs api_calls=%d tokens_in=%d tokens_out=%d "
+            "files_read=%d files_written=%d model=%s cost=%.6f",
+            task_index,
+            goal or "<none>",
+            status,
+            duration,
+            int(api_calls) if isinstance(api_calls, (int, float)) else 0,
+            int(_input_tokens) if isinstance(_input_tokens, (int, float)) else 0,
+            int(_output_tokens) if isinstance(_output_tokens, (int, float)) else 0,
+            len(_files_read),
+            len(_files_written),
+            getattr(child, "model", "unknown"),
+            float(result.get("total_cost", 0)) if isinstance(result, dict) else 0,
+        )
         if _cost_usd is not None:
             try:
                 complete_kwargs["cost_usd"] = float(_cost_usd)
@@ -2134,6 +2187,21 @@ def delegate_task(
                 )
             }
         )
+
+    # Rate limit: prevent orchestrator from spawning too many subagents
+    # too quickly. Sliding window — 10 spawns per 60s default.
+    if not _check_spawn_rate():
+        retry_after = _SPAWN_RATE_WINDOW_SEC
+        if _spawn_timestamps:
+            retry_after = max(1, int(_SPAWN_RATE_WINDOW_SEC - (time.monotonic() - _spawn_timestamps[0])))
+        return json.dumps({
+            "error": (
+                f"Subagent spawn rate limit exceeded "
+                f"(max {_SPAWN_RATE_MAX} per {_SPAWN_RATE_WINDOW_SEC}s). "
+                f"Retry in ~{retry_after}s or increase "
+                f"delegation.spawn_rate_limit in config.yaml."
+            )
+        })
 
     # Load config
     cfg = _load_config()
