@@ -33,14 +33,9 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
   const subagentsBySession = useStore($subagentsBySession)
 
   const subagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
-  const running = activeSubagentCount(subagents)
 
-  // Only show when there are active (running/queued) subagents.
-  if (running === 0) {
-    return null
-  }
-
-  // Sort: running first, then by startedAt ascending.
+  // Sort: running first, then by startedAt ascending. Must run unconditionally —
+  // early return before useMemo caused React #310 when subagents appeared mid-turn.
   const active = useMemo(
     () =>
       [...subagents]
@@ -54,7 +49,9 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
     [subagents]
   )
 
-  if (active.length === 0) {
+  const running = activeSubagentCount(subagents)
+
+  if (running === 0 || active.length === 0) {
     return null
   }
 
