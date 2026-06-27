@@ -719,7 +719,7 @@ export const en: Translations = {
     repoCount: count => `${count} available`,
     repoFrom: count => `${count} from repo`,
     waitingForActivity: 'Waiting for tool activity…',
-    tapToExpand: 'Open spawn tree and expand this agent',
+    tapToExpand: 'Open subagent panel above composer',
     expandRow: 'Expand activity log',
     collapseRow: 'Collapse activity log'
   },

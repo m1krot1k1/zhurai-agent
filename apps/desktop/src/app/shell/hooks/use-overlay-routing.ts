@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 import { type CommandCenterSection } from '@/app/command-center'
 import { AGENTS_ROUTE, appViewForPath, COMMAND_CENTER_ROUTE, isOverlayView, NEW_CHAT_ROUTE } from '@/app/routes'
-import { setFocusSubagentId } from '@/store/subagents'
+import { openSubagentInspector } from '@/store/subagents'
 
 const SECTIONS = ['sessions', 'system', 'usage'] as const
 
@@ -55,13 +55,9 @@ export function useOverlayRouting() {
 
   const openAgents = useCallback(() => navigate(AGENTS_ROUTE), [navigate])
 
-  const openAgentsWithFocus = useCallback(
-    (agentId: string) => {
-      setFocusSubagentId(agentId)
-      navigate(AGENTS_ROUTE)
-    },
-    [navigate]
-  )
+  const openAgentsWithFocus = useCallback((agentId: string) => {
+    openSubagentInspector(agentId)
+  }, [])
 
   return {
     agentsOpen,

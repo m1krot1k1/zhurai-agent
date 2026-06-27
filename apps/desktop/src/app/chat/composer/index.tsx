@@ -107,6 +107,7 @@ import {
   slashChipElement
 } from './rich-editor'
 import { ComposerStatusStack } from './status-stack'
+import { SubagentInspectorPanel } from './subagent-inspector'
 import { detectTrigger, extractClipboardImageBlobs, textBeforeCaret, type TriggerState } from './text-utils'
 import { ComposerTriggerPopover } from './trigger-popover'
 import type { ChatBarProps } from './types'
@@ -2012,6 +2013,7 @@ export function ChatBar({
               height; it overlays the chat instead of pushing it, and publishes
               its own --status-stack-measured-height so the thread's clearance
               accounts for it. Collapses to nothing when every status is empty. */}
+          <SubagentInspectorPanel sessionId={statusSessionId} />
           <ComposerStatusStack
             queue={
               activeQueueSessionKey && queuedPrompts.length > 0 ? (

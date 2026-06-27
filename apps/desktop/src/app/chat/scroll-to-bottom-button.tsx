@@ -62,7 +62,8 @@ export function ScrollToBottomButton() {
         requestScrollToBottom()
       }}
       style={{
-        bottom: 'calc(var(--composer-measured-height) + var(--status-stack-measured-height) + 0.625rem)'
+        bottom:
+          'calc(var(--composer-measured-height) + var(--status-stack-measured-height) + var(--subagent-inspector-measured-height, 0px) + 0.625rem)'
       }}
       tabIndex={visible ? 0 : -1}
       type="button"

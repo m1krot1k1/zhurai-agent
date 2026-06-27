@@ -61,8 +61,22 @@ export const $subagentsBySession = atom<Record<string, SubagentProgress[]>>({})
 /** One-shot focus target when opening the agents overlay from an inline link. */
 export const $focusSubagentId = atom<null | string>(null)
 
+/** Docked inspector above the composer (split nav + detail). */
+export const $subagentInspectorOpen = atom(false)
+export const $subagentInspectorSelectedId = atom<null | string>(null)
+
 export function setFocusSubagentId(id: null | string) {
   $focusSubagentId.set(id)
+}
+
+export function openSubagentInspector(id: string) {
+  $subagentInspectorSelectedId.set(id)
+  $subagentInspectorOpen.set(true)
+  $focusSubagentId.set(null)
+}
+
+export function closeSubagentInspector() {
+  $subagentInspectorOpen.set(false)
 }
 
 const isStr = (v: unknown): v is string => typeof v === 'string'

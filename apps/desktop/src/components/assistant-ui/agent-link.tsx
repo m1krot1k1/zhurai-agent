@@ -1,12 +1,10 @@
 'use client'
 
 import { type ComponentProps, type ReactNode, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 
-import { AGENTS_ROUTE } from '@/app/routes'
 import { Sparkles } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { setFocusSubagentId } from '@/store/subagents'
+import { openSubagentInspector } from '@/store/subagents'
 
 const URL_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
 
@@ -70,12 +68,9 @@ interface AgentLinkProps extends Omit<ComponentProps<'button'>, 'children' | 'on
 }
 
 export function AgentLink({ agentId, children, className, ...props }: AgentLinkProps) {
-  const navigate = useNavigate()
-
   const openAgent = useCallback(() => {
-    setFocusSubagentId(agentId)
-    navigate(AGENTS_ROUTE)
-  }, [agentId, navigate])
+    openSubagentInspector(agentId)
+  }, [agentId])
 
   return (
     <button

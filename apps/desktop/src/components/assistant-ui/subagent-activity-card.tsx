@@ -2,9 +2,7 @@
 
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 
-import { AGENTS_ROUTE } from '@/app/routes'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
@@ -17,7 +15,7 @@ import {
   $subagentsBySession,
   activeSubagentCount,
   buildSubagentTree,
-  setFocusSubagentId,
+  openSubagentInspector,
   type SubagentNode,
   type SubagentProgress
 } from '@/store/subagents'
@@ -29,7 +27,6 @@ import {
  */
 export function SubagentActivityCard({ sessionId }: { sessionId: string | null }) {
   const { t } = useI18n()
-  const navigate = useNavigate()
   const subagentsBySession = useStore($subagentsBySession)
 
   const subagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
@@ -42,10 +39,7 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
     return null
   }
 
-  const openAgentDetail = (agentId: string) => {
-    setFocusSubagentId(agentId)
-    navigate(AGENTS_ROUTE)
-  }
+  const openAgentDetail = (agentId: string) => openSubagentInspector(agentId)
 
   const header =
     running > 0

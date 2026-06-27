@@ -21,7 +21,7 @@ import {
 } from '@/store/composer-status'
 import { $previewStatusBySession, dismissPreviewArtifact } from '@/store/preview-status'
 import { $threadScrolledUp } from '@/store/thread-scroll'
-import { openSessionInNewWindow } from '@/store/windows'
+import { $subagentsBySession, openSubagentInspector } from '@/store/subagents'
 
 import { PreviewStatusRow } from './preview-row'
 import { StatusItemRow } from './status-row'
@@ -84,10 +84,23 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
     return () => clearInterval(timer)
   }, [hasRunningBackground, sessionId])
 
-  const openAgents = () => navigate(AGENTS_ROUTE)
+  const subagentsBySession = useStore($subagentsBySession)
+  const sessionSubagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
 
-  const openSubagent = (item: ComposerStatusItem) =>
-    item.sessionId ? void openSessionInNewWindow(item.sessionId, { watch: true }) : openAgents()
+  const openAgents = () => {
+    const pick =
+      sessionSubagents.find(s => s.status === 'running' || s.status === 'queued') ?? sessionSubagents.at(-1)
+
+    if (pick) {
+      openSubagentInspector(pick.id)
+
+      return
+    }
+
+    navigate(AGENTS_ROUTE)
+  }
+
+  const openSubagent = (item: ComposerStatusItem) => openSubagentInspector(item.id)
 
   const sections: { key: string; node: ReactNode }[] = groups.map(group => ({
     key: group.type,
