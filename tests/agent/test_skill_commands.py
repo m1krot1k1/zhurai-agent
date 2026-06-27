@@ -496,9 +496,8 @@ Generate some audio.
             scan_skill_commands()
             msg = build_skill_invocation_message("/start", "analyze repo delegation")
         assert msg is not None
-        assert 'role="orchestrator"' in msg
-        assert "delegate_task(tasks=" in msg
-        assert "analyze repo delegation" in msg
+        assert msg == "/start analyze repo delegation"
+        assert "delegate_task" not in msg
         assert "[IMPORTANT:" not in msg
         assert "Full skill body" not in msg
 

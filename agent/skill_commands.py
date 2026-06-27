@@ -518,22 +518,16 @@ def resolve_skill_command_key(command: str) -> Optional[str]:
 
 
 def _build_router_skill_message(skill_name: str, user_instruction: str = "") -> str:
-    """Minimal router turn for /start-style skills (no full SKILL.md dump)."""
-    task = (user_instruction or "").strip() or "(no additional instruction)"
-    return (
-        f"/{skill_name} — router mode. Act immediately with ONE delegate_task call:\n"
-        'delegate_task(role="orchestrator", goal="Coordinate user request", '
-        f'context="ORIGINAL_REQUEST: {task}\\n'
-        "MODE: multi_domain\\n"
-        "ORCHESTRATOR_MUST: decompose into 2+ independent branches; "
-        "first wave MUST use delegate_task(tasks=[...]) with parallel specialists "
-        '(repo-explorer, code-reviewer, security-auditor, etc.) — '
-        'NEVER one leaf for the whole analysis.")\n'
-        "Rules: no text reply / file reads / shell before delegate_task; "
-        "orchestrator delegates only, does not implement.\n"
-        "Simple greetings only: answer directly without delegate.\n\n"
-        f"User task: {task}"
-    )
+    """Minimal router turn for /start-style skills (no full SKILL.md dump).
+
+    Keep the user-visible message as ``/start <task>`` so programmatic routing
+    can spawn start → orchestrator → specialists without instructing the root
+    model to delegate orchestrator or leaf specialists directly.
+    """
+    task = (user_instruction or "").strip()
+    if task:
+        return f"/{skill_name} {task}"
+    return f"/{skill_name}"
 
 
 def build_skill_invocation_message(

@@ -10,13 +10,15 @@ import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { type Translations, useI18n } from '@/i18n'
 import { formatSubagentDisplay, formatSubagentRoleBadge } from '@/lib/subagent-label'
-import { AlertCircle, CheckCircle2, Sparkles } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
+import { AlertCircle, CheckCircle2, Sparkles } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
   $subagentsBySession,
   activeSubagentCount,
+  buildSubagentTree,
   setFocusSubagentId,
+  type SubagentNode,
   type SubagentProgress
 } from '@/store/subagents'
 
@@ -31,22 +33,7 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
   const subagentsBySession = useStore($subagentsBySession)
 
   const subagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
-
-  const sorted = useMemo(
-    () =>
-      [...subagents].sort((a, b) => {
-        const rank = (s: SubagentProgress['status']) =>
-          s === 'running' ? 0 : s === 'queued' ? 1 : 2
-        const byStatus = rank(a.status) - rank(b.status)
-
-        if (byStatus !== 0) {
-          return byStatus
-        }
-
-        return a.startedAt - b.startedAt
-      }),
-    [subagents]
-  )
+  const tree = useMemo(() => buildSubagentTree(subagents), [subagents])
 
   const running = activeSubagentCount(subagents)
   const completed = subagents.length - running
@@ -78,10 +65,33 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
       </div>
 
       <div className="divide-y divide-(--ui-stroke-tertiary)/50">
-        {sorted.map(agent => (
-          <SubagentRow agent={agent} key={agent.id} onClick={() => openAgentDetail(agent.id)} />
+        {tree.map(node => (
+          <SubagentTreeRow depth={0} key={node.id} node={node} onOpen={openAgentDetail} />
         ))}
       </div>
+    </div>
+  )
+}
+
+function SubagentTreeRow({
+  depth,
+  node,
+  onOpen
+}: {
+  depth: number
+  node: SubagentNode
+  onOpen: (id: string) => void
+}) {
+  return (
+    <div className={cn(depth > 0 && 'border-l border-(--ui-stroke-tertiary)/60')}>
+      <SubagentRow agent={node} depth={depth} onClick={() => onOpen(node.id)} />
+      {node.children.length > 0 ? (
+        <div className="grid">
+          {node.children.map(child => (
+            <SubagentTreeRow depth={depth + 1} key={child.id} node={child} onOpen={onOpen} />
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -106,9 +116,11 @@ function statusGlyph(status: SubagentProgress['status'], a: Translations['agents
 
 function SubagentRow({
   agent,
+  depth = 0,
   onClick
 }: {
   agent: SubagentProgress
+  depth?: number
   onClick: () => void
 }) {
   const { t } = useI18n()
@@ -123,8 +135,9 @@ function SubagentRow({
   return (
     <button
       className={cn(
-        'flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left transition-colors',
-        'hover:bg-(--ui-row-hover-background) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60'
+        'flex w-full min-w-0 items-center gap-2 py-1.5 text-left transition-colors',
+        'hover:bg-(--ui-row-hover-background) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/60',
+        depth > 0 ? 'pl-4 pr-2.5' : 'px-2.5'
       )}
       data-subagent-id={agent.id}
       onClick={onClick}

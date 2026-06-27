@@ -507,8 +507,8 @@ def format_programmatic_dispatch_message(
     if status == "dispatched":
         count = dispatch_payload.get("count") or len(tasks)
         return (
-            f"Запущено {count} параллельных специалистов ({label_csv}). "
-            "Они работают в фоне — результаты появятся по мере завершения."
+            f"Orchestrator → {count} параллельных специалистов ({label_csv}). "
+            "Они работают в фоне — смотрите Spawn tree (ветки под orchestrator)."
         )
 
     results = dispatch_payload.get("results")
@@ -697,7 +697,21 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
         pass
 
     if is_start_router_turn(message):
-        return try_programmatic_start_router(agent, message, task_id=task_id)
+        routed = try_programmatic_start_router(agent, message, task_id=task_id)
+        if routed:
+            return routed
+        # Never root-fan-out leaf specialists on /start — chain is
+        # start subagent → orchestrator → parallel specialists.
+        logger.warning(
+            "start router dispatch failed; refusing root specialist fan-out "
+            "(session=%s task=%s)",
+            getattr(agent, "session_id", None) or "none",
+            task_id,
+        )
+        return (
+            "Start router: не удалось запустить сабагент **start**. "
+            "Проверьте delegation (spawn paused / max depth) и повторите `/start`."
+        )
 
     tasks = plan_parallel_delegate_tasks(message)
     if len(tasks) < _min_parallel_tasks():
@@ -793,6 +807,23 @@ def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> 
 
 def build_orchestration_injection(message: str) -> Optional[str]:
     """Build API-only user-message injection for multi-domain turns."""
+    if is_start_router_turn(message):
+        # Programmatic mode handles /start via start → orchestrator chain.
+        if orchestrate_mode() == "programmatic":
+            return None
+        original = _orchestration_scoring_text(message) or " ".join((message or "").split())
+        return (
+            "[HERMES_START_ROUTER — orchestration hint; not shown to user]\n"
+            "This is a /start router turn. Do NOT delegate leaf specialists from "
+            "this session. Your FIRST action MUST be ONE delegate_task that spawns "
+            "the **start** subagent (AGENT_ID:start in context, role=orchestrator, "
+            "background=true). Start will hand off to orchestrator; orchestrator "
+            "will fan out parallel specialists.\n\n"
+            f'context must include ORIGINAL_REQUEST: {original}\\n'
+            "MODE: start_router\n\n"
+            "No read_file/terminal/web before delegate_task."
+        )
+
     if not should_auto_orchestrate(message):
         return None
 

@@ -149,6 +149,62 @@ def test_try_start_child_handoff_dispatches_orchestrator(
     assert agent._start_handoff_done is True
 
 
+def test_try_programmatic_start_router_no_fallthrough_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "start.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {
+            "auto_orchestrate": True,
+            "auto_orchestrate_mode": "programmatic",
+            "auto_orchestrate_min_tasks": 2,
+        },
+    )
+
+    agent = MagicMock()
+    agent._delegate_depth = 0
+    agent.valid_tool_names = {"delegate_task"}
+    agent.session_id = "sess-root"
+    agent._dispatch_delegate_task.return_value = json.dumps({"error": "spawn paused"})
+
+    msg = "/start полный анализ репозитория и security audit"
+    response = try_programmatic_orchestration(agent, msg, task_id="task-root")
+    assert response is not None
+    assert "start" in response.lower()
+    assert "repo-explorer" not in response
+    call = agent._dispatch_delegate_task.call_args[0][0]
+    assert "tasks" not in call or not call.get("tasks")
+
+
+def test_build_orchestration_injection_start_router_hint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "auto_orchestrate_mode": "both"},
+    )
+    msg = "/start analyze repo architecture and security"
+    injection = build_orchestration_injection(msg)
+    assert injection is not None
+    assert "AGENT_ID:start" in injection
+    assert "leaf specialists" in injection.lower()
+
+
+def test_build_orchestration_injection_skips_start_in_programmatic_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "auto_orchestrate_mode": "programmatic"},
+    )
+    msg = "/start analyze repo architecture and security"
+    assert build_orchestration_injection(msg) is None
+
+
 def test_try_orchestrator_child_fanout_dispatches(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
