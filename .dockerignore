@@ -67,7 +67,8 @@ runtime/
 # ---------- Not needed inside the Docker image ----------
 
 # Desktop app source (Tauri/Electron); never installed in the container
-apps/
+apps/desktop/
+apps/bootstrap-installer/
 
 # Test suite — not shipped in production images
 tests/
