@@ -8,6 +8,7 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Dockerfile'
+      - '.dockerignore'
       - 'docker/**'
       - '.github/workflows/docker-publish.yml'
       - '.github/actions/hermes-smoke-test/**'
