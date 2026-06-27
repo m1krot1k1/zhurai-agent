@@ -1,4 +1,5 @@
 import { atom } from 'nanostores'
+import { buildSubagentTree as sharedBuildSubagentTree, type SubagentNode as SharedSubagentNode } from '@hermes/shared'
 
 export type SubagentStatus = 'completed' | 'failed' | 'interrupted' | 'queued' | 'running'
 export type SubagentStreamKind = 'progress' | 'summary' | 'thinking' | 'tool'
@@ -239,31 +240,34 @@ export function upsertSubagent(sid: string, payload: SubagentPayload, createIfMi
 }
 
 export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentNode[] {
-  const nodes = new Map<string, SubagentNode>()
-
-  for (const item of items) {
-    nodes.set(item.id, { ...item, children: [] })
-  }
-
-  const roots: SubagentNode[] = []
-
-  for (const node of nodes.values()) {
-    const parent = node.parentId ? nodes.get(node.parentId) : null
-
-    if (parent) {
-      parent.children.push(node)
-    } else {
-      roots.push(node)
-    }
-  }
+  // Delegate to @hermes/shared tree builder (generic on T), then adapt the
+  // shared SubagentNode<T> (which has { aggregate, children, item }) to the
+  // Desktop's SubagentNode (which extends SubagentProgress with children).
+  const shared = sharedBuildSubagentTree(items)
 
   const sort = (a: SubagentNode, b: SubagentNode) =>
     a.startedAt - b.startedAt || a.taskIndex - b.taskIndex || a.goal.localeCompare(b.goal)
 
-  const walk = (node: SubagentNode) => node.children.sort(sort).forEach(walk)
-  roots.sort(sort).forEach(walk)
+  const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>
+    nodes
+      .map(n => ({
+        ...n.item,
+        children: adapt(n.children)
+      }))
+      .sort(sort)
 
-  return roots
+  // Also sort children of each node recursively (the shared builder sorts
+  // by (depth, index) but Desktop sorts by (startedAt, taskIndex, goal)).
+  const sortChildren = (nodes: SubagentNode[]) => {
+    for (const node of nodes) {
+      node.children.sort(sort)
+      sortChildren(node.children)
+    }
+  }
+
+  const result = adapt(shared)
+  sortChildren(result)
+  return result
 }
 
 export const activeSubagentCount = (items: readonly SubagentProgress[]) =>

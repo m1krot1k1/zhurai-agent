@@ -7,4 +7,26 @@ export {
   type GatewayRequestId,
   type JsonRpcFrame,
   type WebSocketLike
-} from './json-rpc-gateway'
+} from './json-rpc-gateway.js'
+
+export {
+  type SubagentAggregate,
+  type SubagentNode,
+  type SubagentProgress,
+  type SubagentStatus,
+  aggregate,
+  buildSubagentTree,
+  descendantIds,
+  flattenTree,
+  fmtCost,
+  fmtDuration,
+  fmtTokens,
+  formatSummary,
+  hotnessBucket,
+  isRunning,
+  peakHotness,
+  sparkline,
+  topLevelSubagents,
+  treeTotals,
+  widthByDepth,
+} from './subagent-tree.js'

@@ -20,6 +20,7 @@ Public API (signatures preserved from the original 2,400-line version):
     check_tool_availability(quiet) -> tuple
 """
 
+import contextvars
 import os
 import json
 import re
@@ -214,7 +215,12 @@ TOOLSET_REQUIREMENTS: Dict[str, dict] = registry.get_toolset_requirements()
 
 # Resolved tool names from the last get_tool_definitions() call.
 # Used by code_execution_tool to know which tools are available in this session.
-_last_resolved_tool_names: List[str] = []
+# ContextVar provides per-thread isolation: child subagent threads never
+# overwrite the parent's value, making the save/restore protocol in
+# delegate_tool.py unnecessary.
+_last_resolved_tool_names: contextvars.ContextVar[List[str]] = (
+    contextvars.ContextVar("_last_resolved_tool_names", default=[])
+)
 
 
 # =============================================================================
@@ -325,8 +331,7 @@ def get_tool_definitions(
         if cached is not None:
             # Update _last_resolved_tool_names so downstream callers see
             # consistent state even on a cache hit.
-            global _last_resolved_tool_names
-            _last_resolved_tool_names = [t["function"]["name"] for t in cached]
+            _last_resolved_tool_names.set([t["function"]["name"] for t in cached])
             # Return a shallow copy of the list but share the dict references —
             # schemas are treated as read-only by all known callers.
             return list(cached)
@@ -513,8 +518,7 @@ def _compute_tool_definitions(
         else:
             print("🛠️  No tools selected (all filtered out or unavailable)")
 
-    global _last_resolved_tool_names
-    _last_resolved_tool_names = [t["function"]["name"] for t in filtered_tools]
+    _last_resolved_tool_names.set([t["function"]["name"] for t in filtered_tools])
 
     # Sanitize schemas for broad backend compatibility. llama.cpp's
     # json-schema-to-grammar converter (used by its OAI server to build
@@ -1135,7 +1139,7 @@ def handle_function_call(
             if function_name == "execute_code":
                 # Prefer the caller-provided list so subagents can't overwrite
                 # the parent's tool set via the process-global.
-                sandbox_enabled = enabled_tools if enabled_tools is not None else _last_resolved_tool_names
+                sandbox_enabled = enabled_tools if enabled_tools is not None else _last_resolved_tool_names.get()
                 def _dispatch(next_args: Dict[str, Any]) -> Any:
                     return registry.dispatch(
                         function_name, next_args,

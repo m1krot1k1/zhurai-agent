@@ -1,5 +1,5 @@
 import { STARTUP_IMAGE, STARTUP_QUERY } from '../config/env.js'
-import { STREAM_BATCH_MS } from '../config/timing.js'
+import { STREAM_BATCH_MS, SUBAGENT_BATCH_MS } from '../config/timing.js'
 import { buildSetupRequiredSections, SETUP_REQUIRED_TITLE } from '../content/setup.js'
 import type {
   CommandsCatalogResponse,
@@ -7,7 +7,8 @@ import type {
   DelegationStatusResponse,
   GatewayEvent,
   GatewaySkin,
-  SessionMostRecentResponse
+  SessionMostRecentResponse,
+  SubagentEventPayload
 } from '../gatewayTypes.js'
 import { rpcErrorMessage } from '../lib/rpc.js'
 import { openExternalUrl } from '../lib/openExternalUrl.js'
@@ -54,6 +55,34 @@ const pushUnique =
 const pushThinking = pushUnique(6)
 const pushNote = pushUnique(6)
 const pushTool = pushUnique(8)
+
+// ── Subagent event debounce ──────────────────────────────────────────────
+// Batches rapid subagent.tool / subagent.thinking / subagent.progress events
+// into a single nanostore update every SUBAGENT_BATCH_MS (50ms).  Without
+// this, each tool call from a fast subagent triggers a separate React
+// re-render of the entire ToolTrail component.
+type DebounceUpdate = {
+  payload: SubagentEventPayload
+  patch: (c: SubagentProgress) => Partial<SubagentProgress>
+}
+let _subagentBatchTimer: ReturnType<typeof setTimeout> | null = null
+let _subagentBatchUpdates: DebounceUpdate[] = []
+
+function _flushSubagentBatch() {
+  _subagentBatchTimer = null
+  const updates = _subagentBatchUpdates
+  _subagentBatchUpdates = []
+  for (const { payload, patch } of updates) {
+    turnController.upsertSubagent(payload, patch, { createIfMissing: false })
+  }
+}
+
+function _scheduleSubagentBatch(payload: SubagentEventPayload, patch: (c: SubagentProgress) => Partial<SubagentProgress>) {
+  _subagentBatchUpdates.push({ payload, patch })
+  if (_subagentBatchTimer === null) {
+    _subagentBatchTimer = setTimeout(_flushSubagentBatch, SUBAGENT_BATCH_MS)
+  }
+}
 
 const KNOWN_SUBAGENT_STATUSES = new Set<SubagentStatus>([
   'completed',
@@ -833,15 +862,13 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           return
         }
 
-        // Update-only: never resurrect subagents whose spawn_requested/start
-        // we missed or that already flushed via message.complete.
-        turnController.upsertSubagent(
+        // Debounced: batched into nanostore updates every SUBAGENT_BATCH_MS
+        _scheduleSubagentBatch(
           ev.payload,
           c => ({
             status: keepTerminalElseRunning(c.status),
             thinking: pushThinking(c.thinking, text)
-          }),
-          { createIfMissing: false }
+          })
         )
 
         return
@@ -853,13 +880,13 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           ev.payload.tool_preview ?? ev.payload.text ?? ''
         )
 
-        turnController.upsertSubagent(
+        // Debounced: batched into nanostore updates every SUBAGENT_BATCH_MS
+        _scheduleSubagentBatch(
           ev.payload,
           c => ({
             status: keepTerminalElseRunning(c.status),
             tools: pushTool(c.tools, line)
-          }),
-          { createIfMissing: false }
+          })
         )
 
         return
@@ -872,13 +899,13 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           return
         }
 
-        turnController.upsertSubagent(
+        // Debounced: batched into nanostore updates every SUBAGENT_BATCH_MS
+        _scheduleSubagentBatch(
           ev.payload,
           c => ({
             notes: pushNote(c.notes, text),
             status: keepTerminalElseRunning(c.status)
-          }),
-          { createIfMissing: false }
+          })
         )
 
         return
