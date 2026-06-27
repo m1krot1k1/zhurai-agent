@@ -3,12 +3,15 @@ name: Typecheck
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   # No paths filter — the job must always run so the required check
   # reports a status (path-gated workflows leave checks "pending" forever
   # when no matching files change, which blocks merge).
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+
+permissions:
+  contents: read
 
 jobs:
   typecheck:
