@@ -253,19 +253,15 @@ export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentN
   // Desktop's SubagentNode (which extends SubagentProgress with children).
   const shared = sharedBuildSubagentTree(items)
 
+  const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>
+    nodes.map(n => {
+      const { item } = n
+      return { ...item, children: adapt(n.children) } as unknown as SubagentNode
+    })
+
   const sort = (a: SubagentNode, b: SubagentNode) =>
     a.startedAt - b.startedAt || a.taskIndex - b.taskIndex || a.goal.localeCompare(b.goal)
 
-  const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>
-    nodes
-      .map(n => ({
-        ...n.item,
-        children: adapt(n.children)
-      }))
-      .sort(sort)
-
-  // Also sort children of each node recursively (the shared builder sorts
-  // by (depth, index) but Desktop sorts by (startedAt, taskIndex, goal)).
   const sortChildren = (nodes: SubagentNode[]) => {
     for (const node of nodes) {
       node.children.sort(sort)
@@ -274,6 +270,7 @@ export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentN
   }
 
   const result = adapt(shared)
+  result.sort(sort)
   sortChildren(result)
   return result
 }
