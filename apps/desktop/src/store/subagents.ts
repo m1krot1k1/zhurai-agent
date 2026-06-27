@@ -197,7 +197,10 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     costUsd: num(payload.cost_usd) ?? prev?.costUsd,
     inputTokens: num(payload.input_tokens) ?? prev?.inputTokens,
     outputTokens: num(payload.output_tokens) ?? prev?.outputTokens,
-    toolCount: num(payload.tool_count) ?? prev?.toolCount ?? 0,
+    toolCount:
+      eventType === 'subagent.tool' && tool
+        ? (prev?.toolCount ?? 0) + 1
+        : num(payload.tool_count) ?? prev?.toolCount ?? 0,
     filesRead: filesRead.length ? filesRead : (prev?.filesRead ?? []),
     filesWritten: filesWritten.length ? filesWritten : (prev?.filesWritten ?? []),
     stream,

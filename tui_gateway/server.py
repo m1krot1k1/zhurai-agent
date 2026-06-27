@@ -3051,6 +3051,10 @@ def _on_tool_progress(
             payload["verbose"] = True
         _emit("reasoning.available", sid, payload)
         return
+    if event_type == "subagent_progress":
+        event_type = "subagent.progress"
+        if not preview and name:
+            preview = str(name)
     if event_type.startswith("subagent."):
         payload = {
             "goal": str(_kwargs.get("goal") or ""),

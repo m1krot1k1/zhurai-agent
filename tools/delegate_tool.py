@@ -752,6 +752,9 @@ def _build_child_system_prompt(
             "WHEN to delegate:\n"
             "- The goal decomposes into 2+ independent subtasks that can "
             "run in parallel (e.g. research A and B simultaneously).\n"
+            "- You MUST use ONE delegate_task call with tasks=[...] for the "
+            "first parallel wave — NEVER call delegate_task once per specialist "
+            "(sequential calls waste time and violate orchestration policy).\n"
             "- A subtask is reasoning-heavy and would flood your context "
             "with intermediate data.\n\n"
             "WHEN NOT to delegate:\n"
@@ -965,7 +968,11 @@ def _build_child_progress_callback(
                     logger.debug("Spinner print_above failed: %s", e)
             if parent_cb:
                 try:
-                    parent_cb("subagent_progress", f"{prefix}{summary_text}")
+                    parent_cb(
+                        "subagent.progress",
+                        preview=f"{prefix}{summary_text}",
+                        **(_identity_kwargs()),
+                    )
                 except Exception as e:
                     logger.debug("Parent callback relay failed: %s", e)
             return
@@ -1136,14 +1143,19 @@ def _build_child_agent(
     # TUI can reconstruct the spawn tree and route per-branch controls.
     child_session_ref: Dict[str, Any] = {}
     # Resolve ecosystem agent id for spawn-tree labels (AGENT_ID in context).
-    try:
-        from agent.orchestrator_router import parse_agent_id_from_envelope
+        try:
+            from agent.orchestrator_router import (
+                infer_agent_id_from_text,
+                parse_agent_id_from_envelope,
+            )
 
-        agent_id_for_cb = parse_agent_id_from_envelope(context or "") or parse_agent_id_from_envelope(
-            goal or ""
-        )
-    except Exception:
-        agent_id_for_cb = None
+            agent_id_for_cb = (
+                parse_agent_id_from_envelope(context or "")
+                or parse_agent_id_from_envelope(goal or "")
+                or infer_agent_id_from_text(f"{goal or ''}\n{context or ''}")
+            )
+        except Exception:
+            agent_id_for_cb = None
 
     child_progress_cb = _build_child_progress_callback(
         task_index,
@@ -1310,6 +1322,7 @@ def _build_child_agent(
     child._subagent_id = subagent_id
     child._parent_subagent_id = parent_subagent_id
     child._subagent_goal = goal
+    child._delegate_branch_context = context or ""
     child._parent_turn_id = getattr(parent_agent, "_current_turn_id", "") or ""
     # Stable sidebar marker: delegate subagent sessions must stay out of
     # session pickers even when a parent delete orphans them (parent_session_id
@@ -2271,6 +2284,29 @@ def delegate_task(
 
     if not task_list:
         return tool_error("No tasks provided.")
+
+    # Enrich batch entries with AGENT_ID context when the model omitted it.
+    try:
+        from agent.orchestrator_router import enrich_delegate_task_entry
+
+        task_list = [enrich_delegate_task_entry(dict(t)) for t in task_list]
+    except Exception:
+        logger.debug("delegate_task: task enrichment skipped", exc_info=True)
+
+    # Orchestrator-role parents fanning out 2+ branches should run in the
+    # background so specialists execute concurrently without blocking the
+    # orchestrator turn on each sequential delegate_task call.
+    if (
+        background is False
+        and len(task_list) >= 2
+        and getattr(parent_agent, "_delegate_role", None) == "orchestrator"
+    ):
+        background = True
+        logger.info(
+            "delegate_task: auto-enabling background=true for orchestrator "
+            "batch of %d tasks",
+            len(task_list),
+        )
 
     # Validate each task has a goal
     for i, task in enumerate(task_list):

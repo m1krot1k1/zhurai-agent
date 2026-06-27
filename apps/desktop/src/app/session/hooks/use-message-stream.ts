@@ -230,12 +230,18 @@ function delegateTaskPayloads(
 
   return tasks.map((task, index) => {
     const goal = firstString(task.goal, args.goal, payload.context) || 'Delegated task'
+    const context = firstString(task.context, args.context)
+    const agentId =
+      firstString(task.agent_id) ||
+      context.match(/\bAGENT_ID:\s*(\S+)/i)?.[1] ||
+      context.match(/\/agents\/([\w-]+)\.md/i)?.[1]
     const summary = firstString(result.summary, payload.summary, payload.message)
 
     return {
       depth: 0,
       duration_seconds: payload.duration_s,
       goal,
+      agent_id: agentId || undefined,
       role: firstString(task.role, args.role),
       status,
       subagent_id: `delegate-tool:${toolId}:${index}`,

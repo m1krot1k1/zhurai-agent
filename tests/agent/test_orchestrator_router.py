@@ -11,12 +11,16 @@ import pytest
 from agent.orchestrator_router import (
     build_orchestration_injection,
     classify_complexity,
+    enrich_delegate_task_entry,
+    extract_original_request,
+    infer_agent_id_from_text,
     orchestrate_mode,
     parse_agent_id_from_envelope,
     plan_parallel_delegate_tasks,
     should_auto_orchestrate,
     should_programmatic_orchestrate,
     suggest_specialists,
+    try_orchestrator_child_fanout,
     try_programmatic_orchestration,
 )
 
@@ -32,6 +36,77 @@ def test_classify_multi_long_request() -> None:
         "исправь баг с max_spawn_depth, напиши тесты и сделай security review."
     )
     assert classify_complexity(msg) == "multi"
+
+
+def test_classify_start_with_body_is_multi() -> None:
+    msg = (
+        "/start полный анализ репозитория: architecture, git history, security audit "
+        "и проверка multi-agent swarm orchestration."
+    )
+    assert classify_complexity(msg) == "multi"
+    assert classify_complexity("/start") == "trivial"
+
+
+def test_infer_agent_id_from_goal_keywords() -> None:
+    assert infer_agent_id_from_text("Deep code review of orchestration bugs") == "code-reviewer"
+    assert infer_agent_id_from_text("Map the codebase structure and key modules") == "repo-explorer"
+
+
+def test_extract_original_request() -> None:
+    ctx = 'ORIGINAL_REQUEST: analyze repo\\nMODE: multi_domain'
+    assert extract_original_request(ctx) == "analyze repo"
+
+
+def test_enrich_delegate_task_entry_adds_agent_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "repo-explorer.md").write_text("---\n", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+
+    enriched = enrich_delegate_task_entry(
+        {"goal": "Map the codebase structure and navigation for this repository"}
+    )
+    assert "AGENT_ID: repo-explorer" in (enriched.get("context") or "")
+
+
+def test_try_orchestrator_child_fanout_dispatches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "code.md").write_text("x", encoding="utf-8")
+    (eco / "agents" / "repo-explorer.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "auto_orchestrate_min_tasks": 2},
+    )
+
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = False
+    agent.valid_tool_names = {"delegate_task"}
+    agent.session_id = "sess-orch"
+    agent._delegate_branch_context = (
+        "ORIGINAL_REQUEST: Analyze repo architecture and security audit\nMODE: multi_domain"
+    )
+    agent._dispatch_delegate_task.return_value = json.dumps(
+        {"status": "dispatched", "count": 2, "results": []}
+    )
+
+    response = try_orchestrator_child_fanout(
+        agent,
+        "Coordinate user request",
+        task_id="task-orch",
+    )
+    assert response is not None
+    agent._dispatch_delegate_task.assert_called_once()
+    call = agent._dispatch_delegate_task.call_args[0][0]
+    assert call.get("background") is True
+    assert len(call.get("tasks") or []) >= 2
+    assert agent._orchestrator_fanout_done is True
 
 
 def test_suggest_specialists_for_repo_analysis() -> None:

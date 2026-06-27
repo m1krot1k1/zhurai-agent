@@ -172,13 +172,87 @@ def is_auto_orchestrate_enabled() -> bool:
     return bool(cfg.get("auto_orchestrate", True))
 
 
-def classify_complexity(message: str) -> str:
-    """Return ``trivial``, ``single``, or ``multi``."""
+def _orchestration_scoring_text(message: str) -> str:
+    """Text used for complexity/specialist scoring (strip bare slash commands)."""
     text = (message or "").strip()
     if not text:
-        return "trivial"
+        return ""
     if text.startswith("/"):
-        return "trivial"  # slash commands carry their own routing
+        # /start with a body is a full task, not a bare slash command.
+        parts = text.split(maxsplit=1)
+        if len(parts) > 1:
+            return parts[1].strip()
+        if "ORIGINAL_REQUEST:" in text:
+            return extract_original_request(text) or text
+        if "User task:" in text:
+            return text.split("User task:", 1)[-1].strip()
+        return ""
+    return text
+
+
+def extract_original_request(text: str) -> Optional[str]:
+    """Pull ORIGINAL_REQUEST from delegate / router envelopes."""
+    if not text or not isinstance(text, str):
+        return None
+    match = re.search(
+        r"ORIGINAL_REQUEST:\s*(.+?)(?:\\n|\n(?:MODE:|ORCHESTRATOR_MUST:|AGENT_ID:)|$)",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if match:
+        return " ".join(match.group(1).split())
+    return None
+
+
+def infer_agent_id_from_text(text: str) -> Optional[str]:
+    """Best-effort agent id when delegate context omits AGENT_ID."""
+    explicit = parse_agent_id_from_envelope(text or "")
+    if explicit:
+        return explicit
+    scored = score_specialists(text or "")
+    if not scored:
+        return None
+    best_id, best_score = scored[0]
+    if best_score < 1:
+        return None
+    # Require a clear winner so ambiguous goals do not get random labels.
+    if len(scored) > 1 and scored[1][1] >= best_score:
+        return None
+    return best_id
+
+
+def enrich_delegate_task_entry(task: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure each batch entry carries AGENT_ID in context when inferrable."""
+    from agent.ecosystem_delegate import build_delegate_branch_context
+
+    goal = str(task.get("goal") or "").strip()
+    context = str(task.get("context") or "").strip()
+    agent_id = parse_agent_id_from_envelope(context) or parse_agent_id_from_envelope(goal)
+    if not agent_id:
+        agent_id = infer_agent_id_from_text(f"{goal}\n{context}")
+    if not agent_id:
+        return task
+    if parse_agent_id_from_envelope(context):
+        return task
+    original = extract_original_request(context) or extract_original_request(goal) or ""
+    objective = goal or _objective_for_agent(agent_id, original or context)
+    enriched = dict(task)
+    enriched["context"] = build_delegate_branch_context(
+        agent_id,
+        objective=objective,
+        original_request=original,
+    )
+    return enriched
+
+
+def classify_complexity(message: str) -> str:
+    """Return ``trivial``, ``single``, or ``multi``."""
+    text = _orchestration_scoring_text(message)
+    if not text:
+        raw = (message or "").strip()
+        if not raw or (raw.startswith("/") and len(raw.split(maxsplit=1)) == 1):
+            return "trivial"
+        text = raw
     if len(text) < 35 and _TRIVIAL_RE.match(text):
         return "trivial"
     if len(text) < 25 and "?" in text and not _ACTION_RE.search(text):
@@ -289,7 +363,7 @@ def _tasks_from_agent_specs(
 
 def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
     """Build delegate_task batch entries for a parallel first wave."""
-    text = (message or "").strip()
+    text = _orchestration_scoring_text(message) or (message or "").strip()
     if not text:
         return []
 
@@ -468,6 +542,77 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
         logger.info("programmatic orchestration rejected: %s", payload.get("error"))
         return None
 
+    return format_programmatic_dispatch_message(tasks, payload)
+
+
+def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> Optional[str]:
+    """Parallel first wave when the active agent is an orchestrator subagent.
+
+    Root ``/start`` often spawns a single orchestrator child; without this hook
+    the model tends to call ``delegate_task`` once per specialist (sequential).
+    """
+    if getattr(agent, "_delegate_role", None) != "orchestrator":
+        return None
+    if getattr(agent, "_orchestrator_fanout_done", False):
+        return None
+
+    valid = getattr(agent, "valid_tool_names", None) or set()
+    if "delegate_task" not in valid:
+        return None
+
+    try:
+        from tools.delegate_tool import is_spawn_paused
+
+        if is_spawn_paused():
+            return None
+    except Exception:
+        pass
+
+    sources = [
+        user_message or "",
+        getattr(agent, "_delegate_branch_context", "") or "",
+        getattr(agent, "ephemeral_system_prompt", "") or "",
+    ]
+    original = ""
+    for src in sources:
+        if not isinstance(src, str) or not src.strip():
+            continue
+        original = extract_original_request(src) or original
+    if not original:
+        original = _orchestration_scoring_text(user_message) or (user_message or "").strip()
+    if not original:
+        return None
+
+    tasks = plan_parallel_delegate_tasks(original)
+    if len(tasks) < _min_parallel_tasks():
+        return None
+
+    tasks = [enrich_delegate_task_entry(t) for t in tasks]
+    logger.info(
+        "orchestrator child fan-out: dispatching %d parallel tasks (session=%s task=%s)",
+        len(tasks),
+        getattr(agent, "session_id", None) or "none",
+        task_id,
+    )
+
+    try:
+        result_json = agent._dispatch_delegate_task(
+            {"tasks": tasks, "role": "leaf", "background": True}
+        )
+    except Exception as exc:
+        logger.warning("orchestrator child fan-out failed: %s", exc)
+        return None
+
+    try:
+        payload = json.loads(result_json)
+    except json.JSONDecodeError:
+        return None
+
+    if payload.get("error"):
+        logger.info("orchestrator child fan-out rejected: %s", payload.get("error"))
+        return None
+
+    agent._orchestrator_fanout_done = True
     return format_programmatic_dispatch_message(tasks, payload)
 
 

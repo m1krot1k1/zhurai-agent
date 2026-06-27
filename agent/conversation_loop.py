@@ -590,13 +590,22 @@ def run_conversation(
     # Programmatic multi-agent fan-out (before first LLM API call).
     if isinstance(original_user_message, str):
         try:
-            from agent.orchestrator_router import try_programmatic_orchestration
+            from agent.orchestrator_router import (
+                try_orchestrator_child_fanout,
+                try_programmatic_orchestration,
+            )
 
             _prog_response = try_programmatic_orchestration(
                 agent,
                 original_user_message,
                 task_id=effective_task_id,
             )
+            if not _prog_response:
+                _prog_response = try_orchestrator_child_fanout(
+                    agent,
+                    original_user_message,
+                    task_id=effective_task_id,
+                )
         except Exception as exc:
             _prog_response = None
             logger.warning("programmatic orchestration error: %s", exc)

@@ -152,6 +152,8 @@ function SubagentRow({
           <span className="truncate text-[0.7rem] text-muted-foreground/70">
             {agent.currentTool.replace(/_/g, ' ')}
           </span>
+        ) : running ? (
+          <span className="truncate text-[0.7rem] text-muted-foreground/70">{t.agents.waitingForActivity}</span>
         ) : !running && agent.summary ? (
           <span className="truncate text-[0.7rem] text-muted-foreground/70">{agent.summary}</span>
         ) : null}

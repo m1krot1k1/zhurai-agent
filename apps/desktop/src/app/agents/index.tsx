@@ -551,7 +551,11 @@ function SubagentRow({
       </button>
 
       {open && running && visibleRows.length === 0 ? (
-        <p className="pl-6 text-[0.72rem] leading-relaxed text-muted-foreground/70">{t.agents.waitingForActivity}</p>
+        <p className="pl-6 text-[0.72rem] leading-relaxed text-muted-foreground/70">
+          {node.currentTool
+            ? node.currentTool.replace(/_/g, ' ')
+            : t.agents.waitingForActivity}
+        </p>
       ) : null}
 
       {visibleRows.length > 0 ? (
