@@ -593,6 +593,7 @@ def run_conversation(
             from agent.orchestrator_router import (
                 try_orchestrator_child_fanout,
                 try_programmatic_orchestration,
+                try_start_child_handoff,
             )
 
             _prog_response = try_programmatic_orchestration(
@@ -600,6 +601,12 @@ def run_conversation(
                 original_user_message,
                 task_id=effective_task_id,
             )
+            if not _prog_response:
+                _prog_response = try_start_child_handoff(
+                    agent,
+                    original_user_message,
+                    task_id=effective_task_id,
+                )
             if not _prog_response:
                 _prog_response = try_orchestrator_child_fanout(
                     agent,

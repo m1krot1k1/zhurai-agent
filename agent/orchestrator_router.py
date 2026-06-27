@@ -322,6 +322,40 @@ def should_programmatic_orchestrate(message: str) -> bool:
     return classify_complexity(message) == "multi"
 
 
+def is_start_router_turn(message: str) -> bool:
+    """True for ``/start`` and router-mode skill injections."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    if text.startswith("/start"):
+        return True
+    lower = text.lower()
+    return "router mode" in lower and "/start" in lower
+
+
+def _agent_ecosystem_id(agent) -> Optional[str]:
+    ctx = getattr(agent, "_delegate_branch_context", "") or ""
+    return parse_agent_id_from_envelope(ctx)
+
+
+def _resolve_original_request(agent, user_message: str) -> str:
+    """Best-effort ORIGINAL_REQUEST from envelope + turn message."""
+    original = ""
+    for src in (
+        user_message or "",
+        getattr(agent, "_delegate_branch_context", "") or "",
+        getattr(agent, "ephemeral_system_prompt", "") or "",
+    ):
+        if not isinstance(src, str) or not src.strip():
+            continue
+        original = extract_original_request(src) or original
+    if original:
+        return original
+    if "User task:" in (user_message or ""):
+        return user_message.split("User task:", 1)[-1].strip()
+    return _orchestration_scoring_text(user_message) or (user_message or "").strip()
+
+
 def should_auto_orchestrate(message: str) -> bool:
     if not is_auto_orchestrate_enabled():
         return False
@@ -490,6 +524,153 @@ def format_programmatic_dispatch_message(
     return f"Оркестрация запущена: {label_csv}."
 
 
+def format_start_router_dispatch_message(dispatch_payload: dict) -> str:
+    status = dispatch_payload.get("status")
+    if status == "dispatched":
+        return (
+            "Запущен сабагент **start** → он передаст задачу **orchestrator** → "
+            "затем orchestrator запустит параллельных специалистов. "
+            "Следите за Spawn tree."
+        )
+    note = dispatch_payload.get("note") or dispatch_payload.get("error") or ""
+    if note:
+        return f"Start router: {note}"
+    return "Start router: делегирование orchestrator."
+
+
+def format_start_handoff_message(dispatch_payload: dict) -> str:
+    status = dispatch_payload.get("status")
+    if status == "dispatched":
+        return (
+            "Start → **orchestrator**: координатор запущен, "
+            "готовлю параллельный рой специалистов."
+        )
+    note = dispatch_payload.get("note") or dispatch_payload.get("error") or ""
+    if note:
+        return f"Start handoff: {note}"
+    return "Start передал задачу orchestrator."
+
+
+def try_programmatic_start_router(
+    agent, message: str, *, task_id: str
+) -> Optional[str]:
+    """Root ``/start``: spawn start subagent (not leaf specialists)."""
+    from agent.ecosystem_delegate import build_delegate_branch_context
+
+    original = _resolve_original_request(agent, message)
+    if not original:
+        return None
+
+    logger.info(
+        "start router: dispatching start subagent (session=%s task=%s)",
+        getattr(agent, "session_id", None) or "none",
+        task_id,
+    )
+
+    ctx = build_delegate_branch_context(
+        "start",
+        objective="Route ORIGINAL_REQUEST to orchestrator (FIRST_ACTION gate)",
+        original_request=original,
+        extra={"MODE": "start_router"},
+    )
+
+    try:
+        result_json = agent._dispatch_delegate_task(
+            {
+                "goal": "Start router: hand off to orchestrator",
+                "context": ctx,
+                "role": "orchestrator",
+                "background": True,
+            }
+        )
+    except Exception as exc:
+        logger.warning("start router dispatch failed: %s", exc)
+        return None
+
+    try:
+        payload = json.loads(result_json)
+    except json.JSONDecodeError:
+        return None
+
+    if payload.get("error"):
+        logger.info("start router rejected: %s", payload.get("error"))
+        return None
+
+    return format_start_router_dispatch_message(payload)
+
+
+def try_start_child_handoff(
+    agent, user_message: str, *, task_id: str
+) -> Optional[str]:
+    """Start subagent → orchestrator before the start LLM turn."""
+    if _agent_ecosystem_id(agent) != "start":
+        return None
+    if getattr(agent, "_start_handoff_done", False):
+        return None
+
+    valid = getattr(agent, "valid_tool_names", None) or set()
+    if "delegate_task" not in valid:
+        return None
+
+    try:
+        from tools.delegate_tool import is_spawn_paused
+
+        if is_spawn_paused():
+            return None
+    except Exception:
+        pass
+
+    original = _resolve_original_request(agent, user_message)
+    if not original:
+        return None
+
+    from agent.ecosystem_delegate import build_delegate_branch_context
+
+    ctx = build_delegate_branch_context(
+        "orchestrator",
+        objective="Coordinate user request and delegate parallel specialist branches",
+        original_request=original,
+        extra={
+            "MODE": "multi_domain",
+            "ORCHESTRATOR_MUST": (
+                "decompose into 2+ independent branches; first wave MUST use "
+                "delegate_task(tasks=[...]) with parallel specialists"
+            ),
+        },
+    )
+
+    logger.info(
+        "start handoff: dispatching orchestrator (session=%s task=%s)",
+        getattr(agent, "session_id", None) or "none",
+        task_id,
+    )
+
+    try:
+        result_json = agent._dispatch_delegate_task(
+            {
+                "goal": "Coordinate user request",
+                "context": ctx,
+                "role": "orchestrator",
+                "background": True,
+            }
+        )
+    except Exception as exc:
+        logger.warning("start handoff failed: %s", exc)
+        return None
+
+    try:
+        payload = json.loads(result_json)
+    except json.JSONDecodeError:
+        return None
+
+    if payload.get("error"):
+        logger.info("start handoff rejected: %s", payload.get("error"))
+        return None
+
+    agent._start_handoff_done = True
+    return format_start_handoff_message(payload)
+
+
 def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Optional[str]:
     """Programmatically fan out delegate_task before the root LLM turn.
 
@@ -514,6 +695,9 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
             return None
     except Exception:
         pass
+
+    if is_start_router_turn(message):
+        return try_programmatic_start_router(agent, message, task_id=task_id)
 
     tasks = plan_parallel_delegate_tasks(message)
     if len(tasks) < _min_parallel_tasks():
@@ -553,6 +737,8 @@ def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> 
     """
     if getattr(agent, "_delegate_role", None) != "orchestrator":
         return None
+    if _agent_ecosystem_id(agent) == "start":
+        return None
     if getattr(agent, "_orchestrator_fanout_done", False):
         return None
 
@@ -568,18 +754,7 @@ def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> 
     except Exception:
         pass
 
-    sources = [
-        user_message or "",
-        getattr(agent, "_delegate_branch_context", "") or "",
-        getattr(agent, "ephemeral_system_prompt", "") or "",
-    ]
-    original = ""
-    for src in sources:
-        if not isinstance(src, str) or not src.strip():
-            continue
-        original = extract_original_request(src) or original
-    if not original:
-        original = _orchestration_scoring_text(user_message) or (user_message or "").strip()
+    original = _resolve_original_request(agent, user_message)
     if not original:
         return None
 

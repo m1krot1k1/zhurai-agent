@@ -14,6 +14,7 @@ from agent.orchestrator_router import (
     enrich_delegate_task_entry,
     extract_original_request,
     infer_agent_id_from_text,
+    is_start_router_turn,
     orchestrate_mode,
     parse_agent_id_from_envelope,
     plan_parallel_delegate_tasks,
@@ -22,6 +23,8 @@ from agent.orchestrator_router import (
     suggest_specialists,
     try_orchestrator_child_fanout,
     try_programmatic_orchestration,
+    try_programmatic_start_router,
+    try_start_child_handoff,
 )
 
 
@@ -69,6 +72,81 @@ def test_enrich_delegate_task_entry_adds_agent_id(
         {"goal": "Map the codebase structure and navigation for this repository"}
     )
     assert "AGENT_ID: repo-explorer" in (enriched.get("context") or "")
+
+
+def test_is_start_router_turn() -> None:
+    assert is_start_router_turn("/start analyze repo") is True
+    assert is_start_router_turn("/start — router mode. delegate...") is True
+    assert is_start_router_turn("analyze repo only") is False
+
+
+def test_try_programmatic_start_router_dispatches_start_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "start.md").write_text("x", encoding="utf-8")
+    (eco / "agents" / "orchestrator.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {
+            "auto_orchestrate": True,
+            "auto_orchestrate_mode": "programmatic",
+            "auto_orchestrate_min_tasks": 2,
+        },
+    )
+
+    agent = MagicMock()
+    agent._delegate_depth = 0
+    agent._delegate_branch_context = ""
+    agent.valid_tool_names = {"delegate_task"}
+    agent.session_id = "sess-root"
+    agent._dispatch_delegate_task.return_value = json.dumps(
+        {"status": "dispatched", "count": 1}
+    )
+
+    msg = (
+        "/start полный анализ репозитория: architecture, git history, security audit "
+        "и проверка multi-agent swarm orchestration."
+    )
+    response = try_programmatic_orchestration(agent, msg, task_id="task-root")
+    assert response is not None
+    assert "start" in response.lower()
+    agent._dispatch_delegate_task.assert_called_once()
+    call = agent._dispatch_delegate_task.call_args[0][0]
+    assert "tasks" not in call or call.get("tasks") is None
+    assert "AGENT_ID: start" in (call.get("context") or "")
+    assert call.get("background") is True
+
+
+def test_try_start_child_handoff_dispatches_orchestrator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "start.md").write_text("x", encoding="utf-8")
+    (eco / "agents" / "orchestrator.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+
+    agent = MagicMock()
+    agent._start_handoff_done = False
+    agent.valid_tool_names = {"delegate_task"}
+    agent.session_id = "sess-start"
+    agent._delegate_branch_context = (
+        "AGENT_ID: start\nORIGINAL_REQUEST: analyze repo architecture and security"
+    )
+    agent._dispatch_delegate_task.return_value = json.dumps(
+        {"status": "dispatched", "count": 1}
+    )
+
+    response = try_start_child_handoff(agent, "continue", task_id="task-start")
+    assert response is not None
+    assert "orchestrator" in response.lower()
+    call = agent._dispatch_delegate_task.call_args[0][0]
+    assert "AGENT_ID: orchestrator" in (call.get("context") or "")
+    assert call.get("role") == "orchestrator"
+    assert agent._start_handoff_done is True
 
 
 def test_try_orchestrator_child_fanout_dispatches(
