@@ -50,28 +50,32 @@ from collections import deque
 _SPAWN_RATE_WINDOW_SEC = 60
 _SPAWN_RATE_MAX = int(os.environ.get("HERMES_SPAWN_RATE_LIMIT", "10"))
 _spawn_timestamps: "deque[float]" = deque()
+_spawn_rate_lock = threading.Lock()
 
 def _check_spawn_rate() -> bool:
     """Return True if spawning is allowed, False if rate-limited.
 
     Tracks spawn timestamps in a sliding window.  When the window is full,
     the oldest timestamp is evicted and the caller is blocked.
+    Uses Lock() for thread safety in multi-session gateway.
     """
     global _spawn_timestamps
     now = time.monotonic()
-    # Prune old entries outside the window
-    while _spawn_timestamps and _spawn_timestamps[0] < now - _SPAWN_RATE_WINDOW_SEC:
-        _spawn_timestamps.popleft()
-    if len(_spawn_timestamps) >= _SPAWN_RATE_MAX:
-        return False
-    _spawn_timestamps.append(now)
+    with _spawn_rate_lock:
+        # Prune old entries outside the window
+        while _spawn_timestamps and _spawn_timestamps[0] < now - _SPAWN_RATE_WINDOW_SEC:
+            _spawn_timestamps.popleft()
+        if len(_spawn_timestamps) >= _SPAWN_RATE_MAX:
+            return False
+        _spawn_timestamps.append(now)
     return True
 
 
 def _reset_spawn_rate() -> None:
     """Clear the spawn rate limiter state.  Intended for test teardown."""
     global _spawn_timestamps
-    _spawn_timestamps.clear()
+    with _spawn_rate_lock:
+        _spawn_timestamps.clear()
 
 
 # Tools that children must never have access to

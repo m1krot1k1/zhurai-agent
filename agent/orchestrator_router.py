@@ -11,6 +11,7 @@ Injected as API-call-time user-message context (never persisted) when
 from __future__ import annotations
 
 import json
+import functools
 import logging
 import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -124,6 +125,39 @@ _TRIVIAL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# ── ORIGINAL_REQUEST sanitization ──────────────────────────────────────────
+# Truncates and wraps user text before verbatim injection into delegation
+# context.  Prevents prompt injection via ORIGINAL_REQUEST and limits
+# context pollution from extremely long user messages.
+_ORIGINAL_REQUEST_MAX_CHARS = 2000
+
+
+def _sanitize_original_request(text: str) -> str:
+    """Truncate, strip dangerous patterns, and wrap ORIGINAL_REQUEST for
+    safe injection into delegation system prompts.
+
+    - Truncates to _ORIGINAL_REQUEST_MAX_CHARS to prevent context flooding
+    - Wraps in a markdown code block to visually scope the injection boundary
+    - Strips patterns known from prompt injection (e.g., 'ignore previous')
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    text = " ".join(text.split())
+
+    # Strip known prompt injection preamble patterns from the user text
+    # (case-insensitive, whole-message match)
+    _injection_patterns = re.compile(
+        r"(?i)^.*?(?:ignore\s+(all\s+)?(?:previous|prior|above)"
+        r"|disregard\s+(?:all\s+)?(?:previous|prior)"
+        r").*$"
+    )
+    text = _injection_patterns.sub("[SANITIZED]", text).strip()
+
+    if len(text) > _ORIGINAL_REQUEST_MAX_CHARS:
+        text = text[:_ORIGINAL_REQUEST_MAX_CHARS]
+
+    return text
+
 _ACTION_RE = re.compile(
     r"\b("
     r"implement|fix|analyze|analyse|refactor|review|migrate|add|create|build|"
@@ -134,6 +168,7 @@ _ACTION_RE = re.compile(
 )
 
 
+@functools.lru_cache(maxsize=1)
 def _load_delegation_cfg() -> dict:
     try:
         from hermes_cli.config import load_config
@@ -141,6 +176,12 @@ def _load_delegation_cfg() -> dict:
         return load_config().get("delegation") or {}
     except Exception:
         return {}
+
+
+def _invalidate_delegation_cfg_cache() -> None:
+    """Invalidate the cached delegation config so next call reloads from file.
+    Call this after delegation config changes mid-session (e.g., gateway config reload)."""
+    _load_delegation_cfg.cache_clear()
 
 
 def orchestrate_mode() -> str:
@@ -637,7 +678,7 @@ def build_orchestrator_recon_injection(agent, user_message: str) -> Optional[str
     if not original:
         return None
 
-    original_one_line = " ".join(original.split())
+    original_one_line = _sanitize_original_request(original)
     return (
         "[HERMES_ORCHESTRATOR_TWO_PHASE — not shown to user]\n"
         "You are AGENT_ID:orchestrator. Run TWO phases in THIS turn:\n\n"
@@ -678,7 +719,7 @@ def build_root_synthesis_injection(message: str) -> Optional[str]:
                 original = line.split(":", 1)[-1].strip()
                 break
 
-    original_one_line = " ".join(original.split()) if original else "see TASK blocks below"
+    original_one_line = _sanitize_original_request(original) if original else "see TASK blocks below"
     return (
         "[HERMES_ORCHESTRATOR_SYNTHESIS — not shown to user]\n"
         "Parallel specialist branches finished. Produce ONE cohesive user-facing "
@@ -1141,7 +1182,9 @@ def build_orchestration_injection(message: str) -> Optional[str]:
         # Programmatic mode handles /start via start → orchestrator chain.
         if orchestrate_mode() == "programmatic":
             return None
-        original = _orchestration_scoring_text(message) or " ".join((message or "").split())
+        original = _sanitize_original_request(
+            _orchestration_scoring_text(message) or " ".join((message or "").split())
+        )
         return (
             "[HERMES_START_ROUTER — orchestration hint; not shown to user]\n"
             "This is a /start router turn. Do NOT delegate leaf specialists from "
@@ -1160,7 +1203,7 @@ def build_orchestration_injection(message: str) -> Optional[str]:
     specialists = suggest_specialists(message)
     specialist_csv = ", ".join(specialists)
     # Keep ORIGINAL_REQUEST on one line for downstream parsers.
-    original = " ".join((message or "").split())
+    original = _sanitize_original_request(" ".join((message or "").split()))
 
     return (
         "[HERMES_MULTI_AGENT_ROUTER — orchestration hint; not shown to user]\n"

@@ -469,6 +469,10 @@ def init_agent(
     agent._delegate_depth = 0        # 0 = top-level agent, incremented for children
     agent._active_children = []      # Running child AIAgents (for interrupt propagation)
     agent._active_children_lock = threading.Lock()
+    # Orchestrator router flags — reset per-agent-instance so stale flags
+    # from a previous session don't block handoff/fanout on session resume.
+    agent._start_handoff_done = False
+    agent._orchestrator_fanout_done = False
     
     # Store OpenRouter provider preferences
     agent.providers_allowed = providers_allowed
