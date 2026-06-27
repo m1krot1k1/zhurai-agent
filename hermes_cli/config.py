@@ -1991,6 +1991,11 @@ DEFAULT_CONFIG = {
         "auto_orchestrate_llm": False,
         # Minimum parallel branches for programmatic mode.
         "auto_orchestrate_min_tasks": 2,
+        # Two-phase /start orchestrator: recon turn with tools, then tailored
+        # delegate_task (LLM-driven or post-turn recon planner fallback).
+        "orchestrator_two_phase": True,
+        # Max parallel specialists per orchestrator wave (L1 fan-out cap).
+        "orchestrator_wave_max_tasks": 6,
         # When a subagent hits a dangerous-command approval prompt, the parent's
         # prompt_toolkit TUI owns stdin — a thread-local input() call from the
         # subagent worker would deadlock the parent UI. To avoid the deadlock,

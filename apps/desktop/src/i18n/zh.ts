@@ -873,6 +873,8 @@ export const zh: Translations = {
 
   agents: {
     close: '关闭代理',
+    expandFullscreen: '打开完整派生树',
+    resizeInspector: '调整派生树面板大小',
     title: '派生树',
     subtitle: '当前回合的子代理实时活动。',
     emptyTitle: '暂无活跃子代理',

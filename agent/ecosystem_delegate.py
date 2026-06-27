@@ -30,6 +30,27 @@ def resolve_agent_brief(agent_id: str) -> Optional[Path]:
     return None
 
 
+def load_agent_brief_excerpt(agent_id: str, *, max_chars: int = 2500) -> str:
+    """Load a trimmed agent brief for injection into delegate context."""
+    brief_path = resolve_agent_brief(agent_id)
+    if brief_path is None:
+        return ""
+    try:
+        text = brief_path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            text = parts[2].strip()
+    text = text.strip()
+    if not text:
+        return ""
+    if len(text) > max_chars:
+        return text[: max_chars - 1].rstrip() + "…"
+    return text
+
+
 def build_delegate_branch_context(
     agent_id: str,
     *,
@@ -38,8 +59,9 @@ def build_delegate_branch_context(
     ownership: str = "",
     extra: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Compose a branch *context* string for delegate_task (child reads brief from path)."""
+    """Compose a branch *context* string for delegate_task."""
     brief = resolve_agent_brief(agent_id)
+    brief_excerpt = load_agent_brief_excerpt(agent_id)
     lines = [
         f"OBJECTIVE: {objective.strip()}",
         f"AGENT_ID: {agent_id.strip()}",
@@ -48,7 +70,10 @@ def build_delegate_branch_context(
         lines.append(f"ORIGINAL_REQUEST: {original_request.strip()}")
     if ownership.strip():
         lines.append(f"OWNERSHIP: {ownership.strip()}")
-    if brief is not None:
+    if brief_excerpt:
+        lines.append("AGENT_BRIEF:")
+        lines.append(brief_excerpt)
+    elif brief is not None:
         lines.append(f"AGENT_BRIEF_PATH: {brief}")
         lines.append(
             "NON-NEGOTIABLE: Read AGENT_BRIEF_PATH at the start of the branch "

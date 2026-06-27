@@ -65,6 +65,24 @@ export const $focusSubagentId = atom<null | string>(null)
 export const $subagentInspectorOpen = atom(false)
 export const $subagentInspectorSelectedId = atom<null | string>(null)
 
+const INSPECTOR_HEIGHT_MIN = 192
+const INSPECTOR_HEIGHT_MAX = 720
+const INSPECTOR_HEIGHT_DEFAULT = 320
+
+export const $subagentInspectorHeight = atom(INSPECTOR_HEIGHT_DEFAULT)
+
+export function clampSubagentInspectorHeight(value: number): number {
+  return Math.min(INSPECTOR_HEIGHT_MAX, Math.max(INSPECTOR_HEIGHT_MIN, Math.round(value)))
+}
+
+export function setSubagentInspectorHeight(value: number) {
+  $subagentInspectorHeight.set(clampSubagentInspectorHeight(value))
+}
+
+export function resetSubagentInspectorHeight() {
+  $subagentInspectorHeight.set(INSPECTOR_HEIGHT_DEFAULT)
+}
+
 export function setFocusSubagentId(id: null | string) {
   $focusSubagentId.set(id)
 }
@@ -77,6 +95,7 @@ export function openSubagentInspector(id: string) {
 
 export function closeSubagentInspector() {
   $subagentInspectorOpen.set(false)
+  $focusSubagentId.set(null)
 }
 
 const isStr = (v: unknown): v is string => typeof v === 'string'

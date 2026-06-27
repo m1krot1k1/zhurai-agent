@@ -29,7 +29,7 @@ def test_build_delegate_branch_context_includes_brief_path(
     eco = tmp_path / "zhur"
     brief = eco / "agents" / "code.md"
     brief.parent.mkdir(parents=True)
-    brief.write_text("---\nname: code\n---\n", encoding="utf-8")
+    brief.write_text("---\nname: code\n---\n# Code agent\nImplement in Python.\n", encoding="utf-8")
     monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
 
     ctx = build_delegate_branch_context(
@@ -38,8 +38,10 @@ def test_build_delegate_branch_context_includes_brief_path(
         original_request="сделай feature X",
         ownership="src/feature/**",
     )
-    assert "AGENT_BRIEF_PATH:" in ctx
-    assert "agents/code.md" in ctx
+    assert "AGENT_BRIEF:" in ctx
+    assert "# Code agent" in ctx
+    assert "Implement in Python." in ctx
+    assert "AGENT_BRIEF_PATH:" not in ctx
     assert "ORIGINAL_REQUEST: сделай feature X" in ctx
     assert "OWNERSHIP: src/feature/**" in ctx
 

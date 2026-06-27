@@ -804,6 +804,8 @@ export const ja = defineLocale({
 
   agents: {
     close: 'エージェントを閉じる',
+    expandFullscreen: 'フルスポーンツリーを開く',
+    resizeInspector: 'スポーンツリーパネルのサイズ変更',
     title: 'スポーンツリー',
     subtitle: '現在のターンのライブサブエージェントのアクティビティ。',
     emptyTitle: 'ライブサブエージェントはありません',

@@ -1801,8 +1801,12 @@ def async_delegation_skips_parent_turn(evt: dict) -> bool:
         return True
     if "coordinate user request" in goal:
         return True
-    # Batch fan-out completions are surfaced in the subagent inspector; re-injecting
-    # them at root retriggers flat programmatic orchestration and breaks the spawn tree.
+    # Specialist-wave batch: re-enter the parent session so root synthesizes ONE
+    # user-facing answer. Programmatic re-orchestration is blocked separately
+    # via is_async_delegation_notification_text() in orchestrator_router.
+    if evt.get("synthesis_required"):
+        return False
+    # Other batch fan-out (plumbing without synthesis flag): inspector only.
     if evt.get("is_batch") or isinstance(evt.get("results"), list):
         return True
     return False
@@ -1867,6 +1871,10 @@ def _format_async_delegation(evt: dict) -> str:
             "dispatching — act on these or re-dispatch if things have changed.",
             "",
         ]
+        orig_req = evt.get("original_request")
+        if orig_req:
+            lines.append(f"ORIGINAL_REQUEST: {orig_req}")
+            lines.append("")
         if isinstance(dispatched_at, (int, float)):
             ts = _time.strftime("%Y-%m-%d %H:%M:%S", _time.localtime(dispatched_at))
             age = f" ({_format_age(completed_at - dispatched_at)} ago)"

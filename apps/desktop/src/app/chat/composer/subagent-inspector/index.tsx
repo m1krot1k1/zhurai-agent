@@ -1,5 +1,8 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import { AGENTS_ROUTE } from '@/app/routes'
 
 import { blurComposerInput } from '@/app/chat/composer/focus'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
@@ -9,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { FadeText } from '@/components/ui/fade-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { type Translations, useI18n } from '@/i18n'
-import { AlertCircle, CheckCircle2, Sparkles, X } from '@/lib/icons'
+import { AlertCircle, CheckCircle2, ExternalLink, Sparkles, X } from '@/lib/icons'
 import { formatSubagentDisplay, formatSubagentRoleBadge } from '@/lib/subagent-label'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
@@ -18,11 +21,15 @@ import {
   $focusSubagentId,
   $subagentInspectorOpen,
   $subagentInspectorSelectedId,
+  $subagentInspectorHeight,
   $subagentsBySession,
   activeSubagentCount,
   buildSubagentTree,
+  clampSubagentInspectorHeight,
   closeSubagentInspector,
   openSubagentInspector,
+  setFocusSubagentId,
+  setSubagentInspectorHeight,
   type SubagentNode,
   type SubagentStatus,
   type SubagentStreamEntry
@@ -129,9 +136,11 @@ interface SubagentInspectorPanelProps {
 
 export function SubagentInspectorPanel({ sessionId }: SubagentInspectorPanelProps) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const open = useStore($subagentInspectorOpen)
   const selectedId = useStore($subagentInspectorSelectedId)
   const focusId = useStore($focusSubagentId)
+  const panelHeight = useStore($subagentInspectorHeight)
   const subagentsBySession = useStore($subagentsBySession)
   const scrolledUp = useStore($threadScrolledUp)
 
@@ -180,6 +189,43 @@ export function SubagentInspectorPanel({ sessionId }: SubagentInspectorPanelProp
   }, [flat.length, open])
 
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null)
+
+  const startResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+      resizeRef.current = { startY: event.clientY, startHeight: panelHeight }
+
+      const onMove = (move: PointerEvent) => {
+        const state = resizeRef.current
+        if (!state) {
+          return
+        }
+
+        setSubagentInspectorHeight(state.startHeight + (state.startY - move.clientY))
+      }
+
+      const onUp = () => {
+        resizeRef.current = null
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+      }
+
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [panelHeight]
+  )
+
+  const openFullscreen = useCallback(() => {
+    if (selected) {
+      setFocusSubagentId(selected.id)
+    }
+
+    closeSubagentInspector()
+    navigate(AGENTS_ROUTE)
+  }, [navigate, selected])
 
   useLayoutEffect(() => {
     const root = document.documentElement
@@ -210,7 +256,7 @@ export function SubagentInspectorPanel({ sessionId }: SubagentInspectorPanelProp
       observer.disconnect()
       root.style.removeProperty('--subagent-inspector-measured-height')
     }
-  }, [open, flat.length, selected?.id])
+  }, [open, flat.length, selected?.id, panelHeight])
 
   if (!open || !selected || flat.length === 0) {
     return null
@@ -220,15 +266,28 @@ export function SubagentInspectorPanel({ sessionId }: SubagentInspectorPanelProp
 
   return (
     <div
-      className="absolute inset-x-0 bottom-full z-4 max-h-[min(44vh,380px)] translate-y-[calc(0.5rem+1px)]"
+      className="absolute inset-x-0 bottom-full z-4 translate-y-[calc(0.5rem+1px)]"
       onPointerDownCapture={() => blurComposerInput()}
       ref={panelRef}
-      style={{ marginBottom: 'var(--status-stack-measured-height, 0px)' }}
+      style={{
+        height: `${panelHeight}px`,
+        marginBottom: 'var(--status-stack-measured-height, 0px)',
+        maxHeight: 'min(72vh, 720px)'
+      }}
     >
+      <div
+        aria-label={t.agents.resizeInspector}
+        className="group absolute inset-x-0 -top-1 z-5 h-2 cursor-row-resize"
+        onDoubleClick={() => setSubagentInspectorHeight(320)}
+        onPointerDown={startResize}
+        role="separator"
+      >
+        <span className="absolute left-1/2 top-1/2 h-0.75 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-60" />
+      </div>
       <div
         className={cn(
           composerDockCard('top'),
-          'mx-2 flex min-h-[12rem] max-h-[min(44vh,380px)] flex-col overflow-hidden rounded-b-none border-b-0 pt-0.5 pb-0 shadow-md'
+          'mx-2 flex h-full min-h-0 flex-col overflow-hidden rounded-b-none border-b-0 pt-0.5 pb-0 shadow-md'
         )}
         data-slot="subagent-inspector"
       >
@@ -242,9 +301,25 @@ export function SubagentInspectorPanel({ sessionId }: SubagentInspectorPanelProp
             </p>
           </div>
           <Button
+            aria-label={t.agents.expandFullscreen}
+            className="size-7 shrink-0 text-muted-foreground/80"
+            onClick={event => {
+              event.stopPropagation()
+              openFullscreen()
+            }}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <ExternalLink className="size-3.5" />
+          </Button>
+          <Button
             aria-label={t.agents.close}
             className="size-7 shrink-0 text-muted-foreground/80"
-            onClick={closeSubagentInspector}
+            onClick={event => {
+              event.stopPropagation()
+              closeSubagentInspector()
+            }}
             size="icon"
             type="button"
             variant="ghost"

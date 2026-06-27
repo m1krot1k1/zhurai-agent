@@ -715,6 +715,12 @@ def _build_child_system_prompt(
     ]
     if context and context.strip():
         parts.append(f"\nCONTEXT:\n{context}")
+        if "AGENT_BRIEF:" in context:
+            parts.append(
+                "\nRole instructions are inlined under AGENT_BRIEF in CONTEXT. "
+                "Follow that brief strictly; do not treat ORIGINAL_REQUEST as "
+                "your only scope — your OBJECTIVE defines this branch."
+            )
     if workspace_path and str(workspace_path).strip():
         parts.append(
             "\nWORKSPACE PATH:\n"
@@ -2149,6 +2155,52 @@ def _recover_tasks_from_json_string(
     return parsed, None
 
 
+def _batch_synthesis_metadata(
+    parent_agent,
+    task_list: List[Dict[str, Any]],
+    *,
+    top_role: str,
+) -> tuple[bool, str]:
+    """Whether a background batch should trigger a root synthesis turn."""
+    original = ""
+    for task in task_list:
+        ctx = str(task.get("context") or "")
+        try:
+            from agent.orchestrator_router import extract_original_request
+
+            original = extract_original_request(ctx) or original
+        except Exception:
+            pass
+    try:
+        from agent.orchestrator_router import is_ecosystem_orchestrator_subagent
+
+        if is_ecosystem_orchestrator_subagent(parent_agent):
+            return True, original
+    except Exception:
+        pass
+    depth = int(getattr(parent_agent, "_delegate_depth", 0) or 0)
+    if depth == 0 and top_role == "leaf" and len(task_list) >= 2:
+        return True, original
+    return False, original
+
+
+def _maybe_mark_orchestrator_fanout_done(parent_agent, result: Optional[dict]) -> None:
+    """Prevent post-recon programmatic fan-out after LLM-driven delegate_task."""
+    if parent_agent is None or not isinstance(result, dict):
+        return
+    if result.get("error"):
+        return
+    if not (result.get("status") == "dispatched" or result.get("results") is not None):
+        return
+    try:
+        from agent.orchestrator_router import is_ecosystem_orchestrator_subagent
+
+        if is_ecosystem_orchestrator_subagent(parent_agent):
+            parent_agent._orchestrator_fanout_done = True
+    except Exception:
+        logger.debug("orchestrator fan-out marker skipped", exc_info=True)
+
+
 def delegate_task(
     goal: Optional[str] = None,
     context: Optional[str] = None,
@@ -2632,6 +2684,7 @@ def delegate_task(
                     "after the turn ends), so the subagent(s) ran SYNCHRONOUSLY and "
                     "the result is included above."
                 )
+            _maybe_mark_orchestrator_fanout_done(parent_agent, _sync_result if isinstance(_sync_result, dict) else None)
             return json.dumps(_sync_result, ensure_ascii=False)
 
         _session_key = get_current_session_key(default="")
@@ -2666,6 +2719,9 @@ def delegate_task(
                     pass
 
         _goals = [t["goal"] for t in task_list]
+        _needs_synthesis, _original_request = _batch_synthesis_metadata(
+            parent_agent, task_list, top_role=top_role
+        )
         dispatch = dispatch_async_delegation_batch(
             goals=_goals,
             context=context,
@@ -2676,6 +2732,8 @@ def delegate_task(
             runner=_batch_runner,
             interrupt_fn=_batch_interrupt,
             max_async_children=_get_max_async_children(),
+            synthesis_required=_needs_synthesis,
+            original_request=_original_request or None,
         )
 
         if dispatch.get("status") == "dispatched":
@@ -2700,6 +2758,7 @@ def delegate_task(
                 "goals": _goals,
                 "note": note,
             }
+            _maybe_mark_orchestrator_fanout_done(parent_agent, payload)
             return json.dumps(payload, ensure_ascii=False)
 
         # Pool at capacity / schedule failure — children are still attached
@@ -2710,10 +2769,18 @@ def delegate_task(
             "batch synchronously instead.",
             dispatch.get("error", "rejected"),
         )
-        return json.dumps(_execute_and_aggregate(), ensure_ascii=False)
+        _inline_result = _execute_and_aggregate()
+        _maybe_mark_orchestrator_fanout_done(
+            parent_agent, _inline_result if isinstance(_inline_result, dict) else None
+        )
+        return json.dumps(_inline_result, ensure_ascii=False)
 
     # ----- Synchronous path -----
-    return json.dumps(_execute_and_aggregate(), ensure_ascii=False)
+    _sync_result = _execute_and_aggregate()
+    _maybe_mark_orchestrator_fanout_done(
+        parent_agent, _sync_result if isinstance(_sync_result, dict) else None
+    )
+    return json.dumps(_sync_result, ensure_ascii=False)
 
 
 def _resolve_child_credential_pool(

@@ -427,9 +427,28 @@ def build_turn_context(
 
     orchestration_user_context = ""
     try:
-        from agent.orchestrator_router import build_orchestration_injection
+        from agent.orchestrator_router import (
+            build_orchestration_injection,
+            build_orchestrator_recon_injection,
+            build_root_synthesis_injection,
+            is_ecosystem_orchestrator_subagent,
+        )
+        from tools.process_registry import is_async_delegation_notification_text
 
-        if isinstance(original_user_message, str):
+        if isinstance(original_user_message, str) and is_async_delegation_notification_text(
+            original_user_message
+        ):
+            orchestration_user_context = (
+                build_root_synthesis_injection(original_user_message) or ""
+            )
+        elif is_ecosystem_orchestrator_subagent(agent) and not getattr(
+            agent, "_orchestrator_fanout_done", False
+        ):
+            if isinstance(original_user_message, str):
+                orchestration_user_context = (
+                    build_orchestrator_recon_injection(agent, original_user_message) or ""
+                )
+        elif isinstance(original_user_message, str):
             orchestration_user_context = build_orchestration_injection(original_user_message) or ""
     except Exception as exc:
         logger.debug("orchestration router skipped: %s", exc)

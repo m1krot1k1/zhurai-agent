@@ -776,6 +776,8 @@ export const zhHant = defineLocale({
 
   agents: {
     close: '關閉代理',
+    expandFullscreen: '開啟完整派生樹',
+    resizeInspector: '調整派生樹面板大小',
     title: '派生樹',
     subtitle: '目前回合的子代理即時活動。',
     emptyTitle: '暫無活躍子代理',

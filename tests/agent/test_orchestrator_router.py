@@ -10,10 +10,13 @@ import pytest
 
 from agent.orchestrator_router import (
     build_orchestration_injection,
+    build_orchestrator_recon_injection,
+    build_root_synthesis_injection,
     classify_complexity,
     enrich_delegate_task_entry,
     extract_original_request,
     infer_agent_id_from_text,
+    is_ecosystem_orchestrator_subagent,
     is_start_router_turn,
     orchestrate_mode,
     parse_agent_id_from_envelope,
@@ -22,6 +25,7 @@ from agent.orchestrator_router import (
     should_programmatic_orchestrate,
     suggest_specialists,
     try_orchestrator_child_fanout,
+    try_orchestrator_post_recon_fanout,
     try_programmatic_orchestration,
     try_programmatic_start_router,
     try_start_child_handoff,
@@ -215,7 +219,11 @@ def test_try_orchestrator_child_fanout_dispatches(
     monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
     monkeypatch.setattr(
         "agent.orchestrator_router._load_delegation_cfg",
-        lambda: {"auto_orchestrate": True, "auto_orchestrate_min_tasks": 2},
+        lambda: {
+            "auto_orchestrate": True,
+            "auto_orchestrate_min_tasks": 2,
+            "orchestrator_two_phase": False,
+        },
     )
 
     agent = MagicMock()
@@ -224,6 +232,7 @@ def test_try_orchestrator_child_fanout_dispatches(
     agent.valid_tool_names = {"delegate_task"}
     agent.session_id = "sess-orch"
     agent._delegate_branch_context = (
+        "AGENT_ID: orchestrator\n"
         "ORIGINAL_REQUEST: Analyze repo architecture and security audit\nMODE: multi_domain"
     )
     agent._dispatch_delegate_task.return_value = json.dumps(
@@ -241,6 +250,25 @@ def test_try_orchestrator_child_fanout_dispatches(
     assert call.get("background") is True
     assert len(call.get("tasks") or []) >= 2
     assert agent._orchestrator_fanout_done is True
+
+
+def test_try_orchestrator_child_fanout_skips_specialist_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "auto_orchestrate_min_tasks": 2},
+    )
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = False
+    agent.valid_tool_names = {"delegate_task"}
+    agent._delegate_branch_context = (
+        "AGENT_ID: repo-explorer\nORIGINAL_REQUEST: map the repo\n"
+    )
+    response = try_orchestrator_child_fanout(agent, "Coordinate", task_id="t1")
+    assert response is None
+    agent._dispatch_delegate_task.assert_not_called()
 
 
 def test_suggest_specialists_for_repo_analysis() -> None:
@@ -278,7 +306,7 @@ def test_plan_parallel_delegate_tasks_includes_agent_ids(
     for task in tasks:
         assert task.get("goal")
         assert "AGENT_ID:" in (task.get("context") or "")
-        assert task.get("role") == "orchestrator"
+        assert task.get("role") == "leaf"
 
 
 def test_build_orchestration_injection_disabled_in_programmatic_mode(
@@ -399,3 +427,159 @@ def test_try_programmatic_skips_without_delegate_tool(
     msg = "Analyze repo and fix bugs and write tests and security review"
     assert try_programmatic_orchestration(agent, msg, task_id="t") is None
     agent._dispatch_delegate_task.assert_not_called()
+
+
+def test_try_orchestrator_child_fanout_skips_when_two_phase_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "orchestrator_two_phase": True},
+    )
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._delegate_branch_context = (
+        "AGENT_ID: orchestrator\nORIGINAL_REQUEST: analyze repo\n"
+    )
+    agent.valid_tool_names = {"delegate_task"}
+    assert try_orchestrator_child_fanout(agent, "Coordinate", task_id="t1") is None
+    agent._dispatch_delegate_task.assert_not_called()
+
+
+def test_build_orchestrator_recon_injection_for_ecosystem_orchestrator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"orchestrator_two_phase": True},
+    )
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = False
+    agent._delegate_branch_context = (
+        "AGENT_ID: orchestrator\nORIGINAL_REQUEST: map architecture and security\n"
+    )
+    injection = build_orchestrator_recon_injection(agent, "Coordinate user request")
+    assert injection is not None
+    assert "PHASE 1" in injection
+    assert "PHASE 2" in injection
+    assert "map architecture and security" in injection
+
+
+def test_build_orchestrator_recon_injection_skips_after_fanout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"orchestrator_two_phase": True},
+    )
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = True
+    agent._delegate_branch_context = "AGENT_ID: orchestrator\nORIGINAL_REQUEST: x\n"
+    assert build_orchestrator_recon_injection(agent, "x") is None
+
+
+def test_try_orchestrator_post_recon_fanout_dispatches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    (eco / "agents" / "code.md").write_text("x", encoding="utf-8")
+    (eco / "agents" / "repo-explorer.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {
+            "auto_orchestrate": True,
+            "auto_orchestrate_min_tasks": 2,
+            "orchestrator_two_phase": True,
+        },
+    )
+
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = False
+    agent.session_id = "sess-orch"
+    agent._delegate_branch_context = (
+        "AGENT_ID: orchestrator\n"
+        "ORIGINAL_REQUEST: Analyze repo architecture and security audit\n"
+    )
+    agent._dispatch_delegate_task.return_value = json.dumps(
+        {"status": "dispatched", "count": 2}
+    )
+
+    messages = [
+        {"role": "assistant", "content": "Found src/ and tests/; need explorer + security."},
+        {"role": "tool", "name": "read_file", "content": '{"path": "run_agent.py"}'},
+    ]
+
+    with patch(
+        "agent.orchestrator_router._plan_tasks_from_recon",
+        return_value=[
+            {"goal": "Map repo", "context": "AGENT_ID: repo-explorer\n", "role": "leaf"},
+            {"goal": "Security audit", "context": "AGENT_ID: security-auditor\n", "role": "leaf"},
+        ],
+    ):
+        response = try_orchestrator_post_recon_fanout(
+            agent,
+            messages,
+            "Coordinate user request",
+            task_id="task-orch",
+        )
+
+    assert response is not None
+    agent._dispatch_delegate_task.assert_called_once()
+    assert agent._orchestrator_fanout_done is True
+
+
+def test_try_orchestrator_post_recon_skips_when_delegate_already_called(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"orchestrator_two_phase": True, "auto_orchestrate_min_tasks": 2},
+    )
+    agent = MagicMock()
+    agent._delegate_role = "orchestrator"
+    agent._orchestrator_fanout_done = False
+    agent._delegate_branch_context = (
+        "AGENT_ID: orchestrator\nORIGINAL_REQUEST: analyze repo\n"
+    )
+    messages = [
+        {
+            "role": "tool",
+            "name": "delegate_task",
+            "content": '{"status": "dispatched", "count": 2}',
+        },
+    ]
+    assert (
+        try_orchestrator_post_recon_fanout(agent, messages, "x", task_id="t1") is None
+    )
+    assert agent._orchestrator_fanout_done is True
+    agent._dispatch_delegate_task.assert_not_called()
+
+
+def test_is_ecosystem_orchestrator_subagent() -> None:
+    orch = MagicMock()
+    orch._delegate_role = "orchestrator"
+    orch._delegate_branch_context = "AGENT_ID: orchestrator\nORIGINAL_REQUEST: x\n"
+    assert is_ecosystem_orchestrator_subagent(orch) is True
+
+    leaf = MagicMock()
+    leaf._delegate_role = "orchestrator"
+    leaf._delegate_branch_context = "AGENT_ID: code\nORIGINAL_REQUEST: x\n"
+    assert is_ecosystem_orchestrator_subagent(leaf) is False
+
+
+def test_build_root_synthesis_injection_batch_complete() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: full repo analysis\n"
+        "TASK 1/2: repo-explorer ..."
+    )
+    injection = build_root_synthesis_injection(msg)
+    assert injection is not None
+    assert "SYNTHESIS" in injection
+    assert "full repo analysis" in injection
+    assert "Do NOT call delegate_task" in injection

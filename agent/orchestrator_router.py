@@ -364,38 +364,74 @@ def should_auto_orchestrate(message: str) -> bool:
     return classify_complexity(message) == "multi"
 
 
+def is_orchestrator_two_phase_enabled() -> bool:
+    cfg = _load_delegation_cfg()
+    if "orchestrator_two_phase" in cfg:
+        return bool(cfg.get("orchestrator_two_phase"))
+    return True
+
+
+def _max_orchestrator_wave_tasks() -> int:
+    cfg = _load_delegation_cfg()
+    try:
+        return max(2, int(cfg.get("orchestrator_wave_max_tasks", 6)))
+    except (TypeError, ValueError):
+        return 6
+
+
+def is_ecosystem_orchestrator_subagent(agent) -> bool:
+    """True when this agent is the ecosystem orchestrator delegate branch."""
+    if getattr(agent, "_delegate_role", None) != "orchestrator":
+        return False
+    return _agent_ecosystem_id(agent) == "orchestrator"
+
+
 def _objective_for_agent(agent_id: str, message: str) -> str:
+    """Branch-specific objective; full user text lives in ORIGINAL_REQUEST in context."""
     base = _AGENT_OBJECTIVES.get(agent_id, f"Execute the user request as {agent_id}")
-    snippet = " ".join((message or "").split())
-    if len(snippet) > 120:
-        snippet = snippet[:117] + "..."
-    return f"{base}. User request: {snippet}"
+    return base
+
+
+def _tasks_from_branch_specs(
+    branches: Sequence[Dict[str, Any]],
+    original_request: str,
+) -> List[Dict[str, Any]]:
+    from agent.ecosystem_delegate import build_delegate_branch_context
+
+    tasks: List[Dict[str, Any]] = []
+    for branch in branches:
+        agent_id = str(branch.get("agent_id") or "").strip()
+        objective = str(branch.get("objective") or "").strip()
+        if not agent_id or not objective:
+            continue
+        extra: Dict[str, Any] = {}
+        ownership = str(branch.get("ownership") or "").strip()
+        steps = str(branch.get("steps") or "").strip()
+        if steps:
+            extra["STEPS"] = steps
+        ctx = build_delegate_branch_context(
+            agent_id,
+            objective=objective,
+            original_request=original_request,
+            ownership=ownership,
+            extra=extra or None,
+        )
+        tasks.append(
+            {
+                "goal": objective,
+                "context": ctx,
+                "role": "leaf",
+            }
+        )
+    return tasks
 
 
 def _tasks_from_agent_specs(
     specs: Sequence[Tuple[str, str]],
     original_request: str,
 ) -> List[Dict[str, Any]]:
-    from agent.ecosystem_delegate import build_delegate_branch_context
-
-    tasks: List[Dict[str, Any]] = []
-    for agent_id, objective in specs:
-        ctx = build_delegate_branch_context(
-            agent_id,
-            objective=objective,
-            original_request=original_request,
-        )
-        tasks.append(
-            {
-                "goal": objective,
-                "context": ctx,
-                # Orchestrator role when depth allows — specialists can spawn
-                # sub-specialists via delegate_task(tasks=[...]). At the depth
-                # floor delegate_tool degrades to leaf automatically.
-                "role": "orchestrator",
-            }
-        )
-    return tasks
+    branches = [{"agent_id": aid, "objective": obj} for aid, obj in specs]
+    return _tasks_from_branch_specs(branches, original_request)
 
 
 def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
@@ -416,8 +452,17 @@ def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
                     agent_ids.append(fallback)
                 if len(agent_ids) >= min_tasks:
                     break
-        specs = [(aid, _objective_for_agent(aid, text)) for aid in agent_ids[:5]]
+        seen: set[str] = set()
+        unique_ids: List[str] = []
+        for aid in agent_ids:
+            if aid not in seen:
+                seen.add(aid)
+                unique_ids.append(aid)
+        specs = [(aid, _objective_for_agent(aid, text)) for aid in unique_ids[:5]]
 
+    max_tasks = _max_orchestrator_wave_tasks()
+    if len(specs) > max_tasks:
+        specs = specs[:max_tasks]
     return _tasks_from_agent_specs(specs, text)
 
 
@@ -439,6 +484,295 @@ def _extract_json_blob(raw: str) -> Optional[dict]:
         return parsed if isinstance(parsed, dict) else None
     except json.JSONDecodeError:
         return None
+
+
+_RECON_PLANNER_SYSTEM = """You plan parallel specialist branches AFTER an orchestrator recon pass.
+
+Output a single JSON object only (no markdown fences):
+
+{
+  "fanout": true,
+  "tasks": [
+    {
+      "agent_id": "repo-explorer",
+      "objective": "<imperative, cites specific files/modules from recon>",
+      "ownership": "<optional exclusive globs>",
+      "steps": "1. ...\\n2. ..."
+    }
+  ]
+}
+
+Rules:
+- Use 2-5 tasks. Each objective MUST cite concrete findings from recon (paths, modules, risks).
+- agent_id MUST be one of: code, repo-explorer, code-reviewer, test-specialist,
+  security-auditor, docs-specialist, debug, frontend-specialist, devops-specialist, architect
+- ownership: disjoint file globs when writers touch code/docs
+- steps: 2-4 numbered actions per branch, derived from recon (not generic templates)
+
+If recon is too thin for fanout, return {"fanout": false}.
+"""
+
+
+def _parse_branch_specs_from_llm(parsed: dict) -> List[Dict[str, Any]]:
+    if not parsed or not parsed.get("fanout"):
+        return []
+    raw_tasks = parsed.get("tasks")
+    if not isinstance(raw_tasks, list):
+        return []
+    branches: List[Dict[str, Any]] = []
+    for entry in raw_tasks:
+        if not isinstance(entry, dict):
+            continue
+        agent_id = str(entry.get("agent_id") or "").strip()
+        objective = str(entry.get("objective") or "").strip()
+        if agent_id not in _VALID_ROUTER_AGENT_IDS or not objective:
+            continue
+        branch: Dict[str, Any] = {"agent_id": agent_id, "objective": objective}
+        ownership = str(entry.get("ownership") or "").strip()
+        steps = str(entry.get("steps") or "").strip()
+        if ownership:
+            branch["ownership"] = ownership
+        if steps:
+            branch["steps"] = steps
+        branches.append(branch)
+    return branches if len(branches) >= 2 else []
+
+
+def _extract_recon_summary(messages: Sequence[Dict[str, Any]], *, max_chars: int = 12000) -> str:
+    """Collect assistant + tool output text from the orchestrator recon turn."""
+    parts: List[str] = []
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+        if role == "assistant":
+            content = msg.get("content")
+            if isinstance(content, str) and content.strip():
+                parts.append(f"[assistant]\n{content.strip()}")
+        elif role == "tool":
+            content = msg.get("content")
+            if not isinstance(content, str):
+                content = str(content or "")
+            if content.strip():
+                tool_name = msg.get("name") or "tool"
+                parts.append(f"[{tool_name}]\n{content.strip()[:2000]}")
+    if not parts:
+        return ""
+    blob = "\n\n".join(parts)
+    if len(blob) > max_chars:
+        return blob[: max_chars - 1].rstrip() + "…"
+    return blob
+
+
+def _turn_includes_delegate_task(messages: Sequence[Dict[str, Any]]) -> bool:
+    for msg in messages:
+        if not isinstance(msg, dict) or msg.get("role") != "tool":
+            continue
+        if msg.get("name") != "delegate_task":
+            continue
+        content = str(msg.get("content") or "")
+        if '"error"' in content and '"results"' not in content and "dispatched" not in content:
+            continue
+        if "dispatched" in content or '"results"' in content or '"status"' in content:
+            return True
+    return False
+
+
+def _plan_tasks_from_recon(recon_summary: str, original_request: str) -> Optional[List[Dict[str, Any]]]:
+    """LLM planner: recon findings → tailored branch specs."""
+    if not recon_summary.strip():
+        return None
+    try:
+        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+    except Exception as exc:
+        logger.debug("orchestrator_router: auxiliary import failed: %s", exc)
+        return None
+
+    try:
+        client, model = get_text_auxiliary_client("orchestrator_router")
+    except Exception as exc:
+        logger.debug("orchestrator_router: aux client unavailable: %s", exc)
+        return None
+    if client is None or not model:
+        return None
+
+    user_blob = (
+        f"ORIGINAL_REQUEST:\n{original_request.strip()}\n\n"
+        f"RECON_SUMMARY:\n{recon_summary.strip()}"
+    )
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _RECON_PLANNER_SYSTEM},
+                {"role": "user", "content": user_blob},
+            ],
+            temperature=0.2,
+            max_tokens=3000,
+            timeout=120,
+            extra_body=get_auxiliary_extra_body() or None,
+        )
+        raw = resp.choices[0].message.content or ""
+    except Exception as exc:
+        logger.info("orchestrator_router recon planner failed: %s", exc)
+        return None
+
+    parsed = _extract_json_blob(raw)
+    branches = _parse_branch_specs_from_llm(parsed or {})
+    if not branches:
+        return None
+    return _tasks_from_branch_specs(branches, original_request)
+
+
+def build_orchestrator_recon_injection(agent, user_message: str) -> Optional[str]:
+    """Two-phase orchestrator hint: recon with tools, then tailored delegate_task."""
+    if not is_orchestrator_two_phase_enabled():
+        return None
+    if not is_ecosystem_orchestrator_subagent(agent):
+        return None
+    if getattr(agent, "_orchestrator_fanout_done", False):
+        return None
+
+    original = _resolve_original_request(agent, user_message)
+    if not original:
+        return None
+
+    original_one_line = " ".join(original.split())
+    return (
+        "[HERMES_ORCHESTRATOR_TWO_PHASE — not shown to user]\n"
+        "You are AGENT_ID:orchestrator. Run TWO phases in THIS turn:\n\n"
+        "PHASE 1 — RECON (do this first):\n"
+        "- Read ORIGINAL_REQUEST and explore the repo (read_file, search_files, "
+        "terminal) until you have concrete findings: key paths, modules, risks, "
+        "and 2+ independent work streams.\n"
+        "- Do NOT call delegate_task until recon is substantive.\n\n"
+        "PHASE 2 — DELEGATE (same turn, after recon):\n"
+        "- ONE delegate_task call with tasks=[...] (parallel batch, background=true).\n"
+        "- Each entry MUST include:\n"
+        "  • goal: imperative, specific to THIS request and YOUR recon (not generic templates)\n"
+        "  • context: AGENT_ID, OBJECTIVE, ORIGINAL_REQUEST, OWNERSHIP (disjoint globs), "
+        "STEPS (2-4 numbered actions)\n"
+        "  • role: leaf\n"
+        "- Specialists implement their slice; you synthesize their summaries later.\n\n"
+        f"ORIGINAL_REQUEST: {original_one_line}\n"
+        "NON-NEGOTIABLE: Generic objectives without request-specific files/AC are invalid."
+    )
+
+
+def build_root_synthesis_injection(message: str) -> Optional[str]:
+    """After specialist batch completes, instruct root to synthesize one answer."""
+    try:
+        from tools.process_registry import is_async_delegation_notification_text
+    except Exception:
+        return None
+    if not is_async_delegation_notification_text(message or ""):
+        return None
+    header = (message or "").strip().split("\n", 1)[0]
+    if "BATCH COMPLETE" not in header:
+        return None
+
+    original = extract_original_request(message or "") or ""
+    if not original:
+        for line in (message or "").splitlines():
+            if line.strip().startswith("Original goal:"):
+                original = line.split(":", 1)[-1].strip()
+                break
+
+    original_one_line = " ".join(original.split()) if original else "see TASK blocks below"
+    return (
+        "[HERMES_ORCHESTRATOR_SYNTHESIS — not shown to user]\n"
+        "Parallel specialist branches finished. Produce ONE cohesive user-facing "
+        "answer in the main chat (not another delegation wave):\n\n"
+        "REQUIRED:\n"
+        "- Directly answer ORIGINAL_REQUEST: scope, findings, top problems, "
+        "risks, and prioritized next steps.\n"
+        "- Merge every TASK summary below; dedupe overlapping points.\n"
+        "- Write for the user who ran /start — structured, complete, actionable.\n\n"
+        "FORBIDDEN:\n"
+        "- Do NOT call delegate_task (no new subagents unless user asks).\n"
+        "- Do NOT reply with only 'see subagent inspector' or meta-status.\n"
+        "- Do NOT repeat the batch header verbatim.\n\n"
+        f"ORIGINAL_REQUEST: {original_one_line}"
+    )
+
+
+def _dispatch_orchestrator_fanout(
+    agent,
+    tasks: List[Dict[str, Any]],
+    *,
+    task_id: str,
+) -> Optional[str]:
+    max_tasks = _max_orchestrator_wave_tasks()
+    if len(tasks) > max_tasks:
+        logger.info(
+            "orchestrator fan-out: trimming %d tasks to wave cap %d",
+            len(tasks),
+            max_tasks,
+        )
+        tasks = tasks[:max_tasks]
+    tasks = [enrich_delegate_task_entry(t) for t in tasks]
+    try:
+        result_json = agent._dispatch_delegate_task(
+            {"tasks": tasks, "role": "leaf", "background": True}
+        )
+    except Exception as exc:
+        logger.warning("orchestrator fan-out dispatch failed: %s", exc)
+        return None
+
+    try:
+        payload = json.loads(result_json)
+    except json.JSONDecodeError:
+        return None
+
+    if payload.get("error"):
+        logger.info("orchestrator fan-out rejected: %s", payload.get("error"))
+        return None
+
+    agent._orchestrator_fanout_done = True
+    return format_programmatic_dispatch_message(tasks, payload)
+
+
+def try_orchestrator_post_recon_fanout(
+    agent,
+    messages: Sequence[Dict[str, Any]],
+    user_message: str,
+    *,
+    task_id: str,
+) -> Optional[str]:
+    """After orchestrator recon turn, plan tailored tasks and fan out if needed."""
+    if not is_orchestrator_two_phase_enabled():
+        return None
+    if not is_ecosystem_orchestrator_subagent(agent):
+        return None
+    if getattr(agent, "_orchestrator_fanout_done", False):
+        return None
+    if _turn_includes_delegate_task(messages):
+        agent._orchestrator_fanout_done = True
+        return None
+
+    original = _resolve_original_request(agent, user_message)
+    if not original:
+        return None
+
+    recon = _extract_recon_summary(messages)
+    tasks = _plan_tasks_from_recon(recon, original)
+    if not tasks or len(tasks) < _min_parallel_tasks():
+        logger.info(
+            "orchestrator post-recon: recon planner returned %s tasks; "
+            "falling back to heuristic plan",
+            len(tasks or []),
+        )
+        tasks = plan_parallel_delegate_tasks(original)
+    if len(tasks) < _min_parallel_tasks():
+        return None
+
+    logger.info(
+        "orchestrator post-recon fan-out: dispatching %d tasks (session=%s task=%s)",
+        len(tasks),
+        getattr(agent, "session_id", None) or "none",
+        task_id,
+    )
+    return _dispatch_orchestrator_fanout(agent, tasks, task_id=task_id)
 
 
 def _plan_tasks_with_llm(message: str) -> Optional[List[Tuple[str, str]]]:
@@ -757,12 +1091,17 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
 def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> Optional[str]:
     """Parallel first wave when the active agent is an orchestrator subagent.
 
-    Root ``/start`` often spawns a single orchestrator child; without this hook
-    the model tends to call ``delegate_task`` once per specialist (sequential).
+    With ``orchestrator_two_phase`` (default), recon + LLM-planned fan-out
+    replaces immediate keyword fan-out. See ``build_orchestrator_recon_injection``
+    and ``try_orchestrator_post_recon_fanout``.
     """
+    if is_orchestrator_two_phase_enabled():
+        return None
+
     if getattr(agent, "_delegate_role", None) != "orchestrator":
         return None
-    if _agent_ecosystem_id(agent) == "start":
+    # Only the ecosystem orchestrator subagent may run programmatic fan-out.
+    if _agent_ecosystem_id(agent) != "orchestrator":
         return None
     if getattr(agent, "_orchestrator_fanout_done", False):
         return None
@@ -787,33 +1126,13 @@ def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> 
     if len(tasks) < _min_parallel_tasks():
         return None
 
-    tasks = [enrich_delegate_task_entry(t) for t in tasks]
     logger.info(
         "orchestrator child fan-out: dispatching %d parallel tasks (session=%s task=%s)",
         len(tasks),
         getattr(agent, "session_id", None) or "none",
         task_id,
     )
-
-    try:
-        result_json = agent._dispatch_delegate_task(
-            {"tasks": tasks, "role": "leaf", "background": True}
-        )
-    except Exception as exc:
-        logger.warning("orchestrator child fan-out failed: %s", exc)
-        return None
-
-    try:
-        payload = json.loads(result_json)
-    except json.JSONDecodeError:
-        return None
-
-    if payload.get("error"):
-        logger.info("orchestrator child fan-out rejected: %s", payload.get("error"))
-        return None
-
-    agent._orchestrator_fanout_done = True
-    return format_programmatic_dispatch_message(tasks, payload)
+    return _dispatch_orchestrator_fanout(agent, tasks, task_id=task_id)
 
 
 def build_orchestration_injection(message: str) -> Optional[str]:

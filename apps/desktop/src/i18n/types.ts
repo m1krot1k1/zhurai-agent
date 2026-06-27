@@ -561,6 +561,8 @@ export interface Translations {
 
   agents: {
     close: string
+    expandFullscreen: string
+    resizeInspector: string
     title: string
     subtitle: string
     emptyTitle: string

@@ -1059,6 +1059,30 @@ def test_async_delegation_skips_parent_turn_for_batch_fanout():
     assert async_delegation_skips_parent_turn(evt) is True
 
 
+def test_async_delegation_skips_parent_turn_for_batch_fanout():
+    evt = {
+        "type": "async_delegation",
+        "context": "ORIGINAL_REQUEST: analyze repo",
+        "goal": "Parallel specialists",
+        "is_batch": True,
+        "results": [{"task_index": 0, "status": "completed", "summary": "done"}],
+    }
+    assert async_delegation_skips_parent_turn(evt) is True
+
+
+def test_async_delegation_does_not_skip_synthesis_batch():
+    evt = {
+        "type": "async_delegation",
+        "context": "ORIGINAL_REQUEST: analyze repo",
+        "goal": "3 parallel subagents: ...",
+        "is_batch": True,
+        "synthesis_required": True,
+        "original_request": "analyze repo",
+        "results": [{"task_index": 0, "status": "completed", "summary": "done"}],
+    }
+    assert async_delegation_skips_parent_turn(evt) is False
+
+
 def test_format_completion_event():
     evt = {
         "type": "completion",

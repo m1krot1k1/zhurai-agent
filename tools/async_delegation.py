@@ -345,6 +345,8 @@ def dispatch_async_delegation_batch(
     runner: Callable[[], Dict[str, Any]],
     interrupt_fn: Optional[Callable[[], None]] = None,
     max_async_children: int = _DEFAULT_MAX_ASYNC_CHILDREN,
+    synthesis_required: bool = False,
+    original_request: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Dispatch a WHOLE fan-out batch as ONE background unit.
 
@@ -387,6 +389,8 @@ def dispatch_async_delegation_batch(
         "completed_at": None,
         "interrupt_fn": interrupt_fn,
         "is_batch": True,
+        "synthesis_required": bool(synthesis_required),
+        "original_request": (original_request or "").strip() or None,
     }
     with _records_lock:
         running = sum(
@@ -493,6 +497,8 @@ def _finalize_batch(
         "total_duration_seconds": combined.get("total_duration_seconds"),
         "dispatched_at": dispatched_at,
         "completed_at": completed_at,
+        "synthesis_required": bool(event_record.get("synthesis_required")),
+        "original_request": event_record.get("original_request"),
     }
     try:
         process_registry.completion_queue.put(evt)

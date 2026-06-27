@@ -684,6 +684,8 @@ export const en: Translations = {
 
   agents: {
     close: 'Close agents',
+    expandFullscreen: 'Open full spawn tree',
+    resizeInspector: 'Resize spawn tree panel',
     title: 'Spawn tree',
     subtitle: 'Subagent activity for this turn — review after completion; clears on your next message.',
     emptyTitle: 'No subagents this turn',

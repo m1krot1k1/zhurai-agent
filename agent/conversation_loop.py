@@ -4609,6 +4609,29 @@ def run_conversation(
                 messages.append({"role": "assistant", "content": final_response})
                 break
     
+    # Two-phase orchestrator: after recon turn, plan tailored fan-out if the
+    # model did not call delegate_task itself.
+    if not interrupted and not failed:
+        try:
+            from agent.orchestrator_router import try_orchestrator_post_recon_fanout
+
+            _post_fanout = try_orchestrator_post_recon_fanout(
+                agent,
+                messages,
+                original_user_message if isinstance(original_user_message, str) else user_message,
+                task_id=effective_task_id,
+            )
+        except Exception as exc:
+            _post_fanout = None
+            logger.warning("orchestrator post-recon fan-out error: %s", exc)
+        if _post_fanout:
+            if final_response:
+                final_response = f"{final_response.rstrip()}\n\n{_post_fanout}"
+            else:
+                final_response = _post_fanout
+            if _turn_exit_reason == "unknown" or not final_response:
+                _turn_exit_reason = "orchestrator_post_recon_fanout"
+
     # Post-loop turn finalization extracted to agent/turn_finalizer.finalize_turn
     # (god-file decomposition Phase 1 step 4). Behavior-neutral: the assembled
     # result dict is returned exactly as before.
