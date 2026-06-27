@@ -1,3 +1,5 @@
+# NOTE: Disabled — hermes-smoke-test action was removed; restore
+# .github/actions/hermes-smoke-test/ before re-enabling this workflow.
 name: Docker Build and Publish
 
 on:
