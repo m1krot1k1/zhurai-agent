@@ -169,7 +169,7 @@ _DEFAULT_MAX_CONCURRENT_CHILDREN = 5
 # so without this flag a config of max_concurrent_children>10 spams the log on
 # every turn / agent spawn even when delegate_task is never called.
 _HIGH_CONCURRENCY_WARNED = False
-MAX_DEPTH = 2  # default: parent (0) -> orchestrator (1) -> specialists (2)
+MAX_DEPTH = 3  # default: root (0) -> start (1) -> orchestrator (2) -> specialists (3)
 # Configurable depth cap consulted by _get_max_spawn_depth; MAX_DEPTH
 # stays as the default fallback and is still the symbol tests import.
 _MIN_SPAWN_DEPTH = 1
@@ -517,8 +517,8 @@ def _get_max_spawn_depth() -> int:
     """Read delegation.max_spawn_depth from config, floored at 1 (no ceiling).
 
     depth 0 = parent agent.  max_spawn_depth = N means agents at depths
-    0..N-1 can spawn; depth N is the leaf floor.  Default 2 enables
-    start→orchestrator→specialists; set to 1 for flat leaf-only.
+    0..N-1 can spawn; depth N is the leaf floor.  Default 3 enables
+    /start chain root→start→orchestrator→specialists; set to 1 for flat leaf-only.
 
     role="orchestrator" removes the toolset strip for spawning children when
     max_spawn_depth >= 2, enabling them to spawn their own workers.

@@ -207,7 +207,8 @@ const firstString = (...candidates: unknown[]): string => {
 function delegateTaskPayloads(
   payload: GatewayEventPayload | undefined,
   phase: 'running' | 'complete',
-  sourceEventType?: string
+  sourceEventType?: string,
+  parent?: { depth: number; id: string } | null
 ): Record<string, unknown>[] {
   if (payload?.name !== 'delegate_task') {
     return []
@@ -238,10 +239,11 @@ function delegateTaskPayloads(
     const summary = firstString(result.summary, payload.summary, payload.message)
 
     return {
-      depth: 0,
+      depth: parent ? parent.depth + 1 : 0,
       duration_seconds: payload.duration_s,
       goal,
       agent_id: agentId || undefined,
+      parent_id: parent?.id,
       role: firstString(task.role, args.role),
       status,
       subagent_id: `delegate-tool:${toolId}:${index}`,
@@ -343,6 +345,8 @@ export function useMessageStream({
   const flushHandleRef = useRef<number | null>(null)
   const lastFlushAtRef = useRef<number>(0)
   const nativeSubagentSessionsRef = useRef<Set<string>>(new Set())
+  /** Best-effort parent for delegate_task tool fallback rows before native subagent.* events. */
+  const latestSubagentParentRef = useRef<Map<string, { depth: number; id: string }>>(new Map())
   // Turns that auto-compacted: skip post-turn hydrate so live scrollback survives.
   const compactedTurnRef = useRef<Set<string>>(new Set())
 
@@ -515,7 +519,12 @@ export function useMessageStream({
       }
 
       if (!nativeSubagentSessionsRef.current.has(sessionId)) {
-        for (const subagentPayload of delegateTaskPayloads(payload, phase, sourceEventType)) {
+        for (const subagentPayload of delegateTaskPayloads(
+          payload,
+          phase,
+          sourceEventType,
+          latestSubagentParentRef.current.get(sessionId) ?? null
+        )) {
           upsertSubagent(
             sessionId,
             subagentPayload,
@@ -846,6 +855,7 @@ export function useMessageStream({
         setSessionCompacting(sessionId, false)
         compactedTurnRef.current.delete(sessionId)
         nativeSubagentSessionsRef.current.delete(sessionId)
+        latestSubagentParentRef.current.delete(sessionId)
 
         if (isActiveEvent) {
           triggerHaptic('streamStart')
@@ -946,6 +956,15 @@ export function useMessageStream({
             event.type === 'subagent.spawn_requested' || event.type === 'subagent.start',
             event.type
           )
+          if (event.type === 'subagent.start') {
+            const p = payload as Record<string, unknown>
+            const subagentId = typeof p.subagent_id === 'string' ? p.subagent_id : ''
+            const depth =
+              typeof p.depth === 'number' && Number.isFinite(p.depth) ? p.depth : 0
+            if (subagentId) {
+              latestSubagentParentRef.current.set(sessionId, { depth, id: subagentId })
+            }
+          }
         }
       } else if (event.type === 'clarify.request') {
         // Surface the clarify tool's overlay. The Python side is blocked on

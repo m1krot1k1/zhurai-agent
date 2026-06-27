@@ -6482,7 +6482,11 @@ def _notification_poller_loop(
     even if the process was started by a different session. This matches
     CLI/gateway behavior (single session per process).
     """
-    from tools.process_registry import process_registry, format_process_notification
+    from tools.process_registry import (
+        async_delegation_skips_parent_turn,
+        format_process_notification,
+        process_registry,
+    )
 
     _emitted = set()  # dedup re-queued events so same completion isn't emitted 50 times while session is busy
     while not stop_event.is_set() and not session.get("_finalized"):
@@ -6505,6 +6509,12 @@ def _notification_poller_loop(
         if evt.get("type") == "completion" and process_registry.is_completion_consumed(_evt_sid):
             continue
 
+        if evt.get("type") == "async_delegation" and async_delegation_skips_parent_turn(
+            evt
+        ):
+            _emitted.add(_notification_event_dedup_key(evt))
+            continue
+
         text = format_process_notification(evt)
         if not text:
             continue
@@ -6515,7 +6525,8 @@ def _notification_poller_loop(
         # visible independently.
         _dedup_key = _notification_event_dedup_key(evt)
         if _dedup_key not in _emitted:
-            _emit("status.update", sid, {"kind": "process", "text": text})
+            if evt.get("type") != "async_delegation":
+                _emit("status.update", sid, {"kind": "process", "text": text})
             _emitted.add(_dedup_key)
 
         with session["history_lock"]:
@@ -6552,13 +6563,20 @@ def _notification_poller_loop(
         _evt_sid = evt.get("session_id", "")
         if evt.get("type") == "completion" and process_registry.is_completion_consumed(_evt_sid):
             continue
+        if evt.get("type") == "async_delegation" and async_delegation_skips_parent_turn(
+            evt
+        ):
+            _emitted.add(_notification_event_dedup_key(evt))
+            continue
+
         text = format_process_notification(evt)
         if not text:
             continue
 
         _dedup_key = _notification_event_dedup_key(evt)
         if _dedup_key not in _emitted:
-            _emit("status.update", sid, {"kind": "process", "text": text})
+            if evt.get("type") != "async_delegation":
+                _emit("status.update", sid, {"kind": "process", "text": text})
             _emitted.add(_dedup_key)
 
         with session["history_lock"]:

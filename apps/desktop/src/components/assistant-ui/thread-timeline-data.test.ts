@@ -37,6 +37,19 @@ describe('deriveTimelineEntries', () => {
       ]).map(e => e.id)
     ).toEqual(['u3'])
   })
+
+  it('drops async delegation completion blocks', () => {
+    expect(
+      deriveTimelineEntries([
+        {
+          id: 'u1',
+          role: 'user',
+          text: '[ASYNC DELEGATION BATCH COMPLETE — deleg_x]\nContext you provided: …'
+        },
+        { id: 'u2', role: 'user', text: 'real prompt' }
+      ]).map(e => e.id)
+    ).toEqual(['u2'])
+  })
 })
 
 describe('activeTimelineIndex', () => {

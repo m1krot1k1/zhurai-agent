@@ -1772,6 +1772,42 @@ class ProcessRegistry:
 process_registry = ProcessRegistry()
 
 
+def is_async_delegation_notification_text(text: str) -> bool:
+    """True for synthetic user messages re-injected after background delegate_task."""
+    stripped = (text or "").strip()
+    if not stripped.startswith("[ASYNC DELEGATION"):
+        return False
+    header = stripped.split("\n", 1)[0]
+    return " COMPLETE" in header
+
+
+def async_delegation_skips_parent_turn(evt: dict) -> bool:
+    """Handoff-only completions must not re-enter the parent chat transcript.
+
+    Start-router and similar plumbing branches already dispatched the next hop
+    inside the child subagent; the parent got a user-facing ack at dispatch
+    time. Re-injecting the formatted completion block only clutters the main
+    thread — details belong in the subagent inspector.
+    """
+    if evt.get("type") != "async_delegation":
+        return False
+    context = str(evt.get("context") or "")
+    if "MODE: start_router" in context:
+        return True
+    if "MODE: multi_domain" in context and "ORCHESTRATOR_MUST" in context:
+        return True
+    goal = str(evt.get("goal") or "").lower()
+    if "hand off to orchestrator" in goal or "handoff to orchestrator" in goal:
+        return True
+    if "coordinate user request" in goal:
+        return True
+    # Batch fan-out completions are surfaced in the subagent inspector; re-injecting
+    # them at root retriggers flat programmatic orchestration and breaks the spawn tree.
+    if evt.get("is_batch") or isinstance(evt.get("results"), list):
+        return True
+    return False
+
+
 def _format_age(seconds: float) -> str:
     """Human-friendly elapsed string ('18m', '2h3m', '45s')."""
     try:

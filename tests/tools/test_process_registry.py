@@ -1004,7 +1004,59 @@ class TestProcessToolHandler:
 # format_process_notification + drain_notifications (shared helpers)
 # =========================================================================
 
-from tools.process_registry import format_process_notification
+from tools.process_registry import (
+    async_delegation_skips_parent_turn,
+    format_process_notification,
+    is_async_delegation_notification_text,
+)
+
+
+def test_is_async_delegation_notification_text():
+    assert is_async_delegation_notification_text(
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_abc]\nDetails"
+    )
+    assert not is_async_delegation_notification_text("[IMPORTANT: Background process x]")
+
+
+def test_async_delegation_skips_parent_turn_for_start_router():
+    evt = {
+        "type": "async_delegation",
+        "context": "OBJECTIVE: Route\nMODE: start_router\nAGENT_ID: start",
+        "goal": "Start router: hand off to orchestrator",
+    }
+    assert async_delegation_skips_parent_turn(evt) is True
+
+
+def test_async_delegation_skips_parent_turn_for_normal_worker():
+    evt = {
+        "type": "async_delegation",
+        "context": "OBJECTIVE: Analyze repo",
+        "goal": "Map codebase structure",
+    }
+    assert async_delegation_skips_parent_turn(evt) is False
+
+
+def test_async_delegation_skips_parent_turn_for_orchestrator_handoff():
+    evt = {
+        "type": "async_delegation",
+        "context": (
+            "ORIGINAL_REQUEST: fix the spawn tree\nMODE: multi_domain\n"
+            "ORCHESTRATOR_MUST: decompose into parallel branches"
+        ),
+        "goal": "Coordinate user request",
+    }
+    assert async_delegation_skips_parent_turn(evt) is True
+
+
+def test_async_delegation_skips_parent_turn_for_batch_fanout():
+    evt = {
+        "type": "async_delegation",
+        "context": "ORIGINAL_REQUEST: analyze repo",
+        "goal": "Parallel specialists",
+        "is_batch": True,
+        "results": [{"task_index": 0, "status": "completed", "summary": "done"}],
+    }
+    assert async_delegation_skips_parent_turn(evt) is True
 
 
 def test_format_completion_event():

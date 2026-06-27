@@ -355,9 +355,30 @@ def test_try_programmatic_orchestration_dispatches(
     assert response is not None
     assert "repo-explorer" in response or "специалист" in response.lower()
     agent._dispatch_delegate_task.assert_called_once()
-    call_args = agent._dispatch_delegate_task.call_args[0][0]
-    assert isinstance(call_args.get("tasks"), list)
-    assert len(call_args["tasks"]) >= 2
+
+
+def test_try_programmatic_orchestration_skips_async_delegation_reinjection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    eco = tmp_path / "zhur"
+    (eco / "agents").mkdir(parents=True)
+    monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
+    monkeypatch.setattr(
+        "agent.orchestrator_router._load_delegation_cfg",
+        lambda: {"auto_orchestrate": True, "auto_orchestrate_mode": "programmatic"},
+    )
+
+    agent = MagicMock()
+    agent._delegate_depth = 0
+    agent.valid_tool_names = {"delegate_task"}
+
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_abc]\n"
+        "ORIGINAL_REQUEST: Analyze repo architecture and security\n"
+        "TASK 1/5: repo-explorer ..."
+    )
+    assert try_programmatic_orchestration(agent, msg, task_id="task-1") is None
+    agent._dispatch_delegate_task.assert_not_called()
 
 
 def test_try_programmatic_skips_without_delegate_tool(

@@ -855,6 +855,7 @@ const StopGlyph = <IconPlayerStopFilled aria-hidden className="size-3.5 -transla
 // render them as a compact system-style notice instead of a user bubble.
 // Shape: see tools/process_registry.py format_process_notification().
 const PROCESS_NOTIFICATION_RE = /^\[IMPORTANT: Background process [\s\S]*\]$/
+const ASYNC_DELEGATION_NOTIFICATION_RE = /^\[ASYNC DELEGATION(?: BATCH)? COMPLETE/m
 
 const ProcessNotificationNote: FC<{ text: string }> = ({ text }) => {
   const body = text.replace(/^\[IMPORTANT:\s*/, '').replace(/\]$/, '')
@@ -971,6 +972,11 @@ const UserMessage: FC<{
         <ProcessNotificationNote text={messageText.trim()} />
       </MessagePrimitive.Root>
     )
+  }
+
+  // Background delegate_task completions belong in the subagent inspector only.
+  if (ASYNC_DELEGATION_NOTIFICATION_RE.test(messageText.trim())) {
+    return null
   }
 
   const hasBody = messageText.trim().length > 0

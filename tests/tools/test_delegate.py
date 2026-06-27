@@ -172,7 +172,7 @@ class TestDelegateTask(unittest.TestCase):
         self.assertIn("parent agent", result["error"])
 
     def test_depth_limit(self):
-        parent = _make_mock_parent(depth=2)
+        parent = _make_mock_parent(depth=3)
         result = json.loads(delegate_task(goal="test", parent_agent=parent))
         self.assertIn("error", result)
         self.assertIn("depth limit", result["error"].lower())
@@ -924,8 +924,8 @@ class TestBlockedTools(unittest.TestCase):
             _MIN_SPAWN_DEPTH,
         )
         self.assertEqual(_get_max_concurrent_children(), 5)
-        self.assertEqual(MAX_DEPTH, 2)
-        self.assertEqual(_get_max_spawn_depth(), 2)       # default: orchestrator→specialists
+        self.assertEqual(MAX_DEPTH, 3)
+        self.assertEqual(_get_max_spawn_depth(), 3)       # default: /start chain depth
         self.assertTrue(_get_orchestrator_enabled())      # default
         self.assertEqual(_MIN_SPAWN_DEPTH, 1)
 
@@ -2221,9 +2221,9 @@ class TestMaxSpawnDepth(unittest.TestCase):
     """Tests for _get_max_spawn_depth clamping and fallback behavior."""
 
     @patch("tools.delegate_tool._load_config", return_value={})
-    def test_max_spawn_depth_defaults_to_2(self, mock_cfg):
+    def test_max_spawn_depth_defaults_to_3(self, mock_cfg):
         from tools.delegate_tool import _get_max_spawn_depth
-        self.assertEqual(_get_max_spawn_depth(), 2)
+        self.assertEqual(_get_max_spawn_depth(), 3)
 
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 0})
@@ -2246,7 +2246,7 @@ class TestMaxSpawnDepth(unittest.TestCase):
            return_value={"max_spawn_depth": "not-a-number"})
     def test_max_spawn_depth_invalid_falls_back_to_default(self, mock_cfg):
         from tools.delegate_tool import _get_max_spawn_depth
-        self.assertEqual(_get_max_spawn_depth(), 2)
+        self.assertEqual(_get_max_spawn_depth(), 3)
 
 
 # =========================================================================

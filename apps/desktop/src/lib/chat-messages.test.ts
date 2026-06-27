@@ -155,6 +155,18 @@ describe('toChatMessages', () => {
 
     expect(chatMessageText(message)).toBe('@file:foo.ts\n\nlook')
   })
+
+  it('marks async delegation completion user rows as hidden', () => {
+    const [message] = toChatMessages([
+      {
+        role: 'user',
+        content: '[ASYNC DELEGATION BATCH COMPLETE — deleg_x]\nContext you provided: …',
+        timestamp: 1
+      }
+    ])
+
+    expect(message.hidden).toBe(true)
+  })
 })
 
 describe('renderMediaTags', () => {

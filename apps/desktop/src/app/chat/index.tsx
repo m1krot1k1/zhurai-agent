@@ -209,6 +209,10 @@ function ChatRuntimeBoundary({
     let headId: string | null = null
 
     for (const message of messages) {
+      if (message.hidden && message.role === 'user') {
+        continue
+      }
+
       let parentId = visibleParentId
 
       if (message.role === 'assistant' && message.branchGroupId) {

@@ -7024,6 +7024,65 @@ def test_config_show_displays_nested_max_turns(monkeypatch):
     assert ["Max Turns", "120"] in agent_rows
 
 
+def test_notification_poller_skips_start_router_handoff(monkeypatch):
+    """Start-router handoff completions must not re-enter the parent chat."""
+    import queue as _queue_mod
+
+    from tools.process_registry import process_registry
+
+    turns = []
+    emitted = []
+
+    class _Agent:
+        def run_conversation(self, prompt, conversation_history=None, stream_callback=None):
+            turns.append(prompt)
+            return {"final_response": "ok", "messages": []}
+
+    class _ImmediateThread:
+        def __init__(self, target=None, daemon=None):
+            self._target = target
+        def start(self):
+            self._target()
+
+    sess = _session(agent=_Agent())
+    server._sessions["sid_handoff"] = sess
+    monkeypatch.setattr(server.threading, "Thread", _ImmediateThread)
+    monkeypatch.setattr(server, "_emit", lambda *a, **kw: emitted.append(a))
+    monkeypatch.setattr(server, "make_stream_renderer", lambda cols: None)
+    monkeypatch.setattr(server, "render_message", lambda raw, cols: None)
+
+    isolated_queue: _queue_mod.Queue = _queue_mod.Queue()
+    monkeypatch.setattr(process_registry, "completion_queue", isolated_queue)
+
+    stop = threading.Event()
+    isolated_queue.put({
+        "type": "async_delegation",
+        "delegation_id": "deleg_start_handoff",
+        "goal": "Start router: hand off to orchestrator",
+        "context": "MODE: start_router\nAGENT_ID: start",
+        "is_batch": True,
+        "results": [{"task_index": 0, "status": "completed", "summary": "Start передал задачу orchestrator."}],
+        "goals": ["Start router: hand off to orchestrator"],
+        "role": "orchestrator",
+        "model": "?",
+        "status": "completed",
+        "total_duration_seconds": 57.58,
+        "dispatched_at": 1_700_000_000,
+        "completed_at": 1_700_000_057,
+    })
+    stop.set()
+
+    try:
+        server._notification_poller_loop(stop, "sid_handoff", sess)
+        assert turns == []
+        assert not any(a[0] == "status.update" for a in emitted)
+        assert not any(a[0] == "message.start" for a in emitted)
+    finally:
+        server._sessions.pop("sid_handoff", None)
+        while not process_registry.completion_queue.empty():
+            process_registry.completion_queue.get_nowait()
+
+
 def test_notification_poller_delivers_completion(monkeypatch):
     """Poller picks up completion events and triggers agent turns."""
     import queue as _queue_mod

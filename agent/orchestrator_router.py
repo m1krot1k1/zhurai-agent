@@ -677,6 +677,14 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
     Returns an assistant-facing message when dispatch succeeded, else None
     (caller falls back to hint injection + normal LLM loop).
     """
+    try:
+        from tools.process_registry import is_async_delegation_notification_text
+    except Exception:
+        is_async_delegation_notification_text = lambda _text: False  # type: ignore
+
+    if is_async_delegation_notification_text(message or ""):
+        return None
+
     if not should_programmatic_orchestrate(message):
         return None
     if getattr(agent, "_delegate_depth", 0) > 0:

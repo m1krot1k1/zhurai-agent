@@ -122,6 +122,18 @@ const ATTACHED_CONTEXT_MARKER_RE = /(?:^|\n)--- Attached Context ---\s*\n/
 const CONTEXT_WARNINGS_MARKER_RE = /(?:^|\n)--- Context Warnings ---[\s\S]*$/
 const CONTEXT_REF_RE = /@(file|folder|url|image|tool|terminal):(?:"[^"\n]+"|'[^'\n]+'|`[^`\n]+`|\S+)/g
 
+/** Synthetic user turns after background delegate_task — not human prompts. */
+export function isAsyncDelegationNotificationText(text: string): boolean {
+  const stripped = text.trim()
+  if (!stripped.startsWith('[ASYNC DELEGATION')) {
+    return false
+  }
+
+  const header = stripped.split('\n', 1)[0]
+
+  return header.includes(' COMPLETE')
+}
+
 function textFromUnknown(value: unknown, depth = 0): string {
   if (typeof value === 'string') {
     return value
@@ -825,7 +837,11 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       id: `${message.timestamp || Date.now()}-${index}-${message.role}`,
       role: message.role,
       parts,
-      timestamp: message.timestamp
+      timestamp: message.timestamp,
+      hidden:
+        message.role === 'user' && isAsyncDelegationNotificationText(displayContent)
+          ? true
+          : undefined
     })
 
     activeAssistantIndex = message.role === 'assistant' ? result.length - 1 : null

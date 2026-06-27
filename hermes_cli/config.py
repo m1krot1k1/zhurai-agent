@@ -1978,7 +1978,7 @@ DEFAULT_CONFIG = {
         # Orchestrator role controls (see tools/delegate_tool.py:_get_max_spawn_depth
         # and _get_orchestrator_enabled).  Floored at 1, no upper ceiling —
         # raise deliberately, each level multiplies API cost.
-        "max_spawn_depth": 2,        # depth (2 = orchestrator→specialists [default], 1 = flat leaf-only)
+        "max_spawn_depth": 3,        # depth (3 = /start→start→orchestrator→specialists [default], 1 = flat leaf-only)
         "orchestrator_enabled": True,  # kill switch for role="orchestrator"
         # When the zhur.ai-agent ecosystem is available (agents/ tree), inject
         # multi-agent orchestration hints into complex user turns so the root
@@ -2848,7 +2848,7 @@ DEFAULT_CONFIG = {
 
 
     # Config schema version - bump this when adding new required fields
-    "_config_version": 30,
+    "_config_version": 31,
 }
 
 # =============================================================================
@@ -5146,6 +5146,24 @@ def migrate_config(interactive: bool = True, quiet: bool = False) -> Dict[str, A
             save_config(config)
             if not quiet:
                 print("  ✓ Renamed write_mode → write_approval (boolean gate)")
+
+    # ── Version 30 → 31: /start chain needs depth 3 ──
+    # root(0) → start(1) → orchestrator(2) → specialists(3). With max_spawn_depth=2
+    # the orchestrator hits the depth floor and cannot delegate; root then re-fans
+    # specialists flat via async-completion re-injection.
+    if current_ver < 31:
+        config = read_raw_config()
+        delegation = config.get("delegation")
+        if isinstance(delegation, dict) and delegation.get("max_spawn_depth") == 2:
+            delegation["max_spawn_depth"] = 3
+            config["delegation"] = delegation
+            save_config(config)
+            results["config_added"].append("delegation.max_spawn_depth=3")
+            if not quiet:
+                print(
+                    "  ✓ Raised delegation.max_spawn_depth 2→3 "
+                    "(enables /start → start → orchestrator → specialists)"
+                )
 
     # ── Version 29 → 30: seed curator.consolidate (default false) ──
     # Consolidation (the LLM umbrella-building fork) is now an opt-in toggle,
