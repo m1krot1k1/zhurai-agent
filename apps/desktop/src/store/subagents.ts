@@ -259,6 +259,10 @@ export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentN
   const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>
     nodes.map(n => {
       const { item } = n
+      const raw = item as unknown as Record<string, unknown>
+      if (typeof raw.startedAt !== 'number' || typeof raw.taskIndex !== 'number') {
+        return { ...item, startedAt: 0, taskIndex: 0, children: adapt(n.children) } as SubagentNode
+      }
       return { ...item, children: adapt(n.children) } as unknown as SubagentNode
     })
 

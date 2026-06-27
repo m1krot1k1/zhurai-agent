@@ -1128,6 +1128,7 @@ class GatewaySlashCommandsMixin:
                         user_providers=user_provs,
                         custom_providers=custom_provs,
                         max_models=50,
+                        force_refresh=force_refresh,
                     )
                 except Exception:
                     providers = []

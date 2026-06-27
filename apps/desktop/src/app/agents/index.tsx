@@ -353,7 +353,7 @@ function SubagentTree({ focusAgentId, tree }: { focusAgentId: null | string; tre
       return
     }
 
-    const id = window.setInterval(() => setNowMs(Date.now()), 500)
+    const id = window.setInterval(() => setNowMs(Date.now()), 5_000)
 
     return () => window.clearInterval(id)
   }, [active])
@@ -474,6 +474,7 @@ function SubagentRow({
   const { t } = useI18n()
   const running = node.status === 'running' || node.status === 'queued'
   const elapsed = useElapsedSeconds(running, `subagent:${node.id}`)
+  const roleBadge = formatSubagentRoleBadge(node.role)
 
   const durationSeconds =
     typeof node.durationSeconds === 'number' ? Math.max(0, Math.round(node.durationSeconds)) : elapsed
@@ -524,9 +525,9 @@ function SubagentRow({
             )}
           >
             <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {formatSubagentRoleBadge(node.role) ? (
+              {roleBadge ? (
                 <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
-                  {formatSubagentRoleBadge(node.role)}
+                  {roleBadge}
                 </span>
               ) : null}
               <span className="min-w-0 wrap-anywhere">{formatSubagentTitle(node.goal, 120)}</span>

@@ -26,7 +26,10 @@ on:
       - 'scripts/desktop-signing-env.sh'
       - 'scripts/ensure-node.sh'
       - '.github/workflows/release-desktop-macos.yml'
+      - 'acp_registry/**'
       - 'package.json'
+      - 'pyproject.toml'
+      - 'hermes_cli/__init__.py'
       - 'package-lock.json'
 
 permissions:
@@ -34,7 +37,7 @@ permissions:
 
 concurrency:
   group: release-desktop-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -63,15 +66,25 @@ jobs:
         id: bump
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "kind=${{ inputs.bump }}" >> "$GITHUB_OUTPUT"
+            KIND="${{ inputs.bump }}"
           else
-            echo "kind=minor" >> "$GITHUB_OUTPUT"
+            KIND="minor"
           fi
+          case "$KIND" in
+            minor|major) ;;
+            *) echo "ERROR: invalid bump kind: $KIND" >&2; exit 1 ;;
+          esac
+          echo "kind=${KIND}" >> "$GITHUB_OUTPUT"
 
       - name: Поднять версию
         id: version
         run: |
-          NEW="$(bash scripts/bump-desktop-version.sh "${{ steps.bump.outputs.kind }}")"
+          KIND="${{ steps.bump.outputs.kind }}"
+          case "$KIND" in
+            minor|major) ;;
+            *) echo "ERROR: invalid bump kind: $KIND" >&2; exit 1 ;;
+          esac
+          NEW="$(bash scripts/bump-desktop-version.sh "$KIND")"
           echo "version=${NEW}" >> "$GITHUB_OUTPUT"
           echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
           echo "Новая версия: v${NEW}"

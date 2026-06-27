@@ -21,10 +21,63 @@ from pathlib import Path
 
 kind, pkg_path, pyproject_path, init_path, agent_json_path = sys.argv[1:6]
 
+SEMVER_RE = re.compile(r"\A\d+\.\d+\.\d+\Z")
+
+
+def read_version_from_pkg(path: str) -> str:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)["version"]
+
+
+def read_version_from_pyproject(path: str) -> str:
+    text = Path(path).read_text(encoding="utf-8")
+    m = re.search(r'(?m)^version = "([^"]+)"', text)
+    if not m:
+        raise SystemExit(f"ERROR: no `version = ...` found in {path}")
+    return m.group(1)
+
+
+def read_version_from_init(path: str) -> str:
+    text = Path(path).read_text(encoding="utf-8")
+    m = re.search(r'__version__\s*=\s*"([^"]+)"', text)
+    if not m:
+        raise SystemExit(f"ERROR: no __version__ found in {path}")
+    return m.group(1)
+
+
+def assert_semver(v: str, source: str) -> None:
+    if not SEMVER_RE.match(v):
+        raise SystemExit(
+            f"ERROR: version in {source} must be MAJOR.MINOR.PATCH, got {v!r}"
+        )
+
+
+# Pre-flight: all 4 files must agree AND be valid semver before any mutation.
+pkg_v = read_version_from_pkg(pkg_path)
+pyproject_v = read_version_from_pyproject(pyproject_path)
+init_v = read_version_from_init(init_path)
+agent_v = read_version_from_pkg(agent_json_path)
+
+for v, src in (
+    (pkg_v, pkg_path),
+    (pyproject_v, pyproject_path),
+    (init_v, init_path),
+    (agent_v, agent_json_path),
+):
+    assert_semver(v, src)
+
+if not (pkg_v == pyproject_v == init_v == agent_v):
+    raise SystemExit(
+        "ERROR: version mismatch — sync manually first:\n"
+        f"  package.json   = {pkg_v}\n"
+        f"  pyproject.toml = {pyproject_v}\n"
+        f"  __init__.py    = {init_v}\n"
+        f"  agent.json     = {agent_v}"
+    )
+
 with open(pkg_path, encoding="utf-8") as f:
     data = json.load(f)
-parts = [int(x) for x in data["version"].split(".")]
-major, minor, patch = (parts + [0, 0, 0])[:3]
+major, minor, patch = map(int, pkg_v.split("."))
 if kind == "minor":
     major, minor, patch = major, minor + 1, 0
 else:

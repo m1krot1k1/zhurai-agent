@@ -1,5 +1,6 @@
 """Tests for the hermes_cli models module."""
 
+import io
 from unittest.mock import patch, MagicMock
 
 from hermes_cli.nous_account import NousPortalAccountInfo
@@ -204,6 +205,110 @@ class TestFetchOpenRouterModels:
 
         ids = [mid for mid, _ in models]
         assert "anthropic/claude-opus-4.8" in ids
+        assert "qwen/qwen3.7-max" in ids
+
+    def test_http_429_falls_back_to_curated(self, monkeypatch):
+        """HTTP 429 (rate limit) from OpenRouter must fall back to the curated
+        manifest rather than surfacing an exception to the model picker.
+
+        The wrapper catches ``except Exception`` around ``urlopen``, so the
+        429 is treated like any other fetch failure. This test fixes that
+        contract explicitly so a future tightening (e.g. re-raising 429 to
+        implement a retry-after backoff) does not silently turn the picker
+        into an exception for rate-limited users.
+        """
+        import urllib.error
+
+        monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
+        # Force the curated manifest path (no remote manifest fetch).
+        with patch(
+            "hermes_cli.model_catalog.get_curated_openrouter_models",
+            return_value=None,
+        ):
+            hdrs = {"Retry-After": "60"}
+            fp = io.BytesIO(b"{}")
+            err = urllib.error.HTTPError(
+                url="https://openrouter.ai/api/v1/models",
+                code=429,
+                msg="Too Many Requests",
+                hdrs=hdrs,  # type: ignore[arg-type]
+                fp=fp,
+            )
+            with patch("hermes_cli.models.urllib.request.urlopen", side_effect=err):
+                models = fetch_openrouter_models(force_refresh=True)
+
+        # The picker must keep working: fallback equals the curated manifest.
+        assert models == OPENROUTER_MODELS
+        # And it's not empty — a regression to [] would empty the picker.
+        assert len(models) >= 1
+
+    def test_empty_api_response_falls_back(self, monkeypatch):
+        """Empty data array from OpenRouter API must fall back to curated
+        models rather than returning an empty picker."""
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, exc_type, exc, tb): return False
+            def read(self): return b'{"data":[]}'
+
+        monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
+        with patch("hermes_cli.model_catalog.get_curated_openrouter_models", return_value=None):
+            with patch("hermes_cli.models.urllib.request.urlopen", return_value=_Resp()):
+                models = fetch_openrouter_models(force_refresh=True)
+
+        assert models == OPENROUTER_MODELS
+        assert len(models) >= 1
+
+    def test_malformed_json_response_falls_back(self, monkeypatch):
+        """Malformed (non-JSON) response from OpenRouter must fall back to
+        curated manifest — JSONDecodeError inside the try block is caught
+        by the same except Exception handler."""
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, exc_type, exc, tb): return False
+            def read(self): return b'not json at all'
+
+        monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
+        with patch("hermes_cli.model_catalog.get_curated_openrouter_models", return_value=None):
+            with patch("hermes_cli.models.urllib.request.urlopen", return_value=_Resp()):
+                models = fetch_openrouter_models(force_refresh=True)
+
+        assert models == OPENROUTER_MODELS
+        assert len(models) >= 1
+
+    def test_timeout_falls_back(self, monkeypatch):
+        """Network timeout during OpenRouter fetch must not propagate
+        to the picker — falls back to curated."""
+        monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
+        with patch("hermes_cli.model_catalog.get_curated_openrouter_models", return_value=None):
+            with patch("hermes_cli.models.urllib.request.urlopen", side_effect=TimeoutError("timed out")):
+                models = fetch_openrouter_models(force_refresh=True)
+
+        assert models == OPENROUTER_MODELS
+        assert len(models) >= 1
+
+    def test_duplicate_ids_in_api_response_deduplicated(self, monkeypatch):
+        """Duplicate model IDs in the API response must be deduplicated
+        (last wins in live_by_id dict) — no crash, no duplicate entries."""
+        class _Resp:
+            def __enter__(self): return self
+            def __exit__(self, exc_type, exc, tb): return False
+            def read(self):
+                return (
+                    b'{"data":['
+                    b'{"id":"anthropic/claude-opus-4.8","pricing":{"prompt":"0.000015","completion":"0.000075"}},'
+                    b'{"id":"anthropic/claude-opus-4.8","pricing":{"prompt":"0.00002","completion":"0.00008"}},'
+                    b'{"id":"qwen/qwen3.7-max","pricing":{"prompt":"0.000000325","completion":"0.00000195"}}'
+                    b']}'
+                )
+
+        monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
+        with patch("hermes_cli.models.urllib.request.urlopen", return_value=_Resp()):
+            models = fetch_openrouter_models(force_refresh=True)
+
+        ids = [mid for mid, _ in models]
+        # claude-opus-4.8 must appear exactly once despite being in the
+        # response twice; qwen3.7-max must still be present.
+        assert ids.count("anthropic/claude-opus-4.8") == 1
         assert "qwen/qwen3.7-max" in ids
 
 

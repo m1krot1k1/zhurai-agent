@@ -3074,7 +3074,9 @@ def _on_tool_progress(
         if _kwargs.get("toolsets"):
             payload["toolsets"] = [str(t) for t in _kwargs["toolsets"]]
         if _kwargs.get("role"):
-            payload["role"] = str(_kwargs["role"])
+            _role = str(_kwargs["role"])
+            if _role in ("leaf", "orchestrator"):
+                payload["role"] = _role
         # Per-branch rollups emitted on subagent.complete (features 1+2+4).
         for int_key in (
             "input_tokens",
@@ -3147,7 +3149,14 @@ _CHILD_RUN_STALE_S = 3600.0
 
 def _child_run_active(child_key: str) -> bool:
     ts = _active_child_runs.get(child_key)
-    return ts is not None and (time.time() - ts) < _CHILD_RUN_STALE_S
+    if ts is None:
+        return False
+    if (time.time() - ts) >= _CHILD_RUN_STALE_S:
+        # Lazy eviction: a lost subagent.complete would otherwise pin this
+        # entry (and the window's "running" indicator) forever.
+        _active_child_runs.pop(child_key, None)
+        return False
+    return True
 
 
 def _mirror_subagent_to_child(event_type: str, payload: dict) -> None:

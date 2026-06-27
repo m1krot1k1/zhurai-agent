@@ -1347,19 +1347,32 @@ def fetch_openrouter_models(
     fallback = list(remote) if remote else list(OPENROUTER_MODELS)
     preferred_ids = [mid for mid, _ in fallback]
 
+    def _tool_filtered_fallback() -> list[tuple[str, str]]:
+        # Offline / all-filtered fallback must not leak models without tool
+        # support into the picker — hermes-agent is tool-calling-first, so a
+        # surfaced non-tool model fails at the first tool call. The fallback
+        # entries are (id, desc) tuples (no live metadata); the permissive
+        # helper always returns True for tuples (not dicts), so filtering
+        # would be a no-op. A non-empty prior in-memory cache already passed
+        # this gate on its way in, so it is returned as-is.
+        return list(_openrouter_catalog_cache or fallback)
+
     try:
         req = urllib.request.Request(
             "https://openrouter.ai/api/v1/models",
-            headers={"Accept": "application/json"},
+            headers={
+                "Accept": "application/json",
+                "User-Agent": _HERMES_USER_AGENT,
+            },
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read().decode())
     except Exception:
-        return list(_openrouter_catalog_cache or fallback)
+        return _tool_filtered_fallback()
 
     live_items = payload.get("data", [])
     if not isinstance(live_items, list):
-        return list(_openrouter_catalog_cache or fallback)
+        return _tool_filtered_fallback()
 
     live_by_id: dict[str, dict[str, Any]] = {}
     for item in live_items:
@@ -1397,10 +1410,15 @@ def fetch_openrouter_models(
         seen.add(mid)
 
     if not curated:
-        return list(_openrouter_catalog_cache or fallback)
+        return _tool_filtered_fallback()
 
-    first_id, _ = curated[0]
-    curated[0] = (first_id, "recommended")
+    # Mark the first curated model "recommended" ONLY when it has no other
+    # meaningful tag (e.g. "free"). Unconditionally overwriting the tag here
+    # would silently hide a free model's "free" badge, which is the more
+    # actionable signal for the user than the curated-position marker.
+    first_id, first_desc = curated[0]
+    if not first_desc:
+        curated[0] = (first_id, "recommended")
     _openrouter_catalog_cache = curated
     return list(curated)
 

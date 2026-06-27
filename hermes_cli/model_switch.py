@@ -2102,6 +2102,8 @@ def list_picker_providers(
     custom_providers: list | None = None,
     max_models: int | None = None,
     current_model: str = "",
+    *,
+    force_refresh: bool = False,
 ) -> List[dict]:
     """Interactive-picker variant of :func:`list_authenticated_providers`.
 
@@ -2121,6 +2123,12 @@ def list_picker_providers(
     All other providers and metadata fields are passed through unchanged.
     The typed ``/model <name>`` path is unaffected -- only the interactive
     picker payload is narrowed.
+
+    ``force_refresh`` is forwarded to :func:`fetch_openrouter_models` so
+    ``/model --refresh`` can bust the in-memory OpenRouter catalog cache in
+    addition to the disk cache that the caller already clears. Without it
+    a stale in-memory cache would keep serving the pre-refresh snapshot for
+    the rest of the process.
     """
     from hermes_cli.models import fetch_openrouter_models
 
@@ -2138,7 +2146,7 @@ def list_picker_providers(
         slug = str(p.get("slug", "")).lower()
         if slug == "openrouter":
             try:
-                live = fetch_openrouter_models()
+                live = fetch_openrouter_models(force_refresh=force_refresh)
                 live_ids = [mid for mid, _ in live]
             except Exception:
                 live_ids = list(p.get("models", []))

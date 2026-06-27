@@ -8,7 +8,7 @@ import { AGENTS_ROUTE } from '@/app/routes'
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
-import { useI18n } from '@/i18n'
+import { type Translations, useI18n } from '@/i18n'
 import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
 import { AlertCircle, CheckCircle2, Sparkles } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
@@ -86,22 +86,22 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
   )
 }
 
-function statusGlyph(status: SubagentProgress['status']): ReactNode {
+function statusGlyph(status: SubagentProgress['status'], a: Translations['agents']): ReactNode {
   if (status === 'running' || status === 'queued') {
     return (
       <GlyphSpinner
-        aria-label="Running"
+        ariaLabel={a.running}
         className="size-3.5 shrink-0 text-muted-foreground/80"
         spinner="breathe"
       />
     )
   }
 
-  if (status === 'failed' || status === 'interrupted') {
-    return <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+  if (status === 'failed' || status === 'error' || status === 'interrupted' || status === 'timeout') {
+    return <AlertCircle aria-label={a.failed} className="size-3.5 shrink-0 text-destructive" />
   }
 
-  return <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600/85 dark:text-emerald-400/85" />
+  return <CheckCircle2 aria-label={a.done} className="size-3.5 shrink-0 text-emerald-600/85 dark:text-emerald-400/85" />
 }
 
 function SubagentRow({
@@ -111,6 +111,7 @@ function SubagentRow({
   agent: SubagentProgress
   onClick: () => void
 }) {
+  const { t } = useI18n()
   const running = agent.status === 'running' || agent.status === 'queued'
   const enterRef = useEnterAnimation(running, `subagent:${agent.id}`)
   const elapsed = useElapsedSeconds(running, `subagent-timer:${agent.id}`)
@@ -129,7 +130,7 @@ function SubagentRow({
       ref={enterRef}
       type="button"
     >
-      {statusGlyph(agent.status)}
+      {statusGlyph(agent.status, t.agents)}
 
       <div className="flex min-w-0 flex-1 flex-col gap-0">
         <span className="flex min-w-0 items-center gap-1.5">

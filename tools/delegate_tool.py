@@ -41,7 +41,6 @@ from tools.terminal_tool import set_approval_callback as _set_subagent_approval_
 from utils import base_url_hostname, is_truthy_value
 
 from collections import deque
-import time
 
 # ── Subagent spawn rate limiter ────────────────────────────────────────────
 # Sliding-window rate limiter that prevents orchestrator from spawning too

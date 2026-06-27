@@ -11,17 +11,12 @@ export function extractAgentLabel(goal: string): string | undefined {
     return subagentType
   }
 
-  const taskType = text.match(/Task\s*\(\s*subagent_type\s*=\s*["']([\w-]+)/i)?.[1]
-  if (taskType) {
-    return taskType
-  }
-
   const role = text.match(/\brole\s*[=:]\s*["']?(orchestrator|leaf)/i)?.[1]
   if (role && role.toLowerCase() !== 'leaf') {
     return role.toLowerCase()
   }
 
-  const objective = text.match(/OBJECTIVE:\s*([^\n]+)/i)?.[1]?.trim()
+  const objective = text.match(/OBJECTIVE:\s*([\s\S]+?)(?:\n\S|$)/i)?.[1]?.trim()
   if (objective) {
     const short = objective.replace(/\s+/g, ' ')
     return short.length <= 48 ? short : undefined
