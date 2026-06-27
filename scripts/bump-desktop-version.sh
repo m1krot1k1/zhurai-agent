@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # bump-desktop-version.sh minor|major
-# Синхронно поднимает version в apps/desktop/package.json, pyproject.toml, hermes_cli/__init__.py
+# Синхронно поднимает version в apps/desktop/package.json, pyproject.toml, hermes_cli/__init__.py, acp_registry/agent.json
 set -euo pipefail
 
 KIND="${1:-}"
@@ -13,12 +13,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PKG="${ROOT}/apps/desktop/package.json"
 PYPROJECT="${ROOT}/pyproject.toml"
 INIT_PY="${ROOT}/hermes_cli/__init__.py"
+AGENT_JSON="${ROOT}/acp_registry/agent.json"
 
-NEW_VERSION="$(python3 - "${KIND}" "${PKG}" "${PYPROJECT}" "${INIT_PY}" <<'PY'
+NEW_VERSION="$(python3 - "${KIND}" "${PKG}" "${PYPROJECT}" "${INIT_PY}" "${AGENT_JSON}" <<'PY'
 import json, re, sys
 from pathlib import Path
 
-kind, pkg_path, pyproject_path, init_path = sys.argv[1:5]
+kind, pkg_path, pyproject_path, init_path, agent_json_path = sys.argv[1:6]
 
 with open(pkg_path, encoding="utf-8") as f:
     data = json.load(f)
@@ -53,6 +54,14 @@ itext, n2 = re.subn(
 if n2 != 1:
     raise SystemExit(f"failed to bump __version__ in {init_path}")
 init_py.write_text(itext, encoding="utf-8")
+
+agent_json = Path(agent_json_path)
+adata = json.loads(agent_json.read_text(encoding="utf-8"))
+adata["version"] = new_v
+adata["distribution"]["uvx"]["package"] = f"hermes-agent[acp]=={new_v}"
+with open(agent_json, "w", encoding="utf-8") as f:
+    json.dump(adata, f, ensure_ascii=False, indent=2)
+    f.write("\n")
 
 print(new_v)
 PY

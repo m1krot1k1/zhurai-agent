@@ -36,11 +36,25 @@ def _make_desktop_tree(tmp_path: Path) -> Path:
     return root
 
 
-def _make_packaged_executable(root: Path, monkeypatch, platform: str = "darwin") -> Path:
+def _make_packaged_executable(
+    root: Path,
+    monkeypatch,
+    platform: str = "darwin",
+    *,
+    product_name: str = "Hermes",
+) -> Path:
     monkeypatch.setattr(cli_main.sys, "platform", platform)
     desktop_dir = root / "apps" / "desktop"
     if platform == "darwin":
-        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Hermes"
+        exe = (
+            desktop_dir
+            / "release"
+            / "mac-arm64"
+            / f"{product_name}.app"
+            / "Contents"
+            / "MacOS"
+            / product_name
+        )
     elif platform == "win32":
         exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
     else:
@@ -48,6 +62,19 @@ def _make_packaged_executable(root: Path, monkeypatch, platform: str = "darwin")
     exe.parent.mkdir(parents=True)
     exe.write_text("", encoding="utf-8")
     return exe
+
+
+def test_desktop_packaged_executable_finds_zhurai_agent_app(tmp_path, monkeypatch):
+    root = _make_desktop_tree(tmp_path)
+    desktop_dir = root / "apps" / "desktop"
+    (desktop_dir / "package.json").write_text(
+        '{"productName":"ZhurAI Agent","build":{"productName":"ZhurAI Agent"}}',
+        encoding="utf-8",
+    )
+    exe = _make_packaged_executable(root, monkeypatch, product_name="ZhurAI Agent")
+    monkeypatch.setattr(cli_main.sys, "platform", "darwin")
+    found = cli_main._desktop_packaged_executable(desktop_dir)
+    assert found == exe
 
 
 def test_gui_installs_packages_and_launches_desktop_app(tmp_path, monkeypatch):

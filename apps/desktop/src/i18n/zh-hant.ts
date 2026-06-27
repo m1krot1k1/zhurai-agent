@@ -780,6 +780,7 @@ export const zhHant = defineLocale({
     subtitle: '目前回合的子代理即時活動。',
     emptyTitle: '暫無活躍子代理',
     emptyDesc: '當某個回合派發任務時，子代理會在此即時顯示進度。',
+    turnComplete: count => `${count} 個子代理已完成 — 點擊查看`,
     running: '執行中',
     failed: '失敗',
     done: '完成',

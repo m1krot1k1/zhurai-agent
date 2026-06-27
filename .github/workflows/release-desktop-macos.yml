@@ -80,7 +80,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/desktop/package.json pyproject.toml hermes_cli/__init__.py
+          git add apps/desktop/package.json pyproject.toml hermes_cli/__init__.py acp_registry/agent.json
           git commit -m "chore(release): v${{ steps.version.outputs.version }} [skip ci]"
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"

@@ -877,6 +877,7 @@ export const zh: Translations = {
     subtitle: '当前回合的子代理实时活动。',
     emptyTitle: '暂无活跃子代理',
     emptyDesc: '当某个回合派发任务时，子代理会在此实时显示进度。',
+    turnComplete: count => `${count} 个子代理已完成 — 点击查看`,
     running: '运行中',
     failed: '失败',
     done: '完成',

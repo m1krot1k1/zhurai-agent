@@ -565,6 +565,7 @@ export interface Translations {
     subtitle: string
     emptyTitle: string
     emptyDesc: string
+    turnComplete: (count: number) => string
     running: string
     failed: string
     done: string

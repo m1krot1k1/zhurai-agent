@@ -1325,16 +1325,20 @@ def fetch_openrouter_models(
     *,
     force_refresh: bool = False,
 ) -> list[tuple[str, str]]:
-    """Return the curated OpenRouter picker list, refreshed from the live catalog when possible."""
+    """Return OpenRouter models for the picker, refreshed from the live catalog when possible.
+
+    Curated manifest / in-repo snapshot ids are listed first (in manifest order);
+    every other live model that advertises tool support is appended alphabetically.
+    Models without tool support are still excluded — hermes-agent is tool-calling-first.
+    """
     global _openrouter_catalog_cache
 
     if _openrouter_catalog_cache is not None and not force_refresh:
         return list(_openrouter_catalog_cache)
 
     # Prefer the remotely-hosted catalog manifest; fall back to the in-repo
-    # snapshot when the manifest is unreachable. Both are curated lists that
-    # drive the picker; the OpenRouter live /v1/models filter (tool support,
-    # free pricing) is applied on top either way.
+    # snapshot when the manifest is unreachable. Curated ids drive ordering and
+    # the offline fallback; the live /v1/models response supplies the full set.
     try:
         from hermes_cli.model_catalog import get_curated_openrouter_models
         remote = get_curated_openrouter_models()
@@ -1366,7 +1370,11 @@ def fetch_openrouter_models(
             continue
         live_by_id[mid] = item
 
+    def _desc_for(item: dict[str, Any]) -> str:
+        return "free" if _openrouter_model_is_free(item.get("pricing")) else ""
+
     curated: list[tuple[str, str]] = []
+    seen: set[str] = set()
     for preferred_id in preferred_ids:
         live_item = live_by_id.get(preferred_id)
         if live_item is None:
@@ -1376,8 +1384,17 @@ def fetch_openrouter_models(
         # when the user selects them. Ported from Kilo-Org/kilocode#9068.
         if not _openrouter_model_supports_tools(live_item):
             continue
-        desc = "free" if _openrouter_model_is_free(live_item.get("pricing")) else ""
-        curated.append((preferred_id, desc))
+        curated.append((preferred_id, _desc_for(live_item)))
+        seen.add(preferred_id)
+
+    for mid in sorted(live_by_id):
+        if mid in seen:
+            continue
+        live_item = live_by_id[mid]
+        if not _openrouter_model_supports_tools(live_item):
+            continue
+        curated.append((mid, _desc_for(live_item)))
+        seen.add(mid)
 
     if not curated:
         return list(_openrouter_catalog_cache or fallback)

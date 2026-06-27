@@ -45,6 +45,9 @@ _SKILL_MULTI_HYPHEN = re.compile(r"-{2,}")
 # tests/openviking_plugin/test_openviking.py::test_skill_markers_match_hermes_scaffolding.
 # ---------------------------------------------------------------------------
 _SKILL_INVOCATION_PREFIX = "[IMPORTANT: The user has invoked the "
+# Router skills inject a minimal turn — not the full SKILL.md body — so the
+# model delegates immediately instead of chatting through the skill text.
+_ROUTER_SKILL_NAMES = frozenset({"start"})
 _SINGLE_SKILL_MARKER = "The full skill content is loaded below.]"
 _SINGLE_SKILL_INSTRUCTION = (
     "The user has provided the following instruction alongside the skill invocation: "
@@ -514,6 +517,25 @@ def resolve_skill_command_key(command: str) -> Optional[str]:
     return cmd_key if cmd_key in get_skill_commands() else None
 
 
+def _build_router_skill_message(skill_name: str, user_instruction: str = "") -> str:
+    """Minimal router turn for /start-style skills (no full SKILL.md dump)."""
+    task = (user_instruction or "").strip() or "(no additional instruction)"
+    return (
+        f"/{skill_name} — router mode. Act immediately with ONE delegate_task call:\n"
+        'delegate_task(role="orchestrator", goal="Coordinate user request", '
+        f'context="ORIGINAL_REQUEST: {task}\\n'
+        "MODE: multi_domain\\n"
+        "ORCHESTRATOR_MUST: decompose into 2+ independent branches; "
+        "first wave MUST use delegate_task(tasks=[...]) with parallel specialists "
+        '(repo-explorer, code-reviewer, security-auditor, etc.) — '
+        'NEVER one leaf for the whole analysis.")\n'
+        "Rules: no text reply / file reads / shell before delegate_task; "
+        "orchestrator delegates only, does not implement.\n"
+        "Simple greetings only: answer directly without delegate.\n\n"
+        f"User task: {task}"
+    )
+
+
 def build_skill_invocation_message(
     cmd_key: str,
     user_instruction: str = "",
@@ -546,6 +568,9 @@ def build_skill_invocation_message(
         bump_use(skill_name)
     except Exception:
         pass  # Non-critical — skill invocation proceeds regardless
+
+    if skill_name in _ROUTER_SKILL_NAMES:
+        return _build_router_skill_message(skill_name, user_instruction)
 
     activation_note = (
         f'[IMPORTANT: The user has invoked the "{skill_name}" skill, indicating they want '

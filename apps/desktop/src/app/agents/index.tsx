@@ -14,12 +14,15 @@ import { $activeSessionId } from '@/store/session'
 import {
   $focusSubagentId,
   $subagentsBySession,
+  activeSubagentCount,
   buildSubagentTree,
   setFocusSubagentId,
   type SubagentNode,
   type SubagentStatus,
   type SubagentStreamEntry
 } from '@/store/subagents'
+
+import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
 
 import { OverlayView } from '../overlays/overlay-view'
 
@@ -95,6 +98,8 @@ export function AgentsView({ onClose }: AgentsViewProps) {
   )
 
   const tree = useMemo(() => buildSubagentTree(activeSubagents), [activeSubagents])
+  const hasLiveActivity =
+    activeSubagents.length > 0 || activeSubagentCount(activeSubagents) > 0 || Boolean(focusAgentId)
 
   return (
     <OverlayView
@@ -107,13 +112,22 @@ export function AgentsView({ onClose }: AgentsViewProps) {
         <h2 className="text-sm font-semibold text-foreground">{t.agents.title}</h2>
         <p className="text-xs text-muted-foreground/80">{t.agents.subtitle}</p>
       </header>
-      <RepoAgentsSection state={repoAgents} />
-      <SubagentTree focusAgentId={focusAgentId} tree={tree} />
+      {hasLiveActivity ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
+          <SubagentTree focusAgentId={focusAgentId} tree={tree} />
+          <RepoAgentsSection collapsed state={repoAgents} />
+        </div>
+      ) : (
+        <>
+          <RepoAgentsSection state={repoAgents} />
+          <SubagentTree focusAgentId={focusAgentId} tree={tree} />
+        </>
+      )}
     </OverlayView>
   )
 }
 
-function RepoAgentsSection({ state }: { state: RepoAgentsState }) {
+function RepoAgentsSection({ collapsed = false, state }: { collapsed?: boolean; state: RepoAgentsState }) {
   const { t } = useI18n()
 
   if (state.loading && state.agents.length === 0) {
@@ -139,33 +153,57 @@ function RepoAgentsSection({ state }: { state: RepoAgentsState }) {
     return null
   }
 
+  const list = (
+    <ul className="grid min-w-0 gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
+      {state.agents.map(agent => (
+        <li className="grid min-w-0 gap-0.5" key={agent.id}>
+          <span className="text-[0.8rem] font-medium text-foreground/90">{agent.name}</span>
+          {agent.description ? (
+            <span className="wrap-anywhere text-[0.68rem] leading-relaxed text-muted-foreground/75">
+              {agent.description}
+            </span>
+          ) : (
+            <span className="font-mono text-[0.62rem] text-muted-foreground/55">{agent.fileName}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+
+  const header = (
+    <div className="flex min-w-0 items-baseline justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <Users aria-hidden className="size-3.5 shrink-0 text-muted-foreground/70" />
+        <h3 className="text-[0.72rem] font-medium uppercase tracking-wider text-muted-foreground/75">
+          {t.agents.repoTitle}
+        </h3>
+      </div>
+      <p className="truncate text-[0.62rem] text-muted-foreground/55" title={state.root ?? undefined}>
+        {state.root ? t.agents.repoFrom(state.agents.length) : t.agents.repoCount(state.agents.length)}
+      </p>
+    </div>
+  )
+
+  if (collapsed) {
+    return (
+      <details className="shrink-0 rounded-lg border border-border/40 bg-muted/10 px-3 py-2">
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            <Users aria-hidden className="size-3.5 shrink-0 text-muted-foreground/70" />
+            <span className="text-[0.72rem] font-medium text-muted-foreground/75">
+              {t.agents.repoTitle} ({state.agents.length})
+            </span>
+          </div>
+        </summary>
+        <div className="mt-2 grid min-w-0 gap-2">{list}</div>
+      </details>
+    )
+  }
+
   return (
     <section className="mb-5 grid min-w-0 gap-2">
-      <div className="flex min-w-0 items-baseline justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <Users aria-hidden className="size-3.5 shrink-0 text-muted-foreground/70" />
-          <h3 className="text-[0.72rem] font-medium uppercase tracking-wider text-muted-foreground/75">
-            {t.agents.repoTitle}
-          </h3>
-        </div>
-        <p className="truncate text-[0.62rem] text-muted-foreground/55" title={state.root ?? undefined}>
-          {state.root ? t.agents.repoFrom(state.agents.length) : t.agents.repoCount(state.agents.length)}
-        </p>
-      </div>
-      <ul className="grid min-w-0 gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
-        {state.agents.map(agent => (
-          <li className="grid min-w-0 gap-0.5" key={agent.id}>
-            <span className="text-[0.8rem] font-medium text-foreground/90">{agent.name}</span>
-            {agent.description ? (
-              <span className="wrap-anywhere text-[0.68rem] leading-relaxed text-muted-foreground/75">
-                {agent.description}
-              </span>
-            ) : (
-              <span className="font-mono text-[0.62rem] text-muted-foreground/55">{agent.fileName}</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      {header}
+      {list}
     </section>
   )
 }
@@ -485,7 +523,14 @@ function SubagentRow({
               running && 'shimmer text-foreground/65'
             )}
           >
-            {node.goal}
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {formatSubagentRoleBadge(node.role) ? (
+                <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
+                  {formatSubagentRoleBadge(node.role)}
+                </span>
+              ) : null}
+              <span className="min-w-0 wrap-anywhere">{formatSubagentTitle(node.goal, 120)}</span>
+            </span>
           </span>
           {subtitle.length > 0 ? (
             <FadeText className="text-[0.66rem] leading-[1.05rem] text-muted-foreground/65">

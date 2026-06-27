@@ -3073,6 +3073,8 @@ def _on_tool_progress(
             payload["tool_count"] = int(_kwargs["tool_count"])
         if _kwargs.get("toolsets"):
             payload["toolsets"] = [str(t) for t in _kwargs["toolsets"]]
+        if _kwargs.get("role"):
+            payload["role"] = str(_kwargs["role"])
         # Per-branch rollups emitted on subagent.complete (features 1+2+4).
         for int_key in (
             "input_tokens",
