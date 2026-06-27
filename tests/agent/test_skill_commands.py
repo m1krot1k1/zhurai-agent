@@ -486,6 +486,22 @@ Generate some audio.
         assert "test-skill" in msg
         assert "do stuff" in msg
 
+    def test_start_skill_router_message_is_minimal(self, tmp_path):
+        with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
+            _make_skill(
+                tmp_path,
+                "start",
+                body="Full skill body that must NOT appear in the user turn.",
+            )
+            scan_skill_commands()
+            msg = build_skill_invocation_message("/start", "analyze repo delegation")
+        assert msg is not None
+        assert 'role="orchestrator"' in msg
+        assert "delegate_task(tasks=" in msg
+        assert "analyze repo delegation" in msg
+        assert "[IMPORTANT:" not in msg
+        assert "Full skill body" not in msg
+
     def test_returns_none_for_unknown(self, tmp_path):
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
             scan_skill_commands()

@@ -5064,11 +5064,39 @@ def _write_desktop_build_stamp(project_root: Path, *, source_mode: bool) -> None
         logger.debug("Failed to write desktop build stamp: %s", exc)
 
 
+def _desktop_product_name(desktop_dir: Path) -> Optional[str]:
+    """Read electron-builder productName from apps/desktop/package.json."""
+    package_json = desktop_dir / "package.json"
+    try:
+        data = json.loads(package_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    build = data.get("build") if isinstance(data.get("build"), dict) else {}
+    name = build.get("productName") or data.get("productName")
+    return name if isinstance(name, str) and name.strip() else None
+
+
 def _desktop_packaged_executable(desktop_dir: Path) -> Optional[Path]:
     """Return the current platform's unpacked Electron app executable."""
     release_dir = desktop_dir / "release"
     if sys.platform == "darwin":
-        candidates = list(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Hermes"))
+        candidates: list[Path] = []
+        # Legacy Hermes branding (upstream default).
+        candidates.extend(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Hermes"))
+        # Current productName (e.g. ZhurAI Agent).
+        product = _desktop_product_name(desktop_dir)
+        if product:
+            candidates.extend(
+                release_dir.glob(f"mac*/{product}.app/Contents/MacOS/{product}")
+            )
+        # Fallback: first executable inside any mac*/*.app bundle.
+        for app_bundle in sorted(release_dir.glob("mac*/*.app")):
+            macos_dir = app_bundle / "Contents" / "MacOS"
+            if not macos_dir.is_dir():
+                continue
+            for exe in macos_dir.iterdir():
+                if exe.is_file() and (exe.stat().st_mode & stat.S_IXUSR):
+                    candidates.append(exe)
     elif sys.platform == "win32":
         candidates = [
             release_dir / "win-unpacked" / "Hermes.exe",
