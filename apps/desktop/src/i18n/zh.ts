@@ -906,7 +906,11 @@ export const zh: Translations = {
     repoEmptyHint:
       '未找到仓库代理。将 agents/ 放入项目，或设置 ZHUR_AI_AGENT_ROOT 指向 zhur.ai-agent。',
     repoCount: count => `${count} 个可用`,
-    repoFrom: count => `${count} 个来自仓库`
+    repoFrom: count => `${count} 个来自仓库`,
+    waitingForActivity: '等待工具活动…',
+    tapToExpand: '打开 Spawn tree 并展开此代理',
+    expandRow: '展开活动日志',
+    collapseRow: '收起活动日志'
   },
 
   commandCenter: {

@@ -22,7 +22,7 @@ import {
   type SubagentStreamEntry
 } from '@/store/subagents'
 
-import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
+import { formatSubagentDisplay, formatSubagentRoleBadge } from '@/lib/subagent-label'
 
 import { OverlayView } from '../overlays/overlay-view'
 
@@ -475,6 +475,8 @@ function SubagentRow({
   const running = node.status === 'running' || node.status === 'queued'
   const elapsed = useElapsedSeconds(running, `subagent:${node.id}`)
   const roleBadge = formatSubagentRoleBadge(node.role)
+  const { badge, title } = formatSubagentDisplay(node.goal, node.agentId, 120)
+  const showRoleBadge = roleBadge && roleBadge !== badge?.toLowerCase()
 
   const durationSeconds =
     typeof node.durationSeconds === 'number' ? Math.max(0, Math.round(node.durationSeconds)) : elapsed
@@ -512,6 +514,7 @@ function SubagentRow({
     >
       <button
         aria-expanded={open}
+        aria-label={open ? t.agents.collapseRow : t.agents.expandRow}
         className="group flex w-full min-w-0 items-start gap-2.5 text-left"
         onClick={() => setOpen(v => !v)}
         type="button"
@@ -525,12 +528,17 @@ function SubagentRow({
             )}
           >
             <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {roleBadge ? (
+              {badge ? (
+                <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                  {badge}
+                </span>
+              ) : null}
+              {showRoleBadge ? (
                 <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
                   {roleBadge}
                 </span>
               ) : null}
-              <span className="min-w-0 wrap-anywhere">{formatSubagentTitle(node.goal, 120)}</span>
+              <span className="min-w-0 wrap-anywhere">{title}</span>
             </span>
           </span>
           {subtitle.length > 0 ? (
@@ -541,6 +549,10 @@ function SubagentRow({
         </span>
         {running ? <ActivityTimerText className="mt-1 shrink-0 text-[0.6rem]" seconds={durationSeconds} /> : null}
       </button>
+
+      {open && running && visibleRows.length === 0 ? (
+        <p className="pl-6 text-[0.72rem] leading-relaxed text-muted-foreground/70">{t.agents.waitingForActivity}</p>
+      ) : null}
 
       {visibleRows.length > 0 ? (
         <div className="grid min-w-0 gap-1 pl-6" data-selectable-text="true">

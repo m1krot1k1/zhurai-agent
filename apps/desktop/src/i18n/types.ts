@@ -594,6 +594,10 @@ export interface Translations {
     repoEmptyHint: string
     repoCount: (count: number) => string
     repoFrom: (count: number) => string
+    waitingForActivity: string
+    tapToExpand: string
+    expandRow: string
+    collapseRow: string
   }
 
   commandCenter: {

@@ -717,7 +717,11 @@ export const en: Translations = {
     repoEmptyHint:
       'No repo agents found. Copy agents into agents/ or set ZHUR_AI_AGENT_ROOT to your zhur.ai-agent checkout.',
     repoCount: count => `${count} available`,
-    repoFrom: count => `${count} from repo`
+    repoFrom: count => `${count} from repo`,
+    waitingForActivity: 'Waiting for tool activity…',
+    tapToExpand: 'Open spawn tree and expand this agent',
+    expandRow: 'Expand activity log',
+    collapseRow: 'Collapse activity log'
   },
 
   commandCenter: {

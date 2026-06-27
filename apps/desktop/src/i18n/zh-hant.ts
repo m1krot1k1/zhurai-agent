@@ -809,7 +809,11 @@ export const zhHant = defineLocale({
     repoEmptyHint:
       '未找到倉庫代理。將 agents/ 放入專案，或設定 ZHUR_AI_AGENT_ROOT 指向 zhur.ai-agent。',
     repoCount: count => `${count} 個可用`,
-    repoFrom: count => `${count} 個來自倉庫`
+    repoFrom: count => `${count} 個來自倉庫`,
+    waitingForActivity: '等待工具活動…',
+    tapToExpand: '開啟 Spawn tree 並展開此代理',
+    expandRow: '展開活動日誌',
+    collapseRow: '收合活動日誌'
   },
 
   commandCenter: {

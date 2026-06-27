@@ -44,6 +44,11 @@ def test_suggest_specialists_for_repo_analysis() -> None:
 def test_parse_agent_id_from_envelope() -> None:
     ctx = "OBJECTIVE: scan\nAGENT_ID: code-reviewer\nOWNERSHIP: src/"
     assert parse_agent_id_from_envelope(ctx) == "code-reviewer"
+    assert (
+        parse_agent_id_from_envelope("AGENT_BRIEF_PATH: /repo/agents/repo-explorer.md")
+        == "repo-explorer"
+    )
+    assert parse_agent_id_from_envelope('Task(subagent_type="code", prompt="x")') == "code"
 
 
 def test_plan_parallel_delegate_tasks_includes_agent_ids(

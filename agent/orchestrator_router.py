@@ -501,11 +501,19 @@ def build_orchestration_injection(message: str) -> Optional[str]:
 
 
 def parse_agent_id_from_envelope(text: str) -> Optional[str]:
-    """Extract AGENT_ID from delegate_task context / goal envelope."""
+    """Extract ecosystem agent id from delegate_task / Task() envelope."""
     if not text:
         return None
-    match = re.search(r"^AGENT_ID:\s*(\S+)", text, re.MULTILINE)
-    if match:
-        return match.group(1).strip()
-    match = re.search(r"\bAGENT_ID:\s*(\S+)", text)
-    return match.group(1).strip() if match else None
+    for pattern in (
+        r"^AGENT_ID:\s*(\S+)",
+        r"\bAGENT_ID:\s*(\S+)",
+        r"AGENT_BRIEF_PATH:\s*.*?/agents/([\w-]+)\.md",
+        r'subagent_type\s*[=:]\s*["\']?([\w-]+)',
+        r'Task\s*\(\s*subagent_type\s*=\s*["\']([\w-]+)["\']',
+    ):
+        match = re.search(pattern, text, re.MULTILINE | re.IGNORECASE)
+        if match:
+            candidate = match.group(1).strip().lower()
+            if candidate in _VALID_ROUTER_AGENT_IDS or candidate in ("orchestrator", "start"):
+                return candidate
+    return None

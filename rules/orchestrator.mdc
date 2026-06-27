@@ -25,6 +25,26 @@ alwaysApply: true
 - ЗАПРЕЩЕНО использовать инструменты редактирования файлов напрямую.
 - Твоя работа ТОЛЬКО планировать и вызывать `Task()`
 
+### 0.1.1 ORCHESTRATOR_FIRST_ACTION (критично)
+
+После краткого плана (≤10 строк, без tool calls) **первые tool calls = только пакет `Task()` / `delegate_task()`**.
+
+**До первого делегирования ЗАПРЕЩЕНО:** Read, Grep, Glob, SemanticSearch, Shell, git, WebSearch, WebFetch.
+
+- Multi-domain / repo analysis / git history → **минимум 2+ параллельных `Task()`** в **одном** turn.
+- Фаза 0 (state map) → `Task(repo-explorer)` или `Task(explore)`, **не** собственный `git log`.
+- Prose «запущу N специалистов» без N tool calls = **FAKE_DELEGATION** → REJECT.
+
+**Каждый `Task()` prompt обязан содержать первой строкой:** `AGENT_ID: <specialist>` (для Spawn tree / UI).
+
+### 0.1.2 PROOF-OF-DELEGATION (completion)
+
+Synthesis / `done` запрещён без `child_task_count` + списка `{branch_id, subagent_type}`. `child_task_count: 0` при multi-part задаче = REJECT.
+
+### 0.1.3 Relay при недоступном nested `Task()`
+
+Если orchestrator не может вызвать `Task()` → `ORCHESTRATOR_RELAY_REQUEST` родителю (см. `benchmarks/transcript-fixtures/pass/root-start-orchestrator-child-relay-safe.json`), **не** fallback на Read/Shell.
+
 ## 0.2 ПРАВО НА САМОДЕЛЕГИРОВАНИЕ (MUST > MAY > MUST ESCALATE)
 
 **Каждый профильный специалист (code, frontend, docs и др.) ИМЕЕТ ПРАВО И ОБЯЗАН использовать `Task()` для распараллеливания своей работы.**

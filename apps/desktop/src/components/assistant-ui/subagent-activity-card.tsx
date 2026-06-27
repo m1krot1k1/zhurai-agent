@@ -9,7 +9,7 @@ import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { type Translations, useI18n } from '@/i18n'
-import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
+import { formatSubagentDisplay, formatSubagentRoleBadge } from '@/lib/subagent-label'
 import { AlertCircle, CheckCircle2, Sparkles } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
@@ -116,8 +116,9 @@ function SubagentRow({
   const enterRef = useEnterAnimation(running, `subagent:${agent.id}`)
   const elapsed = useElapsedSeconds(running, `subagent-timer:${agent.id}`)
 
-  const title = formatSubagentTitle(agent.goal)
+  const { badge, title } = formatSubagentDisplay(agent.goal, agent.agentId)
   const roleBadge = formatSubagentRoleBadge(agent.role)
+  const showRoleBadge = roleBadge && roleBadge !== badge?.toLowerCase()
 
   return (
     <button
@@ -128,13 +129,19 @@ function SubagentRow({
       data-subagent-id={agent.id}
       onClick={onClick}
       ref={enterRef}
+      title={t.agents.tapToExpand}
       type="button"
     >
       {statusGlyph(agent.status, t.agents)}
 
       <div className="flex min-w-0 flex-1 flex-col gap-0">
         <span className="flex min-w-0 items-center gap-1.5">
-          {roleBadge ? (
+          {badge ? (
+            <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              {badge}
+            </span>
+          ) : null}
+          {showRoleBadge ? (
             <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
               {roleBadge}
             </span>

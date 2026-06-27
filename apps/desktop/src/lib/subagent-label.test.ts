@@ -1,10 +1,37 @@
 import { describe, expect, it } from 'vitest'
 
-import { extractAgentLabel, formatSubagentRoleBadge, formatSubagentTitle } from './subagent-label'
+import {
+  extractAgentLabel,
+  extractObjectiveSnippet,
+  formatSubagentDisplay,
+  formatSubagentRoleBadge,
+  formatSubagentTitle
+} from './subagent-label'
 
 describe('subagent-label', () => {
   it('extracts AGENT_ID from Hermes branch envelopes', () => {
     expect(extractAgentLabel('AGENT_ID: code-reviewer\nOBJECTIVE: review diff')).toBe('code-reviewer')
+    expect(extractAgentLabel('OBJECTIVE: review diff', 'repo-explorer')).toBe('repo-explorer')
+  })
+
+  it('extracts agent id from AGENT_BRIEF_PATH', () => {
+    expect(
+      extractAgentLabel('OBJECTIVE: map repo\nAGENT_BRIEF_PATH: /path/agents/repo-explorer.md')
+    ).toBe('repo-explorer')
+  })
+
+  it('formatSubagentDisplay splits badge and objective', () => {
+    const { badge, title } = formatSubagentDisplay(
+      'AGENT_ID: repo-explorer\nOBJECTIVE: Фаза 1 — идентификация репозитория'
+    )
+    expect(badge).toBe('repo-explorer')
+    expect(title).toContain('Фаза 1')
+  })
+
+  it('extractObjectiveSnippet returns OBJECTIVE line', () => {
+    expect(extractObjectiveSnippet('AGENT_ID: code\nOBJECTIVE: Fix login bug\nOWNERSHIP: src/')).toBe(
+      'Fix login bug'
+    )
   })
 
   it('extracts subagent_type from Task() prompts', () => {

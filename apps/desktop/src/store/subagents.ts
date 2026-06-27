@@ -15,6 +15,8 @@ export interface SubagentProgress {
   id: string
   parentId: null | string
   goal: string
+  /** Ecosystem agent id from backend (AGENT_ID / inferred). */
+  agentId?: string
   /** delegate_task role: leaf | orchestrator (when relayed from backend). */
   role?: string
   /** The child's own stored session id — lets UIs open its session window. */
@@ -172,7 +174,7 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
   const filesRead = strList(payload.files_read)
   const filesWritten = strList(payload.files_written)
   const rawGoal = str(payload.goal) || prev?.goal || 'Subagent'
-  const agentId = str(payload.agent_id)
+  const agentId = str(payload.agent_id) || prev?.agentId
   const goal =
     agentId && !/^AGENT_ID:/im.test(rawGoal) ? `AGENT_ID: ${agentId}\n${rawGoal}` : rawGoal
 
@@ -180,6 +182,7 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     id: prev?.id ?? idOf(payload),
     parentId: str(payload.parent_id) || prev?.parentId || null,
     goal,
+    agentId: agentId || undefined,
     role: str(payload.role) || prev?.role,
     sessionId: str(payload.child_session_id) || prev?.sessionId,
     model: str(payload.model) || prev?.model,

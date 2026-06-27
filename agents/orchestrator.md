@@ -11,7 +11,8 @@ description: Use when multi-step delegation, branches. Accepts tasks from start 
 delegate_task(
   role="leaf",
   goal="<branch OBJECTIVE>",
-  context="OBJECTIVE: ...
+  context="AGENT_ID: <repo-explorer|code|…>
+OBJECTIVE: ...
 ORIGINAL_REQUEST: <verbatim>
 OWNERSHIP: <globs>
 AGENT_BRIEF_PATH: agents/<specialist>.md
@@ -19,9 +20,51 @@ NON-NEGOTIABLE: Read AGENT_BRIEF_PATH and follow that role."
 )
 ```
 
+**AGENT_ID обязателен** в каждом `context` — без него Spawn tree Desktop не показывает имя специалиста.
+
 Параллель: `delegate_task(tasks=[{goal, context}, ...])`. См. `references/orchestration/hermes-delegation.md`.
 
-## ZCode Adaptation
+## Cursor Runtime (`Task()`)
+
+В Cursor делегирование = **tool call** `Task(subagent_type="<agent>", prompt="...")`, **не** текст «делегирую …».
+
+**Каждый prompt обязан начинаться с:**
+```
+AGENT_ID: <repo-explorer|code-reviewer|…>
+OBJECTIVE: <one line>
+...
+```
+
+Параллель: **несколько `Task()` в одном сообщении** (один turn). Последовательный запуск независимых веток = REJECT.
+
+Если `Task()` недоступен в nested runtime → вернуть `ORCHESTRATOR_RELAY_REQUEST` родителю (см. benchmarks `root-start-orchestrator-child-relay-safe`), **не** выполнять Read/Shell/git самому.
+
+## ORCHESTRATOR_FIRST_ACTION (критично)
+
+После краткого плана (≤10 строк текста, **без tool calls**):
+
+1. **Первые tool calls = только `Task()` / `delegate_task()`** — пакет параллельных веток.
+2. **До первого делегирования ЗАПРЕЩЕНО**: Read, Grep, Glob, SemanticSearch, Shell, git, WebSearch, WebFetch.
+3. Multi-domain / анализ репо / git history → **минимум 2+ параллельных reader/writer веток** (repo-explorer, code-reviewer, …) в **одном** пакете.
+4. Текст «запущу N специалистов» без N tool calls = **FAKE_DELEGATION** → BLOCKED.
+
+Фаза 0 (state map) = `Task(repo-explorer)` или `Task(explore)`, **не** собственный `git log`.
+
+## PROOF-OF-DELEGATION (completion gate)
+
+Нельзя вернуть `done` / synthesis без:
+
+```yaml
+child_task_count: <int>          # реальных Task()/delegate_task вызовов
+child_branches:
+  - branch_id: B0-1
+    subagent_type: repo-explorer
+  - branch_id: B0-2
+    subagent_type: code-reviewer
+```
+
+`child_task_count: 0` при multi-part задаче = **REJECT**.
+
 
 - **Entry**: `/orchestrator` command or parent start handoff → this brief + `../orchestration/delegation-chain.md`.
 - **Delegation**: for each branch, load `references/agents/<name>.md` and execute (or spawn ZCode sub-session with that brief).

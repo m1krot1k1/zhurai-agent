@@ -837,7 +837,11 @@ export const ja = defineLocale({
     repoEmptyHint:
       'リポジトリエージェントが見つかりません。agents/ を配置するか ZHUR_AI_AGENT_ROOT を設定してください。',
     repoCount: count => `${count} 件利用可能`,
-    repoFrom: count => `リポジトリから ${count} 件`
+    repoFrom: count => `リポジトリから ${count} 件`,
+    waitingForActivity: 'ツール活動を待っています…',
+    tapToExpand: 'Spawn tree を開いてこのエージェントを展開',
+    expandRow: 'アクティビティログを展開',
+    collapseRow: 'アクティビティログを折りたたむ'
   },
 
   commandCenter: {
