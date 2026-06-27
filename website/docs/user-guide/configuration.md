@@ -1869,8 +1869,12 @@ delegation:
   # api_key: "local-key"                    # API key for base_url (falls back to OPENAI_API_KEY)
   # api_mode: ""                            # Wire protocol for base_url: "chat_completions", "codex_responses", or "anthropic_messages". Empty = auto-detect from URL (e.g. /anthropic suffix → anthropic_messages). Set explicitly for non-standard endpoints the heuristic can't detect.
   max_concurrent_children: 3                # Parallel children per batch (floor 1, no ceiling). Also via DELEGATION_MAX_CONCURRENT_CHILDREN env var.
-  max_spawn_depth: 1                        # Delegation tree depth cap (1-3, clamped). 1 = flat (default): parent spawns leaves that cannot delegate. 2 = orchestrator children can spawn leaf grandchildren. 3 = three levels.
+  max_spawn_depth: 2                        # Delegation tree depth cap (floor 1, no ceiling). 2 = default: root → orchestrator → specialists. 1 = flat leaf-only.
   orchestrator_enabled: true                # Global kill switch. When false, role="orchestrator" is ignored and every child is forced to leaf regardless of max_spawn_depth.
+  auto_orchestrate: true                    # zhur.ai-agent: auto fan-out on complex turns when agents/ ecosystem is present
+  auto_orchestrate_mode: programmatic       # hint | programmatic | both
+  auto_orchestrate_llm: false               # true = plan branches via auxiliary.orchestrator_router
+  auto_orchestrate_min_tasks: 2             # minimum parallel branches in programmatic mode
 ```
 
 **Subagent provider:model override:** By default, subagents inherit the parent agent's provider and model. Set `delegation.provider` and `delegation.model` to route subagents to a different provider:model pair — e.g., use a cheap/fast model for narrowly-scoped subtasks while your primary agent runs an expensive reasoning model.

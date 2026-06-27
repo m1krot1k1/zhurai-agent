@@ -171,11 +171,15 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
   const stream = streamFromPayload(payload, status, eventType, at).reduce(appendStream, prev?.stream ?? [])
   const filesRead = strList(payload.files_read)
   const filesWritten = strList(payload.files_written)
+  const rawGoal = str(payload.goal) || prev?.goal || 'Subagent'
+  const agentId = str(payload.agent_id)
+  const goal =
+    agentId && !/^AGENT_ID:/im.test(rawGoal) ? `AGENT_ID: ${agentId}\n${rawGoal}` : rawGoal
 
   return {
     id: prev?.id ?? idOf(payload),
     parentId: str(payload.parent_id) || prev?.parentId || null,
-    goal: str(payload.goal) || prev?.goal || 'Subagent',
+    goal,
     role: str(payload.role) || prev?.role,
     sessionId: str(payload.child_session_id) || prev?.sessionId,
     model: str(payload.model) || prev?.model,

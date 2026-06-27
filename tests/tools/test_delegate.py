@@ -924,8 +924,8 @@ class TestBlockedTools(unittest.TestCase):
             _MIN_SPAWN_DEPTH,
         )
         self.assertEqual(_get_max_concurrent_children(), 5)
-        self.assertEqual(MAX_DEPTH, 1)
-        self.assertEqual(_get_max_spawn_depth(), 1)       # default: flat
+        self.assertEqual(MAX_DEPTH, 2)
+        self.assertEqual(_get_max_spawn_depth(), 2)       # default: orchestrator→specialists
         self.assertTrue(_get_orchestrator_enabled())      # default
         self.assertEqual(_MIN_SPAWN_DEPTH, 1)
 
@@ -2221,9 +2221,9 @@ class TestMaxSpawnDepth(unittest.TestCase):
     """Tests for _get_max_spawn_depth clamping and fallback behavior."""
 
     @patch("tools.delegate_tool._load_config", return_value={})
-    def test_max_spawn_depth_defaults_to_1(self, mock_cfg):
+    def test_max_spawn_depth_defaults_to_2(self, mock_cfg):
         from tools.delegate_tool import _get_max_spawn_depth
-        self.assertEqual(_get_max_spawn_depth(), 1)
+        self.assertEqual(_get_max_spawn_depth(), 2)
 
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 0})
@@ -2246,7 +2246,7 @@ class TestMaxSpawnDepth(unittest.TestCase):
            return_value={"max_spawn_depth": "not-a-number"})
     def test_max_spawn_depth_invalid_falls_back_to_default(self, mock_cfg):
         from tools.delegate_tool import _get_max_spawn_depth
-        self.assertEqual(_get_max_spawn_depth(), 1)
+        self.assertEqual(_get_max_spawn_depth(), 2)
 
 
 # =========================================================================
@@ -2418,14 +2418,13 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
             self.assertEqual(mock_child._delegate_role, "leaf")
 
     @patch("tools.delegate_tool._resolve_delegation_credentials")
-    @patch("tools.delegate_tool._load_config", return_value={})
-    def test_orchestrator_blocked_at_default_flat_depth(
+    @patch("tools.delegate_tool._load_config", return_value={"max_spawn_depth": 1})
+    def test_orchestrator_blocked_at_flat_depth_one(
         self, mock_cfg, mock_creds
     ):
-        """With default max_spawn_depth=1 (flat), role='orchestrator'
-        on a depth-0 parent produces a depth-1 child that is already at
-        the floor — the role degrades to 'leaf' and the delegation
-        toolset is stripped.  This is the new default posture."""
+        """With max_spawn_depth=1 (flat), role='orchestrator' on a depth-0
+        parent produces a depth-1 child that is already at the floor — the
+        role degrades to 'leaf' and the delegation toolset is stripped."""
         mock_creds.return_value = {
             "provider": None, "base_url": None,
             "api_key": None, "api_mode": None, "model": None,

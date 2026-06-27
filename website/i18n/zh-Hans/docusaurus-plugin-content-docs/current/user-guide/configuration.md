@@ -1628,8 +1628,12 @@ delegation:
   # api_key: "local-key"                    # base_url 的 API 密钥（回退到 OPENAI_API_KEY）
   # api_mode: ""                            # base_url 的线路协议："chat_completions"、"codex_responses" 或 "anthropic_messages"。空 = 从 URL 自动检测（例如 /anthropic 后缀 → anthropic_messages）。对启发式无法检测的非标准端点显式设置。
   max_concurrent_children: 3                # 每批并行子 agent 数（下限 1，无上限）。也可通过 DELEGATION_MAX_CONCURRENT_CHILDREN 环境变量设置。
-  max_spawn_depth: 1                        # 委托树深度上限（1-3，截断）。1 = 扁平（默认）：父级生成无法委托的叶子。2 = 编排器子级可以生成叶子孙级。3 = 三级。
+  max_spawn_depth: 2                        # 委托树深度上限（下限 1，无上限）。2 = 默认：根 → 编排器 → 专家。1 = 仅扁平叶子。
   orchestrator_enabled: true                # 全局终止开关。为 false 时，role="orchestrator" 被忽略，每个子级无论 max_spawn_depth 如何都被强制为叶子。
+  auto_orchestrate: true                    # zhur.ai-agent：存在 agents/ 生态时对复杂请求自动 fan-out
+  auto_orchestrate_mode: programmatic       # hint | programmatic | both
+  auto_orchestrate_llm: false               # true = 通过 auxiliary.orchestrator_router 规划分支
+  auto_orchestrate_min_tasks: 2             # programmatic 模式最少并行分支数
 ```
 
 **子 agent provider:model 覆盖：** 默认情况下，子 agent 继承父 agent 的 provider 和模型。设置 `delegation.provider` 和 `delegation.model` 将子 agent 路由到不同的 provider:model 对 —— 例如，在您的主 agent 运行昂贵推理模型时，为范围较窄的子任务使用便宜/快速的模型。

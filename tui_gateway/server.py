@@ -3077,6 +3077,8 @@ def _on_tool_progress(
             _role = str(_kwargs["role"])
             if _role in ("leaf", "orchestrator"):
                 payload["role"] = _role
+        if _kwargs.get("agent_id"):
+            payload["agent_id"] = str(_kwargs["agent_id"])
         # Per-branch rollups emitted on subagent.complete (features 1+2+4).
         for int_key in (
             "input_tokens",

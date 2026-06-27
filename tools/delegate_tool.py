@@ -169,7 +169,7 @@ _DEFAULT_MAX_CONCURRENT_CHILDREN = 5
 # so without this flag a config of max_concurrent_children>10 spams the log on
 # every turn / agent spawn even when delegate_task is never called.
 _HIGH_CONCURRENCY_WARNED = False
-MAX_DEPTH = 1  # flat by default: parent (0) -> child (1); grandchild rejected unless max_spawn_depth raised.
+MAX_DEPTH = 2  # default: parent (0) -> orchestrator (1) -> specialists (2)
 # Configurable depth cap consulted by _get_max_spawn_depth; MAX_DEPTH
 # stays as the default fallback and is still the symbol tests import.
 _MIN_SPAWN_DEPTH = 1
@@ -517,13 +517,10 @@ def _get_max_spawn_depth() -> int:
     """Read delegation.max_spawn_depth from config, floored at 1 (no ceiling).
 
     depth 0 = parent agent.  max_spawn_depth = N means agents at depths
-    0..N-1 can spawn; depth N is the leaf floor.  Default 1 is flat:
-    parent spawns children (depth 1), depth-1 children cannot spawn
-    (blocked by this guard AND, for leaf children, by the delegation
-    toolset strip in _strip_blocked_tools).
+    0..N-1 can spawn; depth N is the leaf floor.  Default 2 enables
+    start→orchestrator→specialists; set to 1 for flat leaf-only.
 
-    Raise to 2+ to unlock nested orchestration. role="orchestrator"
-    removes the toolset strip for spawning children when
+    role="orchestrator" removes the toolset strip for spawning children when
     max_spawn_depth >= 2, enabling them to spawn their own workers.
     Like max_concurrent_children, there is no upper ceiling — but each
     extra level multiplies API cost, so raise it deliberately.
@@ -822,6 +819,7 @@ def _build_child_progress_callback(
     toolsets: Optional[List[str]] = None,
     session_ref: Optional[Dict[str, Any]] = None,
     role: Optional[str] = None,
+    agent_id: Optional[str] = None,
 ) -> Optional[callable]:
     """Build a callback that relays child agent tool calls to the parent display.
 
@@ -871,6 +869,8 @@ def _build_child_progress_callback(
             kw["toolsets"] = list(toolsets)
         if role:
             kw["role"] = role
+        if agent_id:
+            kw["agent_id"] = agent_id
         # The child's own session id — filled into the shared ref once the
         # child agent exists (the callback is built first), so every relayed
         # event lets UIs open/inspect the subagent's session directly.
@@ -1135,6 +1135,16 @@ def _build_child_agent(
     # Identity kwargs thread the subagent_id through every emitted event so the
     # TUI can reconstruct the spawn tree and route per-branch controls.
     child_session_ref: Dict[str, Any] = {}
+    # Resolve ecosystem agent id for spawn-tree labels (AGENT_ID in context).
+    try:
+        from agent.orchestrator_router import parse_agent_id_from_envelope
+
+        agent_id_for_cb = parse_agent_id_from_envelope(context or "") or parse_agent_id_from_envelope(
+            goal or ""
+        )
+    except Exception:
+        agent_id_for_cb = None
+
     child_progress_cb = _build_child_progress_callback(
         task_index,
         goal,
@@ -1147,6 +1157,7 @@ def _build_child_agent(
         toolsets=child_toolsets,
         session_ref=child_session_ref,
         role=effective_role,
+        agent_id=agent_id_for_cb,
     )
 
     # Each subagent gets its own iteration budget capped at max_iterations

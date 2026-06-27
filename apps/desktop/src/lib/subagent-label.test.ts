@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { extractAgentLabel, formatSubagentRoleBadge, formatSubagentTitle } from './subagent-label'
 
 describe('subagent-label', () => {
+  it('extracts AGENT_ID from Hermes branch envelopes', () => {
+    expect(extractAgentLabel('AGENT_ID: code-reviewer\nOBJECTIVE: review diff')).toBe('code-reviewer')
+  })
+
   it('extracts subagent_type from Task() prompts', () => {
     expect(extractAgentLabel('Task(subagent_type="orchestrator", prompt="...")')).toBe('orchestrator')
     expect(extractAgentLabel('OBJECTIVE: run analysis\nsubagent_type: code')).toBe('code')

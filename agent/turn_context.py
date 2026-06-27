@@ -82,6 +82,8 @@ class TurnContext:
     plugin_user_context: str = ""
     # External-memory prefetch result, reused across loop iterations.
     ext_prefetch_cache: str = ""
+    # Multi-agent orchestration hint (API-call-time only, not persisted).
+    orchestration_user_context: str = ""
 
 
 def build_turn_context(
@@ -423,6 +425,15 @@ def build_turn_context(
         except Exception:
             pass
 
+    orchestration_user_context = ""
+    try:
+        from agent.orchestrator_router import build_orchestration_injection
+
+        if isinstance(original_user_message, str):
+            orchestration_user_context = build_orchestration_injection(original_user_message) or ""
+    except Exception as exc:
+        logger.debug("orchestration router skipped: %s", exc)
+
     return TurnContext(
         user_message=user_message,
         original_user_message=original_user_message,
@@ -435,4 +446,5 @@ def build_turn_context(
         should_review_memory=should_review_memory,
         plugin_user_context=plugin_user_context,
         ext_prefetch_cache=ext_prefetch_cache,
+        orchestration_user_context=orchestration_user_context,
     )

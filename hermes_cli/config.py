@@ -1496,6 +1496,17 @@ DEFAULT_CONFIG = {
             "timeout": 180,
             "extra_body": {},
         },
+        # Orchestrator router — optional LLM pass for task decomposition
+        # (future); heuristics in agent/orchestrator_router.py handle the
+        # default path without calling this slot.
+        "orchestrator_router": {
+            "provider": "auto",
+            "model": "",
+            "base_url": "",
+            "api_key": "",
+            "timeout": 120,
+            "extra_body": {},
+        },
         # Profile describer — auto-generates a 1-2 sentence description
         # of what a profile is good at. Invoked by
         # ``hermes profile describe <name> --auto`` and the dashboard's
@@ -1967,8 +1978,19 @@ DEFAULT_CONFIG = {
         # Orchestrator role controls (see tools/delegate_tool.py:_get_max_spawn_depth
         # and _get_orchestrator_enabled).  Floored at 1, no upper ceiling —
         # raise deliberately, each level multiplies API cost.
-        "max_spawn_depth": 1,        # depth (1 = flat [default], 2 = orchestrator→leaf, 3+ = deeper)
+        "max_spawn_depth": 2,        # depth (2 = orchestrator→specialists [default], 1 = flat leaf-only)
         "orchestrator_enabled": True,  # kill switch for role="orchestrator"
+        # When the zhur.ai-agent ecosystem is available (agents/ tree), inject
+        # multi-agent orchestration hints into complex user turns so the root
+        # model fans out via delegate_task without requiring /start.
+        "auto_orchestrate": True,
+        # hint = inject LLM instructions only; programmatic = runtime pre-delegate;
+        # both = programmatic first, hint fallback if dispatch fails.
+        "auto_orchestrate_mode": "programmatic",
+        # When true, plan branches via auxiliary.orchestrator_router LLM (fallback: heuristics).
+        "auto_orchestrate_llm": False,
+        # Minimum parallel branches for programmatic mode.
+        "auto_orchestrate_min_tasks": 2,
         # When a subagent hits a dangerous-command approval prompt, the parent's
         # prompt_toolkit TUI owns stdin — a thread-local input() call from the
         # subagent worker would deadlock the parent UI. To avoid the deadlock,

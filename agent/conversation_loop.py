@@ -559,6 +559,7 @@ def run_conversation(
     _should_review_memory = _ctx.should_review_memory
     _plugin_user_context = _ctx.plugin_user_context
     _ext_prefetch_cache = _ctx.ext_prefetch_cache
+    _orchestration_user_context = _ctx.orchestration_user_context
 
     # Main conversation loop counters (pure locals consumed by the loop below).
     api_call_count = 0
@@ -585,6 +586,39 @@ def run_conversation(
             effective_task_id=effective_task_id,
             should_review_memory=_should_review_memory,
         )
+
+    # Programmatic multi-agent fan-out (before first LLM API call).
+    if isinstance(original_user_message, str):
+        try:
+            from agent.orchestrator_router import try_programmatic_orchestration
+
+            _prog_response = try_programmatic_orchestration(
+                agent,
+                original_user_message,
+                task_id=effective_task_id,
+            )
+        except Exception as exc:
+            _prog_response = None
+            logger.warning("programmatic orchestration error: %s", exc)
+        if _prog_response:
+            messages.append({"role": "assistant", "content": _prog_response})
+            from agent.turn_finalizer import finalize_turn
+
+            return finalize_turn(
+                agent,
+                final_response=_prog_response,
+                api_call_count=0,
+                interrupted=False,
+                failed=False,
+                messages=messages,
+                conversation_history=conversation_history,
+                effective_task_id=effective_task_id,
+                turn_id=turn_id,
+                user_message=user_message,
+                original_user_message=original_user_message,
+                _should_review_memory=_should_review_memory,
+                _turn_exit_reason="programmatic_orchestration",
+            )
 
     while (api_call_count < agent.max_iterations and agent.iteration_budget.remaining > 0) or agent._budget_grace_call:
         # Reset per-turn checkpoint dedup so each iteration can take one snapshot
@@ -752,6 +786,8 @@ def run_conversation(
                         _injections.append(_fenced)
                 if _plugin_user_context:
                     _injections.append(_plugin_user_context)
+                if _orchestration_user_context:
+                    _injections.append(_orchestration_user_context)
                 if _injections:
                     _base = api_msg.get("content", "")
                     if isinstance(_base, str):

@@ -11,6 +11,11 @@ export function extractAgentLabel(goal: string): string | undefined {
     return subagentType
   }
 
+  const agentId = text.match(/^AGENT_ID:\s*(\S+)/im)?.[1]
+  if (agentId) {
+    return agentId
+  }
+
   const role = text.match(/\brole\s*[=:]\s*["']?(orchestrator|leaf)/i)?.[1]
   if (role && role.toLowerCase() !== 'leaf') {
     return role.toLowerCase()
