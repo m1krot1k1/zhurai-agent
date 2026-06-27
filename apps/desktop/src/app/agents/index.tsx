@@ -36,7 +36,7 @@ function statusGlyph(status: SubagentStatus, a: Translations['agents']): ReactNo
     )
   }
 
-  if (status === 'failed' || status === 'interrupted') {
+  if (status === 'failed' || status === 'error' || status === 'interrupted' || status === 'timeout') {
     return <AlertCircle aria-label={a.failed} className="size-3.5 shrink-0 text-destructive" />
   }
 
@@ -304,7 +304,7 @@ function SubagentTree({ focusAgentId, tree }: { focusAgentId: null | string; tre
   }, [highlightAgentId])
 
   const active = flat.filter(n => n.status === 'running' || n.status === 'queued').length
-  const failed = flat.filter(n => n.status === 'failed' || n.status === 'interrupted').length
+  const failed = flat.filter(n => n.status === 'failed' || n.status === 'error' || n.status === 'interrupted' || n.status === 'timeout').length
   const tools = flat.reduce((sum, n) => sum + (n.toolCount ?? 0), 0)
   const files = flat.reduce((sum, n) => sum + n.filesRead.length + n.filesWritten.length, 0)
   const tokens = flat.reduce((sum, n) => sum + (n.inputTokens ?? 0) + (n.outputTokens ?? 0), 0)

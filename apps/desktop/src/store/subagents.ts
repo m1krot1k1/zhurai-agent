@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 import { buildSubagentTree as sharedBuildSubagentTree, type SubagentNode as SharedSubagentNode } from '@hermes/shared'
 
-export type SubagentStatus = 'completed' | 'failed' | 'interrupted' | 'queued' | 'running'
+export type SubagentStatus = 'completed' | 'error' | 'failed' | 'interrupted' | 'queued' | 'running' | 'timeout'
 export type SubagentStreamKind = 'progress' | 'summary' | 'thinking' | 'tool'
 
 export interface SubagentStreamEntry {
@@ -42,7 +42,7 @@ export interface SubagentNode extends SubagentProgress {
 
 export type SubagentPayload = Record<string, unknown>
 
-const TERMINAL: ReadonlySet<SubagentStatus> = new Set(['completed', 'failed', 'interrupted'])
+const TERMINAL: ReadonlySet<SubagentStatus> = new Set(['completed', 'error', 'failed', 'interrupted', 'timeout'])
 const MAX_STREAM = 24
 const PREVIEW_MAX = 220
 const TOOL_PREVIEW_MAX = 96
@@ -62,7 +62,7 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : u
 const strList = (v: unknown) => (Array.isArray(v) ? v.filter(isStr) : [])
 
 const asStatus = (v: unknown): SubagentStatus =>
-  v === 'completed' || v === 'failed' || v === 'interrupted' || v === 'queued' ? v : 'running'
+  v === 'completed' || v === 'error' || v === 'failed' || v === 'interrupted' || v === 'queued' || v === 'timeout' ? v : 'running'
 
 const compact = (text: string, max = PREVIEW_MAX) => {
   const line = text.replace(/\s+/g, ' ').trim()
