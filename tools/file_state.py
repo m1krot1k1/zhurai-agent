@@ -32,6 +32,9 @@ loop detection, which is a different concern.
 """
 from __future__ import annotations
 
+import contextlib
+import errno
+import fcntl
 import os
 import threading
 import time
@@ -81,12 +84,51 @@ class FileStateRegistry:
 
         Same process, same filesystem — threads on the same path serialize.
         Different paths proceed in parallel.
+
+        For cross-process safety (subagents in different processes), also
+        acquires an ``fcntl.flock`` on a ``.writer.lock`` sidecar file.
+        Falls back gracefully on platforms without ``fcntl`` (Windows).
         """
         lock = self._lock_for(resolved)
         lock.acquire()
+        lock_fd = None
         try:
+            # Cross-process advisory lock via fcntl.flock on a sidecar file.
+            # This prevents concurrent writes from different processes
+            # (e.g. gateway sandbox + CLI agent).
+            try:
+                lock_path = Path(resolved).with_name(f".{Path(resolved).name}.writer.lock")
+                lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | os.O_TRUNC, 0o644)
+                deadline = time.monotonic() + 120
+                while True:
+                    try:
+                        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            # Stale lock — another agent held it > 2 min.
+                            # Force-acquire (LOCK_EX without LOCK_NB blocks
+                            # until available, then warn).
+                            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                "Stale cross-process lock on %s — force-acquired",
+                                resolved,
+                            )
+                            break
+                        time.sleep(0.5)
+            except (ImportError, AttributeError, OSError):
+                # fcntl not available (Windows) or filesystem doesn't support it
+                pass
+
             yield
         finally:
+            if lock_fd is not None:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    os.close(lock_fd)
+                except (OSError, ImportError, AttributeError):
+                    pass
             lock.release()
 
     # ── Read/write accounting ───────────────────────────────────────
