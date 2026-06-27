@@ -6739,10 +6739,12 @@ function registerDeepLinkProtocol() {
 // Single-instance lock: deep links on a running app (Win/Linux) arrive as a
 // second-instance argv. Without the lock a second `hermes://` launch spawns a
 // whole new app instead of routing into the running one.
-const _gotSingleInstanceLock = app.requestSingleInstanceLock()
+// Dev server mode skips the lock so `npm run dev` works while the packaged
+// .app is still open (otherwise the second Electron exits immediately).
+const _gotSingleInstanceLock = DEV_SERVER ? true : app.requestSingleInstanceLock()
 if (!_gotSingleInstanceLock) {
   app.quit()
-} else {
+} else if (!DEV_SERVER) {
   app.on('second-instance', (_event, argv) => {
     const url = _extractDeepLink(argv)
     if (url) handleDeepLink(url)
