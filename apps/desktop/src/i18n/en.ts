@@ -685,9 +685,10 @@ export const en: Translations = {
   agents: {
     close: 'Close agents',
     title: 'Spawn tree',
-    subtitle: 'Live subagent activity for the current turn.',
-    emptyTitle: 'No live subagents',
+    subtitle: 'Subagent activity for this turn — review after completion; clears on your next message.',
+    emptyTitle: 'No subagents this turn',
     emptyDesc: 'When a turn delegates work, child agents stream their progress here.',
+    turnComplete: (count: number) => `${count} subagent${count === 1 ? '' : 's'} finished — tap to review`,
     running: 'Running',
     failed: 'Failed',
     done: 'Done',

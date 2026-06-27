@@ -15,7 +15,8 @@ describe('subagent store', () => {
   beforeEach(() => $subagentsBySession.set({}))
 
   it('upserts subagent progress and keeps terminal status stable', () => {
-    upsertSubagent('s1', { goal: 'scan files', status: 'running', subagent_id: 'a1', task_index: 0 })
+    upsertSubagent('s1', { goal: 'scan files', status: 'running', subagent_id: 'a1', task_index: 0, role: 'orchestrator' })
+    expect(listFor('s1')[0]?.role).toBe('orchestrator')
     upsertSubagent('s1', { goal: 'scan files', status: 'completed', subagent_id: 'a1', summary: 'done', task_index: 0 })
     upsertSubagent('s1', { goal: 'scan files', status: 'running', subagent_id: 'a1', task_index: 0, text: 'late' })
 

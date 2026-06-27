@@ -22,6 +22,8 @@ import {
   type SubagentStreamEntry
 } from '@/store/subagents'
 
+import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
+
 import { OverlayView } from '../overlays/overlay-view'
 
 // Mirrors statusGlyph() in tool-fallback.tsx so subagent rows speak the
@@ -521,7 +523,14 @@ function SubagentRow({
               running && 'shimmer text-foreground/65'
             )}
           >
-            {node.goal}
+            <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {formatSubagentRoleBadge(node.role) ? (
+                <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
+                  {formatSubagentRoleBadge(node.role)}
+                </span>
+              ) : null}
+              <span className="min-w-0 wrap-anywhere">{formatSubagentTitle(node.goal, 120)}</span>
+            </span>
           </span>
           {subtitle.length > 0 ? (
             <FadeText className="text-[0.66rem] leading-[1.05rem] text-muted-foreground/65">

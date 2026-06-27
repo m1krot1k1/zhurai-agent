@@ -15,6 +15,8 @@ export interface SubagentProgress {
   id: string
   parentId: null | string
   goal: string
+  /** delegate_task role: leaf | orchestrator (when relayed from backend). */
+  role?: string
   /** The child's own stored session id — lets UIs open its session window. */
   sessionId?: string
   model?: string
@@ -174,6 +176,7 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     id: prev?.id ?? idOf(payload),
     parentId: str(payload.parent_id) || prev?.parentId || null,
     goal: str(payload.goal) || prev?.goal || 'Subagent',
+    role: str(payload.role) || prev?.role,
     sessionId: str(payload.child_session_id) || prev?.sessionId,
     model: str(payload.model) || prev?.model,
     status,

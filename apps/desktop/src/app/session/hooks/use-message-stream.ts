@@ -236,6 +236,7 @@ function delegateTaskPayloads(
       depth: 0,
       duration_seconds: payload.duration_s,
       goal,
+      role: firstString(task.role, args.role),
       status,
       subagent_id: `delegate-tool:${toolId}:${index}`,
       summary: summary || undefined,
@@ -836,7 +837,6 @@ export function useMessageStream({
         }
 
         flushQueuedDeltas(sessionId)
-        clearSessionSubagents(sessionId)
         setSessionCompacting(sessionId, false)
         compactedTurnRef.current.delete(sessionId)
         nativeSubagentSessionsRef.current.delete(sessionId)

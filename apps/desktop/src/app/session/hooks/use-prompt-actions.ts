@@ -663,6 +663,7 @@ export function usePromptActions({
       let sessionId: null | string = activeSessionId
 
       if (sessionId) {
+        clearSessionSubagents(sessionId)
         seedOptimistic(sessionId)
       } else {
         setMessages(current => [...current, buildUserMessage()])

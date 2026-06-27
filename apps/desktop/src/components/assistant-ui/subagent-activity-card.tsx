@@ -9,6 +9,7 @@ import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { useI18n } from '@/i18n'
+import { formatSubagentRoleBadge, formatSubagentTitle } from '@/lib/subagent-label'
 import { AlertCircle, CheckCircle2, Sparkles } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
@@ -20,12 +21,9 @@ import {
 } from '@/store/subagents'
 
 /**
- * Inline subagent activity card shown inside an assistant message while
- * subagents are running. Displays each agent's goal, status, current tool,
- * and elapsed time — clickable to open the Agents overlay.
- *
- * Mirrors the visual vocabulary of Cursor IDE's inline agent panel:
- * a compact, real-time status feed fused into the message transcript.
+ * Inline subagent activity card shown inside an assistant message.
+ * Lists running and recently completed subagents for the current turn
+ * (cleared when the user sends the next message).
  */
 export function SubagentActivityCard({ sessionId }: { sessionId: string | null }) {
   const { t } = useI18n()
@@ -34,24 +32,26 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
 
   const subagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
 
-  // Sort: running first, then by startedAt ascending. Must run unconditionally —
-  // early return before useMemo caused React #310 when subagents appeared mid-turn.
-  const active = useMemo(
+  const sorted = useMemo(
     () =>
-      [...subagents]
-        .filter(s => s.status === 'running' || s.status === 'queued')
-        .sort((a, b) => {
-          if (a.status !== b.status) {
-            return a.status === 'running' ? -1 : 1
-          }
-          return a.startedAt - b.startedAt
-        }),
+      [...subagents].sort((a, b) => {
+        const rank = (s: SubagentProgress['status']) =>
+          s === 'running' ? 0 : s === 'queued' ? 1 : 2
+        const byStatus = rank(a.status) - rank(b.status)
+
+        if (byStatus !== 0) {
+          return byStatus
+        }
+
+        return a.startedAt - b.startedAt
+      }),
     [subagents]
   )
 
   const running = activeSubagentCount(subagents)
+  const completed = subagents.length - running
 
-  if (running === 0 || active.length === 0) {
+  if (subagents.length === 0) {
     return null
   }
 
@@ -60,27 +60,26 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
     navigate(AGENTS_ROUTE)
   }
 
+  const header =
+    running > 0
+      ? t.statusStack.subagents(running)
+      : completed > 0
+        ? t.agents.turnComplete(completed)
+        : t.statusStack.subagents(0)
+
   return (
     <div
       className="mt-2 w-full min-w-0 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background) text-[0.78rem] leading-snug"
       data-slot="aui_subagent-activity"
     >
-      {/* Header */}
       <div className="flex items-center gap-1.5 border-b border-(--ui-stroke-tertiary) px-2.5 py-1.5">
         <Sparkles className="size-3 shrink-0 text-(--ui-accent)" />
-        <span className="font-medium text-(--ui-text-secondary)">
-          {t.statusStack.subagents(running)}
-        </span>
+        <span className="font-medium text-(--ui-text-secondary)">{header}</span>
       </div>
 
-      {/* Agent list */}
       <div className="divide-y divide-(--ui-stroke-tertiary)/50">
-        {active.map(agent => (
-          <SubagentRow
-            agent={agent}
-            key={agent.id}
-            onClick={() => openAgentDetail(agent.id)}
-          />
+        {sorted.map(agent => (
+          <SubagentRow agent={agent} key={agent.id} onClick={() => openAgentDetail(agent.id)} />
         ))}
       </div>
     </div>
@@ -116,9 +115,8 @@ function SubagentRow({
   const enterRef = useEnterAnimation(running, `subagent:${agent.id}`)
   const elapsed = useElapsedSeconds(running, `subagent-timer:${agent.id}`)
 
-  // Truncate goal to a single line
-  const goal = agent.goal.replace(/\s+/g, ' ').trim()
-  const displayGoal = goal.length > 80 ? `${goal.slice(0, 79)}…` : goal
+  const title = formatSubagentTitle(agent.goal)
+  const roleBadge = formatSubagentRoleBadge(agent.role)
 
   return (
     <button
@@ -134,22 +132,29 @@ function SubagentRow({
       {statusGlyph(agent.status)}
 
       <div className="flex min-w-0 flex-1 flex-col gap-0">
-        <span className="truncate font-medium text-foreground/90">
-          {displayGoal}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {roleBadge ? (
+            <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 font-mono text-[0.62rem] font-semibold uppercase tracking-wide text-primary">
+              {roleBadge}
+            </span>
+          ) : null}
+          <span className="truncate font-medium text-foreground/90">{title}</span>
         </span>
-        {running && agent.currentTool && (
+        {running && agent.currentTool ? (
           <span className="truncate text-[0.7rem] text-muted-foreground/70">
             {agent.currentTool.replace(/_/g, ' ')}
           </span>
-        )}
+        ) : !running && agent.summary ? (
+          <span className="truncate text-[0.7rem] text-muted-foreground/70">{agent.summary}</span>
+        ) : null}
       </div>
 
-      {running && (
+      {running ? (
         <ActivityTimerText
           className="shrink-0 text-[0.7rem] tabular-nums text-muted-foreground/60"
           seconds={elapsed}
         />
-      )}
+      ) : null}
     </button>
   )
 }

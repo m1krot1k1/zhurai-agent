@@ -2110,10 +2110,10 @@ def list_picker_providers(
     current install:
 
     - OpenRouter's model list is replaced with the output of
-      :func:`hermes_cli.models.fetch_openrouter_models`, which filters the
-      curated ``OPENROUTER_MODELS`` snapshot against the live OpenRouter
-      catalog.  IDs the live catalog no longer carries drop out, so the
-      picker never offers a model the user can't call.
+      :func:`hermes_cli.models.fetch_openrouter_models`, which merges the
+      curated manifest order with the full live OpenRouter catalog (tool-capable
+      models only). Stale curated ids that the live catalog no longer carries
+      drop out; models outside the manifest are appended alphabetically.
     - Provider rows whose model list ends up empty are dropped, except
       custom endpoints (``is_user_defined=True`` with an ``api_url``) where
       the user may supply their own model set through config.
