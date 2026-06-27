@@ -691,6 +691,47 @@ def check_delegate_requirements() -> bool:
     return True
 
 
+def _format_subagent_instruction(
+    goal: str,
+    context: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    *,
+    max_chars: int = 1200,
+) -> str:
+    """User-visible instruction for spawn-tree inspector (goal + context + brief)."""
+    if system_prompt and str(system_prompt).strip():
+        text = str(system_prompt).strip()
+    else:
+        parts: List[str] = []
+        if goal and str(goal).strip():
+            parts.append(str(goal).strip())
+        if context and str(context).strip():
+            parts.append(str(context).strip())
+        text = "\n\n".join(parts)
+    if not text:
+        return ""
+    if len(text) > max_chars:
+        return text[: max_chars - 1].rstrip() + "…"
+    return text
+
+
+def _resolve_delegation_session_key(parent_agent) -> str:
+    """Best-effort session_key for async delegation completion routing."""
+    from tools.approval import get_current_session_key
+
+    key = get_current_session_key(default="")
+    if key:
+        return key
+    if parent_agent is not None:
+        for attr in ("_gateway_session_key", "session_id"):
+            val = getattr(parent_agent, attr, None)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    import os
+
+    return os.environ.get("HERMES_SESSION_KEY", "") or ""
+
+
 def _build_child_system_prompt(
     goal: str,
     context: Optional[str] = None,
@@ -828,6 +869,8 @@ def _build_child_progress_callback(
     session_ref: Optional[Dict[str, Any]] = None,
     role: Optional[str] = None,
     agent_id: Optional[str] = None,
+    instruction: Optional[str] = None,
+    branch_context: Optional[str] = None,
 ) -> Optional[callable]:
     """Build a callback that relays child agent tool calls to the parent display.
 
@@ -879,6 +922,10 @@ def _build_child_progress_callback(
             kw["role"] = role
         if agent_id:
             kw["agent_id"] = agent_id
+        if instruction:
+            kw["instruction"] = instruction
+        if branch_context:
+            kw["branch_context"] = branch_context
         # The child's own session id — filled into the shared ref once the
         # child agent exists (the callback is built first), so every relayed
         # event lets UIs open/inspect the subagent's session directly.
@@ -1175,6 +1222,8 @@ def _build_child_agent(
         session_ref=child_session_ref,
         role=effective_role,
         agent_id=agent_id_for_cb,
+        instruction=_format_subagent_instruction(goal, context, child_prompt),
+        branch_context=context or "",
     )
 
     # Each subagent gets its own iteration budget capped at max_iterations
@@ -1328,6 +1377,9 @@ def _build_child_agent(
     child._parent_subagent_id = parent_subagent_id
     child._subagent_goal = goal
     child._delegate_branch_context = context or ""
+    child._visible_instruction = _format_subagent_instruction(
+        goal, context, child_prompt
+    )
     child._parent_turn_id = getattr(parent_agent, "_current_turn_id", "") or ""
     # Stable sidebar marker: delegate subagent sessions must stay out of
     # session pickers even when a parent delete orphans them (parent_session_id
@@ -1679,7 +1731,17 @@ def _run_single_child(
         _heartbeat_thread.start()
         if child_progress_cb:
             try:
-                child_progress_cb("subagent.start", preview=goal)
+                _instruction = (
+                    getattr(child, "_visible_instruction", None)
+                    or getattr(child, "ephemeral_system_prompt", None)
+                )
+                child_progress_cb(
+                    "subagent.start",
+                    preview=goal,
+                    instruction=_instruction,
+                    branch_context=str(_kwargs.get("context") or ""),
+                )
+                child_progress_cb("_thinking", "Thinking…")
             except Exception as e:
                 logger.debug("Progress callback start failed: %s", e)
 
@@ -1713,6 +1775,9 @@ def _run_single_child(
         # Python stack (see #14726 — 0-API-call hangs are opaque without it).
         _worker_thread_holder: Dict[str, Optional[threading.Thread]] = {"t": None}
 
+        _text_relay_tail = [""]
+        _text_relay_at = [0.0]
+
         def _relay_child_text(delta: str) -> None:
             # Forward the child's streamed reply text up the progress relay so
             # gateway watch windows mirror it live (subagent.text → message.delta).
@@ -1721,6 +1786,14 @@ def _run_single_child(
                 return
             try:
                 child_progress_cb("subagent.text", preview=delta)
+                _text_relay_tail[0] = (_text_relay_tail[0] + delta)[-400:]
+                now = time.monotonic()
+                if now - _text_relay_at[0] >= 0.35 or len(_text_relay_tail[0]) >= 180:
+                    _text_relay_at[0] = now
+                    child_progress_cb(
+                        "subagent.progress",
+                        preview=_text_relay_tail[0],
+                    )
             except Exception as e:
                 logger.debug("Child text relay failed: %s", e)
 
@@ -2171,10 +2244,23 @@ def _batch_synthesis_metadata(
             original = extract_original_request(ctx) or original
         except Exception:
             pass
+    branch_ctx = getattr(parent_agent, "_delegate_branch_context", "") or ""
+    if not original and branch_ctx:
+        try:
+            from agent.orchestrator_router import extract_original_request
+
+            original = extract_original_request(branch_ctx) or original
+        except Exception:
+            pass
     try:
-        from agent.orchestrator_router import is_ecosystem_orchestrator_subagent
+        from agent.orchestrator_router import (
+            is_ecosystem_orchestrator_subagent,
+            parse_agent_id_from_envelope,
+        )
 
         if is_ecosystem_orchestrator_subagent(parent_agent):
+            return True, original
+        if parse_agent_id_from_envelope(branch_ctx) == "orchestrator":
             return True, original
     except Exception:
         pass
@@ -2656,7 +2742,6 @@ def delegate_task(
     # keep chatting, get the combined summaries back together at the end.
     if background:
         from tools.async_delegation import dispatch_async_delegation_batch
-        from tools.approval import get_current_session_key
 
         # Stateless request/response sessions (the API server / WebUI path)
         # cannot route a detached subagent result back to the agent after the
@@ -2687,7 +2772,7 @@ def delegate_task(
             _maybe_mark_orchestrator_fanout_done(parent_agent, _sync_result if isinstance(_sync_result, dict) else None)
             return json.dumps(_sync_result, ensure_ascii=False)
 
-        _session_key = get_current_session_key(default="")
+        _session_key = _resolve_delegation_session_key(parent_agent)
         _child_agents = [c for (_, _, c) in children]
 
         # Detach every child from the parent's interrupt-propagation list — the

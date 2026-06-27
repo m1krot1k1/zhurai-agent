@@ -721,6 +721,8 @@ export const en: Translations = {
     repoCount: count => `${count} available`,
     repoFrom: count => `${count} from repo`,
     waitingForActivity: 'Waiting for tool activity…',
+    thinking: 'Thinking…',
+    instruction: 'Instruction',
     tapToExpand: 'Open subagent panel above composer',
     expandRow: 'Expand activity log',
     collapseRow: 'Collapse activity log'

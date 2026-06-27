@@ -597,6 +597,8 @@ export interface Translations {
     repoCount: (count: number) => string
     repoFrom: (count: number) => string
     waitingForActivity: string
+    thinking: string
+    instruction: string
     tapToExpand: string
     expandRow: string
     collapseRow: string

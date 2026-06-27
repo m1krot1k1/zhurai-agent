@@ -41,6 +41,8 @@ export interface SubagentProgress {
   stream: SubagentStreamEntry[]
   reasoningTokens?: number
   summary?: string
+  /** Full delegated instruction / system prompt for inspector. */
+  instruction?: string
   /** Active tool while running — cleared on terminal status. */
   currentTool?: string
 }
@@ -239,6 +241,7 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     stream,
     reasoningTokens: num(payload.reasoning_tokens) ?? prev?.reasoningTokens,
     summary: str(payload.summary) || prev?.summary,
+    instruction: str(payload.instruction) || prev?.instruction,
     currentTool: TERMINAL.has(status) ? undefined : tool || prev?.currentTool
   }
 }

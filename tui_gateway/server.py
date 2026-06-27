@@ -3115,6 +3115,10 @@ def _on_tool_progress(
             payload["status"] = str(_kwargs["status"])
         if _kwargs.get("summary"):
             payload["summary"] = str(_kwargs["summary"])
+        if _kwargs.get("instruction"):
+            payload["instruction"] = str(_kwargs["instruction"])
+        if _kwargs.get("branch_context"):
+            payload["branch_context"] = str(_kwargs["branch_context"])
         if _kwargs.get("duration_seconds") is not None:
             payload["duration_seconds"] = float(_kwargs["duration_seconds"])
         if preview and event_type == "subagent.tool":
@@ -6527,6 +6531,15 @@ def _notification_poller_loop(
         if _dedup_key not in _emitted:
             if evt.get("type") != "async_delegation":
                 _emit("status.update", sid, {"kind": "process", "text": text})
+            elif evt.get("synthesis_required"):
+                _emit(
+                    "status.update",
+                    sid,
+                    {
+                        "kind": "process",
+                        "text": "Parallel specialists finished — synthesizing answer…",
+                    },
+                )
             _emitted.add(_dedup_key)
 
         with session["history_lock"]:
@@ -6577,6 +6590,15 @@ def _notification_poller_loop(
         if _dedup_key not in _emitted:
             if evt.get("type") != "async_delegation":
                 _emit("status.update", sid, {"kind": "process", "text": text})
+            elif evt.get("synthesis_required"):
+                _emit(
+                    "status.update",
+                    sid,
+                    {
+                        "kind": "process",
+                        "text": "Parallel specialists finished — synthesizing answer…",
+                    },
+                )
             _emitted.add(_dedup_key)
 
         with session["history_lock"]:

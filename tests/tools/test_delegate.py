@@ -2813,5 +2813,32 @@ class TestFallbackModelInheritance(unittest.TestCase):
         self.assertIsNone(kwargs["fallback_model"])
 
 
+class TestSubagentInstructionHelpers(unittest.TestCase):
+    def test_format_subagent_instruction_prefers_system_prompt(self):
+        from tools.delegate_tool import _format_subagent_instruction
+
+        text = _format_subagent_instruction(
+            "short goal",
+            "AGENT_ID: code",
+            "You are a focused subagent.\n\nYOUR TASK:\nImplement feature X",
+        )
+        self.assertIn("focused subagent", text)
+        self.assertIn("Implement feature X", text)
+
+    def test_batch_synthesis_metadata_orchestrator_branch_context(self):
+        from tools.delegate_tool import _batch_synthesis_metadata
+
+        parent = MagicMock()
+        parent._delegate_branch_context = "AGENT_ID: orchestrator\nORIGINAL_REQUEST: analyze repo"
+        parent._delegate_role = "leaf"
+        needs, original = _batch_synthesis_metadata(
+            parent,
+            [{"goal": "a", "context": "x"}, {"goal": "b", "context": "y"}],
+            top_role="leaf",
+        )
+        self.assertTrue(needs)
+        self.assertIn("analyze repo", original)
+
+
 if __name__ == "__main__":
     unittest.main()

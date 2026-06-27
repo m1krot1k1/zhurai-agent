@@ -46,6 +46,23 @@ describe('subagent store', () => {
     expect(buildSubagentTree(listFor('s1')).map(n => n.id)).toEqual(['a', 'b'])
   })
 
+  it('stores delegated instruction from subagent.start', () => {
+    upsertSubagent(
+      's1',
+      {
+        goal: 'Deep review',
+        instruction: 'You are a focused subagent…\nYOUR TASK:\nDeep review',
+        status: 'running',
+        subagent_id: 'a1',
+        task_index: 0
+      },
+      true,
+      'subagent.start'
+    )
+
+    expect(listFor('s1')[0]?.instruction).toContain('Deep review')
+  })
+
   it('captures live thinking/progress/tool stream lines', () => {
     upsertSubagent(
       's1',

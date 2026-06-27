@@ -910,6 +910,8 @@ export const zh: Translations = {
     repoCount: count => `${count} 个可用`,
     repoFrom: count => `${count} 个来自仓库`,
     waitingForActivity: '等待工具活动…',
+    thinking: '思考中…',
+    instruction: '指令',
     tapToExpand: '打开 Spawn tree 并展开此代理',
     expandRow: '展开活动日志',
     collapseRow: '收起活动日志'

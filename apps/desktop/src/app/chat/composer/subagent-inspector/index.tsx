@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { FadeText } from '@/components/ui/fade-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { type Translations, useI18n } from '@/i18n'
-import { AlertCircle, CheckCircle2, ExternalLink, Sparkles, X } from '@/lib/icons'
+import { AlertCircle, CheckCircle2, ChevronDown, ExternalLink, Sparkles, X } from '@/lib/icons'
 import { formatSubagentDisplay, formatSubagentRoleBadge } from '@/lib/subagent-label'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
@@ -415,6 +415,22 @@ function NavItem({
   )
 }
 
+function InstructionPanel({ instruction, label }: { instruction: string; label: string }) {
+  return (
+    <details className="group mb-2 rounded-md border border-(--ui-stroke-tertiary)/60 bg-muted/20 px-2.5 py-2 open:pb-2" open>
+      <summary className="cursor-pointer list-none text-[0.62rem] font-medium tracking-wide text-muted-foreground/70 uppercase marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+      <p className="mt-1.5 max-h-40 overflow-y-auto text-[0.71rem] leading-relaxed whitespace-pre-wrap text-foreground/85" data-selectable-text="true">
+        {instruction}
+      </p>
+    </details>
+  )
+}
+
 function SubagentDetailPane({ node }: { node: SubagentNode }) {
   const { t } = useI18n()
   const running = node.status === 'running' || node.status === 'queued'
@@ -476,9 +492,11 @@ function SubagentDetailPane({ node }: { node: SubagentNode }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+        {node.instruction ? <InstructionPanel instruction={node.instruction} label={t.agents.instruction} /> : null}
+
         {running && stream.length === 0 ? (
           <p className="text-[0.72rem] leading-relaxed text-muted-foreground/75">
-            {node.currentTool ? node.currentTool.replace(/_/g, ' ') : t.agents.waitingForActivity}
+            {node.currentTool ? node.currentTool.replace(/_/g, ' ') : t.agents.thinking}
           </p>
         ) : null}
 

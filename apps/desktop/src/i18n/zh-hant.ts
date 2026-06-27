@@ -813,6 +813,8 @@ export const zhHant = defineLocale({
     repoCount: count => `${count} 個可用`,
     repoFrom: count => `${count} 個來自倉庫`,
     waitingForActivity: '等待工具活動…',
+    thinking: '思考中…',
+    instruction: '指令',
     tapToExpand: '開啟 Spawn tree 並展開此代理',
     expandRow: '展開活動日誌',
     collapseRow: '收合活動日誌'
