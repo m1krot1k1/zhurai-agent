@@ -400,10 +400,9 @@ class TestBuildSkillsSystemPrompt:
 
     def test_empty_when_no_skills_dir(self, monkeypatch, tmp_path):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        # Prevent the ecosystem fallback: prompt_builder imported
-        # get_all_skills_dirs at module level, so we patch it in its own namespace
-        import agent.prompt_builder as pb
-        monkeypatch.setattr(pb, "get_all_skills_dirs", lambda: [])
+        # Prevent ecosystem fallback from picking up repo's built-in skills
+        # by setting ZHUR_AI_AGENT_ROOT to tmp_path (which has no skills/)
+        monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(tmp_path))
         result = build_skills_system_prompt()
         assert result == ""
 
@@ -1355,9 +1354,7 @@ class TestBuildSkillsSystemPromptConditional:
 
     def test_requires_skill_hidden_when_toolset_missing(self, monkeypatch, tmp_path):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-        # Prevent the ecosystem fallback: patch in prompt_builder's namespace
-        import agent.prompt_builder as pb
-        monkeypatch.setattr(pb, "get_all_skills_dirs", lambda: [tmp_path / "skills"])
+        monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(tmp_path))
         skill_dir = tmp_path / "skills" / "iot" / "openhue"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
