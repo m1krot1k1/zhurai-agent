@@ -278,7 +278,7 @@ def test_plan_parallel_delegate_tasks_includes_agent_ids(
     for task in tasks:
         assert task.get("goal")
         assert "AGENT_ID:" in (task.get("context") or "")
-        assert task.get("role") == "leaf"
+        assert task.get("role") == "orchestrator"
 
 
 def test_build_orchestration_injection_disabled_in_programmatic_mode(

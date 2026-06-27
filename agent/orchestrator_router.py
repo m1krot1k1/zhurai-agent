@@ -389,7 +389,10 @@ def _tasks_from_agent_specs(
             {
                 "goal": objective,
                 "context": ctx,
-                "role": "leaf",
+                # Orchestrator role when depth allows — specialists can spawn
+                # sub-specialists via delegate_task(tasks=[...]). At the depth
+                # floor delegate_tool degrades to leaf automatically.
+                "role": "orchestrator",
             }
         )
     return tasks

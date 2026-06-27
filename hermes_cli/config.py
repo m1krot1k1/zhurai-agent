@@ -1978,7 +1978,7 @@ DEFAULT_CONFIG = {
         # Orchestrator role controls (see tools/delegate_tool.py:_get_max_spawn_depth
         # and _get_orchestrator_enabled).  Floored at 1, no upper ceiling —
         # raise deliberately, each level multiplies API cost.
-        "max_spawn_depth": 3,        # depth (3 = /start→start→orchestrator→specialists [default], 1 = flat leaf-only)
+        "max_spawn_depth": 10,       # depth floor 1, no ceiling (10 = /start + nested sub-specialists; 1 = flat)
         "orchestrator_enabled": True,  # kill switch for role="orchestrator"
         # When the zhur.ai-agent ecosystem is available (agents/ tree), inject
         # multi-agent orchestration hints into complex user turns so the root
@@ -2848,7 +2848,7 @@ DEFAULT_CONFIG = {
 
 
     # Config schema version - bump this when adding new required fields
-    "_config_version": 31,
+    "_config_version": 32,
 }
 
 # =============================================================================
@@ -5146,6 +5146,27 @@ def migrate_config(interactive: bool = True, quiet: bool = False) -> Dict[str, A
             save_config(config)
             if not quiet:
                 print("  ✓ Renamed write_mode → write_approval (boolean gate)")
+
+    # ── Version 31 → 32: nested specialist delegation headroom ──
+    # /start chain uses depths 0–3; specialists need depth 4+ to spawn sub-specialists.
+    # Bump legacy defaults (2/3) to 10; leave max_spawn_depth=1 (flat mode) untouched.
+    if current_ver < 32:
+        config = read_raw_config()
+        delegation = config.get("delegation")
+        if isinstance(delegation, dict):
+            msd = delegation.get("max_spawn_depth")
+            if msd in (2, 3):
+                delegation["max_spawn_depth"] = 10
+                config["delegation"] = delegation
+                save_config(config)
+                results["config_added"].append(
+                    f"delegation.max_spawn_depth={msd}→10"
+                )
+                if not quiet:
+                    print(
+                        f"  ✓ Raised delegation.max_spawn_depth {msd}→10 "
+                        "(enables nested specialist→sub-specialist delegation)"
+                    )
 
     # ── Version 30 → 31: /start chain needs depth 3 ──
     # root(0) → start(1) → orchestrator(2) → specialists(3). With max_spawn_depth=2
