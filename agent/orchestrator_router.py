@@ -619,6 +619,23 @@ def _turn_includes_delegate_task(messages: Sequence[Dict[str, Any]]) -> bool:
     return False
 
 
+def _count_recon_tool_turns(messages: Sequence[Dict[str, Any]]) -> int:
+    """Count tool messages that consumed a recon turn (read_file / search_files).
+
+    Used as a timeout guard: if the orchestrator spends too many turns on
+    recon without delegating, we force a heuristic fan-out instead of waiting
+    for the LLM planner (which may keep exploring indefinitely).
+    """
+    count = 0
+    recon_tools = frozenset({"read_file", "search_files"})
+    for msg in messages:
+        if not isinstance(msg, dict) or msg.get("role") != "tool":
+            continue
+        if msg.get("name") in recon_tools:
+            count += 1
+    return count
+
+
 def _plan_tasks_from_recon(recon_summary: str, original_request: str) -> Optional[List[Dict[str, Any]]]:
     """LLM planner: recon findings → tailored branch specs."""
     if not recon_summary.strip():
@@ -793,6 +810,28 @@ def try_orchestrator_post_recon_fanout(
 
     original = _resolve_original_request(agent, user_message)
     if not original:
+        return None
+
+    # Recon turn limit guard — if the orchestrator has already made 3+ recon
+    # tool calls (read_file / search_files) without delegating, skip the LLM
+    # planner and fall straight through to the heuristic plan.  Prevents
+    # indefinite recon loops that burn tokens without making progress.
+    if _count_recon_tool_turns(messages) >= 3:
+        logger.info(
+            "orchestrator post-recon: %d recon tool turns without delegation — "
+            "forcing heuristic plan (recon timeout)",
+            _count_recon_tool_turns(messages),
+        )
+        tasks = plan_parallel_delegate_tasks(original)
+        if len(tasks) >= _min_parallel_tasks():
+            agent._orchestrator_fanout_done = True
+            logger.info(
+                "orchestrator post-recon forced fan-out: dispatching %d tasks (session=%s task=%s)",
+                len(tasks),
+                getattr(agent, "session_id", None) or "none",
+                task_id,
+            )
+            return _dispatch_orchestrator_fanout(agent, tasks, task_id=task_id)
         return None
 
     recon = _extract_recon_summary(messages)

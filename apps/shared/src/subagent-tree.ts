@@ -8,9 +8,11 @@
  * (has at minimum `id`, `parentId`, `depth`, `index`) works, so TUI and Desktop
  * can each pass their own richer `SubagentProgress` type.
  */
-// TODO(m1krot1k): Standardize SubagentProgress type between TUI and Desktop
-// so the Desktop can import buildSubagentTree from here instead of its own
-// copy in store/subagents.ts.
+// The Desktop previously maintained its own buildSubagentTree copy with
+// chronological sorting (startedAt, taskIndex, goal). That sort has been
+// moved into this shared module as buildSubagentTreeSorted (depth, index)
+// so both TUI and Desktop use a single shared tree builder and sort is
+// consistent across all consumers.
 
 // ── Shared types ──────────────────────────────────────────────────────────
 
@@ -110,6 +112,35 @@ export function buildSubagentTree<T extends SubagentProgress>(
   }
 
   return (byParent.get(ROOT_KEY) ?? []).map(build)
+}
+
+/**
+ * Variant of buildSubagentTree that recursively sorts the full tree by
+ * depth then index — both top-level nodes and children within each parent.
+ *
+ * The base buildSubagentTree sorts siblings within a parent but leaves
+ * top-level (root-keyed) items in insertion order. This variant guarantees
+ * a fully ordered tree and is the recommended export for UI consumers that
+ * render flat lists or need deterministic tree ordering.
+ */
+export function buildSubagentTreeSorted<T extends SubagentProgress>(
+  items: readonly T[]
+): SubagentNode<T>[] {
+  const tree = buildSubagentTree(items)
+
+  const sortFn = (a: SubagentNode<T>, b: SubagentNode<T>) =>
+    a.item.depth - b.item.depth || a.item.index - b.item.index
+
+  const sortRecursive = (nodes: SubagentNode<T>[]) => {
+    if (!nodes.length) return
+    nodes.sort(sortFn)
+    for (const node of nodes) {
+      sortRecursive(node.children)
+    }
+  }
+
+  sortRecursive(tree)
+  return tree
 }
 
 // ── Aggregation ───────────────────────────────────────────────────────────

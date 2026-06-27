@@ -3370,6 +3370,19 @@ DELEGATE_TASK_SCHEMA = {
                 "enum": ["leaf", "orchestrator"],
                 "description": "(rebuilt at get_definitions() time)",
             },
+            # DEPRECATED — Breaking change semantic note:
+            # ---------------------
+            # The `background` field was deprecated when the runtime switched
+            # to auto-background dispatch for all single-task delegations
+            # (v0.24+).  Previously, agents had to explicitly set
+            # `background=True` to avoid blocking the parent turn; any caller
+            # not setting it would block the conversation until the subagent
+            # finished.  The switch made *all* single-task delegations
+            # non-blocking by default, and the `background` parameter became
+            # a no-op.  If you see old code passing `background=False` and
+            # expecting synchronous behavior, that assumption is now invalid.
+            # The parameter is kept only for backward-compatibility of the
+            # JSON schema; setting it has no runtime effect.
             "background": {
                 "type": "boolean",
                 "description": (

@@ -12,7 +12,7 @@ on:
       - '.github/workflows/skills-index.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-index:
@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          # Need the full history and token to push back
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
@@ -40,3 +43,16 @@ jobs:
           name: skills-index
           path: website/static/api/skills-index.json
           retention-days: 7
+
+      - name: Deploy skills-index.json to main branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add website/static/api/skills-index.json
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to skills-index.json — skipping commit."
+          else
+            git commit -m "chore(skills-index): update skills-index.json [skip ci]"
+            git push
+          fi

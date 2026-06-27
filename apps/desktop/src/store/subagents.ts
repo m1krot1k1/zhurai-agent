@@ -1,5 +1,5 @@
 import { atom } from 'nanostores'
-import { buildSubagentTree as sharedBuildSubagentTree, type SubagentNode as SharedSubagentNode } from '@hermes/shared'
+import { buildSubagentTreeSorted as sharedBuildSubagentTreeSorted, type SubagentNode as SharedSubagentNode } from '@hermes/shared'
 
 export type SubagentStatus = 'completed' | 'error' | 'failed' | 'interrupted' | 'queued' | 'running' | 'timeout'
 export type SubagentStreamKind = 'progress' | 'summary' | 'thinking' | 'tool'
@@ -297,10 +297,11 @@ export function upsertSubagent(sid: string, payload: SubagentPayload, createIfMi
 }
 
 export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentNode[] {
-  // Delegate to @hermes/shared tree builder (generic on T), then adapt the
+  // Delegate to @hermes/shared sorted tree builder (generic on T), then adapt the
   // shared SubagentNode<T> (which has { aggregate, children, item }) to the
   // Desktop's SubagentNode (which extends SubagentProgress with children).
-  const shared = sharedBuildSubagentTree(items)
+  // The shared sorted variant pre-sorts top-level items and children by depth then index.
+  const shared = sharedBuildSubagentTreeSorted(items)
 
   const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>
     nodes.map(n => {
@@ -312,20 +313,7 @@ export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentN
       return { ...item, children: adapt(n.children) } as unknown as SubagentNode
     })
 
-  const sort = (a: SubagentNode, b: SubagentNode) =>
-    a.startedAt - b.startedAt || a.taskIndex - b.taskIndex || a.goal.localeCompare(b.goal)
-
-  const sortChildren = (nodes: SubagentNode[]) => {
-    for (const node of nodes) {
-      node.children.sort(sort)
-      sortChildren(node.children)
-    }
-  }
-
-  const result = adapt(shared)
-  result.sort(sort)
-  sortChildren(result)
-  return result
+  return adapt(shared)
 }
 
 export const activeSubagentCount = (items: readonly SubagentProgress[]) =>
