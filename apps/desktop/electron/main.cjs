@@ -2065,8 +2065,15 @@ function resolveHermesCliBinary(updateRoot) {
 }
 
 // Spawn a command and stream each output line to the update progress channel.
+// On failure, `tail` holds the last few lines so the renderer can show why.
 function runStreamedUpdate(command, args, { cwd, env, stage } = {}) {
   return new Promise(resolve => {
+    const recentLines = []
+    const rememberLine = trimmed => {
+      recentLines.push(trimmed)
+      if (recentLines.length > 40) recentLines.shift()
+    }
+    const tailText = () => recentLines.slice(-8).join('\n')
     let child
     try {
       child = spawn(
@@ -2079,20 +2086,39 @@ function runStreamedUpdate(command, args, { cwd, env, stage } = {}) {
         })
       )
     } catch (err) {
-      resolve({ code: 1, error: err.message })
+      resolve({ code: 1, error: err.message, tail: err.message })
       return
     }
     const emitLines = chunk => {
       for (const line of chunk.toString().split('\n')) {
         const trimmed = line.trim()
-        if (trimmed) emitUpdateProgress({ stage, message: trimmed, percent: null })
+        if (trimmed) {
+          rememberLine(trimmed)
+          emitUpdateProgress({ stage, message: trimmed, percent: null })
+        }
       }
     }
     child.stdout.on('data', emitLines)
     child.stderr.on('data', emitLines)
-    child.once('error', err => resolve({ code: 1, error: err.message }))
-    child.once('exit', code => resolve({ code }))
+    child.once('error', err =>
+      resolve({ code: 1, error: err.message, tail: tailText() || err.message })
+    )
+    child.once('exit', code => {
+      const tail = tailText()
+      const lastLine = recentLines[recentLines.length - 1]
+      resolve({
+        code,
+        tail: tail || undefined,
+        error: code !== 0 ? lastLine || 'update-failed' : undefined
+      })
+    })
   })
+}
+
+function updateFailureDetail(result, fallback) {
+  const tail = typeof result?.tail === 'string' ? result.tail.trim() : ''
+  const err = typeof result?.error === 'string' ? result.error.trim() : ''
+  return tail || err || fallback
 }
 
 // The running app's .app bundle (packaged macOS): execPath is
@@ -2152,18 +2178,24 @@ async function applyUpdatesPosixInApp() {
     env.HERMES_DESKTOP_CHILD_PID = desktopChildPids.join(',')
   }
 
-  // Branch-pin so a non-main checkout doesn't get switched to main (and self-heal
-  // to main when the pinned branch no longer exists on origin).
-  let branchArgs = []
-  try {
-    const head = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: updateRoot })
-    const current = (head.stdout || '').trim()
-    if (head.code === 0 && current && current !== 'HEAD') {
-      branchArgs = ['--branch', await resolveHealedBranch(updateRoot, current)]
+  // Branch-pin to persisted desktop update config (zhur fork defaults to dev).
+  // Match checkUpdates + Tauri apply: config is primary so check/apply stay on
+  // the same branch; bare `hermes update` would default to main. Use HEAD only
+  // when config has no branch and checkout is not detached.
+  const { branch: configuredBranch } = readDesktopUpdateConfig()
+  let updateBranch = configuredBranch || DEFAULT_UPDATE_BRANCH
+  if (!updateBranch) {
+    try {
+      const head = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: updateRoot })
+      const current = (head.stdout || '').trim()
+      if (head.code === 0 && current && current !== 'HEAD') {
+        updateBranch = current
+      }
+    } catch {
+      // best effort
     }
-  } catch {
-    // best effort
   }
+  const branchArgs = ['--branch', await resolveHealedBranch(updateRoot, updateBranch || DEFAULT_UPDATE_BRANCH)]
 
   emitUpdateProgress({ stage: 'update', message: 'Updating Hermes (git + dependencies)…', percent: 10 })
   const updated = await runStreamedUpdate(hermes, ['update', '--yes', ...branchArgs], {
@@ -2172,8 +2204,9 @@ async function applyUpdatesPosixInApp() {
     stage: 'update'
   })
   if (updated.code !== 0) {
-    emitUpdateProgress({ stage: 'error', message: 'hermes update failed.', error: updated.error || 'update-failed' })
-    return { ok: false, error: 'hermes update failed' }
+    const detail = updateFailureDetail(updated, 'hermes update failed')
+    emitUpdateProgress({ stage: 'error', message: 'hermes update failed.', error: detail })
+    return { ok: false, error: 'hermes update failed', message: detail }
   }
 
   emitUpdateProgress({ stage: 'rebuild', message: 'Rebuilding the desktop app…', percent: 60 })
@@ -2187,12 +2220,18 @@ async function applyUpdatesPosixInApp() {
     return runStreamedUpdate(hermes, ['desktop', '--build-only'], { cwd: updateRoot, env, stage: 'rebuild' })
   })
   if (rebuilt.code !== 0) {
+    const detail = updateFailureDetail(rebuilt, 'desktop rebuild failed')
     emitUpdateProgress({
       stage: 'error',
       message: 'Backend updated, but the desktop rebuild failed. Restart Hermes to retry.',
-      error: rebuilt.error || 'rebuild-failed'
+      error: detail
     })
-    return { ok: false, backendUpdated: true, error: 'desktop rebuild failed' }
+    return {
+      ok: false,
+      backendUpdated: true,
+      error: 'desktop rebuild failed',
+      message: detail
+    }
   }
 
   // Linux in-app update terminal state (#45205). `hermes desktop --build-only`

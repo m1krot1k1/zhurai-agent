@@ -283,6 +283,19 @@ describe('applyUpdates terminal state', () => {
     expect($updateApply.get().applying).toBe(false)
     expect($updateApply.get().stage).toBe('error')
     expect($updateApply.get().error).toBe('rebuild-failed')
+    expect($updateApply.get().message).toBe('rebuild failed')
+  })
+
+  it('surfaces IPC failure detail when apply resolves not-ok', async () => {
+    applyMock.mockResolvedValue({
+      ok: false,
+      error: 'hermes update failed',
+      message: '✗ Failed to fetch updates from origin.\n  fatal: unable to access'
+    })
+
+    await applyUpdates()
+
+    expect($updateApply.get().message).toContain('unable to access')
   })
 
   it('keeps the manual command state for CLI installs with no staged updater', async () => {

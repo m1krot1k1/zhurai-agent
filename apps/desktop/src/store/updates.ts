@@ -398,12 +398,20 @@ export async function applyUpdates(opts: DesktopUpdateApplyOptions = {}): Promis
           title: translateNow('updates.allSetTitle')
         })
       } else {
+        const prior = $updateApply.get()
+        const logTail = prior.log
+          .filter(entry => entry.stage === 'update' || entry.stage === 'rebuild' || entry.stage === 'error')
+          .slice(-8)
+          .map(entry => entry.message)
+          .join('\n')
+          .trim()
+        const message = result?.message?.trim() || logTail || translateNow('updates.errorBody')
         $updateApply.set({
-          ...$updateApply.get(),
+          ...prior,
           applying: false,
           stage: 'error',
           error: result?.error ?? 'apply-failed',
-          message: result?.message ?? translateNow('updates.errorBody')
+          message
         })
       }
     }

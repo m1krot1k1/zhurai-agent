@@ -111,7 +111,12 @@ export function UpdatesOverlay() {
         )}
 
         {phase === 'error' && (
-          <ErrorView message={apply.message} onDismiss={() => handleClose(false)} onRetry={handleInstall} />
+          <ErrorView
+            log={apply.log}
+            message={apply.message}
+            onDismiss={() => handleClose(false)}
+            onRetry={handleInstall}
+          />
         )}
 
         {phase === 'idle' && (
@@ -414,17 +419,41 @@ function ApplyingView({ apply, isBackend }: { apply: UpdateApplyState; isBackend
   )
 }
 
-function ErrorView({ message, onDismiss, onRetry }: { message: string; onDismiss: () => void; onRetry: () => void }) {
+function ErrorView({
+  log,
+  message,
+  onDismiss,
+  onRetry
+}: {
+  log?: UpdateApplyState['log']
+  message: string
+  onDismiss: () => void
+  onRetry: () => void
+}) {
   const { t } = useI18n()
   const u = t.updates
+  const logTail = (log ?? [])
+    .filter(entry => entry.stage === 'update' || entry.stage === 'rebuild' || entry.stage === 'error')
+    .slice(-6)
+    .map(entry => entry.message)
+    .join('\n')
+    .trim()
+  const showLogTail = Boolean(logTail && logTail !== message.trim() && !message.includes(logTail))
 
   return (
     <ErrorState
       className="px-6 pb-6 pt-7 pr-8"
       description={
-        <DialogDescription className="max-w-prose text-center text-sm leading-5 text-muted-foreground">
-          {message || u.errorBody}
-        </DialogDescription>
+        <div className="grid gap-3">
+          <DialogDescription className="max-w-prose text-center text-sm leading-5 text-muted-foreground">
+            {message || u.errorBody}
+          </DialogDescription>
+          {showLogTail && (
+            <pre className="max-h-32 overflow-auto rounded-md border border-border/60 bg-muted/40 p-3 text-left font-mono text-xs leading-5 whitespace-pre-wrap text-muted-foreground">
+              {logTail}
+            </pre>
+          )}
+        </div>
       }
       title={
         <DialogTitle className="text-center text-xl font-semibold tracking-tight">{u.errorTitle}</DialogTitle>
