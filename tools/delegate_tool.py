@@ -935,6 +935,12 @@ def _build_child_progress_callback(
         # event lets UIs open/inspect the subagent's session directly.
         if session_ref and session_ref.get("session_id"):
             kw["child_session_id"] = str(session_ref["session_id"])
+        wave = getattr(parent_agent, "_orchestrator_wave_number", None)
+        if wave is not None:
+            try:
+                kw["wave_number"] = max(1, int(wave))
+            except (TypeError, ValueError):
+                pass
         kw["tool_count"] = _tool_count[0]
         return kw
 

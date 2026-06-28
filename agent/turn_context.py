@@ -435,6 +435,11 @@ def build_turn_context(
         )
         from tools.process_registry import is_async_delegation_notification_text
 
+        if isinstance(original_user_message, str) and not is_async_delegation_notification_text(
+            original_user_message
+        ):
+            agent._orchestrator_wave_number = 1
+
         if isinstance(original_user_message, str) and is_async_delegation_notification_text(
             original_user_message
         ):

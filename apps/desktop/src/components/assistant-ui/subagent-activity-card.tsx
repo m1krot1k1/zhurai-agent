@@ -15,22 +15,22 @@ import {
   $subagentsBySession,
   activeSubagentCount,
   buildSubagentTree,
+  groupSubagentsByWave,
   openSubagentInspector,
   type SubagentNode,
   type SubagentProgress
 } from '@/store/subagents'
 
 /**
- * Inline subagent activity card shown inside an assistant message.
- * Lists running and recently completed subagents for the current turn
- * (cleared when the user sends the next message).
+ * Inline subagent activity card shown inside the latest assistant message only
+ * (session-wide store; avoids duplicate panels on synthesis follow-up turns).
  */
 export function SubagentActivityCard({ sessionId }: { sessionId: string | null }) {
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
 
   const subagents = sessionId ? (subagentsBySession[sessionId] ?? []) : []
-  const tree = useMemo(() => buildSubagentTree(subagents), [subagents])
+  const waves = useMemo(() => groupSubagentsByWave(subagents), [subagents])
 
   const running = activeSubagentCount(subagents)
   const completed = subagents.length - running
@@ -48,6 +48,8 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
         ? t.agents.turnComplete(completed)
         : t.statusStack.subagents(0)
 
+  const multiWave = waves.size > 1
+
   return (
     <div
       className="mt-2 w-full min-w-0 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background) text-[0.78rem] leading-snug"
@@ -58,11 +60,28 @@ export function SubagentActivityCard({ sessionId }: { sessionId: string | null }
         <span className="font-medium text-(--ui-text-secondary)">{header}</span>
       </div>
 
-      <div className="divide-y divide-(--ui-stroke-tertiary)/50">
-        {tree.map(node => (
-          <SubagentTreeRow depth={0} key={node.id} node={node} onOpen={openAgentDetail} />
-        ))}
-      </div>
+      {[...waves.entries()].map(([waveNumber, waveAgents]) => {
+        const tree = buildSubagentTree(waveAgents)
+        const waveRunning = activeSubagentCount(waveAgents)
+
+        return (
+          <div className="divide-y divide-(--ui-stroke-tertiary)/50" key={`wave-${waveNumber}`}>
+            {multiWave ? (
+              <div className="flex items-center gap-1.5 bg-(--ui-row-hover-background)/40 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t.agents.waveLabel(waveNumber)}
+                {waveRunning > 0 ? (
+                  <span className="font-normal normal-case text-muted-foreground/80">
+                    · {t.statusStack.subagents(waveRunning)}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {tree.map(node => (
+              <SubagentTreeRow depth={0} key={node.id} node={node} onOpen={openAgentDetail} />
+            ))}
+          </div>
+        )
+      })}
     </div>
   )
 }

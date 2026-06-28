@@ -267,6 +267,15 @@ const AssistantMessage: FC<{
   const messageStatus = useAuiState(s => s.message.status?.type)
   const isRunning = messageStatus === 'running'
   const isPlaceholder = useAuiState(s => s.message.status?.type === 'running' && s.message.content.length === 0)
+  const isLastAssistantMessage = useAuiState(({ thread, message }) => {
+    for (let i = thread.messages.length - 1; i >= 0; i -= 1) {
+      if (thread.messages[i]?.role === 'assistant') {
+        return thread.messages[i]?.id === message.id
+      }
+    }
+
+    return false
+  })
   const hasVisibleText = useAuiState(s => contentHasVisibleText(s.message.content))
 
   // Preview targets only materialize once the turn completes — while running
@@ -306,7 +315,7 @@ const AssistantMessage: FC<{
       >
         {/* Todos render in the composer status stack now, not inline. */}
         <MessagePrimitive.Parts components={MESSAGE_PARTS_COMPONENTS} />
-        <SubagentActivityCard sessionId={activeSessionId} />
+        {isLastAssistantMessage ? <SubagentActivityCard sessionId={activeSessionId} /> : null}
         {isRunning && <StreamStallIndicator />}
         {previewTargets.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

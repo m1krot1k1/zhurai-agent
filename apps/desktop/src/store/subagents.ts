@@ -45,6 +45,8 @@ export interface SubagentProgress {
   instruction?: string
   /** Active tool while running — cleared on terminal status. */
   currentTool?: string
+  /** Orchestrator wave number (1 = first fan-out). */
+  waveNumber?: number
 }
 
 export interface SubagentNode extends SubagentProgress {
@@ -242,7 +244,8 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
     reasoningTokens: num(payload.reasoning_tokens) ?? prev?.reasoningTokens,
     summary: str(payload.summary) || prev?.summary,
     instruction: str(payload.instruction) || prev?.instruction,
-    currentTool: TERMINAL.has(status) ? undefined : tool || prev?.currentTool
+    currentTool: TERMINAL.has(status) ? undefined : tool || prev?.currentTool,
+    waveNumber: num(payload.wave_number) ?? prev?.waveNumber ?? 1
   }
 }
 
@@ -314,6 +317,20 @@ export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentN
     })
 
   return adapt(shared)
+}
+
+/** Group subagents by orchestrator wave for inline activity cards. */
+export function groupSubagentsByWave(subagents: readonly SubagentProgress[]): Map<number, SubagentProgress[]> {
+  const groups = new Map<number, SubagentProgress[]>()
+
+  for (const agent of subagents) {
+    const wave = agent.waveNumber ?? 1
+    const bucket = groups.get(wave) ?? []
+    bucket.push(agent)
+    groups.set(wave, bucket)
+  }
+
+  return new Map([...groups.entries()].sort(([a], [b]) => a - b))
 }
 
 export const activeSubagentCount = (items: readonly SubagentProgress[]) =>

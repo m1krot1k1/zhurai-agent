@@ -9,11 +9,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from agent.orchestrator_router import (
+    WaveEvalResult,
     build_orchestration_injection,
     build_orchestrator_recon_injection,
     build_root_synthesis_injection,
     classify_complexity,
     enrich_delegate_task_entry,
+    evaluate_batch_for_next_wave,
+    evaluate_batch_message_for_gaps,
     extract_original_request,
     infer_agent_id_from_text,
     is_ecosystem_orchestrator_subagent,
@@ -28,6 +31,7 @@ from agent.orchestrator_router import (
     try_orchestrator_post_recon_fanout,
     try_programmatic_orchestration,
     try_programmatic_start_router,
+    try_root_post_batch_wave_continue,
     try_start_child_handoff,
 )
 
@@ -583,3 +587,140 @@ def test_build_root_synthesis_injection_batch_complete() -> None:
     assert "SYNTHESIS" in injection
     assert "full repo analysis" in injection
     assert "Do NOT call delegate_task" in injection
+
+
+def test_evaluate_batch_message_for_gaps_detects_failure() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: fix repo\n"
+        "\n"
+        "--- ✗ TASK 1/2: fix index  (status=failed, 12s) ---\n"
+        "Could not deploy skills-index.json\n"
+        "\n"
+        "--- ✓ TASK 2/2: explore  (status=completed, 8s) ---\n"
+        "Mapped key modules.\n"
+    )
+    assert evaluate_batch_message_for_gaps(msg) is True
+
+
+def test_evaluate_batch_message_for_gaps_all_completed() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: fix repo\n"
+        "\n"
+        "--- ✓ TASK 1/1: explore  (status=completed, 8s) ---\n"
+        "Mapped key modules with evidence.\n"
+    )
+    assert evaluate_batch_message_for_gaps(msg) is False
+
+
+def test_try_root_post_batch_wave_continue_dispatches_wave_two() -> None:
+    agent = MagicMock()
+    agent._delegate_depth = 0
+    agent._orchestrator_wave_number = 1
+    agent._dispatch_delegate_task.return_value = json.dumps(
+        {"status": "dispatched", "count": 1}
+    )
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: full repo analysis\n"
+        "\n"
+        "--- ✗ TASK 1/1: deploy index  (status=failed, 5s) ---\n"
+        "blocked: skills-index 404\n"
+    )
+    with patch(
+        "agent.orchestrator_router._dispatch_orchestrator_fanout",
+        return_value="Волна 2: Orchestrator → 1 параллельных специалистов (code).",
+    ) as fanout:
+        result = try_root_post_batch_wave_continue(agent, msg, task_id="t1")
+    assert result is not None
+    assert "Волна 2" in result
+    fanout.assert_called_once()
+    assert agent._orchestrator_wave_number == 2
+
+
+def test_try_root_post_batch_wave_continue_skips_when_all_ok() -> None:
+    agent = MagicMock()
+    agent._delegate_depth = 0
+    agent._orchestrator_wave_number = 1
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: full repo analysis\n"
+        "\n"
+        "--- ✓ TASK 1/1: explore  (status=completed, 5s) ---\n"
+        "Done with evidence.\n"
+    )
+    with patch(
+        "agent.orchestrator_router.evaluate_batch_for_next_wave",
+        return_value=WaveEvalResult(False, "llm", reason="steady_state"),
+    ):
+        assert try_root_post_batch_wave_continue(agent, msg, task_id="t1") is None
+
+
+def test_evaluate_batch_for_next_wave_llm_steady_state() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: fix repo\n"
+        "\n"
+        "--- ✗ TASK 1/1: deploy  (status=failed, 5s) ---\n"
+        "blocked: skills-index 404\n"
+    )
+    with patch(
+        "agent.orchestrator_router._judge_batch_with_llm",
+        return_value={
+            "needs_wave": False,
+            "confidence": 82,
+            "steady_state": True,
+            "gaps": [],
+            "rework_tasks": [],
+        },
+    ):
+        result = evaluate_batch_for_next_wave(msg, "fix repo", current_wave=1)
+    assert result.needs_wave is False
+    assert result.judge_source == "llm"
+    assert result.confidence == 82
+
+
+def test_evaluate_batch_for_next_wave_llm_plans_rework_tasks() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: fix repo\n"
+        "\n"
+        "--- ✗ TASK 1/1: deploy  (status=failed, 5s) ---\n"
+        "blocked: skills-index 404\n"
+    )
+    with patch(
+        "agent.orchestrator_router._judge_batch_with_llm",
+        return_value={
+            "needs_wave": True,
+            "confidence": 91,
+            "gaps": [{"task_index": 1, "severity": "high", "reason": "404 on index"}],
+            "rework_tasks": [
+                {
+                    "agent_id": "devops-specialist",
+                    "objective": "Fix skills-index deploy and verify HTTP 200",
+                    "steps": "1. Fix pipeline\\n2. curl verify",
+                }
+            ],
+        },
+    ):
+        result = evaluate_batch_for_next_wave(msg, "fix repo", current_wave=1)
+    assert result.needs_wave is True
+    assert result.judge_source == "llm"
+    assert len(result.tasks) == 1
+    assert "devops-specialist" in (result.tasks[0].get("context") or "")
+
+
+def test_evaluate_batch_for_next_wave_llm_unavailable_uses_heuristic() -> None:
+    msg = (
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
+        "ORIGINAL_REQUEST: fix repo\n"
+        "\n"
+        "--- ✗ TASK 1/1: deploy  (status=failed, 5s) ---\n"
+        "blocked: skills-index 404\n"
+    )
+    with patch("agent.orchestrator_router._judge_batch_with_llm", return_value=None):
+        result = evaluate_batch_for_next_wave(msg, "fix repo", current_wave=1)
+    assert result.needs_wave is True
+    assert result.judge_source == "heuristic"
+    assert result.tasks

@@ -691,6 +691,7 @@ export const en: Translations = {
     emptyTitle: 'No subagents this turn',
     emptyDesc: 'When a turn delegates work, child agents stream their progress here.',
     turnComplete: (count: number) => `${count} subagent${count === 1 ? '' : 's'} finished — tap to review`,
+    waveLabel: (wave: number) => `Wave ${wave}`,
     running: 'Running',
     failed: 'Failed',
     done: 'Done',

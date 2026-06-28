@@ -1507,6 +1507,16 @@ DEFAULT_CONFIG = {
             "timeout": 120,
             "extra_body": {},
         },
+        # Post-wave judge (code-skeptic persona) — decides whether a follow-up
+        # orchestrator wave is needed after specialist batch completion.
+        "orchestrator_wave_judge": {
+            "provider": "auto",
+            "model": "",
+            "base_url": "",
+            "api_key": "",
+            "timeout": 90,
+            "extra_body": {},
+        },
         # Profile describer — auto-generates a 1-2 sentence description
         # of what a profile is good at. Invoked by
         # ``hermes profile describe <name> --auto`` and the dashboard's
@@ -1996,6 +2006,13 @@ DEFAULT_CONFIG = {
         "orchestrator_two_phase": True,
         # Max parallel specialists per orchestrator wave (L1 fan-out cap).
         "orchestrator_wave_max_tasks": 6,
+        # Max orchestrator waves per user turn (wave 1 + rework waves).
+        "orchestrator_max_waves": 3,
+        # When true, evaluate batch results and dispatch wave N+1 on gaps/failures.
+        "orchestrator_wave_eval_enabled": True,
+        # When true, use auxiliary LLM (code-skeptic judge) for wave evaluation;
+        # falls back to heuristics when the judge is unavailable.
+        "orchestrator_wave_llm_judge": True,
         # When a subagent hits a dangerous-command approval prompt, the parent's
         # prompt_toolkit TUI owns stdin — a thread-local input() call from the
         # subagent worker would deadlock the parent UI. To avoid the deadlock,

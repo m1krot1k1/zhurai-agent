@@ -568,6 +568,7 @@ export interface Translations {
     emptyTitle: string
     emptyDesc: string
     turnComplete: (count: number) => string
+    waveLabel: (wave: number) => string
     running: string
     failed: string
     done: string

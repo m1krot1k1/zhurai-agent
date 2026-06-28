@@ -5,6 +5,7 @@ import {
   activeSubagentCount,
   buildSubagentTree,
   clearSessionSubagents,
+  groupSubagentsByWave,
   pruneDelegateFallbackSubagents,
   upsertSubagent
 } from './subagents'
@@ -125,5 +126,25 @@ describe('subagent store', () => {
 
     expect($subagentsBySession.get().s1).toBeUndefined()
     expect($subagentsBySession.get().s2).toHaveLength(1)
+  })
+
+  it('stores wave_number from subagent.start', () => {
+    upsertSubagent(
+      's1',
+      { goal: 'wave task', status: 'running', subagent_id: 'w1', task_index: 0, wave_number: 2 },
+      true,
+      'subagent.start'
+    )
+
+    expect(listFor('s1')[0]?.waveNumber).toBe(2)
+  })
+
+  it('groups subagents by wave number', () => {
+    upsertSubagent('s1', { goal: 'w1', status: 'completed', subagent_id: 'a', task_index: 0, wave_number: 1 })
+    upsertSubagent('s1', { goal: 'w2', status: 'running', subagent_id: 'b', task_index: 0, wave_number: 2 })
+
+    const groups = groupSubagentsByWave(listFor('s1'))
+    expect([...groups.keys()]).toEqual([1, 2])
+    expect(groups.get(2)?.[0]?.goal).toBe('w2')
   })
 })
