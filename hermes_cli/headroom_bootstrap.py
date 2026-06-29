@@ -356,9 +356,16 @@ def routed_headroom_base_url(*, provider: str, api_mode: str, base_url: str) -> 
         return base_url
 
     provider_norm = str(provider or "").strip().lower()
+    mode = str(api_mode or "").strip().lower()
+    base_norm = str(base_url or "").strip().lower()
+
+    # Skip only runtimes that are not OpenAI/Anthropic HTTP transports and
+    # therefore cannot be proxied through Headroom's request router.
     if provider_norm in {"bedrock", "copilot-acp"}:
         return base_url
-    if provider_norm == "custom":
+    if mode in {"bedrock_converse", "codex_app_server"}:
+        return base_url
+    if base_norm.startswith("acp://") or base_norm.startswith("acp+tcp://"):
         return base_url
 
     dashboard = _dashboard_url(hcfg)
@@ -369,7 +376,6 @@ def routed_headroom_base_url(*, provider: str, api_mode: str, base_url: str) -> 
     if clean.startswith(dashboard):
         return clean
 
-    mode = str(api_mode or "").strip().lower()
     if mode == "anthropic_messages":
         return dashboard
     return f"{dashboard}/v1"

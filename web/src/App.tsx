@@ -700,7 +700,11 @@ export default function App() {
                   label={t.language.switchTo}
                   tooltipWarmRef={tooltipWarmRef}
                 >
-                  <LanguageSwitcher collapsed={isDesktopCollapsed} dropUp />
+                  <LanguageSwitcher
+                    collapsed={isDesktopCollapsed}
+                    dropUp
+                    locales={["en", "ru"]}
+                  />
                 </SidebarIconWithTooltip>
               </div>
             </div>

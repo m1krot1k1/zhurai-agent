@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
@@ -27,7 +27,11 @@ import { cn } from "@/lib/utils";
  * viewport / overflow ancestors. Below the `sm` breakpoint, `dropUp` uses a
  * bottom sheet portaled to `document.body` instead of an anchored dropdown.
  */
-export function LanguageSwitcher({ collapsed = false, dropUp = false }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  collapsed = false,
+  dropUp = false,
+  locales,
+}: LanguageSwitcherProps) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,9 +62,26 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open, useMobileSheet]);
 
-  const current = LOCALE_META[locale];
-  const allLocales = Object.entries(LOCALE_META) as Array<[Locale, typeof current]>;
+  const allLocales = useMemo(() => {
+    const source = locales && locales.length > 0
+      ? locales
+      : (Object.keys(LOCALE_META) as Locale[]);
+    return source.map((code) => [code, LOCALE_META[code]] as [Locale, (typeof LOCALE_META)[Locale]]);
+  }, [locales]);
+  const safeLocale = useMemo(() => {
+    if (allLocales.some(([code]) => code === locale)) {
+      return locale;
+    }
+    return allLocales.some(([code]) => code === "en") ? "en" : allLocales[0]?.[0] ?? "en";
+  }, [allLocales, locale]);
+  const current = LOCALE_META[safeLocale];
   const sheetTitle = t.language.switchTo;
+
+  useEffect(() => {
+    if (locale !== safeLocale) {
+      setLocale(safeLocale);
+    }
+  }, [locale, safeLocale, setLocale]);
 
   return (
     <div ref={containerRef} className="relative inline-flex">
@@ -81,7 +102,7 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
             mondwest
             className="hidden sm:inline text-display tracking-wide text-xs"
           >
-            {locale === "en" ? "EN" : current.name}
+            {safeLocale === "en" ? "EN" : current.name}
           </Typography>
         </span>
       </Button>
@@ -96,7 +117,7 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
           <div aria-label={sheetTitle} role="listbox">
             <LanguageSwitcherOptions
               allLocales={allLocales}
-              locale={locale}
+              locale={safeLocale}
               setLocale={setLocale}
               setOpen={setOpen}
             />
@@ -123,7 +144,7 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
           >
             <LanguageSwitcherOptions
               allLocales={allLocales}
-              locale={locale}
+              locale={safeLocale}
               setLocale={setLocale}
               setOpen={setOpen}
             />
@@ -183,4 +204,5 @@ interface LanguageSwitcherOptionsProps {
 interface LanguageSwitcherProps {
   collapsed?: boolean;
   dropUp?: boolean;
+  locales?: Locale[];
 }

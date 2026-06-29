@@ -184,7 +184,7 @@ def test_routed_headroom_base_url_routes_anthropic_mode(monkeypatch):
     assert routed == "http://127.0.0.1:8787"
 
 
-def test_routed_headroom_base_url_skips_custom_provider(monkeypatch):
+def test_routed_headroom_base_url_routes_custom_provider(monkeypatch):
     monkeypatch.setattr(
         hb,
         "load_config",
@@ -200,6 +200,48 @@ def test_routed_headroom_base_url_skips_custom_provider(monkeypatch):
     routed = hb.routed_headroom_base_url(
         provider="custom",
         api_mode="chat_completions",
+        base_url=original,
+    )
+    assert routed == "http://127.0.0.1:8787/v1"
+
+
+def test_routed_headroom_base_url_skips_bedrock_runtime(monkeypatch):
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {
+            "headroom": {
+                "enabled": True,
+                "route_model_requests": True,
+                "dashboard_url": "http://127.0.0.1:8787",
+            }
+        },
+    )
+    original = "https://bedrock-runtime.us-east-1.amazonaws.com"
+    routed = hb.routed_headroom_base_url(
+        provider="bedrock",
+        api_mode="bedrock_converse",
+        base_url=original,
+    )
+    assert routed == original
+
+
+def test_routed_headroom_base_url_skips_codex_app_server(monkeypatch):
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {
+            "headroom": {
+                "enabled": True,
+                "route_model_requests": True,
+                "dashboard_url": "http://127.0.0.1:8787",
+            }
+        },
+    )
+    original = "acp://copilot"
+    routed = hb.routed_headroom_base_url(
+        provider="copilot-acp",
+        api_mode="codex_app_server",
         base_url=original,
     )
     assert routed == original
