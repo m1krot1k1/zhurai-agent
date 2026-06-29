@@ -10,6 +10,7 @@ This module intentionally keeps bootstrap logic small and idempotent:
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import os
 import platform
@@ -61,6 +62,23 @@ def _dashboard_url(cfg: Dict[str, Any]) -> str:
     return raw.rstrip("/")
 
 
+def _model_provider(config: Dict[str, Any]) -> str:
+    model_cfg = config.get("model")
+    if isinstance(model_cfg, dict):
+        return str(model_cfg.get("provider") or "").strip().lower()
+    return ""
+
+
+def _desired_backend(provider: str) -> str:
+    if provider in {"openrouter"}:
+        return "openrouter"
+    if provider in {"anthropic"}:
+        return "anthropic"
+    if provider in {"google", "gemini", "googleai"}:
+        return "gemini"
+    return ""
+
+
 def _is_loopback(hostname: str) -> bool:
     host = (hostname or "").lower().rstrip(".")
     return host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
@@ -77,6 +95,19 @@ def _is_healthy(base_url: str, timeout_s: float = 1.0) -> bool:
             return 200 <= status < 300
     except (URLError, TimeoutError, OSError):
         return False
+
+
+def _read_health(base_url: str, timeout_s: float = 1.0) -> Dict[str, Any]:
+    try:
+        with urlopen(f"{base_url.rstrip('/')}/health", timeout=timeout_s) as response:
+            status = int(getattr(response, "status", 200))
+            if not (200 <= status < 300):
+                return {}
+            payload = response.read().decode("utf-8", errors="replace")
+            parsed = json.loads(payload)
+            return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
 
 
 def _headroom_available() -> bool:
@@ -147,13 +178,14 @@ def _run_install(timeout_s: float) -> bool:
     return _headroom_available()
 
 
-def _resolve_start_command() -> list[str]:
+def _resolve_start_command(backend: str = "") -> list[str]:
+    backend_args = ["--backend", backend] if backend else []
     cli_path = shutil.which("headroom")
     if cli_path:
-        return [cli_path, "proxy"]
+        return [cli_path, "proxy", *backend_args]
     if importlib.util.find_spec("headroom.cli") is not None:
-        return [sys.executable, "-m", "headroom.cli", "proxy"]
-    return [sys.executable, "-m", "headroom", "proxy"]
+        return [sys.executable, "-m", "headroom.cli", "proxy", *backend_args]
+    return [sys.executable, "-m", "headroom", "proxy", *backend_args]
 
 
 def _host_port(base_url: str) -> tuple[str, int]:
@@ -174,10 +206,55 @@ def _port_is_open(base_url: str, timeout_s: float = 0.5) -> bool:
         return False
 
 
-def _start_proxy(log_path: Path) -> bool:
+def _listeners_for_port(base_url: str) -> list[int]:
+    _host, port = _host_port(base_url)
+    try:
+        proc = subprocess.run(
+            ["lsof", "-nP", "-iTCP:%d" % port, "-sTCP:LISTEN", "-t"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3,
+        )
+    except Exception:
+        return []
+    pids: list[int] = []
+    for line in (proc.stdout or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            pids.append(int(line))
+        except ValueError:
+            continue
+    return pids
+
+
+def _kill_listeners(base_url: str) -> None:
+    pids = _listeners_for_port(base_url)
+    for pid in pids:
+        try:
+            os.kill(pid, 15)
+        except Exception:
+            continue
+    if not pids:
+        return
+    deadline = time.monotonic() + 2.5
+    while time.monotonic() < deadline:
+        if not _port_is_open(base_url):
+            return
+        time.sleep(0.15)
+    for pid in pids:
+        try:
+            os.kill(pid, 9)
+        except Exception:
+            continue
+
+
+def _start_proxy(log_path: Path, backend: str = "") -> bool:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log_file:
-        cmd = _resolve_start_command()
+        cmd = _resolve_start_command(backend=backend)
         kwargs: Dict[str, Any] = {
             "stdout": log_file,
             "stderr": subprocess.STDOUT,
@@ -201,13 +278,29 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
             return {"status": "disabled"}
 
         base_url = _dashboard_url(hcfg)
+        desired_backend = _desired_backend(_model_provider(config))
         parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not _is_loopback(parsed.hostname or ""):
             return {"status": "skipped_non_loopback", "base_url": base_url}
 
         if _is_healthy(base_url):
-            _LAST_SUCCESS = True
-            return {"status": "healthy", "base_url": base_url}
+            if desired_backend:
+                health = _read_health(base_url, timeout_s=1.0)
+                actual_backend = str(
+                    ((health.get("config") or {}) if isinstance(health.get("config"), dict) else {}).get("backend")
+                    or ""
+                ).strip().lower()
+                if actual_backend and actual_backend != desired_backend:
+                    _kill_listeners(base_url)
+                    time.sleep(0.4)
+                    if _is_healthy(base_url, timeout_s=0.8):
+                        return {"status": "backend_mismatch_unresolved", "base_url": base_url}
+                else:
+                    _LAST_SUCCESS = True
+                    return {"status": "healthy", "base_url": base_url}
+            else:
+                _LAST_SUCCESS = True
+                return {"status": "healthy", "base_url": base_url}
 
         now = time.monotonic()
         if _LAST_ATTEMPT_MONO and (now - _LAST_ATTEMPT_MONO) < _MIN_RETRY_SECONDS:
@@ -240,7 +333,7 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
 
         log_file = get_hermes_home() / "logs" / "headroom-proxy.log"
         try:
-            _start_proxy(log_file)
+            _start_proxy(log_file, backend=desired_backend)
         except Exception as exc:
             logger.warning("Headroom bootstrap: failed to start proxy: %s", exc)
             return {"status": "start_failed", "base_url": base_url}
@@ -253,3 +346,30 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
             time.sleep(0.4)
 
         return {"status": "start_timeout", "base_url": base_url}
+
+
+def routed_headroom_base_url(*, provider: str, api_mode: str, base_url: str) -> str:
+    """Return proxy-routed base URL when headroom request routing is enabled."""
+    config = load_config()
+    hcfg = config.get("headroom") if isinstance(config.get("headroom"), dict) else {}
+    if not _bool(hcfg, "enabled", True) or not _bool(hcfg, "route_model_requests", True):
+        return base_url
+
+    provider_norm = str(provider or "").strip().lower()
+    if provider_norm in {"bedrock", "copilot-acp"}:
+        return base_url
+    if provider_norm == "custom":
+        return base_url
+
+    dashboard = _dashboard_url(hcfg)
+    if not dashboard:
+        return base_url
+
+    clean = str(base_url or "").strip().rstrip("/")
+    if clean.startswith(dashboard):
+        return clean
+
+    mode = str(api_mode or "").strip().lower()
+    if mode == "anthropic_messages":
+        return dashboard
+    return f"{dashboard}/v1"

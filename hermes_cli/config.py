@@ -1321,6 +1321,8 @@ DEFAULT_CONFIG = {
         "auto_install": True,
         # Auto-start `headroom proxy` in background when /stats is unreachable.
         "auto_start": True,
+        # Route supported model API traffic through Headroom proxy by default.
+        "route_model_requests": True,
         # Bounded waits for bootstrap paths.
         "install_timeout_seconds": 180,
         "startup_timeout_seconds": 20,

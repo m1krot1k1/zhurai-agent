@@ -142,3 +142,64 @@ def test_headroom_bootstrap_skips_duplicate_spawn_when_port_already_open(monkeyp
 
     assert result["status"] == "port_in_use_unhealthy"
     assert started["called"] is False
+
+
+def test_routed_headroom_base_url_routes_chat_modes(monkeypatch):
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {
+            "headroom": {
+                "enabled": True,
+                "route_model_requests": True,
+                "dashboard_url": "http://127.0.0.1:8787",
+            }
+        },
+    )
+    routed = hb.routed_headroom_base_url(
+        provider="openrouter",
+        api_mode="chat_completions",
+        base_url="https://openrouter.ai/api/v1",
+    )
+    assert routed == "http://127.0.0.1:8787/v1"
+
+
+def test_routed_headroom_base_url_routes_anthropic_mode(monkeypatch):
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {
+            "headroom": {
+                "enabled": True,
+                "route_model_requests": True,
+                "dashboard_url": "http://127.0.0.1:8787",
+            }
+        },
+    )
+    routed = hb.routed_headroom_base_url(
+        provider="anthropic",
+        api_mode="anthropic_messages",
+        base_url="https://api.anthropic.com",
+    )
+    assert routed == "http://127.0.0.1:8787"
+
+
+def test_routed_headroom_base_url_skips_custom_provider(monkeypatch):
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {
+            "headroom": {
+                "enabled": True,
+                "route_model_requests": True,
+                "dashboard_url": "http://127.0.0.1:8787",
+            }
+        },
+    )
+    original = "http://localhost:11434/v1"
+    routed = hb.routed_headroom_base_url(
+        provider="custom",
+        api_mode="chat_completions",
+        base_url=original,
+    )
+    assert routed == original

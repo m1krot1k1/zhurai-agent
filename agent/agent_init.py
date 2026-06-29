@@ -48,7 +48,10 @@ from agent.tool_guardrails import (
     ToolGuardrailDecision,
 )
 from hermes_cli.config import cfg_get
-from hermes_cli.headroom_bootstrap import ensure_headroom_proxy_started
+from hermes_cli.headroom_bootstrap import (
+    ensure_headroom_proxy_started,
+    routed_headroom_base_url,
+)
 from hermes_cli.timeouts import get_provider_request_timeout
 from hermes_constants import get_hermes_home
 from utils import base_url_host_matches, is_truthy_value
@@ -353,6 +356,16 @@ def init_agent(
         agent.api_mode = "bedrock_converse"
     else:
         agent.api_mode = "chat_completions"
+
+    # Route supported runtime traffic through local Headroom proxy when enabled.
+    try:
+        agent.base_url = routed_headroom_base_url(
+            provider=agent.provider,
+            api_mode=agent.api_mode,
+            base_url=agent.base_url,
+        )
+    except Exception:
+        pass
 
     # Eagerly warm the transport cache so import errors surface at init,
     # not mid-conversation.  Also validates the api_mode is registered.
@@ -897,6 +910,18 @@ def init_agent(
                     )
         
         agent._client_kwargs = client_kwargs  # stored for rebuilding after interrupt
+
+        # Keep the actual transport endpoint aligned with Headroom routing.
+        try:
+            routed_base_url = routed_headroom_base_url(
+                provider=agent.provider,
+                api_mode=agent.api_mode,
+                base_url=str(client_kwargs.get("base_url", "") or agent.base_url),
+            )
+            if routed_base_url:
+                client_kwargs["base_url"] = routed_base_url
+        except Exception:
+            pass
 
         # Enable fine-grained tool streaming for Claude on OpenRouter.
         # Without this, Anthropic buffers the entire tool call and goes
