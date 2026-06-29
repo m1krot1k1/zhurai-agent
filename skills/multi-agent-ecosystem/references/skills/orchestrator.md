@@ -56,7 +56,7 @@ requires: [agent-prompt-quality, structured-policy-yaml]
 ### КАНОНИЧЕСКИЕ ССЫЛКИ
 
 - Полный протокол и запреты супервизора: **`../rules/orchestrator.mdc`**
-- Семантика `/start`, relay, цепочка root → worker → orchestrator: **`../orchestration/delegation-chain.md`**, **`../orchestration/start-workflow.md`**
+- Семантика `/start`, relay, flat chain (start → STEP 0.5 → Task(orchestrator) / delegate to orchestrator): **`../orchestration/delegation-chain.md`**, **`../orchestration/start-workflow.md`**
 - Минимальные поля промпта: **`agent-prompt-quality.md`**
 
 ### СЕКЦИИ КОНВЕРТА

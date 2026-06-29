@@ -11,7 +11,7 @@ Align `/start` chain terminology and relay semantics with canonical operator doc
 ## Acceptance Criteria
 
 - [ ] `/start` chain terminology consistent across `agents/start.md`, `rules/orchestrator.mdc`, `rules/specialists.mdc`
-- [ ] Relay semantics (supervisor → worker → orchestrator) documented and working
+- [ ] Flat chain semantics (start → STEP 0.5 → Task(orchestrator)) documented and working
 - [ ] No alternate chain variants introduced outside canonical docs
 - [ ] Claim-to-evidence matrix with traceable refs for each key change
 
