@@ -82,3 +82,63 @@ def test_is_healthy_rejects_non_2xx_status(monkeypatch):
     monkeypatch.setattr(hb, "urlopen", lambda *_args, **_kwargs: _Resp())
 
     assert hb._is_healthy("http://127.0.0.1:8787") is False
+
+
+def test_resolve_start_command_prefers_headroom_cli_binary(monkeypatch):
+    monkeypatch.setattr(hb.shutil, "which", lambda name: "/tmp/headroom" if name == "headroom" else None)
+
+    assert hb._resolve_start_command() == ["/tmp/headroom", "proxy"]
+
+
+def test_resolve_start_command_falls_back_to_headroom_cli_module(monkeypatch):
+    monkeypatch.setattr(hb.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(
+        hb.importlib.util,
+        "find_spec",
+        lambda name: object() if name == "headroom.cli" else None,
+    )
+
+    assert hb._resolve_start_command() == [hb.sys.executable, "-m", "headroom.cli", "proxy"]
+
+
+def test_ensure_pip_uses_ensurepip_when_missing(monkeypatch):
+    class _Proc:
+        def __init__(self, rc: int):
+            self.returncode = rc
+            self.stdout = ""
+            self.stderr = ""
+
+    calls = []
+
+    def _fake_run(cmd, **_kwargs):
+        calls.append(cmd)
+        if cmd[:3] == [hb.sys.executable, "-m", "pip"]:
+            return _Proc(1)
+        if cmd[:3] == [hb.sys.executable, "-m", "ensurepip"]:
+            return _Proc(0)
+        return _Proc(0)
+
+    monkeypatch.setattr(hb.subprocess, "run", _fake_run)
+
+    assert hb._ensure_pip(30.0) is True
+    assert any(cmd[:3] == [hb.sys.executable, "-m", "ensurepip"] for cmd in calls)
+
+
+def test_headroom_bootstrap_skips_duplicate_spawn_when_port_already_open(monkeypatch):
+    _reset_state()
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {"headroom": {"enabled": True, "dashboard_url": "http://127.0.0.1:8787"}},
+    )
+    monkeypatch.setattr(hb, "_is_healthy", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(hb, "_headroom_available", lambda: True)
+    monkeypatch.setattr(hb, "_port_is_open", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(hb.time, "sleep", lambda *_args, **_kwargs: None)
+    started = {"called": False}
+    monkeypatch.setattr(hb, "_start_proxy", lambda *_args, **_kwargs: started.__setitem__("called", True))
+
+    result = hb.ensure_headroom_proxy_started()
+
+    assert result["status"] == "port_in_use_unhealthy"
+    assert started["called"] is False

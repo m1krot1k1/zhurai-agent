@@ -14,6 +14,7 @@ import logging
 import os
 import platform
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -84,7 +85,45 @@ def _headroom_available() -> bool:
     return importlib.util.find_spec("headroom") is not None
 
 
+def _ensure_pip(timeout_s: float) -> bool:
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pip", "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=max(timeout_s, 10.0),
+        )
+    except Exception:
+        proc = None
+    if proc is not None and proc.returncode == 0:
+        return True
+
+    logger.info("Headroom bootstrap: pip missing, running ensurepip")
+    try:
+        ensure_proc = subprocess.run(
+            [sys.executable, "-m", "ensurepip", "--upgrade"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=max(timeout_s, 20.0),
+        )
+    except Exception as exc:
+        logger.warning("Headroom bootstrap: ensurepip failed to start: %s", exc)
+        return False
+    if ensure_proc.returncode != 0:
+        logger.warning(
+            "Headroom bootstrap: ensurepip failed (rc=%s): %s",
+            ensure_proc.returncode,
+            (ensure_proc.stderr or ensure_proc.stdout or "").strip()[:1000],
+        )
+        return False
+    return True
+
+
 def _run_install(timeout_s: float) -> bool:
+    if not _ensure_pip(timeout_s):
+        return False
     cmd = [sys.executable, "-m", "pip", "install", "headroom-ai[proxy,mcp]"]
     logger.info("Headroom bootstrap: installing package via pip")
     try:
@@ -108,10 +147,37 @@ def _run_install(timeout_s: float) -> bool:
     return _headroom_available()
 
 
+def _resolve_start_command() -> list[str]:
+    cli_path = shutil.which("headroom")
+    if cli_path:
+        return [cli_path, "proxy"]
+    if importlib.util.find_spec("headroom.cli") is not None:
+        return [sys.executable, "-m", "headroom.cli", "proxy"]
+    return [sys.executable, "-m", "headroom", "proxy"]
+
+
+def _host_port(base_url: str) -> tuple[str, int]:
+    parsed = urlparse(base_url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port
+    if port is None:
+        port = 443 if parsed.scheme == "https" else 80
+    return host, port
+
+
+def _port_is_open(base_url: str, timeout_s: float = 0.5) -> bool:
+    host, port = _host_port(base_url)
+    try:
+        with socket.create_connection((host, port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
+
+
 def _start_proxy(log_path: Path) -> bool:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log_file:
-        cmd = [sys.executable, "-m", "headroom", "proxy"]
+        cmd = _resolve_start_command()
         kwargs: Dict[str, Any] = {
             "stdout": log_file,
             "stderr": subprocess.STDOUT,
@@ -161,6 +227,16 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
 
         if not auto_start:
             return {"status": "ready_not_started", "base_url": base_url}
+
+        # If something is already binding this port, avoid spawning duplicates.
+        if _port_is_open(base_url):
+            deadline = time.monotonic() + start_timeout
+            while time.monotonic() < deadline:
+                if _is_healthy(base_url, timeout_s=1.0):
+                    _LAST_SUCCESS = True
+                    return {"status": "healthy", "base_url": base_url}
+                time.sleep(0.4)
+            return {"status": "port_in_use_unhealthy", "base_url": base_url}
 
         log_file = get_hermes_home() / "logs" / "headroom-proxy.log"
         try:

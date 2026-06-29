@@ -1323,7 +1323,7 @@ DEFAULT_CONFIG = {
         "auto_start": True,
         # Bounded waits for bootstrap paths.
         "install_timeout_seconds": 180,
-        "startup_timeout_seconds": 8,
+        "startup_timeout_seconds": 20,
         # Proxy base URL (scheme + host + port, no path). Dialog/UI integrations
         # poll {dashboard_url}/stats and {dashboard_url}/stats-history; MCP is
         # at {dashboard_url}/mcp. Override when the proxy binds a non-default port.
