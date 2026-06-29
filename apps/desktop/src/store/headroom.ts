@@ -56,3 +56,76 @@ export function headroomDashboardUrl(baseUrl = DEFAULT_HEADROOM_DASHBOARD_URL): 
 export function headroomStatsUrl(baseUrl = DEFAULT_HEADROOM_DASHBOARD_URL): string {
   return `${normalizeHeadroomBaseUrl(baseUrl)}/stats`
 }
+
+export type HeadroomStatsSnapshot = {
+  requests?: number
+  tokensSaved?: number
+  costSaved?: number
+  cacheHits?: number
+  lifetimeTokensSaved?: number
+}
+
+export function parseStatsPayload(payload: unknown): HeadroomStatsSnapshot | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const root = payload as Record<string, unknown>
+  const requestsBlock = root.requests as Record<string, unknown> | undefined
+  const tokensBlock = root.tokens as Record<string, unknown> | undefined
+  const costBlock = root.cost as Record<string, unknown> | undefined
+  const cacheBlock = root.cache as Record<string, unknown> | undefined
+  const persistent = root.persistent_savings as Record<string, unknown> | undefined
+
+  const readNumber = (...values: unknown[]): number | undefined => {
+    for (const value of values) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value
+      }
+    }
+
+    return undefined
+  }
+
+  return {
+    cacheHits: readNumber(cacheBlock?.hits, cacheBlock?.hit_count),
+    costSaved: readNumber(costBlock?.saved_usd, costBlock?.saved, costBlock?.savings_usd),
+    lifetimeTokensSaved: readNumber(
+      persistent?.tokens_saved,
+      persistent?.total_tokens_saved,
+      persistent?.lifetime_tokens_saved
+    ),
+    requests: readNumber(requestsBlock?.total, requestsBlock?.count),
+    tokensSaved: readNumber(tokensBlock?.saved, tokensBlock?.saved_total, tokensBlock?.savings)
+  }
+}
+
+/** True only for absolute http:// or https:// URLs (rejects javascript:, file:, data:, etc.). */
+export function isHttpHttpsUrl(raw: string): boolean {
+  const trimmed = raw.trim()
+
+  if (!trimmed) {
+    return false
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** Open a URL in the system browser; no-op unless the URL is http(s). */
+export function openHeadroomExternalUrl(url: string): void {
+  if (!isHttpHttpsUrl(url)) {
+    return
+  }
+
+  void window.hermesDesktop?.openExternal?.(url)
+}
+
+export function openHeadroomDashboardInBrowser(baseUrl = $headroomDashboardUrl.get()): void {
+  openHeadroomExternalUrl(headroomDashboardUrl(baseUrl))
+}

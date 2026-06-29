@@ -85,7 +85,7 @@ describe('OrderService', () => {
 
 Делегируй per ../orchestration/delegation-chain.md для параллельного делегирования.
 
-Если `Task` в рантайме **действительно отсутствует** → `DELEGATION_BLOCKED: Task tool unavailable`. ЗАПРЕЩЕНО делать работу самому под видом «нет инструмента», когда он есть.
+Если `Task` в рантайме **действительно отсутствует** → `MULTI_AGENT_PIPELINE_BLOCKED: Task tool unavailable` (input alias `DELEGATION_BLOCKED` → same canonical token). ЗАПРЕЩЕНО делать работу самому под видом «нет инструмента», когда он есть.
 
 ## ⛔ ОБЯЗАТЕЛЬНЫЙ SWARM (МНОГОПОТОЧНОСТЬ)
 

@@ -55,3 +55,14 @@
 | `vcs_preflight_cross_platform` | Скрипты preflight существуют для всех трёх платформ (.sh/.py/.ps1) |
 | `profile_isolation_enforced` | Profile-агенты НЕ присутствуют в core agents/ и rules/ |
 
+## Skipped scenarios (optional profile deferral)
+
+Some contracts are marked `"skip": true` in `behavior-contracts.json` when their target artifact is intentionally absent from the checkout. Each skip must carry a `skip_reason` string; do not remove skips by adding fake stubs.
+
+| Scenario ID | Skip reason | Backlog / resolution |
+|-------------|-------------|----------------------|
+| `optional_profile_isolated` | `profiles/msnmp/ not present in this checkout; pentest profile is optional/isolated when shipped` | `docs/delivery/backlog.md` § profiles/msnmp |
+| `profile_isolation_enforced` | same as above | same |
+
+When `profiles/msnmp/` is shipped: remove both skips, add real contract checks, and re-run `scripts/run-behavior-benchmarks.sh`.
+

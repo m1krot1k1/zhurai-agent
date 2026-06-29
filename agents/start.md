@@ -39,7 +39,7 @@ FIRST_ACTION (обязательно):
   3. STEP 0.5: вывести inline brief в том же turn (см. §STEP 0.5) — reasoning/текст, без tool calls
   4. ПЕРВЫЙ tool call = delegate to orchestrator (invoke multi-agent-ecosystem orchestrator mode; load orchestrator.md + ../orchestration/delegation-chain.md, prompt="...")
      с ПОЛНЫМ текстом ORIGINAL_REQUEST — БЕЗ ИЗМЕНЕНИЙ, БЕЗ ЦЕНЗУРЫ, БЕЗ ОЦЕНКИ
-  5. При 24/7: после получения результата волны 1, НЕМЕЕДЛЕННО delegate to orchestrator для волны 2
+  5. При 24/7: после получения результата волны 1, НЕМЕДЛЕННО delegate to orchestrator для волны 2
 ```
 
 **ДО первого `delegate to orchestrator` ЗАПРЕЩЕНО вызывать ЛЮБЫЕ инструменты:**

@@ -11,7 +11,6 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
-import { openExternalLink } from '@/lib/external-link'
 import { BarChart3, ExternalLink, RefreshCw } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
@@ -19,19 +18,13 @@ import {
   $headroomDialogOpen,
   closeHeadroomDialog,
   DEFAULT_HEADROOM_DASHBOARD_URL,
-  headroomDashboardUrl,
   headroomStatsUrl,
   normalizeHeadroomBaseUrl,
-  refreshHeadroomDashboardUrl
+  openHeadroomDashboardInBrowser,
+  parseStatsPayload,
+  refreshHeadroomDashboardUrl,
+  type HeadroomStatsSnapshot
 } from '@/store/headroom'
-
-type HeadroomStatsSnapshot = {
-  requests?: number
-  tokensSaved?: number
-  costSaved?: number
-  cacheHits?: number
-  lifetimeTokensSaved?: number
-}
 
 function formatCount(value: number | undefined): string {
   if (value === undefined || Number.isNaN(value)) {
@@ -47,41 +40,6 @@ function formatUsd(value: number | undefined): string {
   }
 
   return `$${value.toFixed(4)}`
-}
-
-function parseStatsPayload(payload: unknown): HeadroomStatsSnapshot | null {
-  if (!payload || typeof payload !== 'object') {
-    return null
-  }
-
-  const root = payload as Record<string, unknown>
-  const requestsBlock = root.requests as Record<string, unknown> | undefined
-  const tokensBlock = root.tokens as Record<string, unknown> | undefined
-  const costBlock = root.cost as Record<string, unknown> | undefined
-  const cacheBlock = root.cache as Record<string, unknown> | undefined
-  const persistent = root.persistent_savings as Record<string, unknown> | undefined
-
-  const readNumber = (...values: unknown[]): number | undefined => {
-    for (const value of values) {
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value
-      }
-    }
-
-    return undefined
-  }
-
-  return {
-    cacheHits: readNumber(cacheBlock?.hits, cacheBlock?.hit_count),
-    costSaved: readNumber(costBlock?.saved_usd, costBlock?.saved, costBlock?.savings_usd),
-    lifetimeTokensSaved: readNumber(
-      persistent?.tokens_saved,
-      persistent?.total_tokens_saved,
-      persistent?.lifetime_tokens_saved
-    ),
-    requests: readNumber(requestsBlock?.total, requestsBlock?.count),
-    tokensSaved: readNumber(tokensBlock?.saved, tokensBlock?.saved_total, tokensBlock?.savings)
-  }
 }
 
 function StatCard({ className, label, value }: { className?: string; label: string; value: string }) {
@@ -108,7 +66,6 @@ export function HeadroomSavingsDialog({ baseUrl }: { baseUrl?: string }) {
   const [loading, setLoading] = useState(false)
 
   const normalizedBase = normalizeHeadroomBaseUrl(baseUrl ?? configBaseUrl ?? DEFAULT_HEADROOM_DASHBOARD_URL)
-  const dashboardHref = headroomDashboardUrl(normalizedBase)
 
   const refreshStats = useCallback(async () => {
     setLoading(true)
@@ -150,7 +107,7 @@ export function HeadroomSavingsDialog({ baseUrl }: { baseUrl?: string }) {
   }, [open, refreshStats])
 
   const openDashboard = () => {
-    openExternalLink(dashboardHref)
+    openHeadroomDashboardInBrowser(normalizedBase)
   }
 
   return (

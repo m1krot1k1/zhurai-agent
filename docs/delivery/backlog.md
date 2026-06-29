@@ -133,6 +133,28 @@ See `docs/process-and-quality-gates.md` for "Final Verification Checklist".
 
 ---
 
+## Deferred / Optional Items
+
+Items intentionally absent from this checkout; behavior benchmarks skip related contracts until the artifact lands.
+
+### profiles/msnmp (pentest profile overlay)
+
+- **Status**: Deferred (not shipped in this repo checkout)
+- **Profile path**: `profiles/msnmp/` — **missing** (no `profiles/` root directory)
+- **Expected contents** (when shipped): `profiles/msnmp/agents/pentest-pipeline.md`, `profiles/msnmp/rules/pentest-pipeline.mdc` (see `agents/README.md` § Optional Profiles)
+- **Benchmark impact**: two behavior contracts are skipped with explicit `skip_reason` in `benchmarks/behavior-contracts.json`:
+  - `optional_profile_isolated`
+  - `profile_isolation_enforced`
+- **Skip reason (canonical)**: `profiles/msnmp/ not present in this checkout; pentest profile is optional/isolated when shipped`
+- **Resolution when profile appears**:
+  1. Add `profiles/msnmp/**` with isolated agents/rules (do not merge into core `agents/` or `rules/`)
+  2. Remove `"skip": true` and `skip_reason` from both contracts in `benchmarks/behavior-contracts.json`
+  3. Add contract checks (`required_paths`, `missing_paths`, or `required_regex`) appropriate to the shipped profile
+  4. Run `python3 scripts/run-behavior-benchmarks.py` — expect 0 skipped msnmp scenarios
+- **Policy**: prefer this documented deferral over a fake profile stub; stubs only if benchmarks strictly require a minimal tree (not the case today — skip is sufficient)
+
+---
+
 ## Creation Metadata
 
 - **Created**: 2026-03-31
