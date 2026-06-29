@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import logging
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -117,8 +118,8 @@ def _start_proxy(log_path: Path) -> bool:
             "stdin": subprocess.DEVNULL,
             "close_fds": True,
         }
-        if os.name != "nt":
-            kwargs["preexec_fn"] = os.setsid  # detached process group
+        if platform.system() != "Windows":
+            kwargs["preexec_fn"] = os.setsid  # detached process group  # windows-footgun: ok
         subprocess.Popen(cmd, **kwargs)
     return True
 
