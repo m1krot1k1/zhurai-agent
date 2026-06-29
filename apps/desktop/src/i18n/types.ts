@@ -177,6 +177,23 @@ export interface Translations {
     unmuteHaptics: string
     openSettings: string
     openKeybinds: string
+    openHeadroom: string
+    openHeadroomTitle: string
+  }
+
+  headroom: {
+    title: string
+    description: string
+    refresh: string
+    openInBrowser: string
+    proxyUnavailable: (baseUrl: string) => string
+    stats: {
+      requests: string
+      tokensSaved: string
+      costSaved: string
+      cacheHits: string
+      lifetimeTokensSaved: string
+    }
   }
 
   keybinds: {

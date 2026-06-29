@@ -13,11 +13,13 @@ Policy anchors (do not reinterpret in this doc):
 Use this sequence as the baseline handoff chain:
 
 1. User sends `/start`.
-2. Root `start` runs in supervisor role and launches **`Task(orchestrator, …)` directly**. Worker-start has been removed from the active chain to keep `/start` flat, auditable, and free of an extra routing hop; nested subagents may still use `Task()` when their own rules allow it.
-3. `orchestrator` opens specialist branches (`code`, `docs-specialist`, `security-auditor`, and others by scope).
-4. Specialists return completion contracts to `orchestrator`.
-5. `orchestrator` synthesizes branch outcomes and returns wave result.
-6. Root `start` incorporates the wave outcome / `START_REPORT` semantics and decides continue, pause, or stop based on policy gates.
+2. Root `start` runs STEP 0 (reasoning: capture request, detect `CONTINUOUS_MODE`, `OPEN_ENDED_IMPROVEMENT`, trust boundary) — **no tool calls**.
+3. Root `start` runs **STEP 0.5**: outputs an **inline brief** in the **same turn** (objective restatement, mode, wave plan hint). This is user-facing text/reasoning only — **not** a tool call, **not** a blocking pause. Under active DUA (`/start`), brief and delegation happen in one turn without waiting for confirmation.
+4. Root `start` launches **`Task(orchestrator, …)` directly** as the **first and only** tool call in that turn. Worker-start has been removed from the active chain to keep `/start` flat, auditable, and free of an extra routing hop; nested subagents may still use `Task()` when their own rules allow it. **`ORIGINAL_REQUEST` in the orchestrator prompt must be verbatim** — the brief may paraphrase for the user only.
+5. `orchestrator` opens specialist branches (`code`, `docs-specialist`, `security-auditor`, and others by scope).
+6. Specialists return completion contracts to `orchestrator`.
+7. `orchestrator` synthesizes branch outcomes and returns wave result.
+8. Root `start` incorporates the wave outcome / `START_REPORT` semantics and decides continue, pause, or stop based on policy gates.
 
 Reference detail: `docs/delegation-chain.md` and `docs/quick-start-orchestration.md`.
 
@@ -130,7 +132,9 @@ Operator action:
 
 - [ ] Confirm canonical paths: edit only `agents/`, `rules/`, `skills/`, `docs/` as source-of-truth areas.
 - [ ] Confirm target PBI/task and scope before execution.
-- [ ] Verify `/start` chain includes **`Task(orchestrator)`** directly from root `start` (worker-start deprecated).
+- [ ] STEP 0.5: root `start` emitted inline brief (objective + mode + wave hint) in same turn as `Task(orchestrator)` — no blocking pause under DUA `/start`.
+- [ ] Verify `/start` chain includes **`Task(orchestrator)`** directly from root `start` (worker-start deprecated); first tool call = `Task(orchestrator)` only.
+- [ ] Verify `ORIGINAL_REQUEST` in orchestrator prompt is verbatim user text.
 - [ ] Ensure each branch envelope has ownership and measurable AC.
 - [ ] For each branch, record both `approval_state` and `execution_state`; use only canonical transitions.
 - [ ] Run the benchmark/verification pass relevant to current wave policy (for this repo: `scripts/run-full-repo-benchmark.py` or documented equivalent).

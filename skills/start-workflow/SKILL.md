@@ -25,6 +25,7 @@ requires: [structured-agent-logging]
 
 ```
 /start (root supervisor)
+   ├→ STEP 0.5: inline brief (same turn, no tools)
    └→ Task(orchestrator, ORIGINAL_REQUEST: {...})  ← ПЕРВЫЙ И ЕДИНСТВЕННЫЙ tool call
         ├→ Task(code, ...)
         ├→ Task(test-specialist, ...)
@@ -35,9 +36,39 @@ requires: [structured-agent-logging]
 ### FIRST_ACTION Gate (КРИТИЧЕСКИ ВАЖНО)
 
 - Root-start: **НОЛЬ tool calls** до спавна orchestrator
+- **STEP 0.5** (между reasoning и Task): inline brief в том же turn — objective restatement, режим, hint плана волны; **без tool calls**, **без блокирующей паузы** при DUA `/start`
 - Первый tool call = `Task(orchestrator, ORIGINAL_REQUEST: {дословный текст})`
-- До этого ЗАПРЕЩЕНО: Read, Write, Grep, Shell, SemanticSearch, Task(start)
-- `ORIGINAL_REQUEST` = **дословный текст пользователя** — ЗАПРЕЩЕНО менять
+- До первого Task ЗАПРЕЩЕНО: Read, Write, Grep, Shell, SemanticSearch, Task(start)
+- `ORIGINAL_REQUEST` = **дословный текст пользователя** — ЗАПРЕЩЕНО менять (brief может перефразировать для пользователя, prompt — нет)
+
+### STEP 0.5 — Understanding-first inline brief (DUA-safe)
+
+**Порядок в одном turn:**
+
+```
+1. STEP 0 (reasoning): CONTINUOUS_MODE, OPEN_ENDED, trust-boundary
+2. STEP 0.5 (текст): краткий brief пользователю
+3. FIRST tool call: Task(orchestrator) с ORIGINAL_REQUEST дословно
+```
+
+**Шаблон brief** (3–6 строк):
+
+```markdown
+**Понял задачу:** {restate objective}
+**Режим:** {single_wave|until_user_stop} · OPEN_ENDED: {yes|no} · волна: {N}
+**План волны:** {orchestrator → specialists hint}
+**Дальше:** делегирую orchestrator с ORIGINAL_REQUEST дословно.
+```
+
+**DUA-safe правила:**
+
+| При активном DUA (`/start`, императив) | Запрещено |
+|---|---|
+| Brief + Task(orchestrator) в **одном** turn | Turn только с brief, ожидание «ок?» |
+| Немедленное делегирование после brief | Ambiguity gate с паузой перед Task |
+| Brief = текст/reasoning | Любой tool call до Task(orchestrator) |
+
+**Invariant:** STEP 0.5 не ослабляет FIRST_ACTION — это не extra hop, не pre-flight Read, не approval gate.
 
 ### Запрещённые паттерны
 
@@ -75,7 +106,9 @@ requires: [structured-agent-logging]
 
 ## ЧЕКЛИСТ
 
+- [ ] STEP 0.5: inline brief (objective + режим + hint) в том же turn, без tool calls
 - [ ] FIRST_ACTION: первый tool call = Task(orchestrator)
+- [ ] DUA `/start`: brief + Task без блокирующей паузы
 - [ ] ORIGINAL_REQUEST содержит дословный текст пользователя
 - [ ] CONTINUOUS_MODE определён корректно (24/7 → until_user_stop)
 - [ ] Orchestrator декомпозировал на параллельные ветки
@@ -93,6 +126,8 @@ requires: [structured-agent-logging]
 | **Low** | Подтверждение на каждом критическом решении | Деструктивные операции |
 
 **По умолчанию: Medium.** Overriding через `DUA:HIGH/LOW` в конверте.
+
+**Carve-out (активный DUA):** При `/start`, императиве или явном DUA Medium-tier «уточнить перед стартом» **не блокирует** STEP 0.5 + `Task(orchestrator)`. Зафиксировать допущения в inline brief и делегировать в том же turn — без блокирующей паузы.
 
 ## ШАГИ АВТОНОМНОГО ВЫПОЛНЕНИЯ
 

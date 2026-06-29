@@ -136,11 +136,14 @@ results = [Task(subagent_type="code-reviewer", prompt=f"review file: {f}") for f
 **Правильная цепочка (flat chain):**
 ```
 root-start (REASONING ONLY, zero tool calls до Task(orchestrator))
+  ├→ STEP 0.5: inline brief (текст/reasoning, тот же turn — objective + режим + hint плана)
   └→ Task(subagent_type="orchestrator", prompt="OBJECTIVE: ... ORIGINAL_REQUEST: {дословный текст}")
        ├→ Task(subagent_type="code", prompt="...")
        ├→ Task(subagent_type="test-specialist", prompt="...")
        └→ Task(subagent_type="security-auditor", prompt="...")
 ```
+
+**STEP 0.5 (start only):** understanding-first brief **не считается** tool call и **не нарушает** FIRST_ACTION. При DUA `/start` brief и `Task(orchestrator)` — **один turn**, без approval pause. `ORIGINAL_REQUEST` в prompt — дословно; brief может перефразировать только для пользователя.
 
 **Неправильные цепочки (ЗАПРЕЩЕНЫ):**
 ```
@@ -154,6 +157,8 @@ root-start → Task(start, ENTRY_MODE: supervised_worker) → Task(orchestrator)
 ### 0.6.1 FIRST_ACTION enforcement (start agent)
 
 Root start agent обязан выполнить **ОДИН tool call** перед любыми другими: `Task(subagent_type="orchestrator", prompt="...")`. До этого **ЗАПРЕЩЕНЫ** все остальные инструменты.
+
+**STEP 0.5 exception (не tool call):** root-start MAY вывести inline brief (objective restatement, режим, hint плана волны) как **текст/reasoning в том же turn** immediately before `Task(orchestrator)`. Это не extra hop, не Read/Grep preflight, не blocking approval gate. При DUA `/start` brief + Task — один turn, без паузы «жду подтверждения». `ORIGINAL_REQUEST` в orchestrator prompt — дословно (brief ≠ prompt field).
 
 ### 0.6.2 Запрет на отказ от задач (CRITICAL)
 

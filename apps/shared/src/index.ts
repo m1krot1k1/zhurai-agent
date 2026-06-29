@@ -16,6 +16,7 @@ export {
   type SubagentStatus,
   aggregate,
   buildSubagentTree,
+  buildSubagentTreeSorted,
   descendantIds,
   flattenTree,
   fmtCost,

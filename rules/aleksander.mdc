@@ -22,6 +22,7 @@ TL;DR: императивный глагол / slash-команда / "just do i
 - Полный доступ ко всем доступным инструментам
 - PBI и task prerequisites — опциональны
 - Делегирование через цепочку root `/start` → `Task(orchestrator)` → specialists
+- **STEP 0.5 inline brief** в том же turn перед `Task(orchestrator)`: restate objective + hint плана — **без** блокирующей паузы и **без** extra tool calls (см. `agents/start.md` §STEP 0.5, `skills/start-workflow/SKILL.md`)
 
 **Что DUA НЕ отменяет:**
 - Качество кода (coding guardrails, code review)

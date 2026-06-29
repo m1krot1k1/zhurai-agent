@@ -164,7 +164,27 @@ export const ja = defineLocale({
     showRightSidebar: '右サイドバーを表示',
     muteHaptics: '触覚フィードバックをオフ',
     unmuteHaptics: '触覚フィードバックをオン',
-    openSettings: '設定を開く'
+    openSettings: '設定を開く',
+    openKeybinds: 'キーボードショートカット',
+    openHeadroom: 'Headroom 節約',
+    openHeadroomTitle: 'Headroom プロキシのコンテキスト圧縮節約を表示'
+  },
+
+  headroom: {
+    title: 'Headroom 節約',
+    description:
+      'Headroom プロキシからのライブ統計。デフォルトポート (8787) で `headroom proxy` を起動してください。',
+    refresh: '更新',
+    openInBrowser: 'ダッシュボードを開く',
+    proxyUnavailable: baseUrl =>
+      `${baseUrl} の Headroom に接続できません。プロキシ起動までプレースホルダーを表示します。`,
+    stats: {
+      requests: 'リクエスト',
+      tokensSaved: '節約トークン',
+      costSaved: '節約コスト',
+      cacheHits: 'キャッシュヒット',
+      lifetimeTokensSaved: '累計節約トークン'
+    }
   },
 
   language: {

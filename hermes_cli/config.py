@@ -1311,6 +1311,16 @@ DEFAULT_CONFIG = {
                                       # after live validation.
     },
 
+    # Headroom AI context-compression proxy (optional MCP catalog: official/headroom).
+    # https://headroom-docs.vercel.app/docs/mcp — stats HTTP API and /dashboard UI
+    # bind to this base URL when `headroom proxy` runs (default port 8787).
+    "headroom": {
+        # Proxy base URL (scheme + host + port, no path). Dialog/UI integrations
+        # poll {dashboard_url}/stats and {dashboard_url}/stats-history; MCP is
+        # at {dashboard_url}/mcp. Override when the proxy binds a non-default port.
+        "dashboard_url": "http://127.0.0.1:8787",
+    },
+
     # Kanban subsystem (orchestrator workers + dispatcher-driven child tasks).
     # See tools/kanban_tools.py and hermes_cli/kanban_db.py for the actual
     # implementations. Per-platform notification opt-out is handled by the

@@ -159,7 +159,24 @@ export const zh: Translations = {
     muteHaptics: '关闭触感反馈',
     unmuteHaptics: '开启触感反馈',
     openSettings: '打开设置',
-    openKeybinds: '键盘快捷键'
+    openKeybinds: '键盘快捷键',
+    openHeadroom: 'Headroom 节省',
+    openHeadroomTitle: '查看 Headroom 代理的上下文压缩节省'
+  },
+
+  headroom: {
+    title: 'Headroom 节省',
+    description: '来自 Headroom 代理的实时统计。请在默认端口 (8787) 上运行 `headroom proxy`。',
+    refresh: '刷新',
+    openInBrowser: '打开仪表盘',
+    proxyUnavailable: baseUrl => `无法连接 ${baseUrl} 上的 Headroom。代理启动前显示占位数据。`,
+    stats: {
+      requests: '请求数',
+      tokensSaved: '节省 token',
+      costSaved: '节省费用',
+      cacheHits: '缓存命中',
+      lifetimeTokensSaved: '累计节省 token'
+    }
   },
 
   keybinds: {

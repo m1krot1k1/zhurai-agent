@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
 import { $hapticsMuted, toggleHapticsMuted } from '@/store/haptics'
+import { openHeadroomDialog } from '@/store/headroom'
 import { toggleKeybindPanel } from '@/store/keybinds'
 import {
   $fileBrowserOpen,
@@ -19,6 +20,7 @@ import {
 } from '@/store/layout'
 
 import { appViewForPath, isOverlayView } from '../routes'
+import { HeadroomSavingsDialog } from '../headroom/headroom-savings-dialog'
 
 import { titlebarButtonClass } from './titlebar'
 
@@ -127,6 +129,16 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       }
     },
     {
+      icon: <Codicon name="graph-line" />,
+      id: 'headroom',
+      label: t.titlebar.openHeadroom,
+      onSelect: () => {
+        triggerHaptic('open')
+        openHeadroomDialog()
+      },
+      title: t.titlebar.openHeadroomTitle
+    },
+    {
       icon: <Codicon name="settings-gear" />,
       id: 'settings',
       label: t.titlebar.openSettings,
@@ -192,6 +204,8 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         {settingsTool && <TitlebarToolButton navigate={navigate} tool={settingsTool} />}
         <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
       </div>
+
+      <HeadroomSavingsDialog />
     </>
   )
 }

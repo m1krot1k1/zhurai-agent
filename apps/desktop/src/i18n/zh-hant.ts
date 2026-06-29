@@ -158,7 +158,25 @@ export const zhHant = defineLocale({
     showRightSidebar: '顯示右側邊欄',
     muteHaptics: '靜音觸感回饋',
     unmuteHaptics: '開啟觸感回饋',
-    openSettings: '開啟設定'
+    openSettings: '開啟設定',
+    openKeybinds: '鍵盤快捷鍵',
+    openHeadroom: 'Headroom 節省',
+    openHeadroomTitle: '檢視 Headroom 代理的上下文壓縮節省'
+  },
+
+  headroom: {
+    title: 'Headroom 節省',
+    description: '來自 Headroom 代理的即時統計。請在預設連接埠 (8787) 上執行 `headroom proxy`。',
+    refresh: '重新整理',
+    openInBrowser: '開啟儀表板',
+    proxyUnavailable: baseUrl => `無法連線至 ${baseUrl} 的 Headroom。代理啟動前顯示占位資料。`,
+    stats: {
+      requests: '請求數',
+      tokensSaved: '節省 token',
+      costSaved: '節省費用',
+      cacheHits: '快取命中',
+      lifetimeTokensSaved: '累計節省 token'
+    }
   },
 
   language: {

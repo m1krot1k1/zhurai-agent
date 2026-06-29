@@ -164,7 +164,25 @@ export const en: Translations = {
     muteHaptics: 'Mute haptics',
     unmuteHaptics: 'Unmute haptics',
     openSettings: 'Open settings',
-    openKeybinds: 'Keyboard shortcuts'
+    openKeybinds: 'Keyboard shortcuts',
+    openHeadroom: 'Headroom savings',
+    openHeadroomTitle: 'View context compression savings from the Headroom proxy'
+  },
+
+  headroom: {
+    title: 'Headroom savings',
+    description: 'Live stats from the Headroom proxy. Start with `headroom proxy` on the default port (8787).',
+    refresh: 'Refresh',
+    openInBrowser: 'Open dashboard',
+    proxyUnavailable: baseUrl =>
+      `Could not reach Headroom at ${baseUrl}. Showing placeholders until the proxy is running.`,
+    stats: {
+      requests: 'Requests',
+      tokensSaved: 'Tokens saved',
+      costSaved: 'Cost saved',
+      cacheHits: 'Cache hits',
+      lifetimeTokensSaved: 'Lifetime tokens saved'
+    }
   },
 
   keybinds: {

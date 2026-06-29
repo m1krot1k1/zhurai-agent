@@ -1,0 +1,53 @@
+# Nous-approved MCP catalog entry.
+# Presence in this directory = approval. Merged via PR review.
+#
+# Schema version 1.
+manifest_version: 1
+
+name: headroom
+description: Headroom context compression — MCP tools and proxy stats at :8787.
+source: https://headroom-docs.vercel.app/docs/mcp
+
+# Headroom's proxy binds to 127.0.0.1:8787 by default and auto-exposes MCP over
+# Streamable HTTP at /mcp when you run `headroom proxy`. Hermes connects to that
+# URL; nothing to clone or npm-install on the Hermes side.
+#
+# Standalone MCP (no proxy): `headroom mcp serve --transport http --port 8080`
+# and point url at http://127.0.0.1:8080/mcp instead.
+transport:
+  type: http
+  url: http://127.0.0.1:8787/mcp
+
+# Local proxy has no auth (same-machine only). Do not expose 8787 to the public
+# internet without a separate access layer.
+auth:
+  type: none
+
+# headroom_compress, headroom_retrieve, headroom_stats — leave default_enabled
+# unset so the install-time probe pre-checks whatever the live server exposes.
+#
+# Proxy HTTP surface (base URL = headroom.dashboard_url in config.yaml, default
+# http://127.0.0.1:8787). Desktop dialog / savings UI poll these paths:
+#   GET /stats           — live counters + persistent_savings (poll 5–30s active)
+#   GET /stats-history   — durable hourly/daily/weekly/monthly rollups
+#   GET /dashboard       — built-in browser dashboard (openExternal target)
+#   POST/GET /mcp        — Streamable HTTP MCP (transport.url above)
+# Polling contract + sample payloads: optional-mcps/headroom/README.md
+
+post_install: |
+  This entry connects to a running Headroom proxy (or standalone MCP HTTP server).
+
+  Before Hermes can connect:
+
+    1. Install Headroom: pip install "headroom-ai[proxy,mcp]"
+    2. Start the proxy: headroom proxy
+       (default bind → http://127.0.0.1:8787, MCP at /mcp, dashboard at /dashboard)
+    3. Optional: set headroom.dashboard_url in config.yaml if you changed the port.
+
+  Start or restart your Hermes session AFTER the proxy is listening so tools probe.
+
+  MCP tools: headroom_compress, headroom_retrieve, headroom_stats.
+  HTTP stats for dashboards/dialog: GET /stats (live) and GET /stats-history (durable rollups).
+
+  Re-run the tool checklist any time with:
+    hermes mcp configure headroom
