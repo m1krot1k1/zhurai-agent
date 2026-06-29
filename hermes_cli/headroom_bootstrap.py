@@ -71,7 +71,8 @@ def _health_url(base_url: str) -> str:
 def _is_healthy(base_url: str, timeout_s: float = 1.0) -> bool:
     try:
         with urlopen(_health_url(base_url), timeout=timeout_s) as response:
-            return int(getattr(response, "status", 200)) < 500
+            status = int(getattr(response, "status", 200))
+            return 200 <= status < 300
     except (URLError, TimeoutError, OSError):
         return False
 
