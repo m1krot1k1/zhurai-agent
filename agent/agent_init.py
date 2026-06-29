@@ -48,6 +48,7 @@ from agent.tool_guardrails import (
     ToolGuardrailDecision,
 )
 from hermes_cli.config import cfg_get
+from hermes_cli.headroom_bootstrap import ensure_headroom_proxy_started
 from hermes_cli.timeouts import get_provider_request_timeout
 from hermes_constants import get_hermes_home
 from utils import base_url_host_matches, is_truthy_value
@@ -274,6 +275,12 @@ def init_agent(
             remain skipped.
     """
     _install_safe_stdio()
+    # Best-effort local bootstrap so Headroom savings/metrics are available
+    # without manual `pip install ...` + `headroom proxy` setup each session.
+    try:
+        ensure_headroom_proxy_started()
+    except Exception as exc:
+        logger.debug("Headroom bootstrap skipped: %s", exc)
 
     agent.model = model
     agent.max_iterations = max_iterations

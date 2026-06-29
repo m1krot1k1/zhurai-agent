@@ -1315,6 +1315,15 @@ DEFAULT_CONFIG = {
     # https://headroom-docs.vercel.app/docs/mcp — stats HTTP API and /dashboard UI
     # bind to this base URL when `headroom proxy` runs (default port 8787).
     "headroom": {
+        # Global switch for Headroom bootstrap helpers.
+        "enabled": True,
+        # Auto-install `headroom-ai[proxy,mcp]` when the binary/module is missing.
+        "auto_install": True,
+        # Auto-start `headroom proxy` in background when /stats is unreachable.
+        "auto_start": True,
+        # Bounded waits for bootstrap paths.
+        "install_timeout_seconds": 180,
+        "startup_timeout_seconds": 8,
         # Proxy base URL (scheme + host + port, no path). Dialog/UI integrations
         # poll {dashboard_url}/stats and {dashboard_url}/stats-history; MCP is
         # at {dashboard_url}/mcp. Override when the proxy binds a non-default port.

@@ -17,6 +17,7 @@ import signal
 import time
 import traceback
 
+from hermes_cli.headroom_bootstrap import ensure_headroom_proxy_started
 from tui_gateway import server
 from tui_gateway.server import _CRASH_LOG, dispatch, resolve_skin, write_json
 from tui_gateway.transport import TeeTransport
@@ -262,6 +263,10 @@ def join_mcp_discovery(timeout: float | None = None) -> bool:
 
 def main():
     _install_sidecar_publisher()
+    try:
+        ensure_headroom_proxy_started()
+    except Exception:
+        logger.debug("Headroom bootstrap skipped in tui gateway", exc_info=True)
 
     # MCP tool discovery — runs in a background daemon thread so a slow or
     # unreachable MCP server can't freeze TUI startup.  Previously this ran
