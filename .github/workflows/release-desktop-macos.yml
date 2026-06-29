@@ -29,7 +29,7 @@ on:
       - 'acp_registry/**'
       - 'package.json'
       - 'pyproject.toml'
-      - 'hermes_cli/__init__.py'
+      - 'hermes_cli/**'
       - 'package-lock.json'
 
 permissions:
