@@ -8,11 +8,10 @@
  * (has at minimum `id`, `parentId`, `depth`, `index`) works, so TUI and Desktop
  * can each pass their own richer `SubagentProgress` type.
  */
-// The Desktop previously maintained its own buildSubagentTree copy with
-// chronological sorting (startedAt, taskIndex, goal). That sort has been
-// moved into this shared module as buildSubagentTreeSorted (depth, index)
-// so both TUI and Desktop use a single shared tree builder and sort is
-// consistent across all consumers.
+// buildSubagentTree: siblings under each parent sorted by (depth, index);
+// top-level nodes keep flat-list insertion order (spawn / event order).
+// buildSubagentTreeSorted is the recommended Desktop/TUI export — same
+// sibling sort, no root-level re-order by task index.
 
 // ── Shared types ──────────────────────────────────────────────────────────
 
@@ -76,7 +75,8 @@ export function isRunning(item: Pick<SubagentProgress, 'status'>): boolean {
  *
  * Grouping is by `parentId`; a missing `parentId` (or one pointing at an
  * unknown subagent) is treated as a top-level spawn of the current turn.
- * Children within a parent are sorted by `depth` then `index`.
+ * Top-level nodes keep flat-list insertion order; children under a parent
+ * are sorted by `depth` then `index`.
  */
 export function buildSubagentTree<T extends SubagentProgress>(
   items: readonly T[]
@@ -100,7 +100,11 @@ export function buildSubagentTree<T extends SubagentProgress>(
     byParent.set(parentKey, bucket)
   }
 
-  for (const bucket of byParent.values()) {
+  for (const [parentKey, bucket] of byParent.entries()) {
+    // Root-level nodes keep flat-list insertion order (spawn chronology).
+    if (parentKey === ROOT_KEY) {
+      continue
+    }
     bucket.sort((a, b) => a.depth - b.depth || a.index - b.index)
   }
 
@@ -115,32 +119,16 @@ export function buildSubagentTree<T extends SubagentProgress>(
 }
 
 /**
- * Variant of buildSubagentTree that recursively sorts the full tree by
- * depth then index — both top-level nodes and children within each parent.
+ * Recommended tree builder for UI consumers (Desktop, TUI wrappers).
  *
- * The base buildSubagentTree sorts siblings within a parent but leaves
- * top-level (root-keyed) items in insertion order. This variant guarantees
- * a fully ordered tree and is the recommended export for UI consumers that
- * render flat lists or need deterministic tree ordering.
+ * Siblings under each parent are sorted by `(depth, index)`. Top-level nodes
+ * keep flat-list insertion order (spawn / event order) — not re-sorted by
+ * task index, so chronological spawn order is preserved at the root.
  */
 export function buildSubagentTreeSorted<T extends SubagentProgress>(
   items: readonly T[]
 ): SubagentNode<T>[] {
-  const tree = buildSubagentTree(items)
-
-  const sortFn = (a: SubagentNode<T>, b: SubagentNode<T>) =>
-    a.item.depth - b.item.depth || a.item.index - b.item.index
-
-  const sortRecursive = (nodes: SubagentNode<T>[]) => {
-    if (!nodes.length) return
-    nodes.sort(sortFn)
-    for (const node of nodes) {
-      sortRecursive(node.children)
-    }
-  }
-
-  sortRecursive(tree)
-  return tree
+  return buildSubagentTree(items)
 }
 
 // ── Aggregation ───────────────────────────────────────────────────────────

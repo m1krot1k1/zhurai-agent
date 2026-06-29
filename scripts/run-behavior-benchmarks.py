@@ -58,10 +58,15 @@ def main() -> int:
     scenarios = data.get("scenarios", [])
     failures: list[str] = []
     passed = 0
+    skipped = 0
 
     for scenario in scenarios:
         scenario_failures: list[str] = []
         scenario_id = scenario["id"]
+
+        if scenario.get("skip"):
+            skipped += 1
+            continue
 
         for rel_path in scenario.get("required_paths", []):
             if not (ROOT / rel_path).exists():
@@ -102,7 +107,9 @@ def main() -> int:
         return 1
 
     print("Behavior benchmarks passed.")
-    print(f"- Scenarios: {passed}")
+    print(f"- Scenarios passed: {passed}")
+    if skipped:
+        print(f"- Scenarios skipped: {skipped}")
     print(f"- Spec: {SCENARIO_FILE.relative_to(ROOT).as_posix()}")
     return 0
 

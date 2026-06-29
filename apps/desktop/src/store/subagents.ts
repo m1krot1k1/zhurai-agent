@@ -300,10 +300,10 @@ export function upsertSubagent(sid: string, payload: SubagentPayload, createIfMi
 }
 
 export function buildSubagentTree(items: readonly SubagentProgress[]): SubagentNode[] {
-  // Delegate to @hermes/shared sorted tree builder (generic on T), then adapt the
+  // Delegate to @hermes/shared tree builder (generic on T), then adapt the
   // shared SubagentNode<T> (which has { aggregate, children, item }) to the
   // Desktop's SubagentNode (which extends SubagentProgress with children).
-  // The shared sorted variant pre-sorts top-level items and children by depth then index.
+  // Siblings sort by (depth, index); root nodes keep spawn insertion order.
   const shared = sharedBuildSubagentTreeSorted(items)
 
   const adapt = (nodes: SharedSubagentNode[]): SubagentNode[] =>

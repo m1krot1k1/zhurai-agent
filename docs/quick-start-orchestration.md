@@ -11,7 +11,9 @@
 ```mermaid
 flowchart TD
     A["/start"] --> B["start"]
-    B -->|"MUST: FIRST_ACTION = Task(orchestrator)"| C["orchestrator"]
+    B --> B0["STEP 0: reasoning only (no tools)"]
+    B0 --> B05["STEP 0.5: inline brief (same turn, not a tool call)"]
+    B05 -->|"MUST: FIRST_ACTION = Task(orchestrator)"| C["orchestrator"]
     C -->|"MUST: split by domain / ownership / dependencies"| D["specialists"]
     D --> E{"2+ независимые подзадачи?"}
     E -->|"Нет"| F["MAY: specialist делает работу сам"]
@@ -29,15 +31,19 @@ flowchart TD
 ```text
 /start
   -> start
+  -> STEP 0 (reasoning, no tools)
+  -> STEP 0.5 (inline brief: objective + mode + wave hint, same turn)
   -> Task(orchestrator, ORIGINAL_REQUEST: {...})
   -> specialists
 ```
 
 ## Инварианты новой цепочки
 
-- Root `start` не читает репозиторий и не запускает команды до handoff.
+- Root `start` выполняет **STEP 0** (reasoning: запрос, `CONTINUOUS_MODE`, trust boundary) — **без tool calls**.
+- Root `start` выполняет **STEP 0.5**: **inline brief** в **том же turn** (restate objective, режим, hint плана волны). Это user-facing текст/reasoning — **не** tool call, **не** блокирующая пауза. При активном DUA (`/start`) brief и делегирование — один turn.
+- Root `start` не читает репозиторий и не запускает команды до handoff (STEP 0.5 brief не считается pre-flight Read).
 - Первый tool call root `start` всегда `Task(orchestrator)`.
-- `ORIGINAL_REQUEST` передаётся дословно.
+- `ORIGINAL_REQUEST` передаётся дословно (brief может перефразировать только для пользователя).
 - Root `start` не вызывает специалистов напрямую.
 - Specialists могут использовать `Task()` для своих подзадач по правилам Mandatory SWARM.
 - `Task(start, ENTRY_MODE: supervised_worker)` не является частью активной цепочки и считается legacy drift.
