@@ -108,6 +108,11 @@ export function isHttpHttpsUrl(raw: string): boolean {
     return false
   }
 
+  const lower = trimmed.toLowerCase()
+  if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+    return false
+  }
+
   try {
     const parsed = new URL(trimmed)
 

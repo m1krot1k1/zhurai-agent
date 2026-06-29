@@ -143,6 +143,8 @@ describe('isHttpHttpsUrl', () => {
     expect(isHttpHttpsUrl('file:///etc/passwd')).toBe(false)
     expect(isHttpHttpsUrl('data:text/plain,hi')).toBe(false)
     expect(isHttpHttpsUrl('not-a-url')).toBe(false)
+    expect(isHttpHttpsUrl('http:example.com')).toBe(false)
+    expect(isHttpHttpsUrl('https:example.com')).toBe(false)
     expect(isHttpHttpsUrl('')).toBe(false)
     expect(isHttpHttpsUrl('   ')).toBe(false)
   })

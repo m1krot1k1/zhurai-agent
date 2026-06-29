@@ -1,7 +1,7 @@
 # Multi-Agent Ecosystem — Migration Manifest
 
 **Branch:** B0-8  
-**Migration date:** 2026-06-23  
+**Migration date:** 2026-06-29  
 **Source root:** `/Users/ndppd/Desktop/git/.cursor/`  
 **Target root:** `skills/multi-agent-ecosystem/` (repo root or `ZHUR_AI_AGENT_ROOT`)
 
@@ -254,5 +254,5 @@ Update each row from `pending` → `done` when the target file exists and passes
 | Manifest path | `skills/multi-agent-ecosystem/MANIFEST.md` |
 | Primary mappings | 63 |
 | Mapping completeness | 100% |
-| Created | 2026-06-23 |
+| Created | 2026-06-29 |
 | Owner branch | B0-8 |

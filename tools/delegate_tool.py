@@ -986,6 +986,27 @@ def _build_child_progress_callback(
             _relay("subagent.text", preview=preview)
             return
 
+        if event_type == "subagent.progress":
+            summary_text = preview or tool_name or ""
+            if spinner and summary_text:
+                try:
+                    spinner.print_above(f" {prefix}├─ 🔀 {summary_text}")
+                except Exception as e:
+                    logger.debug("Spinner print_above failed: %s", e)
+            _relay("subagent.progress", preview=preview)
+            return
+
+        if event_type == "reasoning.available":
+            text = preview or tool_name or ""
+            if spinner:
+                short = (text[:55] + "...") if len(text) > 55 else text
+                try:
+                    spinner.print_above(f' {prefix}├─ 💭 "{short}"')
+                except Exception as e:
+                    logger.debug("Spinner print_above failed: %s", e)
+            _relay("subagent.thinking", preview=preview)
+            return
+
         # Normalise legacy strings, new-style "delegate.*" strings, and
         # DelegateEvent enum values all to a single DelegateEvent.  The
         # original implementation only accepted the five legacy strings;
@@ -1254,6 +1275,17 @@ def _build_child_agent(
 
         child_thinking_cb = _child_thinking
 
+    child_reasoning_cb = None
+    if child_progress_cb:
+        def _child_reasoning(text: str) -> None:
+            if not text:
+                return
+            try:
+                child_progress_cb("reasoning.available", preview=text)
+            except Exception as e:
+                logger.debug("Child reasoning callback relay failed: %s", e)
+        child_reasoning_cb = _child_reasoning
+
     # Resolve effective credentials: config override > parent inherit
     effective_model = model or parent_agent.model
     effective_provider = override_provider or getattr(parent_agent, "provider", None)
@@ -1362,6 +1394,7 @@ def _build_child_agent(
         skip_memory=True,
         clarify_callback=None,
         thinking_callback=child_thinking_cb,
+        reasoning_callback=child_reasoning_cb,
         session_db=getattr(parent_agent, "_session_db", None),
         parent_session_id=getattr(parent_agent, "session_id", None),
         providers_allowed=child_providers_allowed,
