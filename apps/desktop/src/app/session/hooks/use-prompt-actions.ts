@@ -76,7 +76,7 @@ interface HandoffResult {
   error?: string
 }
 
-function delay(ms: number): Promise<void> {
+export function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
@@ -108,7 +108,7 @@ function isProviderSetupError(error: unknown) {
   return isProviderSetupErrorMessage(message)
 }
 
-function inlineErrorMessage(error: unknown, fallback: string): string {
+export function inlineErrorMessage(error: unknown, fallback: string): string {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : fallback
 
   return (raw.match(/Error invoking remote method '[^']+': Error: (.+)$/)?.[1] ?? raw).replace(/^Error:\s*/, '').trim()

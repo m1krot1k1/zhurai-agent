@@ -254,13 +254,15 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
   return cleaned || fallback
 }
 
+import { DESIGN_TOKENS } from '../packages/hermes-ink/src/theme/tokens'
+
 export const DARK_THEME: Theme = {
   color: {
-    primary: '#FFD700',
-    accent: '#FFBF00',
-    border: '#CD7F32',
-    text: '#FFF8DC',
-    muted: '#CC9B1F',
+    primary: DESIGN_TOKENS.colors.primary,
+    accent: DESIGN_TOKENS.colors.accent,
+    border: DESIGN_TOKENS.colors.border,
+    text: DESIGN_TOKENS.colors.text,
+    muted: '#CC9B1F', // keep local tuned value for luminance
     // Bumped from the old `#B8860B` darkgoldenrod (~53% luminance) which
     // read as barely-visible on dark terminals for long body text.  The
     // new value sits ~60% luminance — readable without losing the "muted /

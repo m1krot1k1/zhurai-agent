@@ -649,6 +649,8 @@ hermes_cli/skin_engine.py    # SkinConfig dataclass, built-in skins, YAML loader
 - `load_skin(name)` — loads from user skins first, then built-ins, then falls back to default
 - Missing skin values inherit from the `default` skin automatically
 
+**Shared design tokens (P0 parity):** Canonical tokens live at `ui-tui/packages/hermes-ink/src/theme/tokens.ts` (consumed by TUI `fromSkin` + Desktop `src/theme/tokens.ts`). Use `DESIGN_TOKENS.colors.primary` etc. for new UI work to keep gold branding (#FFD700 primary, #FFBF00 accent, #CD7F32 border) consistent. See ui-tui/src/theme.ts:259 for consumption example.
+
 ### What skins customize
 
 | Element | Skin Key | Used By |
