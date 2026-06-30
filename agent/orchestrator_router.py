@@ -269,6 +269,13 @@ def enrich_delegate_task_entry(task: Dict[str, Any]) -> Dict[str, Any]:
 
     goal = str(task.get("goal") or "").strip()
     context = str(task.get("context") or "").strip()
+    # Guard: detect background-review prompt leaking as ORIGINAL_REQUEST.
+    if "Review the conversation above and update the skill library" in context:
+        logger.warning(
+            "enrich_delegate_task_entry: detected _SKILL_REVIEW_PROMPT "
+            "in task context — stripping to prevent pollution cascade."
+        )
+        context = ""
     agent_id = parse_agent_id_from_envelope(context) or parse_agent_id_from_envelope(goal)
     if not agent_id:
         agent_id = infer_agent_id_from_text(f"{goal}\n{context}")
@@ -376,7 +383,21 @@ def is_start_router_turn(message: str) -> bool:
 
 
 def _agent_ecosystem_id(agent) -> Optional[str]:
+    # Clear any stale delegate context from background review forks before
+    # building ORIGINAL_REQUEST.  The background review daemon sets
+    # agent._delegate_branch_context = "" on the parent, but a race between
+    # review completion and the next /start call can still leave the old
+    # value visible.  This second layer detects and discards polluted context.
     ctx = getattr(agent, "_delegate_branch_context", "") or ""
+    _POLLUTED_KEYWORDS = {"review the conversation", "update the skill", "skill library",
+                          "nothing to save", "memory review", "background_review"}
+    if any(kw in ctx.lower() for kw in _POLLUTED_KEYWORDS):
+        ctx = ""
+        try:
+            agent._delegate_branch_context = ""
+        except Exception:
+            pass
+    # ── end context pollution gate ──
     return parse_agent_id_from_envelope(ctx)
 
 

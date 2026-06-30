@@ -655,6 +655,23 @@ def _run_review_in_thread(
             )
             review_agent._memory_write_origin = "background_review"
             review_agent._memory_write_context = "background_review"
+            # ── Context isolation: prevent background review fork from leaking
+            # into the main delegation chain ────────────────────────────────────
+            # The background review share's the parent's session_id for cache-key
+            # parity.  Explicitly clear delegation branch context and stamp the
+            # fork so any code path that reads _delegate_branch_context on this
+            # agent sees empty/isolated state rather than inherited parent data.
+            # This prevents _SKILL_REVIEW_PROMPT — or any review-internal text —
+            # from ever being injected as ORIGINAL_REQUEST in a delegate_task call.
+            review_agent._delegate_branch_context = ""
+            # Also clear the parent agent's stale delegate context so a
+            # subsequent ``/start`` delegation does not inherit the review's
+            # prompt as ORIGINAL_REQUEST (see ORIGINAL_REQUEST_POLLUTION bug).
+            try:
+                agent._delegate_branch_context = ""
+            except Exception:
+                pass
+            review_agent._background_review_fork = True
             # The review fork pins the parent's cached system prompt and keeps
             # ``tools[]`` byte-identical to the parent so its outbound request
             # hits the same provider cache prefix (see the toolset-parity note

@@ -11303,8 +11303,24 @@ def _(rid, params: dict) -> dict:
     except ImportError:
         return _err(rid, 5001, "shell.exec unavailable: approval safety module not importable")
     try:
+        # Prefer shell=False with shlex.split to prevent shell injection.
+        # If the command contains shell metacharacters (pipes, redirects, etc.),
+        # fall back to shell=True as a user convenience for interactive use.
+        import shlex
+        cmd_args = shlex.split(cmd)
+        use_shell = False
+    except ValueError:
+        # shlex.split failed (e.g. unmatched quotes) — reject rather than
+        # fall through to shell=True with potentially malformed input.
+        return _err(rid, 4004, f"malformed command: {cmd}")
+    except Exception:
+        # Any other parsing error — safe fallback with shell=True.
+        # The dangerous/hardline checks above still apply.
+        cmd_args = cmd
+        use_shell = True
+    try:
         r = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=os.getcwd(),
+            cmd_args, shell=use_shell, capture_output=True, text=True, timeout=30, cwd=os.getcwd(),
             stdin=subprocess.DEVNULL,
         )
         return _ok(

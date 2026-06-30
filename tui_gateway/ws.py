@@ -27,6 +27,7 @@ import asyncio
 import concurrent.futures
 import json
 import logging
+import os
 import socket
 from typing import Any
 
@@ -172,6 +173,25 @@ def _disable_nagle(ws: Any) -> None:
 
 async def handle_ws(ws: Any) -> None:
     """Run one WebSocket session. Wire-compatible with ``tui_gateway.entry``."""
+    # ---- Origin / Host validation (CSWSH protection) ----
+    # Only allow WebSocket connections from localhost origins.  Browser-side
+    # CSWSH attacks cannot spoof the Origin header, so this prevents a rogue
+    # website from connecting to a running Hermes TUI gateway through the
+    # victim's browser.
+    scope: dict = getattr(ws, "scope", {}) or {}
+    headers: dict = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+    origin = headers.get("origin", "")
+    # Strip port for comparison: localhost:1234 → localhost
+    host = headers.get("host", "localhost").split(":")[0].lower()
+    if origin:
+        from urllib.parse import urlparse
+        parsed = urlparse(origin)
+        origin_host = parsed.hostname or ""
+        allowed = {"localhost", "127.0.0.1", "::1", host}
+        if origin_host not in allowed:
+            _log.warning("ws rejected origin=%s peer=%s", origin, _ws_peer_label(ws))
+            await ws.close(code=403, reason="origin not allowed")
+            return
     peer = _ws_peer_label(ws)
     transport: WSTransport | None = None
     messages = 0

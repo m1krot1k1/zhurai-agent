@@ -345,106 +345,101 @@ Deprecated aliases (`done`, `continue`, `relay_required`) принимаются
 
 **"approval" от оркестратора означает "волна завершена", НЕ "24/7 цикл завершён".**
 
-```
+---
 
-watchdog = {
+### Watchdog: Runtime Circuit Breaker (`scripts/start-watchdog.py`)
 
-  retry_attempt: 0,
+Вместо псевдо-Python-переменных используй **реальный Python-скрипт**, который управляет состоянием цикла между волнами. Скрипт хранит состояние в JSON-файле и решает: продолжать, остановиться или сообщить о блокере.
 
-  retry_backoff_seconds: 3,
+#### Инструкция для root-start
 
-  no_progress_waves: 0,
-
-  no_progress_limit: 5
-
-}
-
-
-
-while True:  # Root-start вызывает delegate to orchestrator для каждой волны
-
-    result = delegate to orchestrator (invoke multi-agent-ecosystem orchestrator mode; load orchestrator.md + ../orchestration/delegation-chain.md, prompt={wave_N_contract})
-
-    # Стоп ТОЛЬКО если:
-    # 1. Пользователь явно сказал "стоп"
-    # 2. AC достигнуты И НЕ open-ended
-    # 3. steady_state И remaining_vectors=0 И НЕ open-ended
-    # НЕ стоп: status=approval, завершение волны, micro-packet closure
-    _is_stop = (
-        result.get("user_stop", False)
-        or (result.get("ac_reached", False) and OPEN_ENDED_IMPROVEMENT != "yes")
-        or (result.get("steady_state") == True and result.get("remaining_vectors", 1) == 0 and OPEN_ENDED_IMPROVEMENT != "yes")
-    )
-    if _is_stop or user_said_stop:
-        break
-
-    # Явная обработка status=approval в open-ended режиме:
-    # status=approval означает "волна завершена", НЕ "весь 24/7 цикл завершён"
-    if result.get("status") == "approval" and OPEN_ENDED_IMPROVEMENT == "yes":
-        # Продолжить поиск следующего улучшения — micro-packet закрыт, но система не в steady_state
-        wave_N += 1
-        continue
-
-    if result.status == "blocked":
-        # Hard blockers exit the loop permanently.
-        # pause(RELAY_REQUIRED) is NOT a hard stop — parent should proxy and continue.
-        break
-    if result.status == "pause" and result.get("pause_reason") == "RELAY_REQUIRED":
-        # Runtime canonical path: pause + resume intent
-        # Proxy pause payload upward and continue loop via resume_packet
-        wave_N += 1
-        continue
-
-    # Авто-возобновление при лимитах runtime.
-
-    # В START_REPORT это описывается через pause_reason,
-
-    # а runtime_boundary обычно равен turn_boundary.
-
-    if result.status == "pause" and result.get("pause_reason") == "PAUSED_FOR_RUNTIME_BUDGET":
-        wave_N += 1
-        continue  # Возобновляем цикл с новой волной
-
-    wave_N += 1
-    # ДИАГНОСТИКА ВОЛНЫ (обязательно логировать в START_REPORT):
-    # wave: {wave_N}, no_progress_waves: {watchdog.no_progress_waves}/{watchdog.no_progress_limit}
-    # changed_files: {result.changed_files}, status: {result.status}
-
-    watchdog.retry_attempt += 1
-
-    watchdog.retry_backoff_seconds = min(60, watchdog.retry_backoff_seconds * 2)
-
-    # Счётчик "нет прогресса": увеличивается если result не содержит реальных изменений файлов
-    # (0 changed files AND 0 deliverables AND status not in pause/resume transition)
-    if result.get("changed_files", 0) == 0 and result.get("deliverables_count", 0) == 0 and result.status not in ["pause", "resume"]:
-        watchdog.no_progress_waves += 1
-    else:
-        watchdog.no_progress_waves = 0  # сбросить при любом реальном прогрессе
-
-    if watchdog.no_progress_waves >= watchdog.no_progress_limit:
-
-        break
-
-    # ЯВНОЕ ОПРЕДЕЛЕНИЕ build_resume_packet — формирует контракт следующей волны
-    # В open-ended режиме всегда есть следующий gap; никогда не возвращает пустой контракт
-    _resume_packet = result.get("resume_packet")
-    next_contract = _resume_packet if _resume_packet else {
-        "WAVE_NUMBER": wave_N,
-        "OBJECTIVE": "Продолжить open-ended improvement: найти следующий gap в системе и реализовать улучшение",
-        "OPEN_ENDED_IMPROVEMENT": OPEN_ENDED_IMPROVEMENT,
-        "CONTINUOUS_MODE": CONTINUOUS_MODE,
-        "FULL_FORCE_START_PROFILE": "yes",
-        "TRUSTED_POLICY": "../rules/orchestrator.mdc > ../rules/specialists.mdc",
-    }
+**Шаг A — Инициализация** (перед первой волной, после определения режима):
 
 ```
+python3 scripts/start-watchdog.py \
+  --state-file /tmp/start-watchdog-{SESSION_ID}.json \
+  init \
+  --mode {until_user_stop | single_wave} \
+  --open-ended {yes | no} \
+  --original-request "{дословный запрос пользователя}"
+```
 
+**Шаг B — После каждой волны** передать результат orchestrator в watchdog:
 
+```
+python3 scripts/start-watchdog.py \
+  --state-file /tmp/start-watchdog-{SESSION_ID}.json \
+  decide \
+  --wave-result '{COMPLETION_CONTRACT в JSON}'
+```
 
-Стоп-условия: явный стоп от пользователя | AC достигнуты | {watchdog.no_progress_waves} >= no_progress_limit волн без прогресса
-НЕ являются стоп-сигналами: DEPTH_BUDGET исчерпан в волне (→ сброс и следующая волна) | `status: pause` с `pause_reason: RELAY_REQUIRED` (→ проксировать и продолжать)
+**Шаг C — Прочитать решение** из stdout (JSON):
 
+| `action` | Когда | Что делать |
+|----------|-------|-----------|
+| `continue` | Нормальный прогресс, relay, runtime budget | НЕМЕДЛЕННО delegate to orchestrator с `WAVE_NUMBER: wave_N` |
+| `stop` | user_stop, ac_reached, steady_state, no_progress_limit | Синтезировать START_REPORT, завершить цикл |
+| `blocked` | Hard blocker от orchestrator | Синтезировать START_REPORT с blocker, завершить цикл навсегда |
+| `error` | Ошибка в watchdog (нет state, невалидный JSON) | Проверить вывод stderr, переинициализировать |
 
+**Шаг D — При явном стопе пользователя** сбросить watchdog:
+
+```
+python3 scripts/start-watchdog.py \
+  --state-file /tmp/start-watchdog-{SESSION_ID}.json reset
+```
+
+**Шаг E — Для диагностики** (логировать в START_REPORT между волнами):
+
+```
+python3 scripts/start-watchdog.py \
+  --state-file /tmp/start-watchdog-{SESSION_ID}.json status
+```
+
+#### Стоп-условия (enforce'ятся watchdog скриптом)
+
+1. **Явный стоп пользователя** — `user_stop: true` в result orchestrator
+2. **AC достигнуты** — `ac_reached: true` И `OPEN_ENDED_IMPROVEMENT != "yes"`
+3. **Steady state** — `steady_state: true` И `remaining_vectors: 0` И `OPEN_ENDED_IMPROVEMENT != "yes"`
+4. **No progress limit** — **3** последовательные волны без `changed_files` И `deliverables` (снижено с 5 по результатам аудита)
+5. **Hard blocker** — `status: "blocked"` от orchestrator
+
+**НЕ являются стоп-сигналами:**
+- DEPTH_BUDGET исчерпан в волне (→ сброс и следующая волна)
+- `status: pause` с `pause_reason: RELAY_REQUIRED` (→ проксировать и продолжать)
+- `status: approval` в open-ended режиме (→ micro-packet закрыт, продолжить)
+- `status: pause` с `pause_reason: PAUSED_FOR_RUNTIME_BUDGET` (→ auto-continue)
+
+#### Параметры watchdog
+
+| Параметр | По умолчанию | Описание |
+|----------|-------------|----------|
+| `no_progress_limit` | 3 | Максимум волн без изменений файлов до авто-стопа |
+| `retry_backoff_initial` | 3s | Начальная задержка экспоненциального backoff |
+| `retry_backoff_max` | 60s | Максимальная задержка backoff |
+| `state_file` | `/tmp/start-watchdog.json` | Файл состояния (каждый session свой путь)
+
+#### Пример полного цикла (для root-start)
+
+```
+# Перед волной 1:
+python3 scripts/start-watchdog.py --state-file /tmp/wd-abc123.json init \
+  --mode until_user_stop --open-ended yes \
+  --original-request "Улучшить производительность"
+
+# Цикл:
+loop:
+  result = delegate to orchestrator(prompt=next_contract)
+  decision=$(python3 scripts/start-watchdog.py --state-file /tmp/wd-abc123.json decide --wave-result "$result")
+  
+  case $decision.action:
+    continue → продолжить с WAVE_NUMBER=decision.wave_N
+    stop     → break (синтезировать START_REPORT)
+    blocked  → break (START_REPORT с blocker)
+
+# При стопе:
+python3 scripts/start-watchdog.py --state-file /tmp/wd-abc123.json reset
+```
 
 ---
 

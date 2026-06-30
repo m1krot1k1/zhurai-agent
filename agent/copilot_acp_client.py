@@ -5,21 +5,27 @@ backend. Each request starts a short-lived ACP session, sends the formatted
 conversation as a single prompt, collects text chunks, and converts the result
 back into the minimal shape Hermes expects from an OpenAI client.
 """
-
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
-import re
 import shlex
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
+
+# Allowlist of commands that may be spawned as ACP subprocesses.
+# Must match tools/delegate_tool.py _ALLOWED_ACP_COMMANDS.
+_ALLOWED_ACP_COMMANDS: frozenset[str] = frozenset({"copilot", "gh copilot"})
 
 from agent.file_safety import get_read_block_error, is_write_denied
 from agent.redact import redact_sensitive_text
@@ -345,6 +351,15 @@ class CopilotACPClient:
         self._default_headers = dict(default_headers or {})
         self._acp_command = acp_command or command or _resolve_command()
         self._acp_args = list(acp_args or args or _resolve_args())
+        # Defense-in-depth: reject unapproved ACP commands at construction time.
+        # Primary gate is at delegate_task() in tools/delegate_tool.py; this
+        # catches code paths that bypass it (e.g. direct CopilotACPClient use).
+        if self._acp_command not in _ALLOWED_ACP_COMMANDS:
+            raise ValueError(
+                f"ACP command '{self._acp_command}' is not in the allowed set: "
+                f"{sorted(_ALLOWED_ACP_COMMANDS)}. "
+                "Set _ALLOWED_ACP_COMMANDS in copilot_acp_client.py to extend."
+            )
         self._acp_cwd = str(Path(acp_cwd or os.getcwd()).resolve())
         self.chat = _ACPChatNamespace(self)
         self.is_closed = False

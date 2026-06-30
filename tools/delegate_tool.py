@@ -89,6 +89,50 @@ DELEGATE_BLOCKED_TOOLS = frozenset(
     ]
 )
 
+# ── ORIGINAL_REQUEST context pollution detection ──────────────────────────
+# Fingerprint for the background-review _SKILL_REVIEW_PROMPT.  If this text
+# appears inside a delegate_task's ORIGINAL_REQUEST, the background fork's
+# context has leaked into the main delegation chain and must be blocked.
+_SKILL_REVIEW_FINGERPRINT = "Review the conversation above and update the skill library"
+
+
+def _detect_skill_review_pollution(
+    context: Optional[str],
+    *,
+    parent_agent: Any = None,
+) -> Optional[str]:
+    """Check *context* for background-review prompt leakage.
+
+    Returns a human-readable reason string when pollution is detected, or
+    ``None`` when the context is clean.  Also checks the parent agent's
+    ``_background_review_fork`` marker as a fast-path rejection.
+
+    The fingerprint string is a unique, multi-word prefix of
+    ``_SKILL_REVIEW_PROMPT`` that cannot appear naturally in a user's task
+    description without being the review prompt itself.
+    """
+    # Fast path: parent agent is itself a background review fork.
+    if parent_agent is not None:
+        try:
+            if parent_agent._background_review_fork is True:
+                return (
+                    "ORIGINAL_REQUEST_POLLUTION: parent agent is a background-review fork. "
+                    "Background forks cannot delegate — spawn denied."
+                )
+        except (AttributeError, Exception):
+            pass
+
+    # Check context for the review prompt fingerprint.
+    if not context or not isinstance(context, str):
+        return None
+    if _SKILL_REVIEW_FINGERPRINT in context:
+        return (
+            "ORIGINAL_REQUEST_POLLUTION: context contains _SKILL_REVIEW_PROMPT "
+            "fingerprint — background review context is leaking into the delegation "
+            "chain. Spawn blocked to prevent cascading pollution."
+        )
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Subagent approval callbacks
@@ -2301,6 +2345,14 @@ def _batch_synthesis_metadata(
             original = extract_original_request(branch_ctx) or original
         except Exception:
             pass
+    # Guard: detect background-review prompt leaking as ORIGINAL_REQUEST.
+    if original and "Review the conversation above and update the skill library" in original:
+        logger.warning(
+            "_batch_synthesis_metadata: detected _SKILL_REVIEW_PROMPT in "
+            "ORIGINAL_REQUEST extracted from parent context. "
+            "Suppressing synthesis to prevent pollution cascade."
+        )
+        return False, ""
     try:
         from agent.orchestrator_router import (
             is_ecosystem_orchestrator_subagent,
@@ -2334,6 +2386,12 @@ def _maybe_mark_orchestrator_fanout_done(parent_agent, result: Optional[dict]) -
             parent_agent._orchestrator_fanout_done = True
     except Exception:
         logger.debug("orchestrator fan-out marker skipped", exc_info=True)
+
+
+# Allowlist of permitted ACP subprocess commands.  Only commands in this
+# set may be spawned as child ACP agents, preventing arbitrary code execution
+# via the ``acp_command`` tool parameter.
+_ALLOWED_ACP_COMMANDS: frozenset[str] = frozenset({"copilot", "gh copilot"})
 
 
 def delegate_task(
@@ -2416,6 +2474,22 @@ def delegate_task(
             )
         })
 
+    # ACP command validation: prevent arbitrary subprocess execution.
+    # Only pre-approved commands (copilot, gh copilot) may be spawned as ACP
+    # child agents. This blocks an LLM from injecting an arbitrary binary
+    # via the ``acp_command`` tool parameter.
+    if acp_command and acp_command not in _ALLOWED_ACP_COMMANDS:
+        logger.warning(
+            "ACP command '%s' blocked by allowlist. Allowed: %s",
+            acp_command, sorted(_ALLOWED_ACP_COMMANDS),
+        )
+        return json.dumps({
+            "error": (
+                f"ACP command '{acp_command}' is not allowed. "
+                f"Permitted commands: {', '.join(sorted(_ALLOWED_ACP_COMMANDS))}. "
+            )
+        })
+
     # Load config
     cfg = _load_config()
     default_max_iter = cfg.get("max_iterations", DEFAULT_MAX_ITERATIONS)
@@ -2470,6 +2544,42 @@ def delegate_task(
 
     if not task_list:
         return tool_error("No tasks provided.")
+
+    # ── ORIGINAL_REQUEST context pollution check ─────────────────────────
+    # Before any child is spawned, verify that none of the task contexts
+    # carry the _SKILL_REVIEW_PROMPT fingerprint.  This prevents the
+    # background-review fork's internal prompt from leaking into the main
+    # delegation chain as a substituted ORIGINAL_REQUEST.
+    for i, task in enumerate(task_list):
+        if not isinstance(task, dict):
+            continue  # will be caught by dict-validation below
+        pollution = _detect_skill_review_pollution(
+            task.get("context"),
+            parent_agent=parent_agent,
+        )
+        if pollution:
+            logger.warning(
+                "delegate_task: task %d blocked by context pollution — %s",
+                i, pollution,
+            )
+            return json.dumps({
+                "error": pollution,
+                "blocked_task": i,
+                "blocked_goal": task.get("goal", "")[:80],
+            })
+
+    # Also validate per-task acp_command now that task_list is built.
+    for i, task in enumerate(task_list):
+        if not isinstance(task, dict):
+            continue  # will be caught by dict-validation below
+        task_acp = task.get("acp_command")
+        if task_acp and task_acp not in _ALLOWED_ACP_COMMANDS:
+            return json.dumps({
+                "error": (
+                    f"Task {i}: ACP command '{task_acp}' is not allowed. "
+                    f"Permitted commands: {', '.join(sorted(_ALLOWED_ACP_COMMANDS))}."
+                )
+            })
 
     # Enrich batch entries with AGENT_ID context when the model omitted it.
     try:

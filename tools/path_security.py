@@ -37,7 +37,16 @@ def validate_within_dir(path: Path, root: Path) -> Optional[str]:
 def has_traversal_component(path_str: str) -> bool:
     """Return True if *path_str* contains ``..`` traversal components.
 
-    Quick check for obvious traversal attempts before doing full resolution.
+    Checks for ``..`` after normalizing whitespace to catch bypasses like
+    ``".. /foo"`` (space before slash) or ``"..\\foo"``.
+
+    This is a fast pre-filter before ``validate_within_dir()`` does the
+    full ``Path.resolve()`` round-trip.  It is intentionally conservative:
+    any path component that strips to ``..`` is flagged, even if a later
+    resolution step would normalise it away.
     """
     parts = Path(path_str).parts
-    return ".." in parts
+    # Strip whitespace from each component before comparison — catches
+    # traversal-bypass patterns like ``".. "`` (trailing space), ``" .."``
+    # (leading space), and equivalents via normpath / os.sep confusion.
+    return any(part.strip() == ".." for part in parts)

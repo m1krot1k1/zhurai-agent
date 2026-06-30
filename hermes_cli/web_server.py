@@ -260,6 +260,7 @@ _DASHBOARD_EMBEDDED_CHAT_ENABLED = True
 
 # Simple rate limiter for the reveal endpoint
 _reveal_timestamps: List[float] = []
+_reveal_by_ip: Dict[str, List[float]] = {}  # per-IP tracking
 _REVEAL_MAX_PER_WINDOW = 5
 _REVEAL_WINDOW_SECONDS = 30
 
@@ -4360,13 +4361,21 @@ async def reveal_env_var(
     # --- Token check ---
     _require_token(request)
 
-    # --- Rate limit ---
+    # --- Rate limit (global + per-IP) ---
     now = time.time()
     cutoff = now - _REVEAL_WINDOW_SECONDS
+    # Global limit
     _reveal_timestamps[:] = [t for t in _reveal_timestamps if t > cutoff]
     if len(_reveal_timestamps) >= _REVEAL_MAX_PER_WINDOW:
         raise HTTPException(status_code=429, detail="Too many reveal requests. Try again shortly.")
     _reveal_timestamps.append(now)
+    # Per-IP limit (same window, same max)
+    client_ip = request.client.host if request.client else "unknown"
+    ip_timestamps = _reveal_by_ip.setdefault(client_ip, [])
+    ip_timestamps[:] = [t for t in ip_timestamps if t > cutoff]
+    if len(ip_timestamps) >= _REVEAL_MAX_PER_WINDOW:
+        raise HTTPException(status_code=429, detail="Too many reveal requests from this IP. Try again shortly.")
+    ip_timestamps.append(now)
 
     # --- Reveal ---
     with _profile_scope(body.profile or profile):
