@@ -77,7 +77,7 @@ export function useHandoff({ activeSessionIdRef, appendSessionTextMessage, copy,
       session_id: sid
     }).catch(() => null)
 
-    if (cleanup?.state === 'completed') {
+    if ((cleanup as any)?.state === 'completed') {
       appendSessionTextMessage(sid, 'system', copy.handoff.systemNote(target))
       return { ok: true }
     }
