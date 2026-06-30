@@ -93,14 +93,20 @@ DELEGATE_BLOCKED_TOOLS = frozenset(
 # ---------------------------------------------------------------------------
 # Subagent approval callbacks
 # ---------------------------------------------------------------------------
-# Subagents run inside a ThreadPoolExecutor worker. The CLI's interactive
-# approval callback is stored in tools/terminal_tool.py's threading.local(),
-# so worker threads do NOT inherit it. Without a callback,
-# prompt_dangerous_approval() falls back to input() from the worker thread,
-# which deadlocks against the parent's prompt_toolkit TUI that owns stdin.
+# BEFORE (root cause at delegate_tool.py:96-100 per analysis report):
+#   Subagents run inside a ThreadPoolExecutor worker. The CLI's interactive
+#   approval callback is stored in tools/terminal_tool.py's threading.local(),
+#   so worker threads do NOT inherit it. Without a callback,
+#   prompt_dangerous_approval() falls back to input() from the worker thread,
+#   which deadlocks against the parent's prompt_toolkit TUI that owns stdin.
 #
-# Fix: install a non-interactive callback into every subagent worker thread
-# via ThreadPoolExecutor(initializer=_set_subagent_approval_cb, initargs=(cb,)).
+# AFTER (fix applied B0-1):
+#   - timeout path: initializer at line 1814 (pre-existing)
+#   - batch path (>1 tasks): initializer added at line 2570 (this change)
+#   Both now guarantee _set_subagent_approval_cb runs in worker before any
+#   child code, using the auto-deny/approve chosen by config.
+#   No more input() from worker thread → deadlock eliminated.
+#   Follows contextvars/ContextVar thread-safety pattern (see line 2223).
 # The callback is chosen by the `delegation.subagent_auto_approve` config:
 #   false (default) → _subagent_auto_deny (safe; matches leaf tool blocklist)
 #   true            → _subagent_auto_approve (opt-in YOLO for cron/batch)
@@ -2561,7 +2567,16 @@ def delegate_task(
             completed_count = 0
             spinner_ref = getattr(parent_agent, "_delegate_spinner", None)
 
-            with ThreadPoolExecutor(max_workers=pool_cap) as executor:
+            with ThreadPoolExecutor(
+                max_workers=pool_cap,
+                # Install non-interactive approval callback in EVERY worker thread
+                # (batch path). Mirrors the _timeout_executor at line 1814.
+                # Eliminates input() fallback from worker (the deadlock described
+                # in the header comment at lines 96-100). Uses context isolation
+                # pattern (see ContextVar usage at line 2223 for tool names).
+                initializer=_set_subagent_approval_cb,
+                initargs=(_get_subagent_approval_callback(),),
+            ) as executor:
                 futures = {}
                 for i, t, child in children:
                     future = executor.submit(

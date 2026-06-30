@@ -251,8 +251,7 @@ export function isDesktopSlashSuggestion(command: string): boolean {
     return spec.surface.kind !== 'unavailable' && !spec.hidden
   }
 
-  // Skill / quick commands the backend provides.
-  return isDesktopSlashExtensionCommand(normalized)
+  return true
 }
 
 /**
