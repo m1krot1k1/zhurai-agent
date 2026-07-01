@@ -7,7 +7,7 @@ consults ``get_env_value()`` and the provider auto-detect + explicit
 selection gate (``_get_provider``) do the same.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
@@ -231,9 +231,22 @@ class TestTranscribeCallSitesReadDotenv:
                 return "xai-dotenv-key"
             return None
 
-        with patch.object(xai_http, "get_env_value", side_effect=fake_get_env_value), \
+        def fake_tt_get_env_value(name, default=None):
+            if name == "XAI_STT_BASE_URL":
+                return None
+            return default
+
+        with patch(
+            "hermes_cli.runtime_provider.resolve_runtime_provider",
+            side_effect=RuntimeError("no oauth"),
+        ), patch(
+            "hermes_cli.auth.resolve_xai_oauth_runtime_credentials",
+            return_value={},
+        ), patch.object(xai_http, "get_env_value", side_effect=fake_get_env_value), \
+             patch.object(tt, "_load_stt_config", return_value={}), \
+             patch.object(tt, "get_env_value", side_effect=fake_tt_get_env_value), \
              patch("requests.post", side_effect=fake_post), \
-             patch("builtins.open", MagicMock()):
+             patch("builtins.open", mock_open(read_data=b"audio")):
             result = tt._transcribe_xai("/tmp/fake.mp3", "grok-stt")
 
         assert result["success"] is True
@@ -295,8 +308,16 @@ class TestEndToEndRegressionGuard:
             from hermes_cli.config import get_env_value as live_get
             assert live_get("XAI_API_KEY") == "dotenv-secret"
 
-            with patch("requests.post", side_effect=fake_post), \
-                 patch("builtins.open", MagicMock()):
+            with patch(
+                "hermes_cli.runtime_provider.resolve_runtime_provider",
+                side_effect=RuntimeError("no oauth"),
+            ), patch(
+                "hermes_cli.auth.resolve_xai_oauth_runtime_credentials",
+                return_value={},
+            ), patch.object(tt, "_load_stt_config", return_value={}), \
+                 patch.object(tt, "get_env_value", return_value=None), \
+                 patch("requests.post", side_effect=fake_post), \
+                 patch("builtins.open", mock_open(read_data=b"audio")):
                 result = tt._transcribe_xai("/tmp/fake.mp3", "grok-stt")
 
         assert result["success"] is True
