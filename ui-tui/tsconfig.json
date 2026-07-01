@@ -6,7 +6,6 @@
     "moduleResolution": "nodenext",
     "jsx": "react-jsx",
     "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,6 +14,6 @@
     "sourceMap": false,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx", "packages/hermes-ink/src/theme/tokens.ts"],
   "exclude": ["src/__tests__", "node_modules", "dist"]
 }

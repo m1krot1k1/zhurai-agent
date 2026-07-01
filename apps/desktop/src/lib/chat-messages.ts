@@ -69,6 +69,8 @@ export type GatewayEventPayload = {
   count?: number
   // status.update (kind=process → background process completion/watch-match)
   kind?: string
+  // subagent.* / delegate_task progress
+  wave_number?: number
 }
 
 export function textPart(text: string): ChatMessagePart {

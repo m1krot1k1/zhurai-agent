@@ -254,7 +254,7 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
   return cleaned || fallback
 }
 
-import { DESIGN_TOKENS } from '../packages/hermes-ink/src/theme/tokens'
+import { DESIGN_TOKENS } from '../packages/hermes-ink/src/theme/tokens.js'
 
 export const DARK_THEME: Theme = {
   color: {
