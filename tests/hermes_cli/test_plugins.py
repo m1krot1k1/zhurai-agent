@@ -59,28 +59,32 @@ def _make_plugin_dir(base: Path, name: str, *, register_body: str = "pass",
     )
 
     if auto_enable:
-        # Write/merge plugins.enabled in <HERMES_HOME>/config.yaml.
-        # Config is always read from HERMES_HOME (not from the project
-        # dir for project plugins), so that's where we opt in.
         import os
-        hermes_home_str = os.environ.get("HERMES_HOME")
-        if hermes_home_str:
-            hermes_home = Path(hermes_home_str)
-        else:
-            hermes_home = base.parent
-        hermes_home.mkdir(parents=True, exist_ok=True)
-        cfg_path = hermes_home / "config.yaml"
-        cfg: dict = {}
-        if cfg_path.exists():
-            try:
-                cfg = yaml.safe_load(cfg_path.read_text()) or {}
-            except Exception:
-                cfg = {}
-        plugins_cfg = cfg.setdefault("plugins", {})
-        enabled = plugins_cfg.setdefault("enabled", [])
-        if isinstance(enabled, list) and name not in enabled:
-            enabled.append(name)
-        cfg_path.write_text(yaml.safe_dump(cfg))
+
+        def _merge_enabled(cfg_home: Path) -> None:
+            cfg_home.mkdir(parents=True, exist_ok=True)
+            cfg_path = cfg_home / "config.yaml"
+            cfg: dict = {}
+            if cfg_path.exists():
+                try:
+                    cfg = yaml.safe_load(cfg_path.read_text()) or {}
+                except Exception:
+                    cfg = {}
+            plugins_cfg = cfg.setdefault("plugins", {})
+            enabled = plugins_cfg.setdefault("enabled", [])
+            if isinstance(enabled, list) and name not in enabled:
+                enabled.append(name)
+            cfg_path.write_text(yaml.safe_dump(cfg))
+
+        # User plugins: tree lives under get_hermes_home()/plugins.
+        _merge_enabled(base.parent)
+        # Project plugins (./.hermes/plugins): load_config() still reads
+        # process HERMES_HOME, so mirror enablement there when it differs.
+        env_home = os.environ.get("HERMES_HOME")
+        if env_home:
+            env_path = Path(env_home)
+            if env_path.resolve() != base.parent.resolve():
+                _merge_enabled(env_path)
 
     return plugin_dir
 
