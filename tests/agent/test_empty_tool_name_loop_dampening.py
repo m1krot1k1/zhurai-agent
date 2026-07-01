@@ -114,9 +114,12 @@ def agent_env():
     t.start()
 
     test_home = tempfile.mkdtemp(prefix="hermes_e2e_47967_")
-    os.makedirs(os.path.join(test_home, ".hermes"))
+    hermes_home = os.path.join(test_home, ".hermes")
+    os.makedirs(hermes_home)
+    with open(os.path.join(hermes_home, "config.yaml"), "w", encoding="utf-8") as f:
+        f.write("headroom:\n  enabled: false\n")
     prev_home = os.environ.get("HERMES_HOME")
-    os.environ["HERMES_HOME"] = os.path.join(test_home, ".hermes")
+    os.environ["HERMES_HOME"] = hermes_home
 
     # Import fresh so the patched conversation_loop is exercised even when the
     # module was imported earlier in the same worker.

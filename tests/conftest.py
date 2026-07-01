@@ -352,14 +352,16 @@ def _hermetic_environment(tmp_path, monkeypatch):
     #    fixture. Any code in the codebase reading ``~/.hermes/*`` via
     #    ``Path.home() / ".hermes"`` instead of ``get_hermes_home()``
     #    is a bug to fix at the callsite.
-    fake_hermes_home = tmp_path / "hermes_test"
-    fake_hermes_home.mkdir()
-    (fake_hermes_home / "sessions").mkdir()
-    (fake_hermes_home / "cron").mkdir()
-    (fake_hermes_home / "memories").mkdir()
-    (fake_hermes_home / "skills").mkdir()
+    fake_hermes_home = tmp_path.parent / f"hermes_home_{tmp_path.name}"
+    fake_hermes_home.mkdir(parents=True, exist_ok=True)
+    (fake_hermes_home / "sessions").mkdir(exist_ok=True)
+    (fake_hermes_home / "cron").mkdir(exist_ok=True)
+    (fake_hermes_home / "memories").mkdir(exist_ok=True)
+    (fake_hermes_home / "skills").mkdir(exist_ok=True)
     # Headroom routes model traffic to localhost:8787 by default; disable in
     # tests so agent init keeps the base_url under test.
+    # Keep HERMES_HOME outside the test's git workspace (sibling dir) so
+    # config.yaml does not show up as an untracked file in coding_context tests.
     (fake_hermes_home / "config.yaml").write_text(
         "headroom:\n  enabled: false\n",
         encoding="utf-8",

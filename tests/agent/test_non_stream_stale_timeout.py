@@ -17,7 +17,9 @@ from pathlib import Path
 
 def _write_config(tmp_path: Path, body: str) -> None:
     hermes_home = tmp_path
-    (hermes_home / "config.yaml").write_text(body or "{}\n", encoding="utf-8")
+    headroom = "headroom:\n  enabled: false\n"
+    content = headroom + (body or "")
+    (hermes_home / "config.yaml").write_text(content, encoding="utf-8")
 
 
 def _make_agent(tmp_path: Path, **overrides):
