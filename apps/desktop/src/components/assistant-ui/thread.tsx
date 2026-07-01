@@ -11,6 +11,7 @@ import {
   useMessageRuntime
 } from '@assistant-ui/react'
 import { useStore } from '@nanostores/react'
+import { $subagentsBySession } from '@/store/subagents'
 import { IconPlayerStopFilled } from '@tabler/icons-react'
 import {
   type ClipboardEvent,
@@ -278,11 +279,12 @@ const AssistantMessage: FC<{
   })
   const hasVisibleText = useAuiState(s => contentHasVisibleText(s.message.content))
 
+  const subagentsBySession = useStore($subagentsBySession)
   const hasActiveSubagents = useMemo(() => {
     if (!activeSessionId) return false
-    const subs = $subagentsBySession.get()[activeSessionId] ?? []
+    const subs = subagentsBySession[activeSessionId] ?? []
     return subs.length > 0
-  }, [activeSessionId])
+  }, [activeSessionId, subagentsBySession])
 
   // Preview targets only materialize once the turn completes — while running
   // the selector returns '' (stable), so per-token flushes skip the regex
