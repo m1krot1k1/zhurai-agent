@@ -358,6 +358,12 @@ def _hermetic_environment(tmp_path, monkeypatch):
     (fake_hermes_home / "cron").mkdir()
     (fake_hermes_home / "memories").mkdir()
     (fake_hermes_home / "skills").mkdir()
+    # Headroom routes model traffic to localhost:8787 by default; disable in
+    # tests so agent init keeps the base_url under test.
+    (fake_hermes_home / "config.yaml").write_text(
+        "headroom:\n  enabled: false\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("HERMES_HOME", str(fake_hermes_home))
 
     # 4. Deterministic locale / timezone / hashseed. CI runs in UTC with
