@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 
+import { persistAllActiveSubagents } from '@/store/subagents'
+
 import { BootFailureOverlay } from '@/components/boot-failure-overlay'
 import { DesktopInstallOverlay } from '@/components/desktop-install-overlay'
 import { DesktopOnboardingOverlay } from '@/components/desktop-onboarding-overlay'
@@ -331,6 +333,13 @@ export function DesktopController() {
     void window.hermesDesktop?.signalDeepLinkReady?.()
 
     return () => unsubscribe?.()
+  }, [])
+
+  // Persist subagent state before tab close so Agents view survives page reload.
+  useEffect(() => {
+    const handler = () => persistAllActiveSubagents()
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
   useEffect(() => {

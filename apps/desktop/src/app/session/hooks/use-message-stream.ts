@@ -49,7 +49,7 @@ import {
   setYoloActive
 } from '@/store/session'
 import { broadcastSessionsChanged } from '@/store/session-sync'
-import { clearSessionSubagents, pruneDelegateFallbackSubagents, upsertSubagent } from '@/store/subagents'
+import { clearSessionSubagents, persistSubagentsForSession, pruneDelegateFallbackSubagents, upsertSubagent } from '@/store/subagents'
 import { setSessionTodos } from '@/store/todos'
 import { recordToolDiff } from '@/store/tool-diffs'
 import type { RpcEvent } from '@/types/hermes'
@@ -253,6 +253,7 @@ function delegateTaskPayloads(
       text: eventType === 'subagent.progress' ? progressText || goal : undefined,
       tool_name: eventType === 'subagent.start' ? 'delegate_task' : undefined,
       tool_preview: eventType === 'subagent.start' ? progressText : undefined,
+      wave_number: payload.wave_number != null ? Number(payload.wave_number) : undefined,
       toolsets: Array.isArray(task.toolsets) ? task.toolsets : Array.isArray(args.toolsets) ? args.toolsets : [],
       event_type: eventType,
       output_tail:
@@ -956,6 +957,7 @@ export function useMessageStream({
             event.type === 'subagent.spawn_requested' || event.type === 'subagent.start',
             event.type
           )
+          persistSubagentsForSession(sessionId)
           if (event.type === 'subagent.start') {
             const p = payload as Record<string, unknown>
             const subagentId = typeof p.subagent_id === 'string' ? p.subagent_id : ''

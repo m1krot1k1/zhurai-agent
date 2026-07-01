@@ -8961,12 +8961,12 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         _session_env_tokens = self._set_session_env(context)
         
         # Read privacy.redact_pii from config (re-read per message)
-        _redact_pii = False
+        _redact_pii = True
         persist_user_message = None
         persist_user_timestamp = None
         try:
             _pcfg = _load_gateway_config()
-            _redact_pii = bool((_pcfg.get("privacy") or {}).get("redact_pii", False))
+            _redact_pii = bool((_pcfg.get("privacy") or {}).get("redact_pii", True))
         except Exception:
             pass
 

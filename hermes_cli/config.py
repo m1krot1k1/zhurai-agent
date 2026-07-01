@@ -1837,7 +1837,7 @@ DEFAULT_CONFIG = {
 
     # Privacy settings
     "privacy": {
-        "redact_pii": False,  # When True, hash user IDs and strip phone numbers from LLM context
+        "redact_pii": True,  # When True, hash user IDs and strip phone numbers from LLM context
     },
     
     # Text-to-speech configuration
@@ -2348,9 +2348,9 @@ DEFAULT_CONFIG = {
         "tirith_enabled": True,
         "tirith_path": "tirith",
         "tirith_timeout": 5,
-        "tirith_fail_open": True,
+        "tirith_fail_open": False,
         "website_blocklist": {
-            "enabled": False,
+            "enabled": True,
             "domains": [],
             "shared_files": [],
         },

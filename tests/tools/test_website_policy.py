@@ -91,7 +91,7 @@ def test_default_config_exposes_website_blocklist_shape():
     from hermes_cli.config import DEFAULT_CONFIG
 
     website_blocklist = DEFAULT_CONFIG["security"]["website_blocklist"]
-    assert website_blocklist["enabled"] is False
+    assert website_blocklist["enabled"] is True
     assert website_blocklist["domains"] == []
     assert website_blocklist["shared_files"] == []
 
@@ -102,7 +102,7 @@ def test_load_website_blocklist_uses_enabled_default_when_section_missing(tmp_pa
 
     policy = load_website_blocklist(config_path)
 
-    assert policy == {"enabled": False, "rules": []}
+    assert policy == {"enabled": True, "rules": []}
 
 
 def test_load_website_blocklist_raises_clean_error_for_invalid_domains_type(tmp_path):

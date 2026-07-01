@@ -22,12 +22,11 @@ mirroring the Nous provider's precedence convention:
       dashboard:
         basic_auth:
           username: admin               # required
-          # Provide EITHER a precomputed scrypt hash (preferred — no
-          # plaintext at rest) ...
-          password_hash: "scrypt$..."   # see hash_password()
-          # ... OR a plaintext password (hashed in-memory at load).
-          password: "s3cret"
-          secret: "<32+ random bytes, base64 or hex>"  # optional; token-signing key
+          # Use precomputed scrypt hash (preferred — no plaintext at rest).
+          # Plaintext password/secret are NOT stored in config; use env vars:
+          #   HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+          #   HERMES_DASHBOARD_BASIC_AUTH_SECRET
+          password_hash: "scrypt$..."   # see hash_password(); pre-compute offline
           session_ttl_seconds: 43200    # optional; access-token lifetime (default 12h)
 
   Environment overrides::

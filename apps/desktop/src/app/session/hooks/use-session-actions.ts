@@ -49,6 +49,7 @@ import {
   workspaceCwdForNewSession
 } from '@/store/session'
 import { broadcastSessionsChanged } from '@/store/session-sync'
+import { $subagentsBySession, restoreSubagentsForSession } from '@/store/subagents'
 import { reportBackendContract } from '@/store/updates'
 import { isWatchWindow } from '@/store/windows'
 import type { SessionCreateResponse, SessionInfo, SessionResumeResponse, SessionRuntimeInfo, UsageStats } from '@/types/hermes'
@@ -763,6 +764,13 @@ export function useSessionActions({
         patchSessionWorkspace(storedSessionId, runtimeInfo?.cwd)
 
         resumedRunning = Boolean((resumed as { running?: boolean }).running)
+
+        // Restore hydrated subagent state from localStorage on resume.
+        const hydrated = restoreSubagentsForSession(storedSessionId) ?? []
+        if (hydrated.length) {
+          const prev = $subagentsBySession.get()
+          $subagentsBySession.set({ ...prev, [resumed.session_id]: hydrated })
+        }
 
         updateSessionState(
           resumed.session_id,

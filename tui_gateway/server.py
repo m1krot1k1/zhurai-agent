@@ -3075,6 +3075,8 @@ def _on_tool_progress(
             payload["model"] = str(_kwargs["model"])
         if _kwargs.get("tool_count") is not None:
             payload["tool_count"] = int(_kwargs["tool_count"])
+        if _kwargs.get("wave_number") is not None:
+            payload["wave_number"] = int(_kwargs["wave_number"])
         if _kwargs.get("toolsets"):
             payload["toolsets"] = [str(t) for t in _kwargs["toolsets"]]
         if _kwargs.get("role"):

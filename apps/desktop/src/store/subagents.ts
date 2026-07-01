@@ -335,3 +335,61 @@ export function groupSubagentsByWave(subagents: readonly SubagentProgress[]): Ma
 
 export const activeSubagentCount = (items: readonly SubagentProgress[]) =>
   items.filter(item => item.status === 'queued' || item.status === 'running').length
+
+// ── Persistence (localStorage) for session-resume hydration ──────────
+
+const STORAGE_KEY_PREFIX = 'hermes_subagents_'
+
+/** Persist subagent state (slim — no stream arrays) under runtime and stored session ids. */
+export function persistSubagentsForSession(sid: string, storedSid?: string) {
+  const map = $subagentsBySession.get()
+  const list = map[sid]
+  if (!list?.length) return
+  // drop bulky stream arrays — they get re-populated by live events
+  const slim = list.map(({ stream: _stream, ...rest }) => rest)
+  try {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}${sid}`, JSON.stringify(slim))
+    if (storedSid && storedSid !== sid) {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${storedSid}`, JSON.stringify(slim))
+    }
+  } catch {
+    // quota exceeded — non-critical
+  }
+}
+
+/** Restore persisted subagent state for a stored session id (empty stream arrays). */
+export function restoreSubagentsForSession(sid: string): SubagentProgress[] | null {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${sid}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SubagentProgress[]
+    return parsed.map(p => ({ ...p, stream: [] }))
+  } catch {
+    return null
+  }
+}
+
+/** Remove persisted subagent data for a session. */
+export function clearPersistedSubagents(sid: string) {
+  try {
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}${sid}`)
+  } catch {
+    // ignore
+  }
+}
+
+/** Persist all currently-active subagent state (for beforeunload safety). */
+export function persistAllActiveSubagents() {
+  const map = $subagentsBySession.get()
+  for (const sid of Object.keys(map)) {
+    const list = map[sid]
+    if (list?.length) {
+      const slim = list.map(({ stream: _stream, ...rest }) => rest)
+      try {
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}${sid}`, JSON.stringify(slim))
+      } catch {
+        // quota — skip
+      }
+    }
+  }
+}

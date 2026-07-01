@@ -23,7 +23,7 @@ from hermes_constants import get_hermes_home
 logger = logging.getLogger(__name__)
 
 _DEFAULT_WEBSITE_BLOCKLIST = {
-    "enabled": False,
+    "enabled": True,
     "domains": [],
     "shared_files": [],
 }
