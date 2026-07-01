@@ -2,7 +2,7 @@
   "name": "zhurai-agent-desktop",
   "productName": "ZhurAI Agent",
   "private": true,
-  "version": "0.69.0",
+  "version": "0.70.0",
   "description": "Нативное десктопное приложение ZhurAI Agent. CI: release-desktop-macos.yml",
   "author": "m1krot1k1",
   "type": "module",
