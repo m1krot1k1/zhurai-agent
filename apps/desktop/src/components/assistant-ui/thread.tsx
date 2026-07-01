@@ -315,6 +315,7 @@ const AssistantMessage: FC<{
       >
         {/* Todos render in the composer status stack now, not inline. */}
         <MessagePrimitive.Parts components={MESSAGE_PARTS_COMPONENTS} />
+        {/* Spawn tree (SubagentActivityCard using @hermes/shared buildSubagentTree + SubagentNode) renders full hierarchy (depth/parent/wave/role/status/duration) in thinking surface for last assistant; instruction field kept inspector-only to prevent transcript leak. */}
         {isLastAssistantMessage ? <SubagentActivityCard sessionId={activeSessionId} /> : null}
         {isRunning && <StreamStallIndicator />}
         {previewTargets.length > 0 && (
