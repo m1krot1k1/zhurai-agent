@@ -1177,7 +1177,11 @@ class TestHermesHomeIsolation:
         """The conftest autouse fixture sets HERMES_HOME; verify it's active."""
         hermes_home = os.getenv("HERMES_HOME")
         assert hermes_home is not None, "HERMES_HOME should be set by conftest"
-        assert "hermes_test" in hermes_home, "Should point to test temp dir"
+        real_home = os.path.expanduser("~/.hermes")
+        assert hermes_home != real_home, "Should not point at real ~/.hermes"
+        assert "hermes_home_" in hermes_home or "hermes_test" in hermes_home, (
+            "Should point to conftest-isolated temp dir"
+        )
 
     def test_get_hermes_home_fallback(self):
         """Without HERMES_HOME set, falls back to the active OS home."""
