@@ -5,7 +5,10 @@ from unittest.mock import patch
 
 def _build_agent(model_cfg, custom_providers=None, model="anthropic/claude-opus-4.6"):
     """Build an AIAgent with the given model config."""
-    cfg = {"model": model_cfg}
+    cfg = {
+        "model": model_cfg,
+        "headroom": {"enabled": False},
+    }
     if custom_providers is not None:
         cfg["custom_providers"] = custom_providers
 

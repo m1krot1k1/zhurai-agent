@@ -2047,12 +2047,12 @@ class TestDispatchDelegateTask(unittest.TestCase):
 
             delegate_task(
                 goal="test",
-                acp_command="claude",
+                acp_command="copilot",
                 acp_args=["--acp", "--stdio"],
                 parent_agent=parent,
             )
             _, kwargs = mock_build.call_args
-            self.assertEqual(kwargs["override_acp_command"], "claude")
+            self.assertEqual(kwargs["override_acp_command"], "copilot")
             self.assertEqual(kwargs["override_acp_args"], ["--acp", "--stdio"])
 
 class TestDelegateEventEnum(unittest.TestCase):
