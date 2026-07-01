@@ -205,15 +205,9 @@ class TestTranscribeCallSitesReadDotenv:
         assert seen_keys == ["mistral-dotenv-key"]
 
     def test_transcribe_xai_forwards_dotenv_key(self):
-        """xAI STT now resolves credentials through ``tools.xai_http`` so the
-        OAuth bearer wins when present and ``XAI_API_KEY`` is the fallback.
-        Patch the resolver's ``get_env_value`` to simulate a dotenv-only key
-        and confirm it reaches the HTTP call. The per-call-site
-        ``transcription_tools.get_env_value`` is still consulted for the
-        ``XAI_STT_BASE_URL`` override (covered by ``test_custom_base_url``).
-        """
+        """xAI STT resolves credentials through ``tools.xai_http``; stub the
+        resolver to return a dotenv-sourced key and confirm it reaches HTTP."""
         from tools import transcription_tools as tt
-        from tools import xai_http
 
         captured: dict = {}
 
@@ -226,24 +220,19 @@ class TestTranscribeCallSitesReadDotenv:
             response.json.return_value = {"text": "hello"}
             return response
 
-        def fake_get_env_value(name, default=None):
-            if name == "XAI_API_KEY":
-                return "xai-dotenv-key"
-            return None
-
         def fake_tt_get_env_value(name, default=None):
             if name == "XAI_STT_BASE_URL":
                 return None
             return default
 
         with patch(
-            "hermes_cli.runtime_provider.resolve_runtime_provider",
-            side_effect=RuntimeError("no oauth"),
-        ), patch(
-            "hermes_cli.auth.resolve_xai_oauth_runtime_credentials",
-            return_value={},
-        ), patch.object(xai_http, "get_env_value", side_effect=fake_get_env_value), \
-             patch.object(tt, "_load_stt_config", return_value={}), \
+            "tools.xai_http.resolve_xai_http_credentials",
+            return_value={
+                "provider": "xai",
+                "api_key": "xai-dotenv-key",
+                "base_url": "https://api.x.ai/v1",
+            },
+        ), patch.object(tt, "_load_stt_config", return_value={}), \
              patch.object(tt, "get_env_value", side_effect=fake_tt_get_env_value), \
              patch("requests.post", side_effect=fake_post), \
              patch("builtins.open", mock_open(read_data=b"audio")):
@@ -273,7 +262,7 @@ class TestTranscribeCallSitesReadDotenv:
         with patch.object(tt, "get_env_value", side_effect=fake_get_env_value), \
              patch.object(tt, "_load_stt_config", return_value={}), \
              patch("requests.post", side_effect=fake_post), \
-             patch("builtins.open", MagicMock()):
+             patch("builtins.open", mock_open(read_data=b"audio")):
             result = tt._transcribe_elevenlabs("/tmp/fake.mp3", "scribe_v2")
 
         assert result["success"] is True
@@ -308,12 +297,16 @@ class TestEndToEndRegressionGuard:
             from hermes_cli.config import get_env_value as live_get
             assert live_get("XAI_API_KEY") == "dotenv-secret"
 
+            def resolve_from_dotenv():
+                return {
+                    "provider": "xai",
+                    "api_key": live_get("XAI_API_KEY"),
+                    "base_url": "https://api.x.ai/v1",
+                }
+
             with patch(
-                "hermes_cli.runtime_provider.resolve_runtime_provider",
-                side_effect=RuntimeError("no oauth"),
-            ), patch(
-                "hermes_cli.auth.resolve_xai_oauth_runtime_credentials",
-                return_value={},
+                "tools.xai_http.resolve_xai_http_credentials",
+                side_effect=resolve_from_dotenv,
             ), patch.object(tt, "_load_stt_config", return_value={}), \
                  patch.object(tt, "get_env_value", return_value=None), \
                  patch("requests.post", side_effect=fake_post), \
