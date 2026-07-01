@@ -187,8 +187,9 @@ async def handle_ws(ws: Any) -> None:
         from urllib.parse import urlparse
         parsed = urlparse(origin)
         origin_host = parsed.hostname or ""
+        origin_scheme = parsed.scheme or ""
         allowed = {"localhost", "127.0.0.1", "::1", host}
-        if origin_host not in allowed:
+        if origin_host not in allowed and origin_scheme != "file":
             _log.warning("ws rejected origin=%s peer=%s", origin, _ws_peer_label(ws))
             await ws.close(code=403, reason="origin not allowed")
             return
