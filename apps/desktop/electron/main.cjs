@@ -2213,24 +2213,26 @@ async function applyUpdatesPosixInApp() {
   // Retry-once: a first rebuild can fail on a still-settling tree or a
   // self-healed (network-blocked) Electron download; a second run builds clean
   // off the healed dist so we reach the swap+relaunch below instead of bailing.
-  const rebuilt = await runRebuildWithRetry(attempt => {
+  // On retry we auto-inject ELECTRON_MIRROR (npmmirror.com) if the user has not set one.
+  const rebuilt = await runRebuildWithRetry((attempt, attemptEnv) => {
     if (attempt > 0) {
       emitUpdateProgress({ stage: 'rebuild', message: 'Retrying the desktop rebuild…', percent: 60 })
     }
-    return runStreamedUpdate(hermes, ['desktop', '--build-only'], { cwd: updateRoot, env, stage: 'rebuild' })
-  })
+    return runStreamedUpdate(hermes, ['desktop', '--build-only'], { cwd: updateRoot, env: attemptEnv || env, stage: 'rebuild' })
+  }, env)
   if (rebuilt.code !== 0) {
     const detail = updateFailureDetail(rebuilt, 'desktop rebuild failed')
+    const hint = 'If Electron download is blocked, set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ and retry.'
     emitUpdateProgress({
       stage: 'error',
       message: 'Backend updated, but the desktop rebuild failed. Restart Hermes to retry.',
-      error: detail
+      error: `${detail}\n${hint}`
     })
     return {
       ok: false,
       backendUpdated: true,
       error: 'desktop rebuild failed',
-      message: detail
+      message: `${detail}\n${hint}`
     }
   }
 

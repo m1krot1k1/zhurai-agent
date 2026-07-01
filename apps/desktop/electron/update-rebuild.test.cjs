@@ -15,7 +15,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { shouldRetryRebuild, runRebuildWithRetry } = require('./update-rebuild.cjs')
+const { shouldRetryRebuild, runRebuildWithRetry, DEFAULT_ELECTRON_MIRROR } = require('./update-rebuild.cjs')
 
 test('shouldRetryRebuild retries only on a non-success exit', () => {
   assert.equal(shouldRetryRebuild(0), false)
@@ -52,4 +52,26 @@ test('a rebuild that keeps failing runs at most twice and reports the failure', 
   assert.deepEqual(codes, [0, 1])
   assert.equal(result.code, 1)
   assert.equal(result.error, 'rebuild-failed')
+})
+
+test('runRebuildWithRetry injects ELECTRON_MIRROR on retry when not provided', async () => {
+  const mirrors = []
+  const result = await runRebuildWithRetry((attempt, env) => {
+    mirrors.push(env?.ELECTRON_MIRROR || null)
+    return Promise.resolve({ code: attempt === 0 ? 1 : 0 })
+  }, {})
+  assert.equal(mirrors[0], null)
+  assert.equal(mirrors[1], DEFAULT_ELECTRON_MIRROR)
+  assert.equal(result.code, 0)
+})
+
+test('runRebuildWithRetry respects user-provided ELECTRON_MIRROR', async () => {
+  const mirrors = []
+  const custom = 'https://example.com/electron/'
+  const result = await runRebuildWithRetry((attempt, env) => {
+    mirrors.push(env?.ELECTRON_MIRROR || null)
+    return Promise.resolve({ code: attempt === 0 ? 1 : 0 })
+  }, { ELECTRON_MIRROR: custom })
+  assert.deepEqual(mirrors, [custom, custom])
+  assert.equal(result.code, 0)
 })
