@@ -278,6 +278,12 @@ const AssistantMessage: FC<{
   })
   const hasVisibleText = useAuiState(s => contentHasVisibleText(s.message.content))
 
+  const hasActiveSubagents = useMemo(() => {
+    if (!activeSessionId) return false
+    const subs = $subagentsBySession.get()[activeSessionId] ?? []
+    return subs.length > 0
+  }, [activeSessionId])
+
   // Preview targets only materialize once the turn completes — while running
   // the selector returns '' (stable), so per-token flushes skip the regex
   // scan and the re-render it would cause.
@@ -315,8 +321,8 @@ const AssistantMessage: FC<{
       >
         {/* Todos render in the composer status stack now, not inline. */}
         <MessagePrimitive.Parts components={MESSAGE_PARTS_COMPONENTS} />
-        {/* Spawn tree (SubagentActivityCard using @hermes/shared buildSubagentTree + SubagentNode) renders full hierarchy (depth/parent/wave/role/status/duration) in thinking surface for last assistant; instruction field kept inspector-only to prevent transcript leak. */}
-        {isLastAssistantMessage ? <SubagentActivityCard sessionId={activeSessionId} /> : null}
+        {/* Spawn tree (SubagentActivityCard using @hermes/shared buildSubagentTree + SubagentNode) renders full hierarchy (depth/parent/wave/role/status/duration) in thinking surface. Shown for last assistant or when subagents are active (orchestration visibility). Instruction field kept inspector-only. */}
+        {(isLastAssistantMessage || hasActiveSubagents) ? <SubagentActivityCard sessionId={activeSessionId} /> : null}
         {isRunning && <StreamStallIndicator />}
         {previewTargets.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
