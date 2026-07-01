@@ -117,6 +117,9 @@ jobs:
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
+          # Cap parallel pytest subprocesses on 4-core runners. cpu_count*2 (8)
+          # routinely OOM-kills slice 1 (~SIGTERM/143) mid-run.
+          HERMES_TEST_WORKERS: "4"
 
       - name: Upload per-slice durations
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
