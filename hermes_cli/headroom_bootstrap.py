@@ -431,12 +431,22 @@ def _start_dashboard_reverse_proxy() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Config auto-fix: detect dashboard_url pointing to Headroom's own port
+# Config auto-fix: detect dashboard_url pointing at the Hermes web dashboard
+# port and correct it to the Headroom LLM proxy port.
 # ---------------------------------------------------------------------------
 
 def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
-    """Detect if dashboard_url points to Headroom's own proxy port and
-    auto-correct it to the real Hermes dashboard port with a warning.
+    """Detect if dashboard_url points at the Hermes web dashboard port and
+    auto-correct it to the Headroom LLM proxy port.
+
+    The Hermes web dashboard (FastAPI on 9119) is a SEPARATE process from the
+    Headroom LLM proxy (8787). ``routed_headroom_base_url()`` builds the model
+    API base URL from this value, so pointing it at 9119 broke model routing
+    in every mode except an explicitly-running dashboard (CLI, TUI, and
+    desktop all failed with connection-refused retries). A prior regression
+    (commit d77f48b) flipped the default to 9119; correct it back to 8787 and
+    persist the fix so token-savings and the dashboard both work whenever
+    Hermes is running — terminal or desktop.
 
     Returns the corrected (or original) dashboard URL.
     """
@@ -445,11 +455,13 @@ def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
         return url
 
     parsed = urlparse(url)
-    if parsed.port == _HEADROOM_PROXY_PORT:
-        corrected = f"http://127.0.0.1:{_HERMES_DASHBOARD_PORT}"
+    if parsed.port == _HERMES_DASHBOARD_PORT:
+        corrected = f"http://127.0.0.1:{_HEADROOM_PROXY_PORT}"
         logger.warning(
-            "headroom.dashboard_url is set to Headroom's own proxy port "
-            "(%s). Auto-correcting to Hermes dashboard (%s). "
+            "headroom.dashboard_url is set to the Hermes web dashboard port "
+            "(%s). That is the UI dashboard, not the Headroom LLM proxy. "
+            "Auto-correcting to the Headroom proxy (%s) so model API routing "
+            "works in every mode (CLI, TUI, desktop, dashboard). "
             "Persisting fix to config.yaml.",
             url,
             corrected,
@@ -464,9 +476,6 @@ def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
         except Exception as exc:
             logger.warning("Could not persist dashboard_url fix to config: %s", exc)
         return corrected
-
-    if parsed.port == _HERMES_DASHBOARD_PORT:
-        return url
 
     return url
 

@@ -1326,10 +1326,13 @@ DEFAULT_CONFIG = {
         # Bounded waits for bootstrap paths.
         "install_timeout_seconds": 180,
         "startup_timeout_seconds": 20,
-        # Proxy base URL (scheme + host + port, no path). Dialog/UI integrations
-        # poll {dashboard_url}/stats and {dashboard_url}/stats-history; MCP is
-        # at {dashboard_url}/mcp. Override when the proxy binds a non-default port.
-        "dashboard_url": "http://127.0.0.1:9119",
+        # Base URL of the Headroom LLM proxy itself (scheme + host + port, no
+        # path). This is NOT the Hermes web dashboard port (9119) — Headroom
+        # runs as its own process on 8787. The agent routes model API traffic
+        # here, and UI integrations poll {dashboard_url}/stats and
+        # {dashboard_url}/stats-history; MCP is at {dashboard_url}/mcp.
+        # Override only when the proxy binds a non-default port.
+        "dashboard_url": "http://127.0.0.1:8787",
     },
 
     # Kanban subsystem (orchestrator workers + dispatcher-driven child tasks).

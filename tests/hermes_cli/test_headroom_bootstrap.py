@@ -245,3 +245,45 @@ def test_routed_headroom_base_url_skips_codex_app_server(monkeypatch):
         base_url=original,
     )
     assert routed == original
+
+
+# ---------------------------------------------------------------------------
+# _fix_dashboard_url_if_wrong: auto-correct a stale dashboard_url pointing at
+# the Hermes web dashboard port (9119) back to the Headroom proxy port (8787).
+# This is the migration path for configs written by the prior regression that
+# flipped the default to 9119 — without it, model API routing silently breaks
+# in CLI/TUI/desktop modes (only an explicitly-running dashboard masked it).
+# ---------------------------------------------------------------------------
+
+
+def test_fix_dashboard_url_corrects_dashboard_port_to_proxy_port(monkeypatch):
+    """A dashboard_url on 9119 is rewritten to 8787 and persisted."""
+    persisted = {}
+
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {"headroom": {"dashboard_url": "http://127.0.0.1:9119"}},
+    )
+
+    def _save(cfg):
+        persisted["url"] = cfg["headroom"]["dashboard_url"]
+
+    monkeypatch.setattr("hermes_cli.config.save_config", _save)
+
+    corrected = hb._fix_dashboard_url_if_wrong({"dashboard_url": "http://127.0.0.1:9119"})
+
+    assert corrected == "http://127.0.0.1:8787"
+    assert persisted.get("url") == "http://127.0.0.1:8787"
+
+
+def test_fix_dashboard_url_leaves_correct_proxy_port_alone(monkeypatch):
+    """A dashboard_url already on 8787 is returned unchanged (no rewrite/persist)."""
+    monkeypatch.setattr(
+        hb,
+        "load_config",
+        lambda: {"headroom": {"dashboard_url": "http://127.0.0.1:8787"}},
+    )
+
+    result = hb._fix_dashboard_url_if_wrong({"dashboard_url": "http://127.0.0.1:8787"})
+    assert result == "http://127.0.0.1:8787"
