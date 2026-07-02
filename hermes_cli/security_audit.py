@@ -26,9 +26,9 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
 
 from hermes_constants import get_hermes_home
 
@@ -213,7 +213,7 @@ _NPX_PKG = re.compile(r"^(@[A-Za-z0-9._-]+/[A-Za-z0-9._-]+|[A-Za-z0-9._-]+)@([A-
 _UVX_PKG = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9._+!-]+)$")
 
 
-def _extract_mcp_component(server_name: str, command: str, args: list[str]) -> Optional[Component]:
+def _extract_mcp_component(server_name: str, command: str, args: list[str]) -> Component | None:
     """Best-effort: parse `command/args` into a (name, version, ecosystem).
 
     Returns None when the entry doesn't pin a version we can audit (local
@@ -285,7 +285,7 @@ def _discover_mcp() -> list[Component]:
 def _http_post_json(url: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+        url, data=data, headers={"Content-Type": "application/json"}, method="POST",
     )
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
@@ -314,7 +314,7 @@ def _osv_query_batch(components: list[Component]) -> dict[Component, list[str]]:
                     "version": c.version,
                 }
                 for c in chunk
-            ]
+            ],
         }
         try:
             resp = _http_post_json(OSV_BATCH_URL, payload)
@@ -340,7 +340,7 @@ def _osv_severity_from_record(record: dict) -> str:
         if upper in SEVERITY_ORDER:
             return upper
     # Fall back to CVSS score → tier
-    score: Optional[float] = None
+    score: float | None = None
     for sev_entry in record.get("severity") or []:
         s = sev_entry.get("score")
         if isinstance(s, str):
@@ -416,7 +416,7 @@ def run_audit(
     skip_venv: bool = False,
     skip_plugins: bool = False,
     skip_mcp: bool = False,
-    hermes_home: Optional[Path] = None,
+    hermes_home: Path | None = None,
 ) -> list[Finding]:
     """Discover components, query OSV, return findings sorted by severity desc."""
     home = hermes_home or Path(get_hermes_home())
@@ -452,7 +452,7 @@ def run_audit(
             f.component.source,
             f.component.name.lower(),
             f.vuln.osv_id,
-        )
+        ),
     )
     return findings
 
@@ -467,7 +467,7 @@ def _render_human(findings: list[Finding], total_components: int) -> str:
     lines: list[str] = []
     lines.append(
         f"Found {len(findings)} known vulnerability finding(s) "
-        f"across {total_components} component(s):"
+        f"across {total_components} component(s):",
     )
     lines.append("")
     last_source = None
@@ -510,7 +510,7 @@ def _render_json(findings: list[Finding], total_components: int) -> str:
 
 
 def _count_components(
-    *, skip_venv: bool, skip_plugins: bool, skip_mcp: bool, hermes_home: Path
+    *, skip_venv: bool, skip_plugins: bool, skip_mcp: bool, hermes_home: Path,
 ) -> int:
     total = 0
     if not skip_venv:
@@ -542,7 +542,7 @@ def cmd_security_audit(args: argparse.Namespace) -> int:
         return 2
 
     total = _count_components(
-        skip_venv=skip_venv, skip_plugins=skip_plugins, skip_mcp=skip_mcp, hermes_home=home
+        skip_venv=skip_venv, skip_plugins=skip_plugins, skip_mcp=skip_mcp, hermes_home=home,
     )
     if total == 0:
         msg = "No components discovered (everything skipped, or empty environment)."

@@ -32,7 +32,7 @@ import logging
 import os
 import re
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,8 @@ except Exception:
 # This keeps startup fast for users who don't use Bedrock.
 # ---------------------------------------------------------------------------
 
-_bedrock_runtime_client_cache: Dict[str, Any] = {}
-_bedrock_control_client_cache: Dict[str, Any] = {}
+_bedrock_runtime_client_cache: dict[str, Any] = {}
+_bedrock_control_client_cache: dict[str, Any] = {}
 
 
 _MIN_BOTO3_VERSION = (1, 34, 59)
@@ -69,7 +69,7 @@ def _require_boto3():
         raise ImportError(
             "The 'boto3' package is required for the AWS Bedrock provider. "
             "Install it with: pip install boto3\n"
-            "Or install Hermes with Bedrock support: pip install -e '.[bedrock]'"
+            "Or install Hermes with Bedrock support: pip install -e '.[bedrock]'",
         )
     # converse() / converse_stream() were added in boto3 1.34.59.
     # When Hermes is installed editable into system Python, the system boto3
@@ -83,7 +83,7 @@ def _require_boto3():
         raise RuntimeError(
             f"boto3 {boto3.__version__} does not support converse_stream "
             f"(minimum 1.34.59 required). Upgrade with: "
-            f"pip install --upgrade boto3"
+            f"pip install --upgrade boto3",
         )
     return boto3
 
@@ -195,6 +195,8 @@ def is_stale_connection_error(exc: BaseException) -> bool:
     try:
         from botocore.exceptions import (
             ConnectionError as BotoConnectionError,
+        )
+        from botocore.exceptions import (
             HTTPClientError,
         )
         botocore_errors: tuple = (BotoConnectionError, HTTPClientError)
@@ -206,9 +208,11 @@ def is_stale_connection_error(exc: BaseException) -> bool:
     # urllib3: low-level transport failures
     try:
         from urllib3.exceptions import (
-            ProtocolError,
-            NewConnectionError,
             ConnectionError as Urllib3ConnectionError,
+        )
+        from urllib3.exceptions import (
+            NewConnectionError,
+            ProtocolError,
         )
         urllib3_errors = (ProtocolError, NewConnectionError, Urllib3ConnectionError)
     except ImportError:  # pragma: no cover
@@ -280,7 +284,7 @@ _AWS_CREDENTIAL_ENV_VARS = [
 ]
 
 
-def resolve_aws_auth_env_var(env: Optional[Dict[str, str]] = None) -> Optional[str]:
+def resolve_aws_auth_env_var(env: dict[str, str] | None = None) -> str | None:
     """Return the name of the AWS auth source that is active, or None.
 
     Checks environment variables first, then falls back to boto3's credential
@@ -322,7 +326,7 @@ def resolve_aws_auth_env_var(env: Optional[Dict[str, str]] = None) -> Optional[s
     return None
 
 
-def has_aws_credentials(env: Optional[Dict[str, str]] = None) -> bool:
+def has_aws_credentials(env: dict[str, str] | None = None) -> bool:
     """Return True if any AWS credential source is detected.
 
     Checks environment variables first (fast, no I/O), then falls back to
@@ -353,7 +357,7 @@ def has_aws_credentials(env: Optional[Dict[str, str]] = None) -> bool:
     return False
 
 
-def resolve_bedrock_region(env: Optional[Dict[str, str]] = None) -> str:
+def resolve_bedrock_region(env: dict[str, str] | None = None) -> str:
     """Resolve the AWS region for Bedrock API calls.
 
     Priority:
@@ -384,7 +388,7 @@ def resolve_bedrock_region(env: Optional[Dict[str, str]] = None) -> str:
     return "us-east-1"
 
 
-def bedrock_model_ids_or_none() -> Optional[List[str]]:
+def bedrock_model_ids_or_none() -> list[str] | None:
     """Live-discover Bedrock model IDs for the active region.
 
     Returns a list of model ID strings if discovery succeeds and yields
@@ -459,7 +463,7 @@ def is_anthropic_bedrock_model(model_id: str) -> bool:
 # Message format conversion: OpenAI → Bedrock Converse
 # ---------------------------------------------------------------------------
 
-def convert_tools_to_converse(tools: List[Dict]) -> List[Dict]:
+def convert_tools_to_converse(tools: list[dict]) -> list[dict]:
     """Convert OpenAI-format tool definitions to Bedrock Converse ``toolConfig``.
 
     OpenAI format::
@@ -485,12 +489,12 @@ def convert_tools_to_converse(tools: List[Dict]) -> List[Dict]:
                 "name": name,
                 "description": description,
                 "inputSchema": {"json": parameters},
-            }
+            },
         })
     return result
 
 
-def _convert_content_to_converse(content) -> List[Dict]:
+def _convert_content_to_converse(content) -> list[dict]:
     """Convert OpenAI message content (string or list) to Converse content blocks.
 
     Handles:
@@ -516,7 +520,7 @@ def _convert_content_to_converse(content) -> List[Dict]:
             part_type = part.get("type", "")
             if part_type == "text":
                 text = part.get("text", "")
-                blocks.append({"text": text if text else " "})
+                blocks.append({"text": text or " "})
             elif part_type == "image_url":
                 image_url = part.get("image_url", {})
                 url = image_url.get("url", "") if isinstance(image_url, dict) else ""
@@ -532,19 +536,19 @@ def _convert_content_to_converse(content) -> List[Dict]:
                         "image": {
                             "format": media_type.split("/")[-1] if "/" in media_type else "jpeg",
                             "source": {"bytes": data},
-                        }
+                        },
                     })
                 else:
                     # Remote URL — Converse doesn't support URLs directly,
                     # include as text reference for the model.
                     blocks.append({"text": f"[Image: {url}]"})
-        return blocks if blocks else [{"text": " "}]
+        return blocks or [{"text": " "}]
     return [{"text": str(content)}]
 
 
 def convert_messages_to_converse(
-    messages: List[Dict],
-) -> Tuple[Optional[List[Dict]], List[Dict]]:
+    messages: list[dict],
+) -> tuple[list[dict] | None, list[dict]]:
     """Convert OpenAI-format messages to Bedrock Converse format.
 
     Returns ``(system_prompt, converse_messages)`` where:
@@ -561,8 +565,8 @@ def convert_messages_to_converse(
     Converse requires strict user/assistant alternation. Consecutive messages
     with the same role are merged into a single message.
     """
-    system_blocks: List[Dict] = []
-    converse_msgs: List[Dict] = []
+    system_blocks: list[dict] = []
+    converse_msgs: list[dict] = []
 
     for msg in messages:
         role = msg.get("role", "")
@@ -588,7 +592,7 @@ def convert_messages_to_converse(
                 "toolResult": {
                     "toolUseId": tool_call_id,
                     "content": [{"text": result_content}],
-                }
+                },
             }
             # In Converse, tool results go in a "user" role message
             if converse_msgs and converse_msgs[-1]["role"] == "user":
@@ -622,7 +626,7 @@ def convert_messages_to_converse(
                         "toolUseId": tc.get("id", ""),
                         "name": fn.get("name", ""),
                         "input": args_dict,
-                    }
+                    },
                 })
 
             if not content_blocks:
@@ -658,7 +662,7 @@ def convert_messages_to_converse(
     if converse_msgs and converse_msgs[-1]["role"] != "user":
         converse_msgs.append({"role": "user", "content": [{"text": " "}]})
 
-    return (system_blocks if system_blocks else None, converse_msgs)
+    return (system_blocks or None, converse_msgs)
 
 
 # ---------------------------------------------------------------------------
@@ -678,7 +682,7 @@ def _converse_stop_reason_to_openai(stop_reason: str) -> str:
     return mapping.get(stop_reason, "stop")
 
 
-def normalize_converse_response(response: Dict) -> SimpleNamespace:
+def normalize_converse_response(response: dict) -> SimpleNamespace:
     """Convert a Bedrock Converse API response to an OpenAI-compatible object.
 
     The agent loop in ``run_agent.py`` expects responses shaped like
@@ -723,7 +727,7 @@ def normalize_converse_response(response: Dict) -> SimpleNamespace:
     msg = SimpleNamespace(
         role="assistant",
         content="\n".join(text_parts) if text_parts else None,
-        tool_calls=tool_calls if tool_calls else None,
+        tool_calls=tool_calls or None,
         reasoning_content="\n\n".join(reasoning_parts) if reasoning_parts else None,
     )
 
@@ -803,15 +807,16 @@ def stream_converse_with_callbacks(
     Returns:
         An OpenAI-compatible SimpleNamespace response, identical in shape to
         ``normalize_converse_response()``.
+
     """
-    text_parts: List[str] = []
-    reasoning_parts: List[str] = []
-    tool_calls: List[SimpleNamespace] = []
-    current_tool: Optional[Dict] = None
-    current_text_buffer: List[str] = []
+    text_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    tool_calls: list[SimpleNamespace] = []
+    current_tool: dict | None = None
+    current_text_buffer: list[str] = []
     has_tool_use = False
     stop_reason = "end_turn"
-    usage_data: Dict[str, int] = {}
+    usage_data: dict[str, int] = {}
 
     for event in event_stream.get("stream", []):
         # Check for interrupt
@@ -892,7 +897,7 @@ def stream_converse_with_callbacks(
     msg = SimpleNamespace(
         role="assistant",
         content="\n".join(text_parts) if text_parts else None,
-        tool_calls=tool_calls if tool_calls else None,
+        tool_calls=tool_calls or None,
         reasoning_content="\n\n".join(reasoning_parts) if reasoning_parts else None,
     )
 
@@ -927,21 +932,21 @@ def stream_converse_with_callbacks(
 
 def build_converse_kwargs(
     model: str,
-    messages: List[Dict],
-    tools: Optional[List[Dict]] = None,
+    messages: list[dict],
+    tools: list[dict] | None = None,
     max_tokens: int = 4096,
-    temperature: Optional[float] = None,
-    top_p: Optional[float] = None,
-    stop_sequences: Optional[List[str]] = None,
-    guardrail_config: Optional[Dict] = None,
-) -> Dict[str, Any]:
+    temperature: float | None = None,
+    top_p: float | None = None,
+    stop_sequences: list[str] | None = None,
+    guardrail_config: dict | None = None,
+) -> dict[str, Any]:
     """Build kwargs for ``bedrock-runtime.converse()`` or ``converse_stream()``.
 
     Converts OpenAI-format inputs to Converse API parameters.
     """
     system_prompt, converse_messages = convert_messages_to_converse(messages)
 
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "modelId": model,
         "messages": converse_messages,
         "inferenceConfig": {
@@ -977,7 +982,7 @@ def build_converse_kwargs(
             else:
                 logger.warning(
                     "Model %s does not support tool calling — tools stripped. "
-                    "The agent will operate in text-only mode.", model
+                    "The agent will operate in text-only mode.", model,
                 )
 
     if guardrail_config:
@@ -989,13 +994,13 @@ def build_converse_kwargs(
 def call_converse(
     region: str,
     model: str,
-    messages: List[Dict],
-    tools: Optional[List[Dict]] = None,
+    messages: list[dict],
+    tools: list[dict] | None = None,
     max_tokens: int = 4096,
-    temperature: Optional[float] = None,
-    top_p: Optional[float] = None,
-    stop_sequences: Optional[List[str]] = None,
-    guardrail_config: Optional[Dict] = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    stop_sequences: list[str] | None = None,
+    guardrail_config: dict | None = None,
 ) -> SimpleNamespace:
     """Call Bedrock Converse API (non-streaming) and return an OpenAI-compatible response.
 
@@ -1030,13 +1035,13 @@ def call_converse(
 def call_converse_stream(
     region: str,
     model: str,
-    messages: List[Dict],
-    tools: Optional[List[Dict]] = None,
+    messages: list[dict],
+    tools: list[dict] | None = None,
     max_tokens: int = 4096,
-    temperature: Optional[float] = None,
-    top_p: Optional[float] = None,
-    stop_sequences: Optional[List[str]] = None,
-    guardrail_config: Optional[Dict] = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    stop_sequences: list[str] | None = None,
+    guardrail_config: dict | None = None,
 ) -> SimpleNamespace:
     """Call Bedrock ConverseStream API and return an OpenAI-compatible response.
 
@@ -1083,7 +1088,7 @@ def call_converse_stream(
 # Model discovery
 # ---------------------------------------------------------------------------
 
-_discovery_cache: Dict[str, Any] = {}
+_discovery_cache: dict[str, Any] = {}
 _DISCOVERY_CACHE_TTL_SECONDS = 3600
 
 
@@ -1094,8 +1099,8 @@ def reset_discovery_cache():
 
 def discover_bedrock_models(
     region: str,
-    provider_filter: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
+    provider_filter: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Discover available Bedrock foundation models and inference profiles.
 
     Returns a list of model info dicts with keys:
@@ -1232,6 +1237,8 @@ def _extract_provider_from_arn(arn: str) -> str:
     """
     match = re.search(r"foundation-model/([^.]+)", arn)
     return match.group(1) if match else ""
+
+
 # ---------------------------------------------------------------------------
 # Error classification — Bedrock-specific exceptions
 # ---------------------------------------------------------------------------
@@ -1278,6 +1285,7 @@ def classify_bedrock_error(error_message: str) -> str:
       - ``"rate_limit"`` — throttled, backoff and retry
       - ``"overloaded"`` — model temporarily unavailable, retry with delay
       - ``"unknown"`` — unclassified error
+
     """
     if is_context_overflow_error(error_message):
         return "context_overflow"
@@ -1295,7 +1303,7 @@ def classify_bedrock_error(error_message: str) -> str:
 # context window sizes.  Used by agent/model_metadata.py when dynamic
 # detection is unavailable.
 
-BEDROCK_CONTEXT_LENGTHS: Dict[str, int] = {
+BEDROCK_CONTEXT_LENGTHS: dict[str, int] = {
     # Anthropic Claude models on Bedrock
     "anthropic.claude-opus-4-6":     200_000,
     "anthropic.claude-sonnet-4-6":   200_000,

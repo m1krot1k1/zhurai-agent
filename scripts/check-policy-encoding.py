@@ -74,7 +74,7 @@ def main() -> int:
             text = decode_utf8(path).lstrip("\ufeff")
         except UnicodeDecodeError as exc:
             failures.append(
-                f"[decode] {rel_path}: file is not valid UTF-8 ({exc.reason} at byte {exc.start})"
+                f"[decode] {rel_path}: file is not valid UTF-8 ({exc.reason} at byte {exc.start})",
             )
             continue
 

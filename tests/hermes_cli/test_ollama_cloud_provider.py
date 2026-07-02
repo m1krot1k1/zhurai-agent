@@ -1,16 +1,27 @@
 """Tests for Ollama Cloud provider integration."""
 
+import pathlib
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
-from hermes_cli.auth import PROVIDER_REGISTRY, resolve_provider, resolve_api_key_provider_credentials
-from hermes_cli.models import _PROVIDER_MODELS, _PROVIDER_LABELS, _PROVIDER_ALIASES, normalize_provider
-from hermes_cli.model_normalize import normalize_model_for_provider
-from agent.model_metadata import _URL_TO_PROVIDER, _PROVIDER_PREFIXES
+from agent.model_metadata import _PROVIDER_PREFIXES, _URL_TO_PROVIDER
 from agent.models_dev import PROVIDER_TO_MODELS_DEV, list_agentic_models
-
+from hermes_cli.auth import (
+    PROVIDER_REGISTRY,
+    resolve_api_key_provider_credentials,
+    resolve_provider,
+)
+from hermes_cli.model_normalize import normalize_model_for_provider
+from hermes_cli.models import (
+    _PROVIDER_ALIASES,
+    _PROVIDER_LABELS,
+    _PROVIDER_MODELS,
+    normalize_provider,
+)
 
 # ── Provider Registry ──
+
 
 class TestOllamaCloudProviderRegistry:
     def test_ollama_cloud_in_registry(self):
@@ -40,6 +51,7 @@ PROVIDER_ENV_VARS = (
     "GLM_API_KEY", "ZAI_API_KEY", "KIMI_API_KEY",
     "MINIMAX_API_KEY", "DEEPSEEK_API_KEY",
 )
+
 
 @pytest.fixture(autouse=True)
 def _clean_provider_env(monkeypatch):
@@ -125,8 +137,8 @@ class TestOllamaCloudModelCatalog:
                 "models": {
                     "qwen3.5:397b": {"tool_call": True},
                     "glm-5": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("hermes_cli.models.fetch_api_models", return_value=["qwen3.5:397b"]), \
              patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
@@ -151,8 +163,8 @@ class TestOllamaCloudModelPicker:
                 "models": {
                     "qwen3.5:397b": {"tool_call": True},
                     "glm-5": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("hermes_cli.models.fetch_api_models", return_value=["qwen3.5:397b"]), \
              patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
@@ -189,8 +201,8 @@ class TestOllamaCloudMergedDiscovery:
                     "glm-5": {"tool_call": True},
                     "kimi-k2.5": {"tool_call": True},
                     "nemotron-3-super": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("hermes_cli.models.fetch_api_models", return_value=["qwen3.5:397b", "glm-5"]), \
              patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
@@ -214,8 +226,8 @@ class TestOllamaCloudMergedDiscovery:
             "ollama-cloud": {
                 "models": {
                     "glm-5": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
             result = fetch_ollama_cloud_models(force_refresh=True)
@@ -255,7 +267,10 @@ class TestOllamaCloudMergedDiscovery:
 
     def test_stale_cache_used_on_total_failure(self, tmp_path, monkeypatch):
         """If both API and models.dev fail, stale cache is returned."""
-        from hermes_cli.models import fetch_ollama_cloud_models, _save_ollama_cloud_cache
+        from hermes_cli.models import (
+            _save_ollama_cloud_cache,
+            fetch_ollama_cloud_models,
+        )
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         monkeypatch.setenv("OLLAMA_API_KEY", "test-key")
@@ -266,10 +281,10 @@ class TestOllamaCloudMergedDiscovery:
         # Make the cache appear stale by backdating it
         import json
         cache_path = tmp_path / "ollama_cloud_models_cache.json"
-        with open(cache_path) as f:
+        with pathlib.Path(cache_path).open() as f:
             data = json.load(f)
         data["cached_at"] = 0  # epoch = very stale
-        with open(cache_path, "w") as f:
+        with pathlib.Path(cache_path).open("w") as f:
             json.dump(data, f)
 
         with patch("hermes_cli.models.fetch_api_models", return_value=None), \
@@ -333,8 +348,8 @@ class TestOllamaCloudModelsDev:
                     "glm-5": {"tool_call": True},
                     "nemotron-3-nano:30b": {"tool_call": True},
                     "some-embedding:latest": {"tool_call": False},
-                }
-            }
+                },
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_data):
             result = list_agentic_models("ollama-cloud")
@@ -350,6 +365,7 @@ class TestOllamaCloudAgentInit:
     def test_agent_imports_without_error(self):
         """Verify run_agent.py has no SyntaxError."""
         import importlib
+
         import run_agent
         importlib.reload(run_agent)
 
@@ -418,8 +434,8 @@ class TestOllamaCloudSuffixStripping:
 
         mock_mdev = {
             "ollama-cloud": {
-                "models": {"kimi-k2.6:cloud": {"tool_call": True}}
-            }
+                "models": {"kimi-k2.6:cloud": {"tool_call": True}},
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
             result = fetch_ollama_cloud_models(force_refresh=True)
@@ -436,8 +452,8 @@ class TestOllamaCloudSuffixStripping:
 
         mock_mdev = {
             "ollama-cloud": {
-                "models": {"qwen3-coder:480b-cloud": {"tool_call": True}}
-            }
+                "models": {"qwen3-coder:480b-cloud": {"tool_call": True}},
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
             result = fetch_ollama_cloud_models(force_refresh=True)
@@ -457,8 +473,8 @@ class TestOllamaCloudSuffixStripping:
                 "models": {
                     "kimi-k2.6:cloud": {"tool_call": True},
                     "glm-5.1:cloud": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("hermes_cli.models.fetch_api_models", return_value=["kimi-k2.6", "glm-5.1"]), \
              patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
@@ -478,8 +494,8 @@ class TestOllamaCloudSuffixStripping:
 
         mock_mdev = {
             "ollama-cloud": {
-                "models": {"nemotron-3-nano:30b": {"tool_call": True}}
-            }
+                "models": {"nemotron-3-nano:30b": {"tool_call": True}},
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_mdev):
             result = fetch_ollama_cloud_models(force_refresh=True)

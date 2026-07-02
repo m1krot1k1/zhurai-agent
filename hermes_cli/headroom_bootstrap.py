@@ -22,12 +22,12 @@ import subprocess
 import sys
 import threading
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 from hermes_cli.config import load_config
 from hermes_constants import get_hermes_home
@@ -46,7 +46,7 @@ _HERMES_DASHBOARD_PORT = 9119
 _HEADROOM_PROXY_URL = f"http://127.0.0.1:{_HEADROOM_PROXY_PORT}"
 
 
-def _bool(cfg: Dict[str, Any], key: str, default: bool) -> bool:
+def _bool(cfg: dict[str, Any], key: str, default: bool) -> bool:
     value = cfg.get(key, default)
     if isinstance(value, bool):
         return value
@@ -55,7 +55,7 @@ def _bool(cfg: Dict[str, Any], key: str, default: bool) -> bool:
     return default
 
 
-def _number(cfg: Dict[str, Any], key: str, default: float) -> float:
+def _number(cfg: dict[str, Any], key: str, default: float) -> float:
     value = cfg.get(key, default)
     try:
         parsed = float(value)
@@ -66,12 +66,12 @@ def _number(cfg: Dict[str, Any], key: str, default: float) -> float:
     return default
 
 
-def _dashboard_url(cfg: Dict[str, Any]) -> str:
+def _dashboard_url(cfg: dict[str, Any]) -> str:
     raw = str(cfg.get("dashboard_url") or "http://127.0.0.1:8787").strip()
     return raw.rstrip("/")
 
 
-def _model_provider(config: Dict[str, Any]) -> str:
+def _model_provider(config: dict[str, Any]) -> str:
     model_cfg = config.get("model")
     if isinstance(model_cfg, dict):
         return str(model_cfg.get("provider") or "").strip().lower()
@@ -106,7 +106,7 @@ def _is_healthy(base_url: str, timeout_s: float = 1.0) -> bool:
         return False
 
 
-def _read_health(base_url: str, timeout_s: float = 1.0) -> Dict[str, Any]:
+def _read_health(base_url: str, timeout_s: float = 1.0) -> dict[str, Any]:
     try:
         with urlopen(f"{base_url.rstrip('/')}/health", timeout=timeout_s) as response:
             status = int(getattr(response, "status", 200))
@@ -264,7 +264,7 @@ def _start_proxy(log_path: Path, backend: str = "") -> bool:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log_file:
         cmd = _resolve_start_command(backend=backend)
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "stdout": log_file,
             "stderr": subprocess.STDOUT,
             "stdin": subprocess.DEVNULL,
@@ -286,7 +286,8 @@ _DASHBOARD_PROXY_THREAD: threading.Thread | None = None
 
 class _DashboardForwardHandler(BaseHTTPRequestHandler):
     """HTTP request handler that forwards /dashboard/* requests to the real
-    Hermes dashboard at 127.0.0.1:9119 and returns 404 for everything else."""
+    Hermes dashboard at 127.0.0.1:9119 and returns 404 for everything else.
+    """
 
     def do_GET(self) -> None:
         self._forward()
@@ -305,7 +306,8 @@ class _DashboardForwardHandler(BaseHTTPRequestHandler):
 
     def _target_url(self) -> str | None:
         """Build the target URL on the real Hermes dashboard, or None for
-        non-dashboard paths that this proxy does not serve."""
+        non-dashboard paths that this proxy does not serve.
+        """
         path = self.path
         if path.startswith("/dashboard"):
             return f"http://127.0.0.1:{_HERMES_DASHBOARD_PORT}{path}"
@@ -329,7 +331,7 @@ class _DashboardForwardHandler(BaseHTTPRequestHandler):
         try:
             req = Request(
                 target,
-                data=body if body else None,
+                data=body or None,
                 headers={k: v for k, v in self.headers.items()
                          if k.lower() not in ("host", "content-length", "connection",
                                                "transfer-encoding")},
@@ -435,7 +437,7 @@ def _start_dashboard_reverse_proxy() -> bool:
 # port and correct it to the Headroom LLM proxy port.
 # ---------------------------------------------------------------------------
 
-def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
+def _fix_dashboard_url_if_wrong(hcfg: dict[str, Any]) -> str:
     """Detect if dashboard_url points at the Hermes web dashboard port and
     auto-correct it to the Headroom LLM proxy port.
 
@@ -480,7 +482,7 @@ def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
     return url
 
 
-def ensure_headroom_proxy_started() -> Dict[str, Any]:
+def ensure_headroom_proxy_started() -> dict[str, Any]:
     """Ensure local Headroom proxy is up (best effort, no hard failures)."""
     global _LAST_ATTEMPT_MONO, _LAST_SUCCESS
 
@@ -512,7 +514,7 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
                 health = _read_health(base_url, timeout_s=1.0)
                 actual_backend = str(
                     ((health.get("config") or {}) if isinstance(health.get("config"), dict) else {}).get("backend")
-                    or ""
+                    or "",
                 ).strip().lower()
                 if actual_backend and actual_backend != desired_backend:
                     _kill_listeners(base_url)

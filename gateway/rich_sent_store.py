@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import time
-from typing import Optional
 
 _MAX_ENTRIES = 1000
 _MAX_TEXT_CHARS = 2000
@@ -33,15 +33,15 @@ def _key(chat_id, message_id) -> str:
     return f"{chat_id}:{message_id}"
 
 
-def record(chat_id, message_id, text: Optional[str]) -> None:
+def record(chat_id, message_id, text: str | None) -> None:
     """Persist ``text`` for ``(chat_id, message_id)``. No-op on any failure."""
     if not text or message_id is None or chat_id is None:
         return
     path = _store_path()
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        pathlib.Path(os.path.dirname(path)).mkdir(exist_ok=True, parents=True)
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with pathlib.Path(path).open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
             if not isinstance(data, dict):
                 data = {}
@@ -54,23 +54,23 @@ def record(chat_id, message_id, text: Optional[str]) -> None:
         # Trim oldest by timestamp when over cap.
         if len(data) > _MAX_ENTRIES:
             for k, _ in sorted(
-                data.items(), key=lambda kv: kv[1].get("ts", 0)
+                data.items(), key=lambda kv: kv[1].get("ts", 0),
             )[: len(data) - _MAX_ENTRIES]:
                 data.pop(k, None)
         tmp = f"{path}.tmp.{os.getpid()}"
-        with open(tmp, "w", encoding="utf-8") as fh:
+        with pathlib.Path(tmp).open("w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False)
-        os.replace(tmp, path)  # atomic; tolerates concurrent writers racing
+        pathlib.Path(tmp).replace(path)  # atomic; tolerates concurrent writers racing
     except Exception:
         return
 
 
-def lookup(chat_id, message_id) -> Optional[str]:
+def lookup(chat_id, message_id) -> str | None:
     """Return stored text for ``(chat_id, message_id)`` or ``None``."""
     if message_id is None or chat_id is None:
         return None
     try:
-        with open(_store_path(), "r", encoding="utf-8") as fh:
+        with pathlib.Path(_store_path()).open("r", encoding="utf-8") as fh:
             data = json.load(fh)
         entry = data.get(_key(chat_id, message_id))
         if isinstance(entry, dict):

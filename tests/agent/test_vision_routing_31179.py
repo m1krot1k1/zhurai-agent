@@ -26,12 +26,12 @@ The three fixes covered here:
 from __future__ import annotations
 
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Test infrastructure
@@ -43,7 +43,7 @@ def isolated_home(monkeypatch):
     """Temp HERMES_HOME with config + clean credential env vars."""
     test_home = tempfile.mkdtemp(prefix="hermes_test_31179_")
     hermes_home = os.path.join(test_home, ".hermes")
-    os.makedirs(hermes_home)
+    pathlib.Path(hermes_home).mkdir(parents=True)
     monkeypatch.setenv("HERMES_HOME", hermes_home)
 
     # Strip all credential-shaped env vars so each scenario starts hermetic.
@@ -56,8 +56,7 @@ def isolated_home(monkeypatch):
 
 
 def _write_config(home: str, text: str) -> None:
-    with open(os.path.join(home, "config.yaml"), "w") as fp:
-        fp.write(text)
+    pathlib.Path(os.path.join(home, "config.yaml")).write_text(text)
 
 
 def _fresh_modules():
@@ -94,10 +93,11 @@ auxiliary:
         assert base_url == "https://api.openai.com/v1"
 
     def test_provider_openai_with_explicit_base_url_preserves_user_endpoint(
-        self, isolated_home, monkeypatch
+        self, isolated_home, monkeypatch,
     ):
         """User-supplied base_url wins; alias still normalizes provider name
-        to ``custom`` so resolution doesn't hit the unknown-provider path."""
+        to ``custom`` so resolution doesn't hit the unknown-provider path.
+        """
         _write_config(isolated_home, """
 auxiliary:
   vision:
@@ -124,8 +124,9 @@ auxiliary:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         _fresh_modules()
 
-        from agent.auxiliary_client import resolve_vision_provider_client
         from urllib.parse import urlparse
+
+        from agent.auxiliary_client import resolve_vision_provider_client
         provider, client, model = resolve_vision_provider_client()
         assert client is not None, "openai alias should produce a usable client"
         # Exact hostname comparison (not substring) — defends against URLs
@@ -202,7 +203,8 @@ class TestVisionToolGating:
 
     def test_check_vision_succeeds_for_aliased_openai(self, isolated_home, monkeypatch):
         """The user's exact reported scenario: provider=openai unhides
-        vision_analyze instead of silently dropping it."""
+        vision_analyze instead of silently dropping it.
+        """
         _write_config(isolated_home, """
 auxiliary:
   vision:
@@ -235,7 +237,7 @@ auxiliary:
         assert check_vision_requirements() is True
 
     def test_check_vision_false_with_text_only_main_and_no_aggregator(
-        self, isolated_home, monkeypatch
+        self, isolated_home, monkeypatch,
     ):
         _write_config(isolated_home, """
 model:

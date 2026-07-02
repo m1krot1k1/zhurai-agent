@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_setup_parser(subparsers, *, cmd_setup: Callable) -> None:
@@ -33,7 +33,7 @@ def build_setup_parser(subparsers, *, cmd_setup: Callable) -> None:
         help="Non-interactive mode (use defaults/env vars)",
     )
     setup_parser.add_argument(
-        "--reset", action="store_true", help="Reset configuration to defaults"
+        "--reset", action="store_true", help="Reset configuration to defaults",
     )
     setup_parser.add_argument(
         "--reconfigure",

@@ -1,5 +1,4 @@
-"""
-Browser Provider ABC
+"""Browser Provider ABC
 ====================
 
 Defines the pluggable-backend interface for cloud browser providers
@@ -38,8 +37,7 @@ which provider is in use.
 from __future__ import annotations
 
 import abc
-from typing import Any, Dict
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # ABC
@@ -87,7 +85,7 @@ class BrowserProvider(abc.ABC):
         """
 
     @abc.abstractmethod
-    def create_session(self, task_id: str) -> Dict[str, object]:
+    def create_session(self, task_id: str) -> dict[str, object]:
         """Create a cloud browser session and return session metadata.
 
         Must return a dict with at least::
@@ -124,7 +122,7 @@ class BrowserProvider(abc.ABC):
         credentials, network errors, etc. — log and move on. Must not raise.
         """
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         """Return provider metadata for the ``hermes tools`` picker.
 
         Used by :mod:`hermes_cli.tools_config` to inject this provider as a

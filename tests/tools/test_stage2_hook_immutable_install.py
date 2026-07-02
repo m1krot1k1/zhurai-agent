@@ -26,7 +26,7 @@ def test_stage2_does_not_chown_install_tree_to_hermes(stage2_text: str) -> None:
     assert "Fixing ownership of build trees under $INSTALL_DIR" not in stage2_text
     assert 'chown -R hermes:hermes \\\n        "$INSTALL_DIR/.venv"' not in stage2_text
 
-    assert "venv_owner=$(stat -c %u \"$INSTALL_DIR/.venv\"" not in stage2_text
+    assert 'venv_owner=$(stat -c %u "$INSTALL_DIR/.venv"' not in stage2_text
     assert "chown of build trees failed" not in stage2_text
     for install_tree in (
         '"$INSTALL_DIR/.venv" \\',

@@ -22,7 +22,6 @@ import pytest
 from gateway.config import PlatformConfig
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
-
 from tests.gateway.relay.stub_connector import StubConnector
 
 
@@ -81,7 +80,7 @@ async def test_follow_up_wire_action_carries_no_credential(wired):
     adapter, stub = wired
     await adapter.connect()
     await adapter.send_follow_up(
-        session_key="sess-1", kind="discord.interaction_token", content="x", metadata={"a": 1}
+        session_key="sess-1", kind="discord.interaction_token", content="x", metadata={"a": 1},
     )
     action = stub.follow_ups[0]
     # Exactly the token-less semantic fields (+ metadata); no value/secret field.
@@ -101,7 +100,7 @@ async def test_follow_up_failure_surfaces_when_capability_unresolvable(wired):
     stub.next_follow_up_result = {"success": False, "error": "capability absent or tenant mismatch"}
 
     result = await adapter.send_follow_up(
-        session_key="sess-1", kind="discord.interaction_token", content="x"
+        session_key="sess-1", kind="discord.interaction_token", content="x",
     )
 
     assert result.success is False

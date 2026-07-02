@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Tests for the subagent delegation tool.
+"""Tests for the subagent delegation tool.
 
 Uses mock AIAgent instances to test the delegation logic without
 requiring API keys or real LLM calls.
@@ -20,21 +19,21 @@ from unittest.mock import MagicMock, patch
 os.environ.setdefault("HERMES_SPAWN_RATE_LIMIT", "100000")
 
 from tools.delegate_tool import (
+    _LEGACY_EVENT_MAP,
     DELEGATE_BLOCKED_TOOLS,
     DELEGATE_TASK_SCHEMA,
-    DelegateEvent,
-    _get_max_concurrent_children,
-    _LEGACY_EVENT_MAP,
     MAX_DEPTH,
-    check_delegate_requirements,
-    delegate_task,
+    DelegateEvent,
     _build_child_agent,
     _build_child_progress_callback,
     _build_child_system_prompt,
     _extract_output_tail,
-    _strip_blocked_tools,
+    _get_max_concurrent_children,
     _resolve_child_credential_pool,
     _resolve_delegation_credentials,
+    _strip_blocked_tools,
+    check_delegate_requirements,
+    delegate_task,
 )
 
 
@@ -42,7 +41,7 @@ def _make_mock_parent(depth=0):
     """Create a mock parent agent with the fields delegate_task expects."""
     parent = MagicMock()
     parent.base_url = "https://openrouter.ai/api/v1"
-    parent.api_key="***"
+    parent.api_key = "***"
     parent.provider = "openrouter"
     parent.api_mode = "chat_completions"
     parent.model = "anthropic/claude-sonnet-4"
@@ -198,7 +197,7 @@ class TestDelegateTask(unittest.TestCase):
     def test_single_task_mode(self, mock_run):
         mock_run.return_value = {
             "task_index": 0, "status": "completed",
-            "summary": "Done!", "api_calls": 3, "duration_seconds": 5.0
+            "summary": "Done!", "api_calls": 3, "duration_seconds": 5.0,
         }
         parent = _make_mock_parent()
         result = json.loads(delegate_task(goal="Fix tests", context="error log...", parent_agent=parent))
@@ -249,7 +248,7 @@ class TestDelegateTask(unittest.TestCase):
             [
                 {"goal": "Research topic A"},
                 {"goal": "Research topic B"},
-            ]
+            ],
         )
 
         result = json.loads(delegate_task(tasks=tasks, parent_agent=parent))
@@ -264,7 +263,7 @@ class TestDelegateTask(unittest.TestCase):
         parent = _make_mock_parent()
 
         result = json.loads(
-            delegate_task(tasks=["not a task object"], parent_agent=parent)
+            delegate_task(tasks=["not a task object"], parent_agent=parent),
         )
 
         self.assertIn("error", result)
@@ -276,7 +275,7 @@ class TestDelegateTask(unittest.TestCase):
         parent = _make_mock_parent()
 
         result = json.loads(
-            delegate_task(tasks='[{"goal": "bad}', parent_agent=parent)
+            delegate_task(tasks='[{"goal": "bad}', parent_agent=parent),
         )
 
         self.assertIn("error", result)
@@ -286,10 +285,11 @@ class TestDelegateTask(unittest.TestCase):
     @patch("tools.delegate_tool._run_single_child")
     def test_batch_queues_excess_tasks(self, mock_run):
         """When tasks exceed max_concurrent_children, excess must queue
-        (not error). ThreadPoolExecutor handles queuing internally."""
+        (not error). ThreadPoolExecutor handles queuing internally.
+        """
         mock_run.return_value = {
             "task_index": 0, "status": "completed",
-            "summary": "Done", "api_calls": 1, "duration_seconds": 1.0
+            "summary": "Done", "api_calls": 1, "duration_seconds": 1.0,
         }
         parent = _make_mock_parent()
         limit = _get_max_concurrent_children()
@@ -306,7 +306,7 @@ class TestDelegateTask(unittest.TestCase):
         """When tasks array is provided, top-level goal/context/toolsets are ignored."""
         mock_run.return_value = {
             "task_index": 0, "status": "completed",
-            "summary": "Done", "api_calls": 1, "duration_seconds": 1.0
+            "summary": "Done", "api_calls": 1, "duration_seconds": 1.0,
         }
         parent = _make_mock_parent()
         result = json.loads(delegate_task(
@@ -323,7 +323,7 @@ class TestDelegateTask(unittest.TestCase):
         mock_run.return_value = {
             "task_index": 0, "status": "error",
             "summary": None, "error": "Something broke",
-            "api_calls": 0, "duration_seconds": 0.5
+            "api_calls": 0, "duration_seconds": 0.5,
         }
         parent = _make_mock_parent()
         result = json.loads(delegate_task(goal="Break things", parent_agent=parent))
@@ -337,7 +337,7 @@ class TestDelegateTask(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -351,7 +351,7 @@ class TestDelegateTask(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -361,7 +361,7 @@ class TestDelegateTask(unittest.TestCase):
     def test_child_inherits_runtime_credentials(self):
         parent = _make_mock_parent(depth=0)
         parent.base_url = "https://chatgpt.com/backend-api/codex"
-        parent.api_key="***"
+        parent.api_key = "***"
         parent.provider = "openai-codex"
         parent.api_mode = "codex_responses"
 
@@ -434,7 +434,8 @@ class TestToolNamePreservation(unittest.TestCase):
     def test_contextvar_parent_value_preserved_after_delegation(self):
         """The parent's ContextVar value must be preserved after subagent runs
         because ContextVar provides per-thread isolation — child threads never
-        overwrite the parent's copy."""
+        overwrite the parent's copy.
+        """
         import model_tools
 
         parent = _make_mock_parent(depth=0)
@@ -454,7 +455,8 @@ class TestToolNamePreservation(unittest.TestCase):
 
     def test_contextvar_parent_value_preserved_after_child_failure(self):
         """Even when the child agent raises, the parent's ContextVar value is
-        preserved — no save/restore needed."""
+        preserved — no save/restore needed.
+        """
         import model_tools
 
         parent = _make_mock_parent(depth=0)
@@ -476,7 +478,8 @@ class TestToolNamePreservation(unittest.TestCase):
 
         Previously guarded against _saved_tool_names NameError; with ContextVar
         isolation the save/restore pattern is gone, but the build should still
-        never raise."""
+        never raise.
+        """
         parent = _make_mock_parent(depth=0)
 
         with patch("run_agent.AIAgent"):
@@ -493,14 +496,15 @@ class TestToolNamePreservation(unittest.TestCase):
                 )
             except Exception as exc:
                 self.fail(
-                    f"_build_child_agent raised {type(exc).__name__}: {exc}"
+                    f"_build_child_agent raised {type(exc).__name__}: {exc}",
                 )
 
     def test_contextvar_isolation_between_parent_and_child(self):
         """ContextVar must ensure the parent's _last_resolved_tool_names is not
         overwritten by child agent construction. Child's get_tool_definitions()
         call writes to the child's own ContextVar copy, leaving the parent's
-        untouched."""
+        untouched.
+        """
         import model_tools
 
         parent = _make_mock_parent(depth=0)
@@ -526,7 +530,7 @@ class TestToolNamePreservation(unittest.TestCase):
         self.assertEqual(
             model_tools._last_resolved_tool_names.get(),
             parent_tools,
-            "Parent's ContextVar must not be overwritten by child agent"
+            "Parent's ContextVar must not be overwritten by child agent",
         )
 
 
@@ -550,7 +554,7 @@ class TestDelegateObservability(unittest.TestCase):
                 "messages": [
                     {"role": "user", "content": "do something"},
                     {"role": "assistant", "tool_calls": [
-                        {"id": "tc_1", "function": {"name": "web_search", "arguments": '{"query": "test"}'}}
+                        {"id": "tc_1", "function": {"name": "web_search", "arguments": '{"query": "test"}'}},
                     ]},
                     {"role": "tool", "tool_call_id": "tc_1", "content": '{"results": [1,2,3]}'},
                     {"role": "assistant", "content": "done"},
@@ -590,7 +594,7 @@ class TestDelegateObservability(unittest.TestCase):
                 "api_calls": 1,
                 "messages": [
                     {"role": "assistant", "tool_calls": [
-                        {"id": "tc_1", "function": {"name": "image_generate", "arguments": '{"prompt": "x"}'}}
+                        {"id": "tc_1", "function": {"name": "image_generate", "arguments": '{"prompt": "x"}'}},
                     ]},
                     {"role": "tool", "tool_call_id": "tc_1", "content": [
                         {"type": "text", "text": '{"success": true}'},
@@ -608,23 +612,24 @@ class TestDelegateObservability(unittest.TestCase):
     def test_output_tail_flattens_list_content_blocks(self):
         """_extract_output_tail (live overlay) must flatten content-block lists
         so error markers buried inside blocks are detected and previews are
-        real text, not a "[{'type': 'text'...}]" repr blob."""
+        real text, not a "[{'type': 'text'...}]" repr blob.
+        """
         result = {
             "messages": [
                 {"role": "assistant", "tool_calls": [
-                    {"id": "t1", "function": {"name": "terminal", "arguments": "{}"}}
+                    {"id": "t1", "function": {"name": "terminal", "arguments": "{}"}},
                 ]},
                 {"role": "tool", "tool_call_id": "t1", "content": [
                     {"type": "text", "text": "Error: command not found"},
                 ]},
                 {"role": "assistant", "tool_calls": [
-                    {"id": "t2", "function": {"name": "vision", "arguments": "{}"}}
+                    {"id": "t2", "function": {"name": "vision", "arguments": "{}"}},
                 ]},
                 {"role": "tool", "tool_call_id": "t2", "content": [
                     {"type": "text", "text": "all good"},
                     {"type": "image_url", "image_url": {"url": "data:x"}},
                 ]},
-            ]
+            ],
         }
         tail = _extract_output_tail(result, max_entries=8, max_chars=600)
         by_tool = {t["tool"]: t for t in tail}
@@ -655,7 +660,7 @@ class TestDelegateObservability(unittest.TestCase):
                 "api_calls": 1,
                 "messages": [
                     {"role": "assistant", "tool_calls": [
-                        {"id": "tc_1", "function": {"name": "terminal", "arguments": '{"cmd": "ls"}'}}
+                        {"id": "tc_1", "function": {"name": "terminal", "arguments": '{"cmd": "ls"}'}},
                     ]},
                     {"role": "tool", "tool_call_id": "tc_1", "content": "Error: command not found"},
                 ],
@@ -760,7 +765,8 @@ class TestDelegateObservability(unittest.TestCase):
 
 class TestSubagentCostRollup(unittest.TestCase):
     """Port of Kilo-Org/kilocode#9448 — parent's session_estimated_cost_usd
-    must include subagent spend, not just the parent's own API calls."""
+    must include subagent spend, not just the parent's own API calls.
+    """
 
     def _make_parent_with_cost_counters(self, depth=0, starting_cost=0.0):
         parent = _make_mock_parent(depth=depth)
@@ -836,7 +842,7 @@ class TestSubagentCostRollup(unittest.TestCase):
                 delegate_task(
                     tasks=[{"goal": "A"}, {"goal": "B"}, {"goal": "C"}],
                     parent_agent=parent,
-                )
+                ),
             )
 
         # 0.15 + 0.27 + 0.03 even though one child failed — the API calls it
@@ -852,7 +858,8 @@ class TestSubagentCostRollup(unittest.TestCase):
 
     def test_zero_cost_children_leave_parent_source_untouched(self):
         """If every child reports 0 cost (e.g. free local model), we should
-        not invent a fake 'subagent' source — the parent's 'none' stays."""
+        not invent a fake 'subagent' source — the parent's 'none' stays.
+        """
         parent = self._make_parent_with_cost_counters(starting_cost=0.00)
 
         with patch("tools.delegate_tool._run_single_child") as mock_run:
@@ -872,7 +879,8 @@ class TestSubagentCostRollup(unittest.TestCase):
 
     def test_parent_with_real_source_not_overwritten(self):
         """If the parent already has its own cost billed (cost_source != 'none'),
-        adding subagent cost must not clobber the existing source label."""
+        adding subagent cost must not clobber the existing source label.
+        """
         parent = self._make_parent_with_cost_counters(starting_cost=0.20)
         parent.session_cost_status = "exact"
         parent.session_cost_source = "openrouter"
@@ -896,7 +904,8 @@ class TestSubagentCostRollup(unittest.TestCase):
 
     def test_rollup_tolerates_missing_cost_fields(self):
         """Older fixtures / fabricated error entries may not carry
-        _child_cost_usd.  Rollup must degrade to zero-add silently."""
+        _child_cost_usd.  Rollup must degrade to zero-add silently.
+        """
         parent = self._make_parent_with_cost_counters(starting_cost=0.10)
 
         with patch("tools.delegate_tool._run_single_child") as mock_run:
@@ -922,8 +931,9 @@ class TestBlockedTools(unittest.TestCase):
 
     def test_constants(self):
         from tools.delegate_tool import (
-            _get_max_spawn_depth, _get_orchestrator_enabled,
             _MIN_SPAWN_DEPTH,
+            _get_max_spawn_depth,
+            _get_orchestrator_enabled,
         )
         self.assertEqual(_get_max_concurrent_children(), 5)
         self.assertEqual(MAX_DEPTH, 10)
@@ -955,8 +965,6 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertIsNone(creds["provider"])
         self.assertIsNone(creds["base_url"])
         self.assertIsNone(creds["api_key"])
-
-
 
     def test_direct_endpoint_uses_configured_base_url_and_api_key(self):
         parent = _make_mock_parent(depth=0)
@@ -1062,7 +1070,6 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertIsNone(creds["api_key"])
         self.assertEqual(creds["provider"], "custom")
 
-
     @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
     def test_provider_resolution_failure_raises_valueerror(self, mock_resolve):
         """When provider resolution fails, ValueError is raised with helpful message."""
@@ -1121,7 +1128,7 @@ class TestDelegationCredentialResolution(unittest.TestCase):
         self.assertEqual(creds["api_key"], "crof-key-abc")
         # Verify resolve_runtime_provider was called with the configured name
         mock_resolve.assert_called_once_with(
-            requested="crof.ai", target_model="deepseek-v4-pro-CEER"
+            requested="crof.ai", target_model="deepseek-v4-pro-CEER",
         )
 
     @patch("hermes_cli.runtime_provider.resolve_runtime_provider")
@@ -1205,7 +1212,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -1242,7 +1249,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -1259,7 +1266,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
     @patch("tools.delegate_tool._load_config")
     @patch("tools.delegate_tool._resolve_delegation_credentials")
     def test_provider_override_clears_parent_openrouter_filters(
-        self, mock_creds, mock_cfg
+        self, mock_creds, mock_cfg,
     ):
         """Delegated provider should not inherit parent provider-preference filters."""
         mock_cfg.return_value = {
@@ -1319,7 +1326,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -1349,7 +1356,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -1366,7 +1373,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         """When credential resolution fails, delegate_task returns a JSON error."""
         mock_cfg.return_value = {"model": "bad-model", "provider": "nonexistent"}
         mock_creds.side_effect = ValueError(
-            "Cannot resolve delegation provider 'nonexistent': Unknown provider"
+            "Cannot resolve delegation provider 'nonexistent': Unknown provider",
         )
         parent = _make_mock_parent(depth=0)
 
@@ -1401,7 +1408,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
             mock_build.return_value = mock_child
             mock_run.return_value = {
                 "task_index": 0, "status": "completed",
-                "summary": "Done", "api_calls": 1, "duration_seconds": 1.0
+                "summary": "Done", "api_calls": 1, "duration_seconds": 1.0,
             }
 
             tasks = [{"goal": "Task A"}, {"goal": "Task B"}]
@@ -1441,7 +1448,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
             mock_build.return_value = mock_child
             mock_run.return_value = {
                 "task_index": 0, "status": "completed",
-                "summary": "Done", "api_calls": 1, "duration_seconds": 1.0
+                "summary": "Done", "api_calls": 1, "duration_seconds": 1.0,
             }
 
             delegate_task(goal="ACP delegation test", parent_agent=parent)
@@ -1475,7 +1482,7 @@ class TestDelegationProviderIntegration(unittest.TestCase):
         with patch("run_agent.AIAgent") as MockAgent:
             mock_child = MagicMock()
             mock_child.run_conversation.return_value = {
-                "final_response": "done", "completed": True, "api_calls": 1
+                "final_response": "done", "completed": True, "api_calls": 1,
             }
             MockAgent.return_value = mock_child
 
@@ -1541,7 +1548,8 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
 
     def test_custom_different_endpoint_does_not_inherit_parent_pool(self):
         """A child on custom endpoint B must not inherit the parent's custom
-        endpoint A pool just because both normalize to provider='custom'."""
+        endpoint A pool just because both normalize to provider='custom'.
+        """
         parent = _make_mock_parent()
         parent.provider = "custom"
         parent.base_url = "https://endpoint-a.example.com/v1"
@@ -1559,7 +1567,7 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
         with patch("agent.credential_pool.get_custom_provider_pool_key", side_effect=fake_key), \
              patch("agent.credential_pool.load_pool", return_value=child_pool) as load_mock:
             result = _resolve_child_credential_pool(
-                "custom", parent, "https://endpoint-b.example.com/v1"
+                "custom", parent, "https://endpoint-b.example.com/v1",
             )
 
         # Loaded the child's OWN endpoint pool, not the parent's.
@@ -1569,7 +1577,8 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
 
     def test_custom_same_endpoint_shares_parent_pool(self):
         """A child on the SAME custom endpoint as the parent reuses the parent's
-        pool so rotation/cooldown state stays synchronized."""
+        pool so rotation/cooldown state stays synchronized.
+        """
         parent = _make_mock_parent()
         parent.provider = "custom"
         parent.base_url = "https://endpoint-a.example.com/v1"
@@ -1580,7 +1589,7 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
             return_value="custom:endpoint-a",
         ):
             result = _resolve_child_credential_pool(
-                "custom", parent, "https://endpoint-a.example.com/v1"
+                "custom", parent, "https://endpoint-a.example.com/v1",
             )
 
         self.assertIs(result, parent._credential_pool)
@@ -1588,7 +1597,8 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
     def test_custom_unregistered_endpoint_returns_none(self):
         """A raw delegation.base_url with no matching custom_providers entry
         must NOT inherit the parent's pool — return None so the child keeps its
-        fixed delegated credential."""
+        fixed delegated credential.
+        """
         parent = _make_mock_parent()
         parent.provider = "custom"
         parent.base_url = "https://endpoint-a.example.com/v1"
@@ -1599,7 +1609,7 @@ class TestChildCredentialPoolResolution(unittest.TestCase):
             return_value=None,
         ):
             result = _resolve_child_credential_pool(
-                "custom", parent, "https://raw-unregistered.example.com/v1"
+                "custom", parent, "https://raw-unregistered.example.com/v1",
             )
 
         self.assertIsNone(result)
@@ -1943,7 +1953,6 @@ class TestDelegateHeartbeat(unittest.TestCase):
         )
 
 
-
 class TestDelegationReasoningEffort(unittest.TestCase):
     """Tests for delegation.reasoning_effort config override."""
 
@@ -2055,6 +2064,7 @@ class TestDispatchDelegateTask(unittest.TestCase):
             self.assertEqual(kwargs["override_acp_command"], "copilot")
             self.assertEqual(kwargs["override_acp_args"], ["--acp", "--stdio"])
 
+
 class TestDelegateEventEnum(unittest.TestCase):
     """Tests for DelegateEvent enum and back-compat aliases."""
 
@@ -2122,7 +2132,8 @@ class TestDelegateEventEnum(unittest.TestCase):
     def test_progress_callback_accepts_enum_value_directly(self):
         """cb(DelegateEvent.TASK_THINKING, ...) must route to the thinking
         branch.  Pre-fix the callback only handled legacy strings via
-        _LEGACY_EVENT_MAP.get and silently dropped enum-typed callers."""
+        _LEGACY_EVENT_MAP.get and silently dropped enum-typed callers.
+        """
         parent = _make_mock_parent()
         parent._delegate_spinner = MagicMock()
         parent.tool_progress_callback = None
@@ -2138,7 +2149,8 @@ class TestDelegateEventEnum(unittest.TestCase):
     def test_progress_callback_accepts_new_style_string(self):
         """cb('delegate.task_thinking', ...) — the string form of the
         enum value — must route to the thinking branch too, so new-style
-        emitters don't have to import DelegateEvent."""
+        emitters don't have to import DelegateEvent.
+        """
         parent = _make_mock_parent()
         parent._delegate_spinner = MagicMock()
 
@@ -2231,6 +2243,7 @@ class TestMaxSpawnDepth(unittest.TestCase):
            return_value={"max_spawn_depth": 0})
     def test_max_spawn_depth_clamped_below_one(self, mock_cfg):
         import logging
+
         from tools.delegate_tool import _get_max_spawn_depth
         with self.assertLogs("tools.delegate_tool", level=logging.WARNING) as cm:
             result = _get_max_spawn_depth()
@@ -2298,7 +2311,8 @@ class TestOrchestratorRoleSchema(unittest.TestCase):
     def test_explicit_orchestrator_role_stashed(self):
         """role='orchestrator' reaches _build_child_agent and is stashed.
         Full behavior (toolset re-add) lands in commit 3; commit 2 only
-        verifies the plumbing."""
+        verifies the plumbing.
+        """
         child = self._run_with_mock_child("orchestrator")
         self.assertEqual(child._delegate_role, "orchestrator")
 
@@ -2343,7 +2357,7 @@ class TestOrchestratorRoleSchema(unittest.TestCase):
         props = DELEGATE_TASK_SCHEMA["parameters"]["properties"]
         top_acp_desc = props["acp_command"]["description"].lower()
         self.assertNotIn("e.g. 'claude'", top_acp_desc)
-        self.assertNotIn("e.g. \"claude\"", top_acp_desc)
+        self.assertNotIn('e.g. "claude"', top_acp_desc)
 
 
 # Sentinel used to distinguish "role kwarg omitted" from "role=None".
@@ -2377,12 +2391,13 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 2})
     def test_orchestrator_role_keeps_delegation_at_depth_1(
-        self, mock_cfg, mock_creds
+        self, mock_cfg, mock_creds,
     ):
         """role='orchestrator' + depth-0 parent with max_spawn_depth=2 →
         child at depth 1 gets 'delegation' in enabled_toolsets (can
         further delegate).  Requires max_spawn_depth>=2 since the new
-        default is 1 (flat)."""
+        default is 1 (flat).
+        """
         mock_creds.return_value = {
             "provider": None, "base_url": None,
             "api_key": None, "api_mode": None, "model": None,
@@ -2401,10 +2416,11 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 2})
     def test_orchestrator_blocked_at_max_spawn_depth(
-        self, mock_cfg, mock_creds
+        self, mock_cfg, mock_creds,
     ):
         """Parent at depth 1 with max_spawn_depth=2 spawns child
-        at depth 2 (the floor); role='orchestrator' degrades to leaf."""
+        at depth 2 (the floor); role='orchestrator' degrades to leaf.
+        """
         mock_creds.return_value = {
             "provider": None, "base_url": None,
             "api_key": None, "api_mode": None, "model": None,
@@ -2422,11 +2438,12 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
     @patch("tools.delegate_tool._resolve_delegation_credentials")
     @patch("tools.delegate_tool._load_config", return_value={"max_spawn_depth": 1})
     def test_orchestrator_blocked_at_flat_depth_one(
-        self, mock_cfg, mock_creds
+        self, mock_cfg, mock_creds,
     ):
         """With max_spawn_depth=1 (flat), role='orchestrator' on a depth-0
         parent produces a depth-1 child that is already at the floor — the
-        role degrades to 'leaf' and the delegation toolset is stripped."""
+        role degrades to 'leaf' and the delegation toolset is stripped.
+        """
         mock_creds.return_value = {
             "provider": None, "base_url": None,
             "api_key": None, "api_mode": None, "model": None,
@@ -2444,7 +2461,8 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
     @patch("tools.delegate_tool._resolve_delegation_credentials")
     def test_orchestrator_enabled_false_forces_leaf(self, mock_creds):
         """Kill switch delegation.orchestrator_enabled=false overrides
-        role='orchestrator'."""
+        role='orchestrator'.
+        """
         mock_creds.return_value = {
             "provider": None, "base_url": None,
             "api_key": None, "api_mode": None, "model": None,
@@ -2485,7 +2503,8 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
 
     def test_orchestrator_prompt_at_depth_floor_says_children_are_leaves(self):
         """With max_spawn_depth=2 and child_depth=1, the orchestrator's
-        own children would be at depth 2 (the floor) → must be leaves."""
+        own children would be at depth 2 (the floor) → must be leaves.
+        """
         prompt = _build_child_system_prompt(
             "Survey", role="orchestrator",
             max_spawn_depth=2, child_depth=1,
@@ -2494,7 +2513,8 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
 
     def test_orchestrator_prompt_below_floor_allows_more_nesting(self):
         """With max_spawn_depth=3 and child_depth=1, the orchestrator's
-        own children can themselves be orchestrators (depth 2 < 3)."""
+        own children can themselves be orchestrators (depth 2 < 3).
+        """
         prompt = _build_child_system_prompt(
             "Deep work", role="orchestrator",
             max_spawn_depth=3, child_depth=1,
@@ -2543,7 +2563,7 @@ class TestOrchestratorRoleBehavior(unittest.TestCase):
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 2})
     def test_intersection_preserves_delegation_bound(
-        self, mock_cfg, mock_creds
+        self, mock_cfg, mock_creds,
     ):
         """Design decision: orchestrator capability is granted by role,
         NOT inherited from the parent's toolset. A parent without
@@ -2739,11 +2759,14 @@ class TestSubagentApprovalCallback(unittest.TestCase):
         not the parent's — verifies the fix actually scopes to workers.
         """
         from concurrent.futures import ThreadPoolExecutor
+
+        from tools.delegate_tool import _subagent_auto_deny
         from tools.terminal_tool import (
-            set_approval_callback as _set_cb,
             _get_approval_callback,
         )
-        from tools.delegate_tool import _subagent_auto_deny
+        from tools.terminal_tool import (
+            set_approval_callback as _set_cb,
+        )
 
         # Parent thread has no callback.
         _set_cb(None)

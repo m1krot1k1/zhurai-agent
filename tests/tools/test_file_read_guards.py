@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Tests for read_file_tool safety guards: device-path blocking,
+"""Tests for read_file_tool safety guards: device-path blocking,
 character-count limits, file deduplication, and dedup reset on
 context compression.
 
@@ -9,30 +8,32 @@ Run with:  python -m pytest tests/tools/test_file_read_guards.py -v
 
 import json
 import os
+import pathlib
 import tempfile
 import time
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from tools.file_tools import (
-    read_file_tool,
-    write_file_tool,
-    reset_file_dedup,
-    _is_blocked_device,
-    _invalidate_dedup_for_path,
-    _READ_DEDUP_STATUS_MESSAGE,
     _DEFAULT_MAX_READ_CHARS,
+    _READ_DEDUP_STATUS_MESSAGE,
+    _invalidate_dedup_for_path,
+    _is_blocked_device,
     _read_tracker,
     notify_other_tool_call,
+    read_file_tool,
+    reset_file_dedup,
+    write_file_tool,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeReadResult:
     """Minimal stand-in for FileOperations.read_file return value."""
+
     def __init__(self, content="line1\nline2\n", total_lines=2, file_size=100):
         self.content = content
         self._total_lines = total_lines
@@ -121,7 +122,7 @@ class TestDevicePathBlocking(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             link_path = os.path.join(tmpdir, "zero-link")
             try:
-                os.symlink("/dev/zero", link_path)
+                pathlib.Path(link_path).symlink_to("/dev/zero")
             except OSError as exc:
                 self.skipTest(f"symlink unavailable: {exc}")
             self.assertTrue(_is_blocked_device(link_path))
@@ -130,21 +131,20 @@ class TestDevicePathBlocking(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             target_path = os.path.join(tmpdir, "regular.txt")
             link_path = os.path.join(tmpdir, "regular-link")
-            with open(target_path, "w", encoding="utf-8") as handle:
-                handle.write("safe\n")
+            pathlib.Path(target_path).write_text("safe\n", encoding="utf-8")
             try:
-                os.symlink(target_path, link_path)
+                pathlib.Path(link_path).symlink_to(target_path)
             except OSError as exc:
                 self.skipTest(f"symlink unavailable: {exc}")
             self.assertFalse(_is_blocked_device(link_path))
 
     def test_symlink_to_blocked_alias_is_blocked_before_realpath(self):
-        if not os.path.exists("/dev/stdin"):
+        if not pathlib.Path("/dev/stdin").exists():
             self.skipTest("/dev/stdin is not available on this platform")
         with tempfile.TemporaryDirectory() as tmpdir:
             link_path = os.path.join(tmpdir, "stdin-link")
             try:
-                os.symlink("/dev/../dev/stdin", link_path)
+                pathlib.Path(link_path).symlink_to("/dev/../dev/stdin")
             except OSError as exc:
                 self.skipTest(f"symlink unavailable: {exc}")
             self.assertTrue(_is_blocked_device(link_path))
@@ -160,7 +160,7 @@ class TestDevicePathBlocking(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             link_path = os.path.join(tmpdir, "zero-link")
             try:
-                os.symlink("/dev/zero", link_path)
+                pathlib.Path(link_path).symlink_to("/dev/zero")
             except OSError as exc:
                 self.skipTest(f"symlink unavailable: {exc}")
 
@@ -172,16 +172,16 @@ class TestDevicePathBlocking(unittest.TestCase):
 
     @patch("tools.file_tools._get_file_ops")
     def test_read_file_tool_rejects_task_cwd_relative_device_alias_symlink(self, mock_ops):
-        if not os.path.exists("/dev/stdin"):
+        if not pathlib.Path("/dev/stdin").exists():
             self.skipTest("/dev/stdin is not available on this platform")
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = os.path.join(tmpdir, "workspace")
             process_cwd = os.path.join(tmpdir, "process")
-            os.mkdir(workspace)
-            os.mkdir(process_cwd)
+            pathlib.Path(workspace).mkdir()
+            pathlib.Path(process_cwd).mkdir()
             link_path = os.path.join(workspace, "stdin-link")
             try:
-                os.symlink("/dev/../dev/stdin", link_path)
+                pathlib.Path(link_path).symlink_to("/dev/../dev/stdin")
             except OSError as exc:
                 self.skipTest(f"symlink unavailable: {exc}")
 
@@ -259,14 +259,13 @@ class TestFileDedup(unittest.TestCase):
         _read_tracker.clear()
         self._tmpdir = _make_safe_tempdir("hermes-dedup-")
         self._tmpfile = os.path.join(self._tmpdir, "dedup_test.txt")
-        with open(self._tmpfile, "w") as f:
-            f.write("line one\nline two\n")
+        pathlib.Path(self._tmpfile).write_text("line one\nline two\n")
 
     def tearDown(self):
         _read_tracker.clear()
         try:
-            os.unlink(self._tmpfile)
-            os.rmdir(self._tmpdir)
+            pathlib.Path(self._tmpfile).unlink()
+            pathlib.Path(self._tmpdir).rmdir()
         except OSError:
             pass
 
@@ -340,7 +339,7 @@ class TestFileDedup(unittest.TestCase):
         """
         fake = MagicMock()
         fake.write_file = lambda path, content: MagicMock(
-            to_dict=lambda: {"success": True, "path": path}
+            to_dict=lambda: {"success": True, "path": path},
         )
         mock_ops.return_value = fake
 
@@ -371,8 +370,7 @@ class TestFileDedup(unittest.TestCase):
 
         # Modify the file — ensure mtime changes
         time.sleep(0.05)
-        with open(self._tmpfile, "w") as f:
-            f.write("changed content\n")
+        pathlib.Path(self._tmpfile).write_text("changed content\n")
 
         r2 = json.loads(read_file_tool(self._tmpfile, task_id="mod"))
         self.assertNotEqual(r2.get("dedup"), True, "Modified file should not dedup")
@@ -409,26 +407,26 @@ class TestFileDedup(unittest.TestCase):
 class TestDedupStubLoopGuard(unittest.TestCase):
     """Repeated dedup stubs must escalate to a hard BLOCKED error so weak
     tool-following models don't burn iteration budget in an infinite loop
-    of ``read_file → stub → read_file → stub → ...``"""
+    of ``read_file → stub → read_file → stub → ...``
+    """
 
     def setUp(self):
         _read_tracker.clear()
         self._tmpdir = tempfile.mkdtemp()
         self._tmpfile = os.path.join(self._tmpdir, "loop_test.txt")
-        with open(self._tmpfile, "w") as f:
-            f.write("line one\nline two\n")
+        pathlib.Path(self._tmpfile).write_text("line one\nline two\n")
 
     def tearDown(self):
         _read_tracker.clear()
         try:
-            os.unlink(self._tmpfile)
-            os.rmdir(self._tmpdir)
+            pathlib.Path(self._tmpfile).unlink()
+            pathlib.Path(self._tmpdir).rmdir()
         except OSError:
             pass
 
     @patch("tools.file_tools._get_file_ops")
     def test_third_read_is_blocked(self, mock_ops):
-        """read → stub → BLOCKED.  Second stub escalates to hard error."""
+        """Read → stub → BLOCKED.  Second stub escalates to hard error."""
         mock_ops.return_value = _make_fake_ops(
             content="line one\nline two\n", file_size=20,
         )
@@ -471,7 +469,8 @@ class TestDedupStubLoopGuard(unittest.TestCase):
     @patch("tools.file_tools._get_file_ops")
     def test_file_modification_clears_block(self, mock_ops):
         """Real file change should break out of the block — new content
-        is legitimately different and the agent should see it."""
+        is legitimately different and the agent should see it.
+        """
         mock_ops.return_value = _make_fake_ops(
             content="line one\nline two\n", file_size=20,
         )
@@ -482,8 +481,7 @@ class TestDedupStubLoopGuard(unittest.TestCase):
 
         # File changes — mtime updates
         time.sleep(0.05)
-        with open(self._tmpfile, "w") as f:
-            f.write("brand new content\n")
+        pathlib.Path(self._tmpfile).write_text("brand new content\n")
 
         r4 = json.loads(read_file_tool(self._tmpfile, task_id="loop"))
         self.assertNotIn("error", r4)
@@ -492,7 +490,8 @@ class TestDedupStubLoopGuard(unittest.TestCase):
     @patch("tools.file_tools._get_file_ops")
     def test_other_tool_call_clears_hits(self, mock_ops):
         """An intervening non-read tool call resets stub-hit counters,
-        just like it resets the consecutive-read counter."""
+        just like it resets the consecutive-read counter.
+        """
         mock_ops.return_value = _make_fake_ops(
             content="line one\nline two\n", file_size=20,
         )
@@ -511,7 +510,8 @@ class TestDedupStubLoopGuard(unittest.TestCase):
     @patch("tools.file_tools._get_file_ops")
     def test_different_ranges_tracked_independently(self, mock_ops):
         """Stub-hit counter is keyed by (path, offset, limit), so hammering
-        one range shouldn't block reads of a different range."""
+        one range shouldn't block reads of a different range.
+        """
         mock_ops.return_value = _make_fake_ops(
             content="line one\nline two\n", file_size=20,
         )
@@ -532,7 +532,8 @@ class TestDedupStubLoopGuard(unittest.TestCase):
     @patch("tools.file_tools._get_file_ops")
     def test_reset_file_dedup_clears_hits(self, mock_ops):
         """Post-compression reset must clear stub-hit counters too,
-        otherwise the agent stays blocked after compression."""
+        otherwise the agent stays blocked after compression.
+        """
         mock_ops.return_value = _make_fake_ops(
             content="line one\nline two\n", file_size=20,
         )
@@ -555,20 +556,20 @@ class TestDedupStubLoopGuard(unittest.TestCase):
 
 class TestDedupResetOnCompression(unittest.TestCase):
     """reset_file_dedup should clear the dedup cache so post-compression
-    reads return full content."""
+    reads return full content.
+    """
 
     def setUp(self):
         _read_tracker.clear()
         self._tmpdir = tempfile.mkdtemp()
         self._tmpfile = os.path.join(self._tmpdir, "compress_test.txt")
-        with open(self._tmpfile, "w") as f:
-            f.write("original content\n")
+        pathlib.Path(self._tmpfile).write_text("original content\n")
 
     def tearDown(self):
         _read_tracker.clear()
         try:
-            os.unlink(self._tmpfile)
-            os.rmdir(self._tmpdir)
+            pathlib.Path(self._tmpfile).unlink()
+            pathlib.Path(self._tmpdir).rmdir()
         except OSError:
             pass
 
@@ -650,9 +651,11 @@ class TestLargeFileHint(unittest.TestCase):
         fake = _make_fake_ops(content=content, total_lines=10000, file_size=600_000)
         # Make to_dict return truncated=True
         orig_read = fake.read_file
+
         def patched_read(path, offset=1, limit=500):
             r = orig_read(path, offset, limit)
             orig_to_dict = r.to_dict
+
             def new_to_dict():
                 d = orig_to_dict()
                 d["truncated"] = True
@@ -724,14 +727,13 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
         _read_tracker.clear()
         self._tmpdir = _make_safe_tempdir("hermes-write-dedup-")
         self._tmpfile = os.path.join(self._tmpdir, "write_dedup.txt")
-        with open(self._tmpfile, "w") as f:
-            f.write("original content\n")
+        pathlib.Path(self._tmpfile).write_text("original content\n")
 
     def tearDown(self):
         _read_tracker.clear()
         try:
-            os.unlink(self._tmpfile)
-            os.rmdir(self._tmpdir)
+            pathlib.Path(self._tmpfile).unlink()
+            pathlib.Path(self._tmpdir).rmdir()
         except OSError:
             pass
 
@@ -749,7 +751,7 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
             content="original content\n", total_lines=1, file_size=18,
         )
         fake.write_file = lambda path, content: MagicMock(
-            to_dict=lambda: {"success": True, "path": path}
+            to_dict=lambda: {"success": True, "path": path},
         )
         mock_ops.return_value = fake
 
@@ -778,7 +780,7 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
             content="line1\nline2\nline3\n", total_lines=3, file_size=20,
         )
         fake.write_file = lambda path, content: MagicMock(
-            to_dict=lambda: {"success": True, "path": path}
+            to_dict=lambda: {"success": True, "path": path},
         )
         mock_ops.return_value = fake
 
@@ -801,15 +803,14 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
     def test_write_does_not_invalidate_other_files(self, mock_ops):
         """Writing file A should not invalidate dedup for file B."""
         other = os.path.join(self._tmpdir, "other.txt")
-        with open(other, "w") as f:
-            f.write("other content\n")
+        pathlib.Path(other).write_text("other content\n")
 
         fake = MagicMock()
         fake.read_file = lambda path, offset=1, limit=500: _FakeReadResult(
             content="other content\n", total_lines=1, file_size=15,
         )
         fake.write_file = lambda path, content: MagicMock(
-            to_dict=lambda: {"success": True, "path": path}
+            to_dict=lambda: {"success": True, "path": path},
         )
         mock_ops.return_value = fake
 
@@ -825,7 +826,7 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
                         "Unrelated file should still dedup after writing another file")
 
         try:
-            os.unlink(other)
+            pathlib.Path(other).unlink()
         except OSError:
             pass
 
@@ -837,7 +838,7 @@ class TestWriteInvalidatesDedup(unittest.TestCase):
             content="original content\n", total_lines=1, file_size=18,
         )
         fake.write_file = lambda path, content: MagicMock(
-            to_dict=lambda: {"success": True, "path": path}
+            to_dict=lambda: {"success": True, "path": path},
         )
         mock_ops.return_value = fake
 

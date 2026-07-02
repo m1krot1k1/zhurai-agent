@@ -1,5 +1,4 @@
-"""
-DM Pairing System
+"""DM Pairing System
 
 Code-based approval flow for authorizing new users on messaging platforms.
 Instead of static allowlists with user IDs, unknown users receive a one-time
@@ -26,7 +25,6 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 from gateway.whatsapp_identity import (
     expand_whatsapp_aliases,
@@ -34,7 +32,6 @@ from gateway.whatsapp_identity import (
 )
 from hermes_constants import get_hermes_dir
 from utils import atomic_replace
-
 
 # Unambiguous alphabet -- excludes 0/O, 1/I to prevent confusion
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -67,20 +64,19 @@ def _secure_write(path: Path, data: str) -> None:
             os.fsync(f.fileno())
         atomic_replace(tmp_path, path)
         try:
-            os.chmod(path, 0o600)
+            Path(path).chmod(0o600)
         except OSError:
             pass  # Windows doesn't support chmod the same way
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
 
 
 class PairingStore:
-    """
-    Manages pairing codes and approved user lists.
+    """Manages pairing codes and approved user lists.
 
     Data files per platform:
       - {platform}-pending.json   : pending pairing requests
@@ -202,10 +198,9 @@ class PairingStore:
         return hashlib.sha256(salt + code.encode("utf-8")).hexdigest()
 
     def generate_code(
-        self, platform: str, user_id: str, user_name: str = ""
-    ) -> Optional[str]:
-        """
-        Generate a pairing code for a new user.
+        self, platform: str, user_id: str, user_name: str = "",
+    ) -> str | None:
+        """Generate a pairing code for a new user.
 
         Returns the code string, or None if:
           - User is rate-limited (too recent request)
@@ -257,9 +252,8 @@ class PairingStore:
 
             return code
 
-    def approve_code(self, platform: str, code: str) -> Optional[dict]:
-        """
-        Approve a pairing code. Adds the user to the approved list.
+    def approve_code(self, platform: str, code: str) -> dict | None:
+        """Approve a pairing code. Adds the user to the approved list.
 
         Returns ``{user_id, user_name}`` on success, ``None`` if the code is
         invalid/expired OR the platform is currently locked out after

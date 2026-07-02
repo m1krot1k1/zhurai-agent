@@ -30,7 +30,6 @@ from agent.orchestrator_router import (
     try_orchestrator_child_fanout,
     try_orchestrator_post_recon_fanout,
     try_programmatic_orchestration,
-    try_programmatic_start_router,
     try_root_post_batch_wave_continue,
     try_start_child_handoff,
 )
@@ -64,7 +63,7 @@ def test_infer_agent_id_from_goal_keywords() -> None:
 
 
 def test_extract_original_request() -> None:
-    ctx = 'ORIGINAL_REQUEST: analyze repo\\nMODE: multi_domain'
+    ctx = "ORIGINAL_REQUEST: analyze repo\\nMODE: multi_domain"
     assert extract_original_request(ctx) == "analyze repo"
 
 
@@ -77,7 +76,7 @@ def test_enrich_delegate_task_entry_adds_agent_id(
     monkeypatch.setenv("ZHUR_AI_AGENT_ROOT", str(eco))
 
     enriched = enrich_delegate_task_entry(
-        {"goal": "Map the codebase structure and navigation for this repository"}
+        {"goal": "Map the codebase structure and navigation for this repository"},
     )
     assert "AGENT_ID: repo-explorer" in (enriched.get("context") or "")
 
@@ -111,7 +110,7 @@ def test_try_programmatic_start_router_dispatches_start_agent(
     agent.valid_tool_names = {"delegate_task"}
     agent.session_id = "sess-root"
     agent._dispatch_delegate_task.return_value = json.dumps(
-        {"status": "dispatched", "count": 1}
+        {"status": "dispatched", "count": 1},
     )
 
     msg = (
@@ -145,7 +144,7 @@ def test_try_start_child_handoff_dispatches_orchestrator(
         "AGENT_ID: start\nORIGINAL_REQUEST: analyze repo architecture and security"
     )
     agent._dispatch_delegate_task.return_value = json.dumps(
-        {"status": "dispatched", "count": 1}
+        {"status": "dispatched", "count": 1},
     )
 
     response = try_start_child_handoff(agent, "continue", task_id="task-start")
@@ -240,7 +239,7 @@ def test_try_orchestrator_child_fanout_dispatches(
         "ORIGINAL_REQUEST: Analyze repo architecture and security audit\nMODE: multi_domain"
     )
     agent._dispatch_delegate_task.return_value = json.dumps(
-        {"status": "dispatched", "count": 2, "results": []}
+        {"status": "dispatched", "count": 2, "results": []},
     )
 
     response = try_orchestrator_child_fanout(
@@ -293,7 +292,7 @@ def test_parse_agent_id_from_envelope() -> None:
 
 
 def test_plan_parallel_delegate_tasks_includes_agent_ids(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     (eco / "agents").mkdir(parents=True)
@@ -314,7 +313,7 @@ def test_plan_parallel_delegate_tasks_includes_agent_ids(
 
 
 def test_build_orchestration_injection_disabled_in_programmatic_mode(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     (eco / "agents").mkdir(parents=True)
@@ -331,7 +330,7 @@ def test_build_orchestration_injection_disabled_in_programmatic_mode(
 
 
 def test_build_orchestration_injection_hint_mode(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     (eco / "agents").mkdir(parents=True)
@@ -350,7 +349,7 @@ def test_build_orchestration_injection_hint_mode(
 
 
 def test_try_programmatic_orchestration_dispatches(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     (eco / "agents").mkdir(parents=True)
@@ -376,7 +375,7 @@ def test_try_programmatic_orchestration_dispatches(
             "count": 2,
             "delegation_id": "del-1",
             "goals": ["a", "b"],
-        }
+        },
     )
 
     msg = (
@@ -414,7 +413,7 @@ def test_try_programmatic_orchestration_skips_async_delegation_reinjection(
 
 
 def test_try_programmatic_skips_without_delegate_tool(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     (eco / "agents").mkdir(parents=True)
@@ -510,7 +509,7 @@ def test_try_orchestrator_post_recon_fanout_dispatches(
         "ORIGINAL_REQUEST: Analyze repo architecture and security audit\n"
     )
     agent._dispatch_delegate_task.return_value = json.dumps(
-        {"status": "dispatched", "count": 2}
+        {"status": "dispatched", "count": 2},
     )
 
     messages = [
@@ -619,7 +618,7 @@ def test_try_root_post_batch_wave_continue_dispatches_wave_two() -> None:
     agent._delegate_depth = 0
     agent._orchestrator_wave_number = 1
     agent._dispatch_delegate_task.return_value = json.dumps(
-        {"status": "dispatched", "count": 1}
+        {"status": "dispatched", "count": 1},
     )
     msg = (
         "[ASYNC DELEGATION BATCH COMPLETE — deleg_xyz]\n"
@@ -700,7 +699,7 @@ def test_evaluate_batch_for_next_wave_llm_plans_rework_tasks() -> None:
                     "agent_id": "devops-specialist",
                     "objective": "Fix skills-index deploy and verify HTTP 200",
                     "steps": "1. Fix pipeline\\n2. curl verify",
-                }
+                },
             ],
         },
     ):

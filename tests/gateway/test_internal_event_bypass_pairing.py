@@ -19,10 +19,10 @@ from gateway.run import GatewayRunner
 from gateway.session import SessionSource
 from tools.process_registry import ProcessRegistry, ProcessSession
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class _FakeRegistry:
     """Return pre-canned sessions, then None once exhausted."""
@@ -80,7 +80,7 @@ async def test_notify_on_complete_sets_internal_flag(monkeypatch, tmp_path):
 
     sessions = [
         SimpleNamespace(
-            output_buffer="done\n", exited=True, exit_code=0, command="echo test"
+            output_buffer="done\n", exited=True, exit_code=0, command="echo test",
         ),
     ]
     monkeypatch.setattr(pr_module, "process_registry", _FakeRegistry(sessions))
@@ -247,7 +247,7 @@ async def test_notify_on_complete_preserves_user_identity(monkeypatch, tmp_path)
 
     sessions = [
         SimpleNamespace(
-            output_buffer="done\n", exited=True, exit_code=0, command="echo test"
+            output_buffer="done\n", exited=True, exit_code=0, command="echo test",
         ),
     ]
     monkeypatch.setattr(pr_module, "process_registry", _FakeRegistry(sessions))
@@ -278,7 +278,7 @@ async def test_notify_on_complete_uses_session_store_origin_for_group_topic(monk
 
     sessions = [
         SimpleNamespace(
-            output_buffer="done\n", exited=True, exit_code=0, command="echo test"
+            output_buffer="done\n", exited=True, exit_code=0, command="echo test",
         ),
     ]
     monkeypatch.setattr(pr_module, "process_registry", _FakeRegistry(sessions))
@@ -298,7 +298,7 @@ async def test_notify_on_complete_uses_session_store_origin_for_group_topic(monk
             thread_id="42",
             user_id="user-42",
             user_name="alice",
-        )
+        ),
     )
 
     watcher = {
@@ -395,8 +395,8 @@ async def test_none_user_id_does_not_generate_pairing_code(monkeypatch, tmp_path
 @pytest.mark.asyncio
 async def test_non_internal_event_without_user_triggers_pairing(monkeypatch, tmp_path):
     """Verify the normal (non-internal) path still triggers pairing for unknown users."""
-    import gateway.run as gateway_run
     import gateway.pairing as pairing_mod
+    import gateway.run as gateway_run
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
     # gateway.pairing.PAIRING_DIR is a module-level constant captured at

@@ -2,8 +2,7 @@
 
 import json
 import time
-from typing import List, Optional
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -11,26 +10,25 @@ import pytest
 from tools.skills_hub import (
     GitHubAuth,
     GitHubSource,
+    HubLockFile,
     LobeHubSource,
-    SkillsShSource,
-    UrlSource,
-    WellKnownSkillSource,
     OptionalSkillSource,
-    SkillSource,
     SkillBundle,
     SkillMeta,
-    HubLockFile,
+    SkillSource,
+    SkillsShSource,
     TapsManager,
+    UrlSource,
+    WellKnownSkillSource,
+    _skill_meta_to_dict,
+    append_audit_log,
     bundle_content_hash,
     check_for_skill_updates,
     create_source_router,
     parallel_search_sources,
-    unified_search,
-    append_audit_log,
-    _skill_meta_to_dict,
     quarantine_bundle,
+    unified_search,
 )
-
 
 # ---------------------------------------------------------------------------
 # GitHubSource._parse_frontmatter_quick
@@ -298,8 +296,8 @@ class TestSkillsShSource:
                         "name": "vercel-react-best-practices",
                         "installs": 207679,
                         "source": "vercel-labs/agent-skills",
-                    }
-                ]
+                    },
+                ],
             },
         )
 
@@ -319,11 +317,11 @@ class TestSkillsShSource:
     def test_empty_search_uses_featured_homepage_links(self, mock_get, _mock_read_cache, _mock_write_cache):
         mock_get.return_value = MagicMock(
             status_code=200,
-            text='''
+            text="""
                 <a href="/vercel-labs/agent-skills/vercel-react-best-practices">React</a>
                 <a href="/anthropics/skills/pdf">PDF</a>
                 <a href="/vercel-labs/agent-skills/vercel-react-best-practices">React again</a>
-            ''',
+            """,
         )
 
         results = self._source().search("", limit=10)
@@ -385,13 +383,13 @@ class TestSkillsShSource:
         )
         mock_get.return_value = MagicMock(
             status_code=200,
-            text='''
+            text="""
                 <h1>vercel-react-best-practices</h1>
                 <code>$ npx skills add https://github.com/vercel-labs/agent-skills --skill vercel-react-best-practices</code>
                 <div class="prose"><h1>Vercel React Best Practices</h1><p>React rules.</p></div>
                 <a href="/vercel-labs/agent-skills/vercel-react-best-practices/security/socket">Socket</a> Pass
                 <a href="/vercel-labs/agent-skills/vercel-react-best-practices/security/snyk">Snyk</a> Pass
-            ''',
+            """,
         )
 
         meta = self._source().inspect("skills-sh/vercel-labs/agent-skills/vercel-react-best-practices")
@@ -463,11 +461,11 @@ class TestSkillsShSource:
         mock_list_skills.return_value = [resolved]
         mock_get.return_value = MagicMock(
             status_code=200,
-            text='''
+            text="""
                 <h1>json-render-react</h1>
                 <code>$ npx skills add https://github.com/vercel-labs/json-render --skill json-render-react</code>
                 <div class="prose"><h1>@json-render/react</h1><p>React renderer.</p></div>
-            ''',
+            """,
         )
 
         meta = self._source().inspect("skills-sh/vercel-labs/json-render/json-render-react")
@@ -503,11 +501,11 @@ class TestSkillsShSource:
         mock_list_skills.return_value = [resolved_meta]
         mock_get.return_value = MagicMock(
             status_code=200,
-            text='''
+            text="""
                 <h1>json-render-react</h1>
                 <code>$ npx skills add https://github.com/vercel-labs/json-render --skill json-render-react</code>
                 <div class="prose"><h1>@json-render/react</h1><p>React renderer.</p></div>
-            ''',
+            """,
         )
 
         bundle = self._source().fetch("skills-sh/vercel-labs/json-render/json-render-react")
@@ -558,7 +556,8 @@ class TestSkillsShSource:
         self, mock_fetch, mock_get, _mock_read_cache, _mock_write_cache,
     ):
         """Skills in deeply nested dirs (e.g. cli-tool/components/skills/dev/my-skill/)
-        are found via the GitHub Trees API when candidate paths and shallow scan fail."""
+        are found via the GitHub Trees API when candidate paths and shallow scan fail.
+        """
         tree_entries = [
             {"path": "README.md", "type": "blob"},
             {"path": "cli-tool/components/skills/development/my-skill/SKILL.md", "type": "blob"},
@@ -573,7 +572,7 @@ class TestSkillsShSource:
             if url.endswith("/contents/"):
                 # Root listing for shallow scan — return empty so it falls through
                 resp.status_code = 200
-                resp.json = lambda: []
+                resp.json = list
                 return resp
             if "/contents/" in url:
                 # All contents API calls fail (candidate paths miss)
@@ -629,7 +628,7 @@ class TestSkillsShSource:
             resp = MagicMock()
             if url == root_url:
                 resp.status_code = 200
-                resp.json = lambda: []
+                resp.json = list
                 return resp
             resp.status_code = 404
             return resp
@@ -810,7 +809,7 @@ class TestWellKnownSkillSource:
                 "skills": [
                     {"name": "git-workflow", "description": "Git rules", "files": ["SKILL.md"]},
                     {"name": "code-review", "description": "Review code", "files": ["SKILL.md", "references/checklist.md"]},
-                ]
+                ],
             },
         )
 
@@ -844,7 +843,7 @@ class TestWellKnownSkillSource:
         def fake_get(url, *args, **kwargs):
             if url.endswith("/index.json"):
                 return MagicMock(status_code=200, json=lambda: {
-                    "skills": [{"name": "git-workflow", "description": "Git rules", "files": ["SKILL.md"]}]
+                    "skills": [{"name": "git-workflow", "description": "Git rules", "files": ["SKILL.md"]}],
                 })
             if url.endswith("/git-workflow/SKILL.md"):
                 return MagicMock(status_code=200, text="---\nname: git-workflow\ndescription: Git rules\n---\n\n# Git Workflow\n")
@@ -870,7 +869,7 @@ class TestWellKnownSkillSource:
                         "name": "code-review",
                         "description": "Review code",
                         "files": ["SKILL.md", "references/checklist.md"],
-                    }]
+                    }],
                 })
             if url.endswith("/code-review/SKILL.md"):
                 return MagicMock(status_code=200, text="# Code Review\n")
@@ -898,7 +897,7 @@ class TestWellKnownSkillSource:
                         "name": "code-review",
                         "description": "Review code",
                         "files": ["SKILL.md", "../../../escape.txt"],
-                    }]
+                    }],
                 })
             if url.endswith("/code-review/SKILL.md"):
                 return MagicMock(status_code=200, text="# Code Review\n")
@@ -934,10 +933,10 @@ class TestUrlSource:
     def test_rejects_well_known_url(self):
         # Leave these for WellKnownSkillSource.
         assert self._source()._matches(
-            "https://example.com/.well-known/skills/git-workflow/SKILL.md"
+            "https://example.com/.well-known/skills/git-workflow/SKILL.md",
         ) is False
         assert self._source()._matches(
-            "https://example.com/.well-known/skills/index.json"
+            "https://example.com/.well-known/skills/index.json",
         ) is False
 
     def test_rejects_wrapped_identifiers(self):
@@ -1318,7 +1317,7 @@ class TestHubLockFile:
         lock_file = tmp_path / "lock.json"
         lock_file.write_text(json.dumps({
             "version": 1,
-            "installed": {"my-skill": {"source": "github"}}
+            "installed": {"my-skill": {"source": "github"}},
         }))
         lock = HubLockFile(path=lock_file)
         data = lock.load()
@@ -1600,7 +1599,7 @@ class TestUnifiedSearchDedup:
         failing.search.side_effect = RuntimeError("boom")
         ok = self._make_source("ok", [
             SkillMeta(name="s1", description="d", source="ok",
-                       identifier="x", trust_level="community")
+                       identifier="x", trust_level="community"),
         ])
         results = unified_search("query", [failing, ok])
         assert len(results) == 1
@@ -1675,10 +1674,10 @@ class TestOptionalSkillSourceBinaryAssets:
         )
         wav_bytes = b"RIFF\x00\x01fakewav"
         (skill_dir / "assets" / "neutts-cli" / "samples" / "jo.wav").write_bytes(
-            wav_bytes
+            wav_bytes,
         )
         (skill_dir / "assets" / "neutts-cli" / "samples" / "jo.txt").write_text(
-            "hello\n", encoding="utf-8"
+            "hello\n", encoding="utf-8",
         )
         pycache_dir = skill_dir / "assets" / "neutts-cli" / "src" / "neutts_cli" / "__pycache__"
         pycache_dir.mkdir(parents=True)
@@ -2056,8 +2055,8 @@ class TestInstallPathSafety:
                     "metadata": {},
                     "installed_at": "now",
                     "updated_at": "now",
-                }
-            }
+                },
+            },
         }))
 
         patch_lock_file(lock_path)
@@ -2084,8 +2083,8 @@ class TestInstallPathSafety:
                     "install_path": "../sibling",
                     "files": [], "metadata": {},
                     "installed_at": "now", "updated_at": "now",
-                }
-            }
+                },
+            },
         }))
 
         patch_lock_file(lock_path)
@@ -2112,8 +2111,8 @@ class TestInstallPathSafety:
                     "install_path": "",
                     "files": [], "metadata": {},
                     "installed_at": "now", "updated_at": "now",
-                }
-            }
+                },
+            },
         }))
 
         patch_lock_file(lock_path)
@@ -2122,7 +2121,7 @@ class TestInstallPathSafety:
         assert (isolated_skills_dir / "bystander" / "SKILL.md").read_text() == "safe"
 
     def test_uninstall_rejects_symlink_redirect_inside_skills(
-        self, tmp_path, isolated_skills_dir, patch_lock_file
+        self, tmp_path, isolated_skills_dir, patch_lock_file,
     ):
         """A symlinked skill dir that points outside skills/ must not be followed."""
         from tools.skills_hub import uninstall_skill
@@ -2149,8 +2148,8 @@ class TestInstallPathSafety:
                     "install_path": "evil",
                     "files": [], "metadata": {},
                     "installed_at": "now", "updated_at": "now",
-                }
-            }
+                },
+            },
         }))
 
         patch_lock_file(lock_path)
@@ -2161,7 +2160,8 @@ class TestInstallPathSafety:
 
     def test_install_from_quarantine_rejects_symlinks(self, tmp_path):
         """Skill install must not follow symlinks that leak file contents
-        from outside the quarantine directory."""
+        from outside the quarantine directory.
+        """
         import tools.skills_hub as hub
         from tools.skills_guard import ScanResult
 
@@ -2224,15 +2224,15 @@ class _FakeSource(SkillSource):
     def source_id(self) -> str:
         return self._sid
 
-    def search(self, query: str, limit: int = 10) -> List[SkillMeta]:
+    def search(self, query: str, limit: int = 10) -> list[SkillMeta]:
         if self._sleep:
             time.sleep(self._sleep)
         return list(self._results)
 
-    def fetch(self, identifier: str) -> Optional[SkillBundle]:
+    def fetch(self, identifier: str) -> SkillBundle | None:
         return None
 
-    def inspect(self, identifier: str) -> Optional[SkillMeta]:
+    def inspect(self, identifier: str) -> SkillMeta | None:
         return None
 
 
@@ -2250,7 +2250,8 @@ class TestParallelSearchSourcesTimeout:
         """A source sleeping well past overall_timeout must not stall the
         return. Before the fix the executor's `with` block waited on the slow
         worker (~5s); now the call returns promptly and reports the source as
-        timed out."""
+        timed out.
+        """
         fast = _FakeSource("fast", sleep=0.0, results=[self._meta("fast")])
         slow = _FakeSource("slow", sleep=5.0, results=[self._meta("slow")])
 
@@ -2270,7 +2271,8 @@ class TestParallelSearchSourcesTimeout:
 
     def test_all_fast_sources_complete_without_timeout(self):
         """Happy path: when every source finishes within budget, none are
-        flagged and all results are collected."""
+        flagged and all results are collected.
+        """
         a = _FakeSource("a", results=[self._meta("a")])
         b = _FakeSource("b", results=[self._meta("b")])
 

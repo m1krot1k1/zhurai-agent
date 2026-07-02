@@ -15,9 +15,9 @@ def test_show_status_includes_tavily_key(monkeypatch, capsys, tmp_path):
 
 
 def test_show_status_termux_gateway_section_skips_systemctl(monkeypatch, capsys, tmp_path):
-    from hermes_cli import status as status_mod
     import hermes_cli.auth as auth_mod
     import hermes_cli.gateway as gateway_mod
+    from hermes_cli import status as status_mod
 
     monkeypatch.setenv("TERMUX_VERSION", "0.118.3")
     monkeypatch.setenv("PREFIX", "/data/data/com.termux/files/usr")
@@ -27,9 +27,9 @@ def test_show_status_termux_gateway_section_skips_systemctl(monkeypatch, capsys,
     monkeypatch.setattr(status_mod, "resolve_requested_provider", lambda requested=None: "openai-codex", raising=False)
     monkeypatch.setattr(status_mod, "resolve_provider", lambda requested=None, **kwargs: "openai-codex", raising=False)
     monkeypatch.setattr(status_mod, "provider_label", lambda provider: "OpenAI Codex", raising=False)
-    monkeypatch.setattr(auth_mod, "get_nous_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_codex_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", lambda: {}, raising=False)
+    monkeypatch.setattr(auth_mod, "get_nous_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_codex_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", dict, raising=False)
     monkeypatch.setattr(gateway_mod, "find_gateway_pids", lambda exclude_pids=None: [], raising=False)
 
     def _unexpected_systemctl(*args, **kwargs):
@@ -46,9 +46,9 @@ def test_show_status_termux_gateway_section_skips_systemctl(monkeypatch, capsys,
 
 
 def test_show_status_reports_nous_auth_error(monkeypatch, capsys, tmp_path):
-    from hermes_cli import status as status_mod
     import hermes_cli.auth as auth_mod
     import hermes_cli.gateway as gateway_mod
+    from hermes_cli import status as status_mod
 
     monkeypatch.setattr(status_mod, "get_env_path", lambda: tmp_path / ".env", raising=False)
     monkeypatch.setattr(status_mod, "get_hermes_home", lambda: tmp_path, raising=False)
@@ -69,9 +69,9 @@ def test_show_status_reports_nous_auth_error(monkeypatch, capsys, tmp_path):
         },
         raising=False,
     )
-    monkeypatch.setattr(auth_mod, "get_codex_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", lambda: {}, raising=False)
+    monkeypatch.setattr(auth_mod, "get_codex_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", dict, raising=False)
     monkeypatch.setattr(gateway_mod, "find_gateway_pids", lambda exclude_pids=None: [], raising=False)
 
     status_mod.show_status(SimpleNamespace(all=False, deep=False))
@@ -84,10 +84,10 @@ def test_show_status_reports_nous_auth_error(monkeypatch, capsys, tmp_path):
 
 
 def test_show_status_reports_nous_inference_key_without_portal_login(monkeypatch, capsys, tmp_path):
-    from hermes_cli import status as status_mod
-    from hermes_cli.nous_account import NousPortalAccountInfo
     import hermes_cli.auth as auth_mod
     import hermes_cli.gateway as gateway_mod
+    from hermes_cli import status as status_mod
+    from hermes_cli.nous_account import NousPortalAccountInfo
 
     monkeypatch.setattr(status_mod, "get_env_path", lambda: tmp_path / ".env", raising=False)
     monkeypatch.setattr(status_mod, "get_hermes_home", lambda: tmp_path, raising=False)
@@ -120,9 +120,9 @@ def test_show_status_reports_nous_inference_key_without_portal_login(monkeypatch
         raising=False,
     )
     monkeypatch.setattr(status_mod, "managed_nous_tools_enabled", lambda: False, raising=False)
-    monkeypatch.setattr(auth_mod, "get_codex_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", lambda: {}, raising=False)
+    monkeypatch.setattr(auth_mod, "get_codex_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", dict, raising=False)
     monkeypatch.setattr(gateway_mod, "find_gateway_pids", lambda exclude_pids=None: [], raising=False)
 
     status_mod.show_status(SimpleNamespace(all=False, deep=False))
@@ -139,9 +139,9 @@ def test_show_status_reports_nous_inference_key_without_portal_login(monkeypatch
 
 def _base_xai_mocks(monkeypatch, tmp_path):
     """Set up the minimal environment for show_status, returning status_mod."""
-    from hermes_cli import status as status_mod
     import hermes_cli.auth as auth_mod
     import hermes_cli.gateway as gateway_mod
+    from hermes_cli import status as status_mod
 
     monkeypatch.setattr(status_mod, "get_env_path", lambda: tmp_path / ".env", raising=False)
     monkeypatch.setattr(status_mod, "get_hermes_home", lambda: tmp_path, raising=False)
@@ -149,10 +149,10 @@ def _base_xai_mocks(monkeypatch, tmp_path):
     monkeypatch.setattr(status_mod, "resolve_requested_provider", lambda requested=None: "openai-codex", raising=False)
     monkeypatch.setattr(status_mod, "resolve_provider", lambda requested=None, **kwargs: "openai-codex", raising=False)
     monkeypatch.setattr(status_mod, "provider_label", lambda provider: "OpenAI Codex", raising=False)
-    monkeypatch.setattr(auth_mod, "get_nous_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_codex_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_minimax_oauth_auth_status", lambda: {}, raising=False)
+    monkeypatch.setattr(auth_mod, "get_nous_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_codex_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_qwen_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_minimax_oauth_auth_status", dict, raising=False)
     monkeypatch.setattr(gateway_mod, "find_gateway_pids", lambda exclude_pids=None: [], raising=False)
     return status_mod
 

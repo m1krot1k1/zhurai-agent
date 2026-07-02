@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-body_calc.py — All-in-one fitness calculator.
+"""body_calc.py — All-in-one fitness calculator.
 
 Subcommands:
   bmi      <weight_kg> <height_cm>
@@ -11,8 +10,8 @@ Subcommands:
 
 No external dependencies — stdlib only.
 """
-import sys
 import math
+import sys
 
 
 def bmi(weight_kg, height_cm):
@@ -29,10 +28,10 @@ def bmi(weight_kg, height_cm):
     print(f"BMI: {val:.1f} — {cat}")
     print()
     print("Ranges:")
-    print(f"  Underweight : < 18.5")
-    print(f"  Normal      : 18.5 – 24.9")
-    print(f"  Overweight  : 25.0 – 29.9")
-    print(f"  Obese       : 30.0+")
+    print("  Underweight : < 18.5")
+    print("  Normal      : 18.5 – 24.9")
+    print("  Overweight  : 25.0 – 29.9")
+    print("  Obese       : 30.0+")
 
 
 def tdee(weight_kg, height_cm, age, sex, activity):
@@ -160,7 +159,7 @@ def bodyfat(sex, neck_cm, waist_cm, hip_cm, height_cm):
             break
 
     print(f"Category: {cat}")
-    print(f"Method: US Navy circumference formula")
+    print("Method: US Navy circumference formula")
 
 
 def usage():

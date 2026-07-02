@@ -74,7 +74,8 @@ def test_initialized_path_connect_skips_init_lock(kanban_home):
 
 def test_first_init_connect_is_bounded_when_lock_held(kanban_home, monkeypatch):
     """First-init connect must time out the cross-process lock and proceed,
-    not hang forever, when another holder owns it."""
+    not hang forever, when another holder owns it.
+    """
     monkeypatch.setattr(kb, "_INIT_LOCK_TIMEOUT_SECONDS", 0.6)
     db_path = kb.kanban_db_path(board="default")
 

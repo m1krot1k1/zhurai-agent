@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Bootstrap a video production kanban from a structured plan JSON.
+"""Bootstrap a video production kanban from a structured plan JSON.
 
 Reads a plan.json describing the team + brief, expands templates from
 ../assets/, and writes a setup.sh that creates Hermes profiles and fires the
@@ -59,7 +58,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -104,27 +102,26 @@ def validate_plan(plan: dict) -> list[str]:
                     if not PROFILE_NAME_RE.match(t["profile"]):
                         errors.append(
                             f"team[{i}].profile {t['profile']!r} must match "
-                            f"[a-z0-9][a-z0-9_-]{{0,63}} per Hermes profile rules"
+                            f"[a-z0-9][a-z0-9_-]{{0,63}} per Hermes profile rules",
                         )
                     if t["profile"] in seen_profiles:
                         errors.append(
-                            f"team[{i}].profile {t['profile']!r} is duplicated"
+                            f"team[{i}].profile {t['profile']!r} is duplicated",
                         )
                     seen_profiles.add(t["profile"])
                 # Toolsets / skills must be lists, not strings.
                 if "toolsets" in t and not isinstance(t["toolsets"], list):
                     errors.append(
-                        f"team[{i}].toolsets must be a list of strings"
+                        f"team[{i}].toolsets must be a list of strings",
                     )
                 if "skills" in t and not isinstance(t["skills"], list):
                     errors.append(
-                        f"team[{i}].skills must be a list of strings"
+                        f"team[{i}].skills must be a list of strings",
                     )
 
-    if "slug" in plan:
-        if not SLUG_RE.match(plan["slug"]):
-            errors.append("slug must be lowercase, hyphenated, "
-                          "starting with [a-z0-9]")
+    if "slug" in plan and not SLUG_RE.match(plan["slug"]):
+        errors.append("slug must be lowercase, hyphenated, "
+                      "starting with [a-z0-9]")
 
     return errors
 
@@ -140,7 +137,7 @@ def render_brief(plan: dict) -> str:
         scene_rows.append(
             f"| {s.get('n', '?')} | {s.get('time', '?')} | "
             f"{s.get('content', '')} | {s.get('tool', '')} | "
-            f"{s.get('audio', '')} | {s.get('notes', '')} |"
+            f"{s.get('audio', '')} | {s.get('notes', '')} |",
         )
     scene_table = "\n".join(scene_rows) if scene_rows else "_(none yet)_"
 
@@ -149,7 +146,7 @@ def render_brief(plan: dict) -> str:
     for d in plan["deliverables"]:
         deliv_rows.append(
             f"| {d.get('format', '?')} | {d.get('resolution', '?')} | "
-            f"{d.get('notes', '')} |"
+            f"{d.get('notes', '')} |",
         )
     deliv_table = "\n".join(deliv_rows) if deliv_rows else "_(none)_"
 
@@ -210,7 +207,7 @@ def render_team_md(plan: dict) -> str:
             if t["skills"] else "no skills required"
         )
         lines.append(
-            f"- `{t['profile']}` — {t['responsibilities']} ({skills})"
+            f"- `{t['profile']}` — {t['responsibilities']} ({skills})",
         )
     lines.extend(["", "## Task Graph", "", "```"])
 
@@ -225,7 +222,7 @@ def render_team_md(plan: dict) -> str:
     if "cinematographer" in profiles_by_role:
         cid = f"T{next_id}"
         lines.append(
-            f"{cid:5} {profiles_by_role['cinematographer']} — visual spec for all scenes (parent: T0)"
+            f"{cid:5} {profiles_by_role['cinematographer']} — visual spec for all scenes (parent: T0)",
         )
         parents_for_renderer = [cid]
         next_id += 1
@@ -233,7 +230,7 @@ def render_team_md(plan: dict) -> str:
     if "music-supervisor" in profiles_by_role:
         cid = f"T{next_id}"
         lines.append(
-            f"{cid:5} {profiles_by_role['music-supervisor']} — track analysis + beats.json (parent: T0)"
+            f"{cid:5} {profiles_by_role['music-supervisor']} — track analysis + beats.json (parent: T0)",
         )
         next_id += 1
         ms_id = cid
@@ -254,7 +251,7 @@ def render_team_md(plan: dict) -> str:
         parent_str = ", ".join(parents)
         lines.append(
             f"{cid:5} {renderer_profile} — scene {s.get('n', '?')}: "
-            f"{s.get('content', '')[:50]} (parents: {parent_str})"
+            f"{s.get('content', '')[:50]} (parents: {parent_str})",
         )
         scene_ids.append(cid)
         next_id += 1
@@ -271,7 +268,7 @@ def render_team_md(plan: dict) -> str:
         am_id = f"T{next_id}"
         am_parents = [p for p in [ms_id, vo_id] if p]
         lines.append(
-            f"{am_id:5} {profiles_by_role['audio-mixer']} — mix audio (parents: {', '.join(am_parents)})"
+            f"{am_id:5} {profiles_by_role['audio-mixer']} — mix audio (parents: {', '.join(am_parents)})",
         )
         next_id += 1
     else:
@@ -282,7 +279,7 @@ def render_team_md(plan: dict) -> str:
         ed_id = f"T{next_id}"
         ed_parents = scene_ids + [p for p in [am_id, vo_id, ms_id] if p and p not in scene_ids]
         lines.append(
-            f"{ed_id:5} {profiles_by_role['editor']} — assemble + mux (parents: {', '.join(ed_parents)})"
+            f"{ed_id:5} {profiles_by_role['editor']} — assemble + mux (parents: {', '.join(ed_parents)})",
         )
         next_id += 1
     else:
@@ -292,7 +289,7 @@ def render_team_md(plan: dict) -> str:
     if "captioner" in profiles_by_role and ed_id:
         cap_id = f"T{next_id}"
         lines.append(
-            f"{cap_id:5} {profiles_by_role['captioner']} — SRT + burn (parent: {ed_id})"
+            f"{cap_id:5} {profiles_by_role['captioner']} — SRT + burn (parent: {ed_id})",
         )
         next_id += 1
         last = cap_id
@@ -303,7 +300,7 @@ def render_team_md(plan: dict) -> str:
     if "reviewer" in profiles_by_role and last:
         rv_id = f"T{next_id}"
         lines.append(
-            f"{rv_id:5} {profiles_by_role['reviewer']} — final QA (parent: {last})"
+            f"{rv_id:5} {profiles_by_role['reviewer']} — final QA (parent: {last})",
         )
 
     lines.append("```")
@@ -311,12 +308,12 @@ def render_team_md(plan: dict) -> str:
         "",
         "## Per-task workspace requirement",
         "",
-        f"All `kanban_create` calls MUST pass:",
-        f"```",
-        f'workspace_kind="dir"',
+        "All `kanban_create` calls MUST pass:",
+        "```",
+        'workspace_kind="dir"',
         f'workspace_path="$HOME/projects/video-pipeline/{plan["slug"]}"',
         f'tenant="{plan["tenant"]}"',
-        f"```",
+        "```",
     ])
     return "\n".join(lines)
 
@@ -328,7 +325,7 @@ def render_setup_sh(plan: dict, brief_md: str, team_md: str) -> str:
     # API key checks
     key_checks = []
     for key in plan.get("api_keys_required", []):
-        key_checks.append(f'check_key {key} hermes {key} || exit 1')
+        key_checks.append(f"check_key {key} hermes {key} || exit 1")
     key_checks_str = "\n".join(key_checks) if key_checks else "# (no API keys required)"
 
     # Scene dirs
@@ -342,7 +339,7 @@ def render_setup_sh(plan: dict, brief_md: str, team_md: str) -> str:
     profile_creates = []
     for t in plan["team"]:
         profile_creates.append(
-            f'hermes profile create {t["profile"]} --clone 2>/dev/null || true'
+            f'hermes profile create {t["profile"]} --clone 2>/dev/null || true',
         )
 
     # Profile config — emit JSON arrays so the bash function can pass them
@@ -354,7 +351,7 @@ def render_setup_sh(plan: dict, brief_md: str, team_md: str) -> str:
         # Use single-quoted bash strings; JSON only contains "/[/], no single
         # quotes, so this is safe.
         profile_configs.append(
-            f"configure_profile {t['profile']!r} {ts_json!r} {sk_json!r}"
+            f"configure_profile {t['profile']!r} {ts_json!r} {sk_json!r}",
         )
 
     # SOUL writes — uses heredocs per profile
@@ -364,7 +361,7 @@ def render_setup_sh(plan: dict, brief_md: str, team_md: str) -> str:
             f'cat > "$HOME/.hermes/profiles/{t["profile"]}/SOUL.md" <<\'SOUL_EOF\'\n'
             f"{render_soul_md(t, plan)}\n"
             f"SOUL_EOF\n"
-            f'echo "  ✓ SOUL.md for {t["profile"]}"'
+            f'echo "  ✓ SOUL.md for {t["profile"]}"',
         )
 
     # Taste writes (placeholder; real content optional)
@@ -407,7 +404,7 @@ def render_soul_md(team_member: dict, plan: dict) -> str:
 
     common_rules = (
         "- **Read the brief and team graph** before doing anything else.\n"
-        "- **Pass `workspace_kind=\"dir\"` and `workspace_path` on every "
+        '- **Pass `workspace_kind="dir"` and `workspace_path` on every '
         "`kanban_create` call.** This keeps the team in one shared workspace.\n"
         f"- **Use tenant `{plan['tenant']}`** on every kanban call.\n"
         "- **Write outputs to predictable paths.** Other profiles depend on "
@@ -444,15 +441,15 @@ def render_soul_md(team_member: dict, plan: dict) -> str:
     out = out.replace("{{TOOLSETS}}", ", ".join(team_member["toolsets"]))
     out = out.replace(
         "{{SKILLS}}",
-        ", ".join(team_member["skills"]) if team_member["skills"] else "(none)"
+        ", ".join(team_member["skills"]) if team_member["skills"] else "(none)",
     )
     out = out.replace(
         "{{EXTERNAL_TOOLS}}",
-        team_member.get("external_tools", "ffmpeg, ffprobe (via terminal)")
+        team_member.get("external_tools", "ffmpeg, ffprobe (via terminal)"),
     )
     out = out.replace(
         "{{ROLE_RULES}}",
-        team_member.get("role_rules", "_(see TEAM.md and brief.md)_")
+        team_member.get("role_rules", "_(see TEAM.md and brief.md)_"),
     )
     out = out.replace("{{COMMON_RULES}}", common_rules)
     out = out.replace("{{COMMON_COMMANDS}}", common_commands)
@@ -484,7 +481,7 @@ def main():
     setup = render_setup_sh(plan, brief, team)
 
     Path(args.out).write_text(setup)
-    os.chmod(args.out, 0o755)
+    Path(args.out).chmod(0o755)
     print(f"Wrote {args.out}")
 
     if args.brief_out:

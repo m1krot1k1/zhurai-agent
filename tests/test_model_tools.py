@@ -1,22 +1,22 @@
 """Tests for model_tools.py — function call dispatch, agent-loop interception, legacy toolsets."""
 
 import json
+import math
 from unittest.mock import ANY, call, patch
 
-
 from model_tools import (
-    handle_function_call,
-    get_all_tool_names,
-    get_toolset_for_tool,
     _AGENT_LOOP_TOOLS,
     _LEGACY_TOOLSET_MAP,
     TOOL_TO_TOOLSET_MAP,
+    get_all_tool_names,
+    get_toolset_for_tool,
+    handle_function_call,
 )
-
 
 # =========================================================================
 # handle_function_call
 # =========================================================================
+
 
 class TestHandleFunctionCall:
     def test_agent_loop_tool_returns_error(self):
@@ -189,7 +189,7 @@ class TestHandleFunctionCall:
                 task_id="task-1",
                 tool_call_id="tool-1",
                 session_id="session-1",
-            )
+            ),
         )
 
         assert seen["execution_args"] == {"q": "test", "rewritten": True}
@@ -424,7 +424,8 @@ class TestBackwardCompat:
 class TestCoerceNumberInfNan:
     """_coerce_number must honor its documented contract ("Returns original
     string on failure") for inf/nan inputs, because float('inf') and
-    float('nan') are not JSON-compliant under strict serialization."""
+    float('nan') are not JSON-compliant under strict serialization.
+    """
 
     def test_inf_returns_original_string(self):
         from model_tools import _coerce_number
@@ -445,7 +446,8 @@ class TestCoerceNumberInfNan:
 
     def test_coerced_result_is_strict_json_safe(self):
         """Whatever _coerce_number returns for inf/nan must round-trip
-        through strict (allow_nan=False) json.dumps without raising."""
+        through strict (allow_nan=False) json.dumps without raising.
+        """
         from model_tools import _coerce_number
         for s in ("inf", "-inf", "nan", "Infinity"):
             result = _coerce_number(s)
@@ -455,12 +457,14 @@ class TestCoerceNumberInfNan:
         """Guard against over-correction — real numbers still coerce."""
         from model_tools import _coerce_number
         assert _coerce_number("42") == 42
-        assert _coerce_number("3.14") == 3.14
+        assert _coerce_number("3.14") == math.pi
         assert _coerce_number("1e3") == 1000
+
 
 class TestDisabledToolsetsPlatformBundle:
     """Regression test for #33924: disabling a platform bundle (hermes-*)
-    must not remove core tools from other enabled toolsets."""
+    must not remove core tools from other enabled toolsets.
+    """
 
     def test_disabling_platform_bundle_preserves_core_tools(self):
         """Disabling hermes-yuanbao should not strip core tools from hermes-telegram."""
@@ -520,11 +524,11 @@ class TestDisabledToolsetsPlatformBundle:
             f"Web tools not removed: {present_web - removed}"
         )
 
-
     def test_disabling_bundle_removes_platform_tools_but_keeps_core(self):
         """Disabling hermes-discord (when enabled) removes discord/discord_admin
-        from the resolved delta but keeps core tools — via bundle_non_core_tools."""
-        from toolsets import bundle_non_core_tools, _HERMES_CORE_TOOLS
+        from the resolved delta but keeps core tools — via bundle_non_core_tools.
+        """
+        from toolsets import _HERMES_CORE_TOOLS, bundle_non_core_tools
 
         delta = bundle_non_core_tools("hermes-yuanbao")
         # The delta is the bundle's platform-specific tools, NOT core.

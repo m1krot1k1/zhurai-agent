@@ -11,15 +11,14 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 import requests
 import yaml
 
-from utils import atomic_json_write, base_url_host_matches, base_url_hostname
-
 from hermes_constants import OPENROUTER_MODELS_URL
+from utils import atomic_json_write, base_url_host_matches, base_url_hostname
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +37,10 @@ def _resolve_requests_verify() -> bool | str:
     """
     for env_var in ("HERMES_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
         val = os.getenv(env_var)
-        if val and os.path.isfile(val):
+        if val and Path(val).is_file():
             return val
     return True
+
 
 # Provider names that can appear as a "provider:" prefix before a model ID.
 # Only these are stripped — Ollama-style "model:tag" colons (e.g. "qwen3.5:27b")
@@ -60,7 +60,7 @@ _PROVIDER_PREFIXES: frozenset[str] = frozenset({
     "glm", "z-ai", "z.ai", "zhipu", "github", "github-copilot",
     "github-models", "kimi", "moonshot", "kimi-cn", "moonshot-cn", "claude", "deep-seek",
     "ollama",
-    "stepfun", "opencode", "zen", "go", "kilo", "dashscope", "aliyun", "qwen",
+    "opencode", "zen", "go", "kilo", "dashscope", "aliyun", "qwen",
     "mimo", "xiaomi-mimo",
     "tencent", "tokenhub", "tencent-cloud", "tencentmaas",
     "arcee-ai", "arceeai",
@@ -103,13 +103,14 @@ def _strip_provider_prefix(model: str) -> str:
         return suffix
     return model
 
-_model_metadata_cache: Dict[str, Dict[str, Any]] = {}
+
+_model_metadata_cache: dict[str, dict[str, Any]] = {}
 _model_metadata_cache_time: float = 0
-_novita_metadata_cache: Dict[str, Dict[str, Any]] = {}
+_novita_metadata_cache: dict[str, dict[str, Any]] = {}
 _novita_metadata_cache_time: float = 0
 _MODEL_CACHE_TTL = 3600
-_endpoint_model_metadata_cache: Dict[str, Dict[str, Dict[str, Any]]] = {}
-_endpoint_model_metadata_cache_time: Dict[str, float] = {}
+_endpoint_model_metadata_cache: dict[str, dict[str, dict[str, Any]]] = {}
+_endpoint_model_metadata_cache_time: dict[str, float] = {}
 _ENDPOINT_MODEL_CACHE_TTL = 300
 
 
@@ -119,7 +120,7 @@ def _get_model_metadata_cache_path() -> Path:
     return get_hermes_home() / "cache" / "openrouter_model_metadata.json"
 
 
-def _model_metadata_disk_cache_age_seconds() -> Optional[float]:
+def _model_metadata_disk_cache_age_seconds() -> float | None:
     """Return disk-cache age in seconds, or None if freshness is unknown."""
     try:
         cache_path = _get_model_metadata_cache_path()
@@ -133,7 +134,7 @@ def _model_metadata_disk_cache_age_seconds() -> Optional[float]:
         return None
 
 
-def _load_model_metadata_disk_cache() -> Dict[str, Dict[str, Any]]:
+def _load_model_metadata_disk_cache() -> dict[str, dict[str, Any]]:
     """Load processed OpenRouter metadata cache from disk."""
     try:
         cache_path = _get_model_metadata_cache_path()
@@ -151,7 +152,7 @@ def _load_model_metadata_disk_cache() -> Dict[str, Dict[str, Any]]:
         return {}
 
 
-def _save_model_metadata_disk_cache(data: Dict[str, Dict[str, Any]]) -> None:
+def _save_model_metadata_disk_cache(data: dict[str, dict[str, Any]]) -> None:
     """Save processed OpenRouter metadata cache to disk atomically."""
     try:
         atomic_json_write(
@@ -162,6 +163,7 @@ def _save_model_metadata_disk_cache(data: Dict[str, Dict[str, Any]]) -> None:
         )
     except Exception as e:
         logger.debug("Failed to save OpenRouter model metadata disk cache: %s", e)
+
 
 # Descending tiers for context length probing when the model is unknown.
 # We start at 256K (covers GPT-5.x, many current large-context models) and
@@ -392,7 +394,7 @@ def _normalize_base_url(base_url: str) -> str:
     return (base_url or "").strip().rstrip("/")
 
 
-def _auth_headers(api_key: str = "") -> Dict[str, str]:
+def _auth_headers(api_key: str = "") -> dict[str, str]:
     token = str(api_key or "").strip()
     if not token:
         return {}
@@ -408,7 +410,7 @@ def _is_custom_endpoint(base_url: str) -> bool:
     return bool(normalized) and not _is_openrouter_base_url(normalized)
 
 
-_URL_TO_PROVIDER: Dict[str, str] = {
+_URL_TO_PROVIDER: dict[str, str] = {
     "api.openai.com": "openai",
     "chatgpt.com": "openai",
     "api.anthropic.com": "anthropic",
@@ -460,7 +462,7 @@ except Exception:
     pass
 
 
-def _infer_provider_from_url(base_url: str) -> Optional[str]:
+def _infer_provider_from_url(base_url: str) -> str | None:
     """Infer the models.dev provider name from a base URL.
 
     This allows context length resolution via models.dev for custom endpoints
@@ -538,7 +540,7 @@ def is_local_endpoint(base_url: str) -> bool:
     return False
 
 
-def detect_local_server_type(base_url: str, api_key: str = "") -> Optional[str]:
+def detect_local_server_type(base_url: str, api_key: str = "") -> str | None:
     """Detect which local server is running at base_url by probing known endpoints.
 
     Returns one of: "ollama", "lm-studio", "vllm", "llamacpp", or None.
@@ -547,8 +549,7 @@ def detect_local_server_type(base_url: str, api_key: str = "") -> Optional[str]:
 
     normalized = _normalize_base_url(base_url)
     server_url = normalized
-    if server_url.endswith("/v1"):
-        server_url = server_url[:-3]
+    server_url = server_url.removesuffix("/v1")
 
     headers = _auth_headers(api_key)
 
@@ -609,7 +610,7 @@ def _iter_nested_dicts(value: Any):
             yield from _iter_nested_dicts(item)
 
 
-def _coerce_reasonable_int(value: Any, minimum: int = 1024, maximum: int = 10_000_000) -> Optional[int]:
+def _coerce_reasonable_int(value: Any, minimum: int = 1024, maximum: int = 10_000_000) -> int | None:
     try:
         if isinstance(value, bool):
             return None
@@ -623,7 +624,7 @@ def _coerce_reasonable_int(value: Any, minimum: int = 1024, maximum: int = 10_00
     return None
 
 
-def _extract_first_int(payload: Dict[str, Any], keys: tuple[str, ...]) -> Optional[int]:
+def _extract_first_int(payload: dict[str, Any], keys: tuple[str, ...]) -> int | None:
     keyset = {key.lower() for key in keys}
     for mapping in _iter_nested_dicts(payload):
         for key, value in mapping.items():
@@ -635,19 +636,19 @@ def _extract_first_int(payload: Dict[str, Any], keys: tuple[str, ...]) -> Option
     return None
 
 
-def _extract_context_length(payload: Dict[str, Any]) -> Optional[int]:
+def _extract_context_length(payload: dict[str, Any]) -> int | None:
     return _extract_first_int(payload, _CONTEXT_LENGTH_KEYS)
 
 
-def _extract_max_completion_tokens(payload: Dict[str, Any]) -> Optional[int]:
+def _extract_max_completion_tokens(payload: dict[str, Any]) -> int | None:
     return _extract_first_int(payload, _MAX_COMPLETION_KEYS)
 
 
-def _extract_pricing(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_pricing(payload: dict[str, Any]) -> dict[str, Any]:
     novita_input = payload.get("input_token_price_per_m")
     novita_output = payload.get("output_token_price_per_m")
     if novita_input is not None or novita_output is not None:
-        pricing: Dict[str, Any] = {}
+        pricing: dict[str, Any] = {}
         if novita_input is not None:
             pricing["prompt"] = str(float(novita_input) / 10_000 / 1_000_000)
         if novita_output is not None:
@@ -665,7 +666,7 @@ def _extract_pricing(payload: Dict[str, Any]) -> Dict[str, Any]:
         normalized = {str(key).lower(): value for key, value in mapping.items()}
         if not any(any(alias in normalized for alias in aliases) for aliases in alias_map.values()):
             continue
-        pricing: Dict[str, Any] = {}
+        pricing: dict[str, Any] = {}
         for target, aliases in alias_map.items():
             for alias in aliases:
                 if alias in normalized and normalized[alias] not in {None, ""}:
@@ -676,14 +677,14 @@ def _extract_pricing(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
-def _add_model_aliases(cache: Dict[str, Dict[str, Any]], model_id: str, entry: Dict[str, Any]) -> None:
+def _add_model_aliases(cache: dict[str, dict[str, Any]], model_id: str, entry: dict[str, Any]) -> None:
     cache[model_id] = entry
     if "/" in model_id:
         bare_model = model_id.split("/", 1)[1]
         cache.setdefault(bare_model, entry)
 
 
-def fetch_model_metadata(force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+def fetch_model_metadata(force_refresh: bool = False) -> dict[str, dict[str, Any]]:
     """Fetch model metadata from OpenRouter (cached for 1 hour)."""
     global _model_metadata_cache, _model_metadata_cache_time
 
@@ -725,7 +726,7 @@ def fetch_model_metadata(force_refresh: bool = False) -> Dict[str, Dict[str, Any
         return cache
 
     except Exception as e:
-        logger.warning(f"Failed to fetch model metadata from OpenRouter: {e}")
+        logger.warning("Failed to fetch model metadata from OpenRouter: %s", e)
         if _model_metadata_cache:
             return _model_metadata_cache
         disk_cache = _load_model_metadata_disk_cache()
@@ -744,7 +745,7 @@ def fetch_endpoint_model_metadata(
     base_url: str,
     api_key: str = "",
     force_refresh: bool = False,
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Fetch model metadata from an OpenAI-compatible ``/models`` endpoint.
 
     This is used for explicit custom endpoints where hardcoded global model-name
@@ -769,7 +770,7 @@ def fetch_endpoint_model_metadata(
         candidates.append(alternate)
 
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
 
     if is_local_endpoint(normalized):
         try:
@@ -783,14 +784,14 @@ def fetch_endpoint_model_metadata(
                 )
                 response.raise_for_status()
                 payload = response.json()
-                cache: Dict[str, Dict[str, Any]] = {}
+                cache: dict[str, dict[str, Any]] = {}
                 for model in payload.get("models", []):
                     if not isinstance(model, dict):
                         continue
                     model_id = model.get("key") or model.get("id")
                     if not model_id:
                         continue
-                    entry: Dict[str, Any] = {"name": model.get("name", model_id)}
+                    entry: dict[str, Any] = {"name": model.get("name", model_id)}
 
                     context_length = None
                     for inst in model.get("loaded_instances", []) or []:
@@ -829,14 +830,14 @@ def fetch_endpoint_model_metadata(
             response = requests.get(url, headers=headers, timeout=10, verify=_resolve_requests_verify())
             response.raise_for_status()
             payload = response.json()
-            cache: Dict[str, Dict[str, Any]] = {}
+            cache: dict[str, dict[str, Any]] = {}
             for model in payload.get("data", []):
                 if not isinstance(model, dict):
                     continue
                 model_id = model.get("id")
                 if not model_id:
                     continue
-                entry: Dict[str, Any] = {"name": model.get("name", model_id)}
+                entry: dict[str, Any] = {"name": model.get("name", model_id)}
                 context_length = _extract_context_length(model)
                 if context_length is not None:
                     entry["context_length"] = context_length
@@ -888,7 +889,7 @@ def _resolve_endpoint_context_length(
     model: str,
     base_url: str,
     api_key: str = "",
-) -> Optional[int]:
+) -> int | None:
     """Resolve context length from an endpoint's live ``/models`` metadata."""
     endpoint_metadata = fetch_endpoint_model_metadata(base_url, api_key=api_key)
     matched = endpoint_metadata.get(model)
@@ -913,13 +914,13 @@ def _get_context_cache_path() -> Path:
     return get_hermes_home() / "context_length_cache.yaml"
 
 
-def _load_context_cache() -> Dict[str, int]:
+def _load_context_cache() -> dict[str, int]:
     """Load the model+provider -> context_length cache from disk."""
     path = _get_context_cache_path()
     if not path.exists():
         return {}
     try:
-        with open(path, encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return data.get("context_lengths", {})
     except Exception as e:
@@ -941,14 +942,14 @@ def save_context_length(model: str, base_url: str, length: int) -> None:
     path = _get_context_cache_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             yaml.dump({"context_lengths": cache}, f, default_flow_style=False)
         logger.info("Cached context length %s -> %s tokens", key, f"{length:,}")
     except Exception as e:
         logger.debug("Failed to save context length cache: %s", e)
 
 
-def get_cached_context_length(model: str, base_url: str) -> Optional[int]:
+def get_cached_context_length(model: str, base_url: str) -> int | None:
     """Look up a previously discovered context length for model+provider."""
     key = f"{model}@{base_url}"
     cache = _load_context_cache()
@@ -965,13 +966,13 @@ def _invalidate_cached_context_length(model: str, base_url: str) -> None:
     path = _get_context_cache_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             yaml.dump({"context_lengths": cache}, f, default_flow_style=False)
     except Exception as e:
         logger.debug("Failed to invalidate context length cache entry %s: %s", key, e)
 
 
-def get_next_probe_tier(current_length: int) -> Optional[int]:
+def get_next_probe_tier(current_length: int) -> int | None:
     """Return the next lower probe tier, or None if already at minimum."""
     for tier in CONTEXT_PROBE_TIERS:
         if tier < current_length:
@@ -979,7 +980,7 @@ def get_next_probe_tier(current_length: int) -> Optional[int]:
     return None
 
 
-def parse_context_limit_from_error(error_msg: str) -> Optional[int]:
+def parse_context_limit_from_error(error_msg: str) -> int | None:
     """Try to extract the actual context limit from an API error message.
 
     Many providers include the limit in their error text, e.g.:
@@ -991,11 +992,11 @@ def parse_context_limit_from_error(error_msg: str) -> Optional[int]:
     error_lower = error_msg.lower()
     # Pattern: look for numbers near context-related keywords
     patterns = [
-        r'(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})',
-        r'context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})',
-        r'(\d{4,})\s*(?:token)?\s*(?:context|limit)',
-        r'>\s*(\d{4,})\s*(?:max|limit|token)',  # "250000 tokens > 200000 maximum"
-        r'(\d{4,})\s*(?:max(?:imum)?)\b',  # "200000 maximum"
+        r"(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})",
+        r"context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})",
+        r"(\d{4,})\s*(?:token)?\s*(?:context|limit)",
+        r">\s*(\d{4,})\s*(?:max|limit|token)",  # "250000 tokens > 200000 maximum"
+        r"(\d{4,})\s*(?:max(?:imum)?)\b",  # "200000 maximum"
     ]
     for pattern in patterns:
         match = re.search(pattern, error_lower)
@@ -1010,7 +1011,7 @@ def parse_context_limit_from_error(error_msg: str) -> Optional[int]:
 def get_context_length_from_provider_error(
     error_msg: str,
     current_context_length: int,
-) -> Optional[int]:
+) -> int | None:
     """Return a provider-reported lower context limit, if one is present.
 
     Context-overflow recovery must not invent a new model window size.  Some
@@ -1027,7 +1028,7 @@ def get_context_length_from_provider_error(
     return None
 
 
-def parse_available_output_tokens_from_error(error_msg: str) -> Optional[int]:
+def parse_available_output_tokens_from_error(error_msg: str) -> int | None:
     """Detect an "output cap too large" error and return how many output tokens are available.
 
     Background — two distinct context errors exist:
@@ -1071,10 +1072,10 @@ def parse_available_output_tokens_from_error(error_msg: str) -> Optional[int]:
     # Extract the available_tokens figure.
     # Anthropic format: "… = available_tokens: 10000"
     patterns = [
-        r'available_tokens[:\s]+(\d+)',
-        r'available\s+tokens[:\s]+(\d+)',
+        r"available_tokens[:\s]+(\d+)",
+        r"available\s+tokens[:\s]+(\d+)",
         # fallback: last number after "=" in expressions like "200000 - 190000 = 10000"
-        r'=\s*(\d+)\s*$',
+        r"=\s*(\d+)\s*$",
     ]
     for pattern in patterns:
         match = re.search(pattern, error_lower)
@@ -1085,9 +1086,9 @@ def parse_available_output_tokens_from_error(error_msg: str) -> Optional[int]:
 
     # OpenRouter/Nous format: "maximum context length is N … (A of text input,
     # B of tool input, C in the output)". Available output = ctx - text - tool.
-    _m_ctx = re.search(r'maximum context length is (\d+)', error_lower)
+    _m_ctx = re.search(r"maximum context length is (\d+)", error_lower)
     _m_parts = re.search(
-        r'\((\d+)\s+of text input,\s*(\d+)\s+of tool input,\s*(\d+)\s+in the output\)',
+        r"\((\d+)\s+of text input,\s*(\d+)\s+of tool input,\s*(\d+)\s+in the output\)",
         error_lower,
     )
     if _m_ctx and _m_parts:
@@ -1102,8 +1103,8 @@ def parse_available_output_tokens_from_error(error_msg: str) -> Optional[int]:
     # Estimate the input tokens conservatively (~3 chars/token, which
     # over-reserves the input so the retried output cap stays safely inside the
     # window) and leave the remainder of the window for output.
-    _m_ctx_tok = re.search(r'maximum context length is (\d+)\s*token', error_lower)
-    _m_chars = re.search(r'prompt contains (\d+)\s*character', error_lower)
+    _m_ctx_tok = re.search(r"maximum context length is (\d+)\s*token", error_lower)
+    _m_chars = re.search(r"prompt contains (\d+)\s*character", error_lower)
     if _m_ctx_tok and _m_chars:
         _ctx = int(_m_ctx_tok.group(1))
         _est_input = (int(_m_chars.group(1)) + 2) // 3
@@ -1133,7 +1134,7 @@ def _model_id_matches(candidate_id: str, lookup_model: str) -> bool:
     return False
 
 
-def query_ollama_num_ctx(model: str, base_url: str, api_key: str = "") -> Optional[int]:
+def query_ollama_num_ctx(model: str, base_url: str, api_key: str = "") -> int | None:
     """Query an Ollama server for the model's context length.
 
     Returns the model's maximum context from GGUF metadata via ``/api/show``,
@@ -1147,8 +1148,7 @@ def query_ollama_num_ctx(model: str, base_url: str, api_key: str = "") -> Option
 
     bare_model = _strip_provider_prefix(model)
     server_url = base_url.rstrip("/")
-    if server_url.endswith("/v1"):
-        server_url = server_url[:-3]
+    server_url = server_url.removesuffix("/v1")
 
     try:
         server_type = detect_local_server_type(base_url, api_key=api_key)
@@ -1188,7 +1188,7 @@ def query_ollama_num_ctx(model: str, base_url: str, api_key: str = "") -> Option
     return None
 
 
-def _query_ollama_api_show(model: str, base_url: str, api_key: str = "") -> Optional[int]:
+def _query_ollama_api_show(model: str, base_url: str, api_key: str = "") -> int | None:
     """Query an Ollama server's native ``/api/show`` for context length.
 
     Provider-agnostic: works against ANY Ollama-compatible server regardless
@@ -1210,8 +1210,7 @@ def _query_ollama_api_show(model: str, base_url: str, api_key: str = "") -> Opti
     import httpx
 
     server_url = base_url.rstrip("/")
-    if server_url.endswith("/v1"):
-        server_url = server_url[:-3]
+    server_url = server_url.removesuffix("/v1")
 
     headers = _auth_headers(api_key)
 
@@ -1285,7 +1284,7 @@ def _model_name_suggests_grok_4_3(model: str) -> bool:
     return "grok-4.3" in model.lower()
 
 
-def _query_local_context_length(model: str, base_url: str, api_key: str = "") -> Optional[int]:
+def _query_local_context_length(model: str, base_url: str, api_key: str = "") -> int | None:
     """Query a local server for the model's context length."""
     import httpx
 
@@ -1295,8 +1294,7 @@ def _query_local_context_length(model: str, base_url: str, api_key: str = "") ->
 
     # Strip /v1 suffix to get the server root
     server_url = base_url.rstrip("/")
-    if server_url.endswith("/v1"):
-        server_url = server_url[:-3]
+    server_url = server_url.removesuffix("/v1")
 
     headers = _auth_headers(api_key)
 
@@ -1389,7 +1387,7 @@ def _normalize_model_version(model: str) -> str:
     return model.replace(".", "-")
 
 
-def _query_anthropic_context_length(model: str, base_url: str, api_key: str) -> Optional[int]:
+def _query_anthropic_context_length(model: str, base_url: str, api_key: str) -> int | None:
     """Query Anthropic's /v1/models endpoint for context length.
 
     Only works with regular ANTHROPIC_API_KEY (sk-ant-api*).
@@ -1399,8 +1397,7 @@ def _query_anthropic_context_length(model: str, base_url: str, api_key: str) -> 
         return None  # OAuth tokens can't access /v1/models
     try:
         base = base_url.rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3]
+        base = base.removesuffix("/v1")
         url = f"{base}/v1/models?limit=1000"
         headers = {
             "x-api-key": api_key,
@@ -1428,7 +1425,7 @@ def _query_anthropic_context_length(model: str, base_url: str, api_key: str) -> 
 #
 # Used as a fallback when the live probe fails (no token, network error).
 # Longest keys first so substring match picks the most specific entry.
-_CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
+_CODEX_OAUTH_CONTEXT_FALLBACK: dict[str, int] = {
     "gpt-5.1-codex-max": 272_000,
     "gpt-5.1-codex-mini": 272_000,
     "gpt-5.3-codex": 272_000,
@@ -1447,12 +1444,12 @@ _CODEX_OAUTH_CONTEXT_FALLBACK: Dict[str, int] = {
 }
 
 
-_codex_oauth_context_cache: Dict[str, int] = {}
+_codex_oauth_context_cache: dict[str, int] = {}
 _codex_oauth_context_cache_time: float = 0.0
 _CODEX_OAUTH_CONTEXT_CACHE_TTL = 3600  # 1 hour
 
 
-def _fetch_codex_oauth_context_lengths(access_token: str) -> Dict[str, int]:
+def _fetch_codex_oauth_context_lengths(access_token: str) -> dict[str, int]:
     """Probe the ChatGPT Codex /models endpoint for per-slug context windows.
 
     Codex OAuth imposes its own context limits that differ from the direct
@@ -1488,7 +1485,7 @@ def _fetch_codex_oauth_context_lengths(access_token: str) -> Dict[str, int]:
         return {}
 
     entries = data.get("models", []) if isinstance(data, dict) else []
-    result: Dict[str, int] = {}
+    result: dict[str, int] = {}
     for item in entries:
         if not isinstance(item, dict):
             continue
@@ -1504,8 +1501,8 @@ def _fetch_codex_oauth_context_lengths(access_token: str) -> Dict[str, int]:
 
 
 def _resolve_codex_oauth_context_length(
-    model: str, access_token: str = ""
-) -> Optional[int]:
+    model: str, access_token: str = "",
+) -> int | None:
     """Resolve a Codex OAuth model's real context window.
 
     Prefers a live probe of chatgpt.com/backend-api/codex/models (when we
@@ -1528,7 +1525,7 @@ def _resolve_codex_oauth_context_length(
     # Fallback: longest-key-first substring match over hardcoded defaults.
     model_lower = model_bare.lower()
     for slug, ctx in sorted(
-        _CODEX_OAUTH_CONTEXT_FALLBACK.items(), key=lambda x: len(x[0]), reverse=True
+        _CODEX_OAUTH_CONTEXT_FALLBACK.items(), key=lambda x: len(x[0]), reverse=True,
     ):
         if slug in model_lower:
             return ctx
@@ -1540,7 +1537,7 @@ def _resolve_nous_context_length(
     model: str,
     base_url: str = "",
     api_key: str = "",
-) -> Tuple[Optional[int], str]:
+) -> tuple[int | None, str]:
     """Resolve Nous Portal model context length.
 
     Tries the live Nous inference endpoint first (authoritative), then falls
@@ -1569,7 +1566,7 @@ def _resolve_nous_context_length(
 
     metadata = fetch_model_metadata()
 
-    def _safe_ctx(or_id: str, entry: dict) -> Optional[int]:
+    def _safe_ctx(or_id: str, entry: dict) -> int | None:
         ctx = entry.get("context_length")
         if ctx is None:
             return None
@@ -1641,7 +1638,8 @@ def get_model_context_length(
     6. OpenRouter live API metadata (Kimi-family 32k guard)
     7. Hardcoded defaults (broad family patterns, longest-key-first)
     8. Local server query (last resort)
-    9. Default fallback (256K)"""
+    9. Default fallback (256K)
+    """
     # 0. Explicit config override — user knows best
     if config_context_length is not None and isinstance(config_context_length, int) and config_context_length > 0:
         return config_context_length
@@ -1855,7 +1853,7 @@ def get_model_context_length(
 
     if effective_provider == "nous":
         ctx, source = _resolve_nous_context_length(
-            model, base_url=base_url or "", api_key=api_key or ""
+            model, base_url=base_url or "", api_key=api_key or "",
         )
         if ctx:
             # Persist ONLY portal-derived values.  Caching an OR-fallback
@@ -1961,7 +1959,7 @@ def get_model_context_length(
     # "claude-sonnet-4" to incorrectly match "claude-sonnet-4-6" and return 1M.
     model_lower = model.lower()
     for default_model, length in sorted(
-        DEFAULT_CONTEXT_LENGTHS.items(), key=lambda x: len(x[0]), reverse=True
+        DEFAULT_CONTEXT_LENGTHS.items(), key=lambda x: len(x[0]), reverse=True,
     ):
         if default_model in model_lower:
             return length
@@ -1990,7 +1988,7 @@ def estimate_tokens_rough(text: str) -> int:
     return (len(text) + 3) // 4
 
 
-def estimate_messages_tokens_rough(messages: List[Dict[str, Any]]) -> int:
+def estimate_messages_tokens_rough(messages: list[dict[str, Any]]) -> int:
     """Rough token estimate for a message list (pre-flight only).
 
     Image parts (base64 PNG/JPEG) are counted as a flat ~1500 tokens per
@@ -2007,7 +2005,7 @@ def estimate_messages_tokens_rough(messages: List[Dict[str, Any]]) -> int:
     return ((total_chars + 3) // 4) + image_tokens
 
 
-def _count_image_tokens(msg: Dict[str, Any], cost_per_image: int) -> int:
+def _count_image_tokens(msg: dict[str, Any], cost_per_image: int) -> int:
     """Count image-like content parts in a message; return their token cost."""
     count = 0
     content = msg.get("content") if isinstance(msg, dict) else None
@@ -2033,7 +2031,7 @@ def _count_image_tokens(msg: Dict[str, Any], cost_per_image: int) -> int:
     return count * cost_per_image
 
 
-def _estimate_message_chars(msg: Dict[str, Any]) -> int:
+def _estimate_message_chars(msg: dict[str, Any]) -> int:
     """Char count for token estimation, excluding base64 image data.
 
     Base64 images are counted via `_count_image_tokens` instead; including
@@ -2041,7 +2039,7 @@ def _estimate_message_chars(msg: Dict[str, Any]) -> int:
     """
     if not isinstance(msg, dict):
         return len(str(msg))
-    shadow: Dict[str, Any] = {}
+    shadow: dict[str, Any] = {}
     for k, v in msg.items():
         if k == "_anthropic_content_blocks":
             continue
@@ -2067,10 +2065,10 @@ def _estimate_message_chars(msg: Dict[str, Any]) -> int:
 
 
 def estimate_request_tokens_rough(
-    messages: List[Dict[str, Any]],
+    messages: list[dict[str, Any]],
     *,
     system_prompt: str = "",
-    tools: Optional[List[Dict[str, Any]]] = None,
+    tools: list[dict[str, Any]] | None = None,
 ) -> int:
     """Rough token estimate for a full chat-completions request.
 

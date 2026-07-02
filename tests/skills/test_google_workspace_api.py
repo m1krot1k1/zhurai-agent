@@ -5,12 +5,11 @@ import json
 import subprocess
 import sys
 import types
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 BRIDGE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -70,7 +69,7 @@ def _write_token(path: Path, *, token="ya29.test", expiry=None, **extra):
 
 def test_bridge_returns_valid_token(bridge_module, tmp_path):
     """Non-expired token is returned without refresh."""
-    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
     token_path = bridge_module.get_token_path()
     _write_token(token_path, token="ya29.valid", expiry=future)
 
@@ -80,7 +79,7 @@ def test_bridge_returns_valid_token(bridge_module, tmp_path):
 
 def test_bridge_refreshes_expired_token(bridge_module, tmp_path):
     """Expired token triggers a refresh via token_uri."""
-    past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     token_path = bridge_module.get_token_path()
     _write_token(token_path, token="ya29.old", expiry=past)
 
@@ -105,8 +104,9 @@ def test_bridge_refreshes_expired_token(bridge_module, tmp_path):
 def test_bridge_refresh_passes_timeout_to_urlopen(bridge_module):
     """Token refresh must pass an explicit timeout so a hung Google endpoint
     cannot block the agent turn indefinitely (no `timeout=` defaults to the
-    global socket timeout, which is unset)."""
-    past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    global socket timeout, which is unset).
+    """
+    past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     token_path = bridge_module.get_token_path()
     _write_token(token_path, token="ya29.old", expiry=past)
 
@@ -130,19 +130,19 @@ def test_bridge_refresh_passes_timeout_to_urlopen(bridge_module):
 
 def test_bridge_refresh_exits_cleanly_on_network_error(bridge_module):
     """URLError/timeout during refresh exits 1 with a readable message
-    instead of crashing with a raw traceback."""
+    instead of crashing with a raw traceback.
+    """
     import urllib.error
 
-    past = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
     token_path = bridge_module.get_token_path()
     _write_token(token_path, token="ya29.old", expiry=past)
 
     with patch(
         "urllib.request.urlopen",
         side_effect=urllib.error.URLError("timed out"),
-    ):
-        with pytest.raises(SystemExit) as exc_info:
-            bridge_module.get_valid_token()
+    ), pytest.raises(SystemExit) as exc_info:
+        bridge_module.get_valid_token()
 
     assert exc_info.value.code == 1
 
@@ -155,7 +155,7 @@ def test_bridge_exits_on_missing_token(bridge_module):
 
 def test_bridge_main_injects_token_env(bridge_module, tmp_path):
     """main() sets GOOGLE_WORKSPACE_CLI_TOKEN in subprocess env."""
-    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
     token_path = bridge_module.get_token_path()
     _write_token(token_path, token="ya29.injected", expiry=future)
 
@@ -204,7 +204,7 @@ def test_api_calendar_list_uses_events_list(api_module):
 
 
 def test_api_calendar_list_respects_date_range(api_module):
-    """calendar list with --start/--end passes correct time bounds."""
+    """Calendar list with --start/--end passes correct time bounds."""
     captured = {}
 
     def capture_run(cmd, **kwargs):
@@ -333,7 +333,7 @@ def test_api_gmail_search_reads_headers_case_insensitively(
             "date": "Fri, 29 May 2026 12:00:00 +0000",
             "snippet": "preview",
             "labels": ["INBOX"],
-        }
+        },
     ]
 
 

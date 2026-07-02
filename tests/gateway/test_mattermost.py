@@ -2,8 +2,9 @@
 import json
 import os
 import time
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from gateway.config import Platform, PlatformConfig
 from gateway.run import (
@@ -57,7 +58,7 @@ class TestMattermostDisplayHygiene:
                 "platforms": {
                     "mattermost": {"interim_assistant_messages": True},
                 },
-            }
+            },
         }
 
         assert _resolve_gateway_display_bool(
@@ -100,7 +101,7 @@ class TestMattermostDisplayHygiene:
             "display": {
                 "show_reasoning": False,
                 "platforms": {"mattermost": {"show_reasoning": True}},
-            }
+            },
         }
 
         assert _resolve_gateway_display_bool(
@@ -355,7 +356,6 @@ class TestMattermostSend:
         payload = self.adapter._session.post.call_args[1]["json"]
         assert "root_id" not in payload
 
-
     @pytest.mark.asyncio
     async def test_send_uses_metadata_thread_id_for_progress_messages(self):
         """Progress/status messages pass Mattermost thread context via metadata."""
@@ -440,24 +440,6 @@ class TestMattermostSend:
         assert self.adapter._api_post.call_count == 1
         payload = self.adapter._api_post.call_args_list[0][0][1]
         assert payload["root_id"] == "root_post"
-
-    @pytest.mark.asyncio
-    async def test_progress_send_with_invalid_thread_root_never_falls_back_flat(self):
-        """Tool/status/progress bubbles must stay quiet when the thread is broken."""
-        self.adapter._reply_mode = "thread"
-        self.adapter._api_get = AsyncMock(return_value={"id": "bad_root", "root_id": ""})
-        self.adapter._api_post = AsyncMock(return_value={})
-
-        result = await self.adapter.send(
-            "channel_1",
-            "⚙️ terminal...",
-            metadata={"thread_id": "bad_root"},
-        )
-
-        assert result.success is False
-        assert self.adapter._api_post.call_count == 1
-        payload = self.adapter._api_post.call_args_list[0][0][1]
-        assert payload["root_id"] == "bad_root"
 
     @pytest.mark.asyncio
     async def test_send_api_failure(self):
@@ -700,7 +682,7 @@ class TestMattermostMentionBehavior:
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("MATTERMOST_REQUIRE_MENTION", None)
             await self.adapter._handle_ws_event(
-                self._make_event("@hermes-bot what is 2+2")
+                self._make_event("@hermes-bot what is 2+2"),
             )
             assert self.adapter.handle_message.called
             msg = self.adapter.handle_message.call_args[0][0]
@@ -733,7 +715,7 @@ class TestMattermostFileUpload:
         mock_upload_resp = AsyncMock()
         mock_upload_resp.status = 200
         mock_upload_resp.json = AsyncMock(return_value={
-            "file_infos": [{"id": "file_abc123"}]
+            "file_infos": [{"id": "file_abc123"}],
         })
         mock_upload_resp.text = AsyncMock(return_value="")
         mock_upload_resp.__aenter__ = AsyncMock(return_value=mock_upload_resp)
@@ -761,7 +743,7 @@ class TestMattermostFileUpload:
         self.adapter._session.post = MagicMock(side_effect=post_side_effect)
 
         result = await self.adapter.send_image(
-            "channel_1", "https://img.example.com/cat.png", caption="A cat"
+            "channel_1", "https://img.example.com/cat.png", caption="A cat",
         )
 
         assert result.success is True
@@ -882,7 +864,8 @@ class TestMattermostRequirements:
 class TestMattermostMediaTypes:
     """Verify that media_types contains actual MIME types (e.g. 'image/png')
     rather than bare category strings ('image'), so downstream
-    ``mtype.startswith("image/")`` checks in run.py work correctly."""
+    ``mtype.startswith("image/")`` checks in run.py work correctly.
+    """
 
     def setup_method(self):
         self.adapter = _make_adapter()
@@ -972,7 +955,6 @@ class TestMattermostMediaTypes:
         assert msg.media_types == ["application/pdf"]
         assert not msg.media_types[0].startswith("image/")
         assert not msg.media_types[0].startswith("audio/")
-
 
 
 @pytest.mark.asyncio

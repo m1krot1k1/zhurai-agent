@@ -62,8 +62,8 @@ def test_refresh_writes_through_to_root_when_profile_has_no_own_state(profile_an
                     "tokens": {
                         "access_token": "old-access",
                         "refresh_token": "old-refresh",
-                    }
-                }
+                    },
+                },
             },
         },
     )
@@ -98,8 +98,8 @@ def test_refresh_does_not_touch_root_when_profile_has_own_state(profile_and_root
                     "tokens": {
                         "access_token": "profile-old",
                         "refresh_token": "profile-old-refresh",
-                    }
-                }
+                    },
+                },
             },
         },
     )
@@ -112,14 +112,14 @@ def test_refresh_does_not_touch_root_when_profile_has_own_state(profile_and_root
                     "tokens": {
                         "access_token": "root-untouched",
                         "refresh_token": "root-untouched-refresh",
-                    }
-                }
+                    },
+                },
             },
         },
     )
 
     auth._save_xai_oauth_tokens(
-        {"access_token": "profile-new", "refresh_token": "profile-new-refresh"}
+        {"access_token": "profile-new", "refresh_token": "profile-new-refresh"},
     )
 
     profile = _read_store(profile_path)
@@ -141,7 +141,7 @@ def test_write_through_is_noop_in_classic_mode(tmp_path, monkeypatch):
 
     # Should not raise and should persist to the single store.
     auth._save_xai_oauth_tokens(
-        {"access_token": "a", "refresh_token": "r"}
+        {"access_token": "a", "refresh_token": "r"},
     )
     store = _read_store(profile_path)
     assert store["providers"]["xai-oauth"]["tokens"]["refresh_token"] == "r"

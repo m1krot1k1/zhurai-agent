@@ -17,12 +17,13 @@ identical across processes, machines, and language versions.
 References:
   Plate (1995) — Holographic Reduced Representations
   Gayler (2004) — Vector Symbolic Architectures answer Jackendoff's challenges
+
 """
 
 import hashlib
 import logging
-import struct
 import math
+import struct
 
 try:
     import numpy as np
@@ -151,7 +152,7 @@ def encode_fact(content: str, entities: list[str], dim: int = 1024) -> "np.ndarr
     role_entity = encode_atom("__hrr_role_entity__", dim)
 
     components: list[np.ndarray] = [
-        bind(encode_text(content, dim), role_content)
+        bind(encode_text(content, dim), role_content),
     ]
 
     for entity in entities:

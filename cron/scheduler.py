@@ -1,5 +1,4 @@
-"""
-Cron job scheduler - executes due jobs.
+"""Cron job scheduler - executes due jobs.
 
 Provides tick() which checks for due jobs and runs them. The gateway
 calls this every 60 seconds from a background thread.
@@ -31,16 +30,15 @@ except ImportError:
     except ImportError:
         msvcrt = None
 from pathlib import Path
-from typing import List, Optional
 
 # Add parent directory to path for imports BEFORE repo-level imports.
 # Without this, standalone invocations (e.g. after `hermes update` reloads
 # the module) fail with ModuleNotFoundError for hermes_time et al.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hermes_constants import get_hermes_home
 from hermes_cli._subprocess_compat import windows_hide_flags
-from hermes_cli.config import load_config, _expand_env_vars
+from hermes_cli.config import _expand_env_vars, load_config
+from hermes_constants import get_hermes_home
 from hermes_time import now as _hermes_now
 
 logger = logging.getLogger(__name__)
@@ -189,7 +187,9 @@ def _resolve_cron_enabled_toolsets(job: dict, cfg: dict) -> list[str] | None:
     if per_job:
         return _merge_mcp_into_per_job_toolsets(list(per_job), cfg or {})
     try:
-        from hermes_cli.tools_config import _get_platform_tools  # lazy: avoid heavy import at cron module load
+        from hermes_cli.tools_config import (
+            _get_platform_tools,  # lazy: avoid heavy import at cron module load
+        )
         return sorted(_get_platform_tools(cfg or {}, "cron"))
     except Exception as exc:
         logger.warning(
@@ -197,6 +197,7 @@ def _resolve_cron_enabled_toolsets(job: dict, cfg: dict) -> list[str] | None:
             exc,
         )
         return None
+
 
 # Valid delivery platforms — used to validate user-supplied platform names
 # in cron delivery targets, preventing env var enumeration via crafted names.
@@ -236,7 +237,7 @@ _LEGACY_HOME_TARGET_ENV_VARS = {
     "QQBOT_HOME_CHANNEL": "QQ_HOME_CHANNEL",
 }
 
-from cron.jobs import get_due_jobs, mark_job_run, save_job_output, advance_next_run
+from cron.jobs import advance_next_run, get_due_jobs, mark_job_run, save_job_output
 
 # Sentinel: when a cron agent has nothing new to report, it can start its
 # response with this marker to suppress delivery.  Output is still saved
@@ -248,8 +249,8 @@ SILENT_MARKER = "[SILENT]"
 # The tick function submits jobs here and returns immediately so the ticker
 # thread is never blocked by long-running jobs (e.g. the fixer running 15+ min).
 # ---------------------------------------------------------------------------
-_parallel_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
-_parallel_pool_max_workers: Optional[int] = None
+_parallel_pool: concurrent.futures.ThreadPoolExecutor | None = None
+_parallel_pool_max_workers: int | None = None
 _running_job_ids: set = set()
 _running_lock = threading.Lock()
 
@@ -257,10 +258,10 @@ _running_lock = threading.Lock()
 # process-global runtime state — must run one at a time, but must NOT block the
 # ticker thread.  A persistent single-thread executor preserves ordering across
 # ticks while keeping dispatch fire-and-forget, the same as the parallel pool.
-_sequential_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_sequential_pool: concurrent.futures.ThreadPoolExecutor | None = None
 
 
-def _get_parallel_pool(max_workers: Optional[int]) -> concurrent.futures.ThreadPoolExecutor:
+def _get_parallel_pool(max_workers: int | None) -> concurrent.futures.ThreadPoolExecutor:
     """Return (or create) the persistent parallel pool."""
     global _parallel_pool, _parallel_pool_max_workers
     if _parallel_pool is None or _parallel_pool_max_workers != max_workers:
@@ -322,7 +323,7 @@ def _get_lock_paths() -> tuple[Path, Path]:
     return lock_dir, lock_dir / ".tick.lock"
 
 
-def _resolve_origin(job: dict) -> Optional[dict]:
+def _resolve_origin(job: dict) -> dict | None:
     """Extract origin info from a job, preserving any extra routing metadata.
 
     Treats non-dict origins (free-form provenance strings, ints, lists from
@@ -426,7 +427,7 @@ def _get_home_target_chat_id(platform_name: str) -> str:
     return value
 
 
-def _get_home_target_thread_id(platform_name: str) -> Optional[str]:
+def _get_home_target_thread_id(platform_name: str) -> str | None:
     """Return the optional thread/topic ID for a platform home target.
 
     Telegram-only override: ``TELEGRAM_CRON_THREAD_ID`` takes precedence over
@@ -506,14 +507,13 @@ def cron_delivery_targets() -> list[dict]:
                 "name": name.replace("_", " ").title(),
                 "home_target_set": bool(_get_home_target_chat_id(name)),
                 "home_env_var": env_var or None,
-            }
+            },
         )
     return targets
 
 
-def _resolve_single_delivery_target(job: dict, deliver_value: str) -> Optional[dict]:
+def _resolve_single_delivery_target(job: dict, deliver_value: str) -> dict | None:
     """Resolve one concrete auto-delivery target for a cron job."""
-
     origin = _resolve_origin(job)
 
     if deliver_value == "local":
@@ -624,7 +624,7 @@ def _normalize_deliver_value(deliver) -> str:
 _ROUTING_TOKENS = frozenset({"all"})
 
 
-def _expand_routing_tokens(part: str) -> List[str]:
+def _expand_routing_tokens(part: str) -> list[str]:
     """Expand a routing-intent token to concrete platform names.
 
     ``all`` expands to every platform in ``_iter_home_target_platforms()``
@@ -635,14 +635,14 @@ def _expand_routing_tokens(part: str) -> List[str]:
     token = part.lower()
     if token not in _ROUTING_TOKENS:
         return [part]
-    expanded: List[str] = []
+    expanded: list[str] = []
     for platform_name in _iter_home_target_platforms():
         if _get_home_target_chat_id(platform_name):
             expanded.append(platform_name)
     return expanded
 
 
-def _resolve_delivery_targets(job: dict) -> List[dict]:
+def _resolve_delivery_targets(job: dict) -> list[dict]:
     """Resolve all concrete auto-delivery targets for a cron job.
 
     Accepts the legacy comma-separated ``deliver`` string plus the
@@ -659,7 +659,7 @@ def _resolve_delivery_targets(job: dict) -> List[dict]:
     raw_parts = [p.strip() for p in deliver.split(",") if p.strip()]
 
     # Expand routing intents.
-    parts: List[str] = []
+    parts: list[str] = []
     for raw in raw_parts:
         parts.extend(_expand_routing_tokens(raw))
 
@@ -675,7 +675,7 @@ def _resolve_delivery_targets(job: dict) -> List[dict]:
     return targets
 
 
-def _resolve_delivery_target(job: dict) -> Optional[dict]:
+def _resolve_delivery_target(job: dict) -> dict | None:
     """Resolve the concrete auto-delivery target for a cron job, if any."""
     targets = _resolve_delivery_targets(job)
     return targets[0] if targets else None
@@ -683,8 +683,8 @@ def _resolve_delivery_target(job: dict) -> Optional[dict]:
 
 # Media extension sets — audio routing is centralized in gateway.platforms.base
 # via should_send_media_as_audio() so Telegram-specific rules stay in one place.
-_VIDEO_EXTS = frozenset({'.mp4', '.mov', '.avi', '.mkv', '.webm', '.3gp'})
-_IMAGE_EXTS = frozenset({'.jpg', '.jpeg', '.png', '.webp', '.gif'})
+_VIDEO_EXTS = frozenset({".mp4", ".mov", ".avi", ".mkv", ".webm", ".3gp"})
+_IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
 
 
 def _send_media_via_adapter(
@@ -761,12 +761,11 @@ def _confirm_adapter_delivery(send_result) -> bool:
         return False
     if not hasattr(send_result, "success"):
         return False
-    return bool(getattr(send_result, "success"))
+    return bool(send_result.success)
 
 
-def _deliver_result(job: dict, content: str, adapters=None, loop=None) -> Optional[str]:
-    """
-    Deliver job output to the configured target(s) (origin chat, specific platform, etc.).
+def _deliver_result(job: dict, content: str, adapters=None, loop=None) -> str | None:
+    """Deliver job output to the configured target(s) (origin chat, specific platform, etc.).
 
     When ``adapters`` and ``loop`` are provided (gateway is running), tries to
     use the live adapter first — this supports E2EE rooms (e.g. Matrix) where
@@ -797,8 +796,8 @@ def _deliver_result(job: dict, content: str, adapters=None, loop=None) -> Option
         logger.warning("Job '%s': %s", job["id"], msg)
         return msg
 
+    from gateway.config import Platform, load_gateway_config
     from tools.send_message_tool import _send_to_platform
-    from gateway.config import load_gateway_config, Platform
 
     # Optionally wrap the content with a header/footer so the user knows this
     # is a cron delivery.  Wrapping is on by default; set cron.wrap_response: false
@@ -818,7 +817,7 @@ def _deliver_result(job: dict, content: str, adapters=None, loop=None) -> Option
             f"(job_id: {job_id})\n"
             f"-------------\n\n"
             f"{content}\n\n"
-            f"To stop or manage this job, send me a new message (e.g. \"stop reminder {task_name}\")."
+            f'To stop or manage this job, send me a new message (e.g. "stop reminder {task_name}").'
         )
     else:
         delivery_content = content
@@ -1203,6 +1202,7 @@ def _run_job_script(script_path: str) -> tuple[bool, str]:
     Returns:
         (success, output) — on failure *output* contains the error message so the
         LLM can report the problem to the user.
+
     """
     scripts_dir = _get_hermes_home() / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -1243,7 +1243,7 @@ def _run_job_script(script_path: str) -> tuple[bool, str]:
         # than a FileNotFoundError with a confusing "[WinError 2]"
         # traceback.
         _bash = shutil.which("bash") or (
-            "/bin/bash" if os.path.isfile("/bin/bash") else None
+            "/bin/bash" if Path("/bin/bash").is_file() else None
         )
         if _bash is None:
             return False, (
@@ -1321,7 +1321,7 @@ def _parse_wake_gate(script_output: str) -> bool:
     return gate.get("wakeAgent", True) is not False
 
 
-def _build_job_prompt(job: dict, prerun_script: Optional[tuple] = None) -> str:
+def _build_job_prompt(job: dict, prerun_script: tuple | None = None) -> str:
     """Build the effective prompt for a cron job, optionally loading one or more skills first.
 
     Args:
@@ -1331,6 +1331,7 @@ def _build_job_prompt(job: dict, prerun_script: Optional[tuple] = None) -> str:
             When provided, the script is not re-executed and the cached
             result is used for prompt injection. When omitted, the script
             (if any) runs inline as before.
+
     """
     user_prompt = str(job.get("prompt") or "")
     prompt = user_prompt
@@ -1428,7 +1429,7 @@ def _build_job_prompt(job: dict, prerun_script: Optional[tuple] = None) -> str:
         "the output yourself. Just produce your report/output as your "
         "final response and the system handles the rest. "
         "SILENT: If there is genuinely nothing new to report, respond "
-        "with exactly \"[SILENT]\" (nothing else) to suppress delivery. "
+        'with exactly "[SILENT]" (nothing else) to suppress delivery. '
         "Never combine [SILENT] with content — either report your "
         "findings normally, or say [SILENT] and nothing more.]\n\n"
     )
@@ -1449,9 +1450,12 @@ def _build_job_prompt(job: dict, prerun_script: Optional[tuple] = None) -> str:
             user_prompt=user_prompt,
         )
 
-    from tools.skills_tool import skill_view
+    from agent.skill_bundles import (
+        build_bundle_invocation_message,
+        resolve_bundle_command_key,
+    )
     from tools.skill_usage import bump_use
-    from agent.skill_bundles import build_bundle_invocation_message, resolve_bundle_command_key
+    from tools.skills_tool import skill_view
 
     parts = []
     skipped: list[str] = []
@@ -1507,7 +1511,7 @@ def _build_job_prompt(job: dict, prerun_script: Optional[tuple] = None) -> str:
                 f'[IMPORTANT: The user has invoked the "{skill_name}" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]',
                 "",
                 content,
-            ]
+            ],
         )
 
     if skipped:
@@ -1530,7 +1534,7 @@ def _scan_assembled_cron_prompt(
     *,
     has_skills: bool = False,
     has_injected_data: bool = False,
-    user_prompt: Optional[str] = None,
+    user_prompt: str | None = None,
 ) -> str:
     """Scan the fully-assembled cron prompt for injection patterns. Raises
     ``CronPromptInjectionBlocked`` when a match fires so ``run_job`` can
@@ -1594,12 +1598,12 @@ def _scan_assembled_cron_prompt(
     return assembled
 
 
-def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
-    """
-    Execute a single cron job.
+def run_job(job: dict) -> tuple[bool, str, str, str | None]:
+    """Execute a single cron job.
     
     Returns:
         Tuple of (success, full_output_doc, final_response, error_message)
+
     """
     job_id = job["id"]
     job_name = str(job.get("name") or job.get("prompt") or job_id or "cron job")
@@ -1675,7 +1679,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
         # means "nothing to report this tick", same as empty stdout.
         if not _parse_wake_gate(output):
             logger.info(
-                "Job '%s' (no_agent): wakeAgent=false gate — silent run", job_id
+                "Job '%s' (no_agent): wakeAgent=false gate — silent run", job_id,
             )
             silent_doc = (
                 f"# Cron Job: {job_name}\n\n"
@@ -1789,7 +1793,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
 
     # Use ContextVars for per-job session/delivery state so parallel jobs
     # don't clobber each other's targets (os.environ is process-global).
-    from gateway.session_context import set_session_vars, clear_session_vars, _VAR_MAP
+    from gateway.session_context import _VAR_MAP, clear_session_vars, set_session_vars
 
     # Cron execution is an internal scheduler context, not a live inbound
     # gateway message. Do not seed HERMES_SESSION_* contextvars from the
@@ -1865,7 +1869,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
             _VAR_MAP["HERMES_CRON_AUTO_DELIVER_THREAD_ID"].set(
                 ""
                 if delivery_target.get("thread_id") is None
-                else str(delivery_target["thread_id"])
+                else str(delivery_target["thread_id"]),
             )
 
         # Model resolution precedence: per-job override > HERMES_MODEL env >
@@ -1880,8 +1884,8 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
         try:
             import yaml
             _cfg_path = str(_get_hermes_home() / "config.yaml")
-            if os.path.exists(_cfg_path):
-                with open(_cfg_path, encoding="utf-8") as _f:
+            if Path(_cfg_path).exists():
+                with Path(_cfg_path).open(encoding="utf-8") as _f:
                     _cfg = yaml.safe_load(_f) or {}
                 # Managed scope: a scheduled job must honor administrator-pinned
                 # model / reasoning / toolsets / provider_routing too. This loader
@@ -1918,7 +1922,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
                 "config.yaml model.default missing or empty). "
                 f"Set a per-job model via "
                 f"`cronjob action=update job_id={job_id} model=<name>` or set a "
-                "default with `hermes model <name>`."
+                "default with `hermes model <name>`.",
             )
 
         # Apply IPv4 preference if configured.
@@ -1951,7 +1955,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
                 pfpath = _get_hermes_home() / pfpath
             if pfpath.exists():
                 try:
-                    with open(pfpath, "r", encoding="utf-8") as _pf:
+                    with Path(pfpath).open("r", encoding="utf-8") as _pf:
                         prefill_messages = json.load(_pf)
                     if not isinstance(prefill_messages, list):
                         prefill_messages = None
@@ -1965,11 +1969,11 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
         # Provider routing
         pr = _cfg.get("provider_routing", {})
 
-        from hermes_cli.runtime_provider import (
-            resolve_runtime_provider,
-            format_runtime_provider_error,
-        )
         from hermes_cli.auth import AuthError
+        from hermes_cli.runtime_provider import (
+            format_runtime_provider_error,
+            resolve_runtime_provider,
+        )
         try:
             # Do not inject HERMES_INFERENCE_PROVIDER here. resolve_runtime_provider()
             # already prefers persisted config over stale shell/env overrides when
@@ -2079,7 +2083,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
             session_id=_cron_session_id,
             session_db=_session_db,
         )
-        
+
         # Run the agent with an *inactivity*-based timeout: the job can run
         # for hours if it's actively calling tools / receiving stream tokens,
         # but a hung API call or stuck tool with no activity for the configured
@@ -2165,13 +2169,13 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
             raise TimeoutError(
                 f"Cron job '{job_name}' idle for "
                 f"{int(_secs_ago)}s (limit {int(_cron_inactivity_limit)}s) "
-                f"— last activity: {_last_desc}"
+                f"— last activity: {_last_desc}",
             )
 
         # Guard against non-dict returns from run_conversation under error conditions
         if not isinstance(result, dict):
             raise RuntimeError(
-                f"agent.run_conversation returned {type(result).__name__} instead of dict: {result!r}"
+                f"agent.run_conversation returned {type(result).__name__} instead of dict: {result!r}",
             )
 
         # If the agent itself reported failure (e.g. all retries exhausted on
@@ -2209,8 +2213,8 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
             final_response = ""
         # Use a separate variable for log display; keep final_response clean
         # for delivery logic (empty response = no delivery).
-        logged_response = final_response if final_response else "(No response generated)"
-        
+        logged_response = final_response or "(No response generated)"
+
         output = f"""# Cron Job: {job_name}
 
 **Job ID:** {job_id}
@@ -2225,14 +2229,14 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
 
 {logged_response}
 """
-        
+
         logger.info("Job '%s' completed successfully", job_name)
         return True, output, final_response, None
-        
+
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}"
+        error_msg = f"{type(e).__name__}: {e!s}"
         logger.exception("Job '%s' failed: %s", job_name, error_msg)
-        
+
         output = f"""# Cron Job: {job_name} (FAILED)
 
 **Job ID:** {job_id}
@@ -2358,7 +2362,7 @@ def run_one_job(job: dict, *, adapters=None, loop=None, verbose: bool = False) -
         return True
 
     except Exception as e:
-        logger.error("Error processing job %s: %s", job['id'], e)
+        logger.error("Error processing job %s: %s", job["id"], e)
         mark_job_run(job["id"], False, str(e))
         return False
 
@@ -2382,8 +2386,7 @@ def _notify_provider_jobs_changed() -> None:
 
 
 def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> int:
-    """
-    Check and run all due jobs.
+    """Check and run all due jobs.
     
     Uses a file lock so only one tick runs at a time, even if the gateway's
     in-process ticker and a standalone daemon or manual tick overlap.
@@ -2395,6 +2398,7 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
     
     Returns:
         Number of jobs executed (0 if another tick is already running)
+
     """
     lock_dir, lock_file = _get_lock_paths()
     lock_dir.mkdir(parents=True, exist_ok=True)
@@ -2402,12 +2406,12 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
     # Cross-platform file locking: fcntl on Unix, msvcrt on Windows
     lock_fd = None
     try:
-        lock_fd = open(lock_file, "w", encoding="utf-8")
+        lock_fd = Path(lock_file).open("w", encoding="utf-8")
         if fcntl:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         elif msvcrt:
             msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-    except (OSError, IOError):
+    except OSError:
         logger.debug("Tick skipped — another instance holds the lock")
         if lock_fd is not None:
             lock_fd.close()
@@ -2417,11 +2421,11 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
         due_jobs = get_due_jobs()
 
         if verbose and not due_jobs:
-            logger.info("%s - No jobs due", _hermes_now().strftime('%H:%M:%S'))
+            logger.info("%s - No jobs due", _hermes_now().strftime("%H:%M:%S"))
             return 0
 
         if verbose:
-            logger.info("%s - %s job(s) due", _hermes_now().strftime('%H:%M:%S'), len(due_jobs))
+            logger.info("%s - %s job(s) due", _hermes_now().strftime("%H:%M:%S"), len(due_jobs))
 
         # Advance next_run_at for all recurring jobs FIRST, under the file lock,
         # before any execution begins.  This preserves at-most-once semantics.
@@ -2433,7 +2437,7 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
 
         # Resolve max parallel workers: env var > config.yaml > unbounded.
         # Set HERMES_CRON_MAX_PARALLEL=1 to restore old serial behaviour.
-        _max_workers: Optional[int] = None
+        _max_workers: int | None = None
         try:
             _env_par = os.getenv("HERMES_CRON_MAX_PARALLEL", "").strip()
             if _env_par:
@@ -2455,14 +2459,15 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
             logger.info(
                 "Running %d job(s) in parallel (max_workers=%s)",
                 len(due_jobs),
-                _max_workers if _max_workers else "unbounded",
+                _max_workers or "unbounded",
             )
 
         def _process_job(job: dict) -> bool:
             """Run one due job end-to-end. Thin wrapper around the shared
             module-level ``run_one_job`` so ``tick`` and external providers
             (Chronos ``fire_due``) use the identical execute→save→deliver→mark
-            body."""
+            body.
+            """
             return run_one_job(job, adapters=adapters, loop=loop, verbose=verbose)
 
         # Partition due jobs: those with a per-job workdir mutate
@@ -2582,12 +2587,12 @@ def tick(verbose: bool = True, adapters=None, loop=None, sync: bool = True) -> i
         if fcntl:
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            except (OSError, IOError):
+            except OSError:
                 pass
         elif msvcrt:
             try:
                 msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
-            except (OSError, IOError):
+            except OSError:
                 pass
         lock_fd.close()
 

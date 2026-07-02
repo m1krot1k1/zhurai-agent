@@ -15,13 +15,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def server():
     with patch.dict(
         "sys.modules",
         {
             "hermes_constants": MagicMock(
-                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_child_mirror")
+                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_child_mirror"),
             ),
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
@@ -39,7 +39,7 @@ def server():
         mod._active_child_runs.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def emits(server, monkeypatch):
     captured: list = []
     monkeypatch.setattr(
@@ -142,7 +142,8 @@ def test_window_closed_midrun_drops_state_then_fresh_turn_on_reopen(server, emit
 
 def test_upgraded_child_session_not_mirrored(server, emits):
     """A watch window upgraded to a full session (agent built) owns a real
-    native stream — mirroring on top would interleave two turns on one sid."""
+    native stream — mirroring on top would interleave two turns on one sid.
+    """
     server._sessions["live-1"] = {"session_key": "child-1", "agent": object()}
 
     _relay(server, "subagent.tool", tool_name="terminal", child_session_id="child-1")
@@ -155,7 +156,8 @@ def test_upgraded_child_session_not_mirrored(server, emits):
 
 def test_stale_child_run_not_reported_active(server, emits):
     """A leaked registry entry (lost completion event) must age out instead of
-    pinning running=true on every future lazy resume of that child."""
+    pinning running=true on every future lazy resume of that child.
+    """
     server._active_child_runs["child-1"] = 0.0  # epoch — ancient
 
     assert server._child_run_active("child-1") is False
@@ -166,7 +168,8 @@ def test_stale_child_run_not_reported_active(server, emits):
 
 def test_prompt_submit_rejected_while_child_run_active(server, emits):
     """Typing into a watch window mid-run must not build a second agent racing
-    the in-flight child on the same stored session — busy error instead."""
+    the in-flight child on the same stored session — busy error instead.
+    """
     import threading
 
     server._sessions["live-1"] = {
@@ -190,7 +193,8 @@ def test_prompt_submit_rejected_while_child_run_active(server, emits):
 def test_active_child_runs_registry_tracks_liveness(server, emits):
     """Every relayed event marks the child as in flight (even with no window
     open), and completion clears it — lazy watch resumes read this registry to
-    report running=true while the child is silent inside a long tool call."""
+    report running=true while the child is silent inside a long tool call.
+    """
     _relay(server, "subagent.start", preview="go", child_session_id="child-1")
     assert "child-1" in server._active_child_runs
 
@@ -221,7 +225,8 @@ def test_start_mirrors_as_immediate_header_line(server, emits):
 def test_text_mirrors_as_message_delta(server, emits):
     """The child's streamed reply (subagent.text) becomes a native
     message.delta on the live child sid — the watch window streams it as the
-    agent 'talking', the piece that was previously missing entirely."""
+    agent 'talking', the piece that was previously missing entirely.
+    """
     server._sessions["live-1"] = {"session_key": "child-1", "agent": None}
 
     _relay(server, "subagent.text", preview="Here is ", child_session_id="child-1")
@@ -239,7 +244,8 @@ def test_text_routes_to_watch_transport_without_contextvar(server, monkeypatch):
     """Async/background path: the child runs on a detached daemon thread that
     carries NO contextvar transport binding. Routing must still reach the
     watch window because write_json keys event frames off the session's STORED
-    transport, not the current context. Exercises the real _emit/write_json."""
+    transport, not the current context. Exercises the real _emit/write_json.
+    """
     monkeypatch.setattr(server, "_tool_progress_enabled", lambda sid: True)
 
     frames: list = []

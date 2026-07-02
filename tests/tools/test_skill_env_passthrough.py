@@ -29,7 +29,7 @@ def _create_skill(tmp_path, name, frontmatter_extra=""):
         f"{frontmatter_extra}"
         f"---\n\n"
         f"# {name}\n\n"
-        f"Test content.\n"
+        f"Test content.\n",
     )
     return skill_dir
 
@@ -37,7 +37,8 @@ def _create_skill(tmp_path, name, frontmatter_extra=""):
 class TestSkillViewRegistersPassthrough:
     def test_available_env_vars_registered(self, tmp_path, monkeypatch):
         """When a skill declares required_environment_variables and the var IS set,
-        it should be registered in the passthrough."""
+        it should be registered in the passthrough.
+        """
         _create_skill(
             tmp_path,
             "test-skill",
@@ -48,7 +49,7 @@ class TestSkillViewRegistersPassthrough:
             ),
         )
         monkeypatch.setattr(
-            "tools.skills_tool.SKILLS_DIR", tmp_path
+            "tools.skills_tool.SKILLS_DIR", tmp_path,
         )
         # Set the env var so it's "available"
         monkeypatch.setenv("TENOR_API_KEY", "test-value-123")
@@ -93,7 +94,8 @@ class TestSkillViewRegistersPassthrough:
 
     def test_missing_env_vars_not_registered(self, tmp_path, monkeypatch):
         """When a skill declares required_environment_variables but the var is NOT set,
-        it should NOT be registered in the passthrough."""
+        it should NOT be registered in the passthrough.
+        """
         _create_skill(
             tmp_path,
             "test-skill",
@@ -104,7 +106,7 @@ class TestSkillViewRegistersPassthrough:
             ),
         )
         monkeypatch.setattr(
-            "tools.skills_tool.SKILLS_DIR", tmp_path
+            "tools.skills_tool.SKILLS_DIR", tmp_path,
         )
         monkeypatch.delenv("NONEXISTENT_SKILL_KEY_XYZ", raising=False)
 
@@ -120,7 +122,7 @@ class TestSkillViewRegistersPassthrough:
         """Skills without required_environment_variables shouldn't register anything."""
         _create_skill(tmp_path, "simple-skill")
         monkeypatch.setattr(
-            "tools.skills_tool.SKILLS_DIR", tmp_path
+            "tools.skills_tool.SKILLS_DIR", tmp_path,
         )
 
         with patch("tools.skills_tool._secret_capture_callback", None):

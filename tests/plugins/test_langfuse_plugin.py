@@ -7,9 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
 import yaml
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = REPO_ROOT / "plugins" / "observability" / "langfuse"
@@ -194,7 +192,7 @@ class TestPayloadSanitization:
 
         payload = "data:image/jpeg;base64," + ("b" * 20000)
         serialized = mod._serialize_messages([
-            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": payload}}]}
+            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": payload}}]},
         ])
 
         assert serialized[0]["content"][0]["image_url"]["url"] == {
@@ -367,7 +365,8 @@ class TestTurnTraceIsolation:
         """turn_id is preferred over api_request_id so the turn-scoped
         post_llm_call (which carries no api_request_id) still resolves to the
         same key as the request-scoped pre/post_api_request hooks.  If the
-        ordering were reversed, finalization would silently break."""
+        ordering were reversed, finalization would silently break.
+        """
         mod = self._fresh_plugin()
         turn_id = "S:T:turnX"
         api_request_id = f"{turn_id}:api:1"
@@ -402,7 +401,8 @@ class TestTurnTraceIsolation:
     def test_trace_key_strings_unchanged_by_refactor(self):
         """Pin the exact key strings across all task/session/turn/api
         combinations so the _scope_prefix extraction can never silently change
-        a key (keys are matched across hooks; a drift breaks finalization)."""
+        a key (keys are matched across hooks; a drift breaks finalization).
+        """
         mod = self._fresh_plugin()
         tk = mod._trace_key
         assert tk("t", "s", turn_id="u") == "task:t:turn:u"
@@ -437,9 +437,10 @@ class _FakeLangfuse:
     gate refuses to proceed past ``if Langfuse is None`` when the SDK
     is missing, which would short-circuit before the placeholder check
     can fire.  Patching ``plugin.Langfuse`` with this class lets the
-    placeholder validator exercise its full code path."""
+    placeholder validator exercise its full code path.
+    """
 
-    instances: list["_FakeLangfuse"] = []
+    instances: list[_FakeLangfuse] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -480,7 +481,8 @@ class TestPlaceholderKeyDetection:
 
     def test_redact_key_preview_short_value_echoed(self, monkeypatch):
         """Short placeholder strings are echoed in full so the operator
-        can see exactly which template they forgot to replace."""
+        can see exactly which template they forgot to replace.
+        """
         self._clear_env(monkeypatch)
         plugin = self._fresh_plugin()
         assert plugin._redact_key_preview("placeholder") == "'placeholder'"
@@ -488,7 +490,8 @@ class TestPlaceholderKeyDetection:
 
     def test_redact_key_preview_long_value_truncated(self, monkeypatch):
         """If an operator pasted a real secret into the wrong env var the
-        preview must NOT echo it in full — only the leading 6 chars."""
+        preview must NOT echo it in full — only the leading 6 chars.
+        """
         self._clear_env(monkeypatch)
         plugin = self._fresh_plugin()
         result = plugin._redact_key_preview("sk-lf-abcdefghijklmnop")
@@ -500,17 +503,17 @@ class TestPlaceholderKeyDetection:
         self._clear_env(monkeypatch)
         plugin = self._fresh_plugin()
         assert plugin._validate_langfuse_key(
-            "HERMES_LANGFUSE_PUBLIC_KEY", "pk-lf-real-public-xyz"
+            "HERMES_LANGFUSE_PUBLIC_KEY", "pk-lf-real-public-xyz",
         ) is None
         assert plugin._validate_langfuse_key(
-            "HERMES_LANGFUSE_SECRET_KEY", "sk-lf-real-secret-xyz"
+            "HERMES_LANGFUSE_SECRET_KEY", "sk-lf-real-secret-xyz",
         ) is None
 
     def test_validate_langfuse_key_rejects_wrong_prefix(self, monkeypatch):
         self._clear_env(monkeypatch)
         plugin = self._fresh_plugin()
         msg = plugin._validate_langfuse_key(
-            "HERMES_LANGFUSE_PUBLIC_KEY", "placeholder"
+            "HERMES_LANGFUSE_PUBLIC_KEY", "placeholder",
         )
         assert msg is not None
         assert "HERMES_LANGFUSE_PUBLIC_KEY" in msg
@@ -581,7 +584,8 @@ class TestPlaceholderKeyDetection:
         """The cached ``_INIT_FAILED`` sentinel must short-circuit
         subsequent calls so each hook invocation isn't a fresh log
         line — otherwise a busy gateway will spam the operator's
-        terminal."""
+        terminal.
+        """
         self._clear_env(monkeypatch)
         monkeypatch.setenv("HERMES_LANGFUSE_PUBLIC_KEY", "placeholder")
         monkeypatch.setenv("HERMES_LANGFUSE_SECRET_KEY", "placeholder")
@@ -608,7 +612,8 @@ class TestPlaceholderKeyDetection:
     ])
     def test_common_placeholders_detected(self, monkeypatch, caplog, placeholder):
         """A grab-bag of values that real-world ``.env.example`` templates
-        use as stand-ins.  Any of them in either key must trip the guard."""
+        use as stand-ins.  Any of them in either key must trip the guard.
+        """
         self._clear_env(monkeypatch)
         monkeypatch.setenv("HERMES_LANGFUSE_PUBLIC_KEY", placeholder)
         monkeypatch.setenv("HERMES_LANGFUSE_SECRET_KEY", "sk-lf-real-secret-xyz")
@@ -620,7 +625,8 @@ class TestPlaceholderKeyDetection:
     def test_legacy_LANGFUSE_PUBLIC_KEY_also_validated(self, monkeypatch, caplog):
         """The plugin reads both the canonical HERMES_-prefixed env var and
         the legacy bare ``LANGFUSE_PUBLIC_KEY``.  The validator must run on
-        whichever value ``_get_langfuse()`` actually consumed."""
+        whichever value ``_get_langfuse()`` actually consumed.
+        """
         self._clear_env(monkeypatch)
         monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "placeholder")
         monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-real-secret-xyz")
@@ -638,7 +644,8 @@ class TestPlaceholderKeyDetection:
         configured the plugin yet) — it must remain SILENT.  Regression
         guard against the placeholder validator accidentally running on
         empty values and re-introducing log noise for unconfigured
-        installs."""
+        installs.
+        """
         self._clear_env(monkeypatch)
         plugin = self._fresh_plugin(monkeypatch)
         with caplog.at_level(logging.WARNING, logger=self.LOGGER_NAME):
@@ -654,7 +661,8 @@ class TestPlaceholderKeyDetection:
         re-warning here would dilute the actually-actionable SDK-missing
         signal upstream.  The ``Langfuse is None`` guard at the top of
         ``_get_langfuse`` already handles this; this test pins that
-        behaviour."""
+        behaviour.
+        """
         self._clear_env(monkeypatch)
         monkeypatch.setenv("HERMES_LANGFUSE_PUBLIC_KEY", "placeholder")
         monkeypatch.setenv("HERMES_LANGFUSE_SECRET_KEY", "placeholder")
@@ -674,7 +682,8 @@ class TestPlaceholderKeyDetection:
         a recording fake so the assertion can confirm BOTH that the
         placeholder warning didn't fire AND that the client was actually
         constructed — the latter is the success signal the bug report
-        wanted."""
+        wanted.
+        """
         self._clear_env(monkeypatch)
         monkeypatch.setenv("HERMES_LANGFUSE_PUBLIC_KEY", "pk-lf-real-public-xyz")
         monkeypatch.setenv("HERMES_LANGFUSE_SECRET_KEY", "sk-lf-real-secret-xyz")
@@ -756,7 +765,7 @@ class TestToolCallOutputBackfill:
         assert state.turn_tool_calls[0]["output"] == ended["output"]
         assert state.turn_tool_calls[0]["function"]["output"] == ended["output"]
         assert state.turn_tool_calls[0]["output"] == {
-            "results": [{"url": "https://example.com", "content": "Example Domain"}]
+            "results": [{"url": "https://example.com", "content": "Example Domain"}],
         }
 
     def test_serialize_messages_keeps_tool_name_and_call_id(self):
@@ -880,7 +889,8 @@ class TestToolObservationKeying:
         """The actual concurrency contract: when 8 threads race to drain
         the pending queue, no observation is consumed twice and none is
         lost.  Validates ``_STATE_LOCK`` discipline, not Python list
-        semantics."""
+        semantics.
+        """
         import threading
 
         mod = self._make_mod()
@@ -953,7 +963,8 @@ class TestUsageFromSanitizedResponse:
     """Regression: ``post_api_request`` delivers ``response`` as a sanitized
     dict (no ``.usage`` attribute) plus a separate ``usage`` summary dict. The
     post-call handler must read the ``usage`` dict instead of treating the dict
-    response as a usage-bearing object and dropping all token/cost data."""
+    response as a usage-bearing object and dropping all token/cost data.
+    """
 
     def _setup(self, mod, monkeypatch):
         # Active client so on_post_llm_call does not early-return.

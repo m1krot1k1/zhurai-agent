@@ -17,10 +17,10 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 from tools.skills_sync import (
-    sync_skills,
-    reset_bundled_skill,
-    list_user_modified_bundled_skills,
     diff_bundled_skill,
+    list_user_modified_bundled_skills,
+    reset_bundled_skill,
+    sync_skills,
 )
 
 
@@ -37,13 +37,13 @@ def _make_bundled(tmp_path):
 def _patches(bundled, skills_dir, manifest_file):
     stack = ExitStack()
     stack.enter_context(
-        patch("tools.skills_sync._get_bundled_dir", return_value=bundled)
+        patch("tools.skills_sync._get_bundled_dir", return_value=bundled),
     )
     stack.enter_context(
         patch(
             "tools.skills_sync._get_optional_dir",
             return_value=bundled.parent / "optional-skills",
-        )
+        ),
     )
     stack.enter_context(patch("tools.skills_sync.SKILLS_DIR", skills_dir))
     stack.enter_context(patch("tools.skills_sync.MANIFEST_FILE", manifest_file))

@@ -52,7 +52,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
         conn = kb.connect()
         try:
             row = conn.execute(
-                "SELECT id FROM tasks WHERE status='ready' AND claim_lock IS NULL LIMIT 1"
+                "SELECT id FROM tasks WHERE status='ready' AND claim_lock IS NULL LIMIT 1",
             ).fetchone()
             if row is None:
                 idle += 1
@@ -91,7 +91,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
         finally:
             conn.close()
 
-    with open(result_file, "w") as f:
+    with Path(result_file).open("w") as f:
         json.dump(events, f)
 
 
@@ -116,7 +116,7 @@ def reclaimer_loop(hermes_home: str, result_file: str) -> None:
         finally:
             conn.close()
         time.sleep(0.2)
-    with open(result_file, "w") as f:
+    with Path(result_file).open("w") as f:
         json.dump(events, f)
 
 
@@ -134,7 +134,7 @@ def main():
                        tenant="reclaim-race")
     conn.close()
     print(f"Seeded {NUM_TASKS} tasks. TTL={TTL}s, work_duration={WORK_DURATION_S}s")
-    print(f"(worker work > TTL guarantees reclaims)")
+    print("(worker work > TTL guarantees reclaims)")
 
     ctx = mp.get_context("spawn")
     worker_results = [f"/tmp/rc_worker_{i}.json" for i in range(NUM_WORKERS)]
@@ -157,12 +157,12 @@ def main():
     # Aggregate.
     all_events = []
     for f in worker_results:
-        if os.path.isfile(f):
-            with open(f) as fh:
+        if Path(f).is_file():
+            with Path(f).open() as fh:
                 all_events.extend(json.load(fh))
     reclaim_events = []
-    if os.path.isfile(reclaim_result):
-        with open(reclaim_result) as fh:
+    if Path(reclaim_result).is_file():
+        with Path(reclaim_result).open() as fh:
             reclaim_events = json.load(fh)
 
     op_counts = {}
@@ -189,7 +189,7 @@ def main():
             failures.append(
                 f"INVARIANT VIOLATION: task {row['id']} status={row['status']} "
                 f"current_run_id={row['current_run_id']} but run ended "
-                f"outcome={row['outcome']}"
+                f"outcome={row['outcome']}",
             )
         # Every run with NULL ended_at should still have the task pointing at it
         orphans = conn.execute("""
@@ -210,16 +210,16 @@ def main():
         print(f"\nDB event counts: claimed={claim_evts} reclaimed={reclaim_evts} completed={comp_evts}")
         # Every reclaimed run must have ended_at set
         unended_reclaims = conn.execute(
-            "SELECT COUNT(*) FROM task_runs WHERE outcome='reclaimed' AND ended_at IS NULL"
+            "SELECT COUNT(*) FROM task_runs WHERE outcome='reclaimed' AND ended_at IS NULL",
         ).fetchone()[0]
         if unended_reclaims:
             failures.append(f"UNENDED RECLAIMED RUNS: {unended_reclaims}")
         # Count of completed runs
         comp_runs = conn.execute(
-            "SELECT COUNT(*) FROM task_runs WHERE outcome='completed'"
+            "SELECT COUNT(*) FROM task_runs WHERE outcome='completed'",
         ).fetchone()[0]
         reclaim_runs = conn.execute(
-            "SELECT COUNT(*) FROM task_runs WHERE outcome='reclaimed'"
+            "SELECT COUNT(*) FROM task_runs WHERE outcome='reclaimed'",
         ).fetchone()[0]
         print(f"DB run outcomes: completed={comp_runs} reclaimed={reclaim_runs}")
     finally:

@@ -23,10 +23,10 @@ from gateway.run import (
     _is_transient_network_error,
 )
 
-
 # ----- Fake exception classes that mimic the real wire types ----------
 # We avoid importing telegram / httpx here so the test runs in environments
 # without those packages installed (the classifier matches on class name).
+
 
 class TimedOut(Exception):
     """Stand-in for ``telegram.error.TimedOut``."""
@@ -163,7 +163,7 @@ def test_handler_tolerates_missing_exception_key(monkeypatch):
     try:
         forwarded: list[dict] = []
         monkeypatch.setattr(
-            loop, "default_exception_handler", lambda ctx: forwarded.append(ctx)
+            loop, "default_exception_handler", lambda ctx: forwarded.append(ctx),
         )
         ctx = {"message": "warning without exception"}
         _gateway_loop_exception_handler(loop, ctx)

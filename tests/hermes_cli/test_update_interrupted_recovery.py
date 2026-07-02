@@ -7,8 +7,6 @@ finished automatically on the next launch instead of leaving a half-built venv.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import hermes_cli.main as m
 
 
@@ -115,7 +113,7 @@ def test_recovery_keeps_marker_on_failure(tmp_path, monkeypatch):
         raise RuntimeError("install died")
 
     monkeypatch.setattr(
-        m, "_install_python_dependencies_with_optional_fallback", boom
+        m, "_install_python_dependencies_with_optional_fallback", boom,
     )
 
     # Must not raise.

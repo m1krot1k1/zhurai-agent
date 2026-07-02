@@ -12,7 +12,6 @@ import subprocess
 import threading
 import uuid
 from pathlib import Path
-from typing import Optional
 
 from hermes_constants import get_hermes_home
 from tools.environments.base import (
@@ -36,7 +35,7 @@ def _find_singularity_executable() -> str:
     raise RuntimeError(
         "Neither 'apptainer' nor 'singularity' was found in PATH. "
         "Install Apptainer (https://apptainer.org/docs/admin/main/installation.html) "
-        "or Singularity and ensure the CLI is available."
+        "or Singularity and ensure the CLI is available.",
     )
 
 
@@ -50,7 +49,7 @@ def _ensure_singularity_available() -> str:
         )
     except FileNotFoundError:
         raise RuntimeError(
-            f"Singularity backend selected but '{exe}' could not be executed."
+            f"Singularity backend selected but '{exe}' could not be executed.",
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"'{exe} version' timed out.")
@@ -106,12 +105,12 @@ _sif_build_lock = threading.Lock()
 
 
 def _get_or_build_sif(image: str, executable: str = "apptainer") -> str:
-    if image.endswith('.sif') and Path(image).exists():
+    if image.endswith(".sif") and Path(image).exists():
         return image
-    if not image.startswith('docker://'):
+    if not image.startswith("docker://"):
         return image
 
-    image_name = image.replace('docker://', '').replace('/', '-').replace(':', '-')
+    image_name = image.replace("docker://", "").replace("/", "-").replace(":", "-")
     cache_dir = _get_apptainer_cache_dir()
     sif_path = cache_dir / f"{image_name}.sif"
 
@@ -181,7 +180,7 @@ class SingularityEnvironment(BaseEnvironment):
         self._instance_started = False
         self._persistent = persistent_filesystem
         self._task_id = task_id
-        self._overlay_dir: Optional[Path] = None
+        self._overlay_dir: Path | None = None
         self._cpu = cpu
         self._memory = memory
 
@@ -204,7 +203,10 @@ class SingularityEnvironment(BaseEnvironment):
             cmd.append("--writable-tmpfs")
 
         try:
-            from tools.credential_files import get_credential_file_mounts, get_skills_directory_mount
+            from tools.credential_files import (
+                get_credential_file_mounts,
+                get_skills_directory_mount,
+            )
             for mount_entry in get_credential_file_mounts():
                 cmd.extend(["--bind", f"{mount_entry['host_path']}:{mount_entry['container_path']}:ro"])
             for skills_mount in get_skills_directory_mount():

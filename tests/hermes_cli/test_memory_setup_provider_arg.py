@@ -43,7 +43,8 @@ class TestMemorySetupProviderRouting:
 
     def test_unknown_provider_reports_and_returns_early(self, capsys):
         """An unknown provider name surfaces a helpful message and returns
-        before any config load/save (the not-found guard precedes those imports)."""
+        before any config load/save (the not-found guard precedes those imports).
+        """
         memory_setup.cmd_setup_provider("notaprovider")
         out = capsys.readouterr().out
         assert "not found" in out
@@ -53,15 +54,17 @@ class TestMemorySetupProviderRouting:
 class TestInstallDependenciesRunner:
     """`_install_dependencies` must install via `uv` when present and fall back
     to standard `pip` when `uv` is unavailable (e.g. slim containers / CI images
-    that don't ship uv) instead of dead-ending with "cannot install"."""
+    that don't ship uv) instead of dead-ending with "cannot install".
+    """
 
     def _run_with_missing_dep(self, tmp_path, which_side_effect):
         """Drive _install_dependencies for a plugin that declares one missing
-        pip dep, capturing the subprocess.run argv (or None if never called)."""
+        pip dep, capturing the subprocess.run argv (or None if never called).
+        """
         import sys
 
         (tmp_path / "plugin.yaml").write_text(
-            "pip_dependencies:\n  - definitely-not-installed-xyz\n", encoding="utf-8"
+            "pip_dependencies:\n  - definitely-not-installed-xyz\n", encoding="utf-8",
         )
         captured = {}
 
@@ -77,7 +80,7 @@ class TestInstallDependenciesRunner:
 
     def test_uses_uv_when_available(self, tmp_path):
         cmd, _ = self._run_with_missing_dep(
-            tmp_path, lambda b: "/usr/bin/uv" if b == "uv" else None
+            tmp_path, lambda b: "/usr/bin/uv" if b == "uv" else None,
         )
         assert cmd is not None
         assert cmd[:3] == ["/usr/bin/uv", "pip", "install"]
@@ -85,7 +88,7 @@ class TestInstallDependenciesRunner:
     def test_falls_back_to_pip_when_uv_missing(self, tmp_path, capsys):
         """The salvaged behavior (#5954): no uv but pip present -> python -m pip."""
         cmd, py = self._run_with_missing_dep(
-            tmp_path, lambda b: "/usr/bin/pip3" if b == "pip3" else None
+            tmp_path, lambda b: "/usr/bin/pip3" if b == "pip3" else None,
         )
         assert cmd is not None
         assert cmd[:4] == [py, "-m", "pip", "install"]

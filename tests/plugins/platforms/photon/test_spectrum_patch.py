@@ -5,7 +5,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-
 _PATCHER = Path("plugins/platforms/photon/sidecar/patch-spectrum-mixed-attachments.mjs")
 
 
@@ -135,7 +134,7 @@ def test_spectrum_patch_preserves_text_when_single_attachment(tmp_path: Path) ->
               cacheMessage(cache, msg);
               return [msg];
             };
-            """
+            """,
         ),
         encoding="utf-8",
     )

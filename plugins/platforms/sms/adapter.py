@@ -24,8 +24,11 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import urllib.parse
-from typing import Any, Dict, Optional
+from typing import Any
+
+import aiohttp
 
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import (
@@ -54,8 +57,7 @@ def check_sms_requirements() -> bool:
 
 
 class SmsAdapter(BasePlatformAdapter):
-    """
-    Twilio SMS <-> Hermes gateway adapter.
+    """Twilio SMS <-> Hermes gateway adapter.
 
     Each inbound phone number gets its own Hermes session (multi-tenant).
     Replies are always sent from the configured TWILIO_PHONE_NUMBER.
@@ -69,12 +71,12 @@ class SmsAdapter(BasePlatformAdapter):
         self._auth_token: str = os.environ["TWILIO_AUTH_TOKEN"]
         self._from_number: str = os.getenv("TWILIO_PHONE_NUMBER", "")
         self._webhook_port: int = int(
-            os.getenv("SMS_WEBHOOK_PORT", str(DEFAULT_WEBHOOK_PORT))
+            os.getenv("SMS_WEBHOOK_PORT", str(DEFAULT_WEBHOOK_PORT)),
         )
         self._webhook_host: str = os.getenv("SMS_WEBHOOK_HOST", DEFAULT_WEBHOOK_HOST)
         self._webhook_url: str = os.getenv("SMS_WEBHOOK_URL", "").strip()
         self._runner = None
-        self._http_session: Optional["aiohttp.ClientSession"] = None
+        self._http_session: aiohttp.ClientSession | None = None
 
     def _basic_auth_header(self) -> str:
         """Build HTTP Basic auth header value for Twilio."""
@@ -154,8 +156,8 @@ class SmsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         import aiohttp
 
@@ -206,7 +208,7 @@ class SmsAdapter(BasePlatformAdapter):
 
         return last_result
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         return {"name": chat_id, "type": "dm"}
 
     # ------------------------------------------------------------------
@@ -272,14 +274,14 @@ class SmsAdapter(BasePlatformAdapter):
             # Has explicit default port → strip it
             return urllib.parse.urlunparse(
                 (parsed.scheme, parsed.hostname, parsed.path,
-                 parsed.params, parsed.query, parsed.fragment)
+                 parsed.params, parsed.query, parsed.fragment),
             )
-        elif parsed.port is None:
+        if parsed.port is None:
             # No port → add default
             netloc = f"{parsed.hostname}:{default_port}"
             return urllib.parse.urlunparse(
                 (parsed.scheme, netloc, parsed.path,
-                 parsed.params, parsed.query, parsed.fragment)
+                 parsed.params, parsed.query, parsed.fragment),
             )
 
         # Non-standard port — no variant
@@ -316,7 +318,7 @@ class SmsAdapter(BasePlatformAdapter):
                 )
             flat_params = {k: v[0] for k, v in form.items() if v}
             if not self._validate_twilio_signature(
-                self._webhook_url, flat_params, twilio_sig
+                self._webhook_url, flat_params, twilio_sig,
             ):
                 logger.warning("[sms] Rejected: invalid Twilio signature")
                 return web.Response(
@@ -415,7 +417,8 @@ async def _standalone_send(
     force_document=False,
 ):
     """Out-of-process SMS delivery via the Twilio REST API. Implements the
-    standalone_sender_fn contract; replaces the legacy _send_sms helper."""
+    standalone_sender_fn contract; replaces the legacy _send_sms helper.
+    """
     auth_token = getattr(pconfig, "api_key", None) or os.getenv("TWILIO_AUTH_TOKEN", "")
     try:
         import aiohttp
@@ -438,7 +441,7 @@ async def _standalone_send(
             return {"error": text}
 
     try:
-        from gateway.platforms.base import resolve_proxy_url, proxy_kwargs_for_aiohttp
+        from gateway.platforms.base import proxy_kwargs_for_aiohttp, resolve_proxy_url
         _proxy = resolve_proxy_url()
         _sess_kw, _req_kw = proxy_kwargs_for_aiohttp(_proxy)
         creds = f"{account_sid}:{auth_token}"
@@ -462,7 +465,8 @@ async def _standalone_send(
 
 def _is_connected(config) -> bool:
     """SMS is connected when Twilio credentials are present. Mirrors the legacy
-    _PLATFORM_CONNECTED_CHECKERS[Platform.SMS] = bool(TWILIO_ACCOUNT_SID)."""
+    _PLATFORM_CONNECTED_CHECKERS[Platform.SMS] = bool(TWILIO_ACCOUNT_SID).
+    """
     import hermes_cli.gateway as gateway_mod
     return bool((gateway_mod.get_env_value("TWILIO_ACCOUNT_SID") or "").strip())
 

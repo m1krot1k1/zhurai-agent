@@ -15,7 +15,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
     / "optional-skills"
@@ -263,7 +262,7 @@ def test_config_apply_block_does_not_flip_on_non_config_conflict(tmp_path):
 def test_run_if_selected_skips_config_ops_after_block(tmp_path):
     mod = _load()
     migrator = _make_minimal_migrator(
-        mod, tmp_path, execute=True, selected_options={"model-config", "tts-config"}
+        mod, tmp_path, execute=True, selected_options={"model-config", "tts-config"},
     )
     migrator._config_apply_blocked = True
     called = []
@@ -279,7 +278,7 @@ def test_run_if_selected_skips_config_ops_after_block(tmp_path):
 def test_run_if_selected_runs_non_config_ops_even_after_block(tmp_path):
     mod = _load()
     migrator = _make_minimal_migrator(
-        mod, tmp_path, execute=True, selected_options={"soul"}
+        mod, tmp_path, execute=True, selected_options={"soul"},
     )
     migrator._config_apply_blocked = True
     called = []
@@ -289,10 +288,11 @@ def test_run_if_selected_runs_non_config_ops_even_after_block(tmp_path):
 
 def test_dry_run_never_blocks_even_after_conflict(tmp_path):
     """Dry runs must preview the full plan — blocking mid-preview would hide
-    conflicts and mislead the user about what would actually happen."""
+    conflicts and mislead the user about what would actually happen.
+    """
     mod = _load()
     migrator = _make_minimal_migrator(
-        mod, tmp_path, execute=False, selected_options={"tts-config"}
+        mod, tmp_path, execute=False, selected_options={"tts-config"},
     )
     migrator._config_apply_blocked = True
     called = []
@@ -336,13 +336,14 @@ def test_json_mode_emits_structured_report(tmp_path):
 
 def test_json_mode_redacts_secrets_in_output(tmp_path):
     """Even plan-only JSON output goes through the redactor — the stdout
-    capture path is what gets piped into CI / support tickets."""
+    capture path is what gets piped into CI / support tickets.
+    """
     source = tmp_path / "openclaw"
     source.mkdir()
     (source / "openclaw.json").write_text("{}", encoding="utf-8")
     # Plant a fake OpenClaw .env with a recognizably-shaped key.
     (source / ".env").write_text(
-        "OPENROUTER_API_KEY=sk-or-v1-abcdef1234567890abcdef\n", encoding="utf-8"
+        "OPENROUTER_API_KEY=sk-or-v1-abcdef1234567890abcdef\n", encoding="utf-8",
     )
     target = tmp_path / "hermes"
     target.mkdir()

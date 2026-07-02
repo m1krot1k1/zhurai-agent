@@ -6,10 +6,10 @@ import pytest
 
 from agent.oneshot import (
     PROMPT_TEMPLATES,
-    render_template,
-    run_oneshot,
     _strip_code_fence,
     _truncate,
+    render_template,
+    run_oneshot,
 )
 
 

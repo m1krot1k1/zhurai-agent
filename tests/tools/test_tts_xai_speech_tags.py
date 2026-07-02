@@ -81,7 +81,7 @@ def test_apply_xai_auto_speech_tags_single_newline_still_gets_first_sentence_pau
 
 
 def test_generate_xai_tts_sends_auxiliary_rewriter_output_to_api(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch,
 ):
     """auto_speech_tags=True should send the auxiliary rewriter's tagged
     output (not the conservative local pause fallback) to the xAI TTS API.
@@ -109,13 +109,13 @@ def test_generate_xai_tts_sends_auxiliary_rewriter_output_to_api(
         return FakeResponse()
 
     fake_response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=rewriter_output))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content=rewriter_output))],
     )
 
     monkeypatch.setenv("XAI_API_KEY", "test-xai-key")
     monkeypatch.setattr("requests.post", fake_post)
     monkeypatch.setattr(
-        "agent.auxiliary_client.call_llm", lambda *a, **kw: fake_response
+        "agent.auxiliary_client.call_llm", lambda *a, **kw: fake_response,
     )
 
     out = tmp_path / "out.mp3"
@@ -138,12 +138,12 @@ def test_auto_speech_tags_calls_auxiliary_rewriter_with_tts_audio_tags_task():
     that documents the xAI inline + wrapping tag vocabulary.
     """
     response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="[warmly] Hi."))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content="[warmly] Hi."))],
     )
 
     with patch("agent.auxiliary_client.call_llm", return_value=response) as mock_call:
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     assert result == "[warmly] Hi."
@@ -185,12 +185,12 @@ def test_auto_speech_tags_strips_markdown_fences_from_rewriter_output():
     """
     fenced = "```\n[warmly] Bonjour. [soft laugh]\n```"
     response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=fenced))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content=fenced))],
     )
 
     with patch("agent.auxiliary_client.call_llm", return_value=response):
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     assert result == "[warmly] Bonjour. [soft laugh]"
@@ -200,12 +200,12 @@ def test_auto_speech_tags_strips_markdown_fence_with_language_hint():
     """The fence regex accepts an optional language tag like ```text ...```."""
     fenced = "```text\n[warmly] Bonjour.\n```"
     response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=fenced))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content=fenced))],
     )
 
     with patch("agent.auxiliary_client.call_llm", return_value=response):
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     assert result == "[warmly] Bonjour."
@@ -223,7 +223,7 @@ def test_auto_speech_tags_falls_back_to_local_on_auxiliary_exception(caplog):
         side_effect=RuntimeError("upstream provider timed out"),
     ):
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     # Local fallback: first sentence gets a [pause] inserted, single
@@ -237,14 +237,14 @@ def test_auto_speech_tags_falls_back_to_local_on_auxiliary_exception(caplog):
 def test_auto_speech_tags_falls_back_to_local_when_rewriter_returns_empty():
     """An empty / None rewriter response must also fall back to local."""
     empty_response = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content=""))],
     )
 
     with patch(
-        "agent.auxiliary_client.call_llm", return_value=empty_response
+        "agent.auxiliary_client.call_llm", return_value=empty_response,
     ):
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     assert result == (
@@ -292,10 +292,10 @@ def test_auto_speech_tags_falls_back_to_local_on_malformed_rewriter_response(
     conservative local pass rather than crash.
     """
     with patch(
-        "agent.auxiliary_client.call_llm", return_value=bad_response
+        "agent.auxiliary_client.call_llm", return_value=bad_response,
     ):
         result = _apply_xai_auto_speech_tags(
-            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale."
+            "Bonjour Monsieur Talbot. Ceci est un test de réponse vocale.",
         )
 
     assert result == (
@@ -379,7 +379,7 @@ def test_generate_xai_tts_sends_speed_when_set(tmp_path, monkeypatch):
 
 
 def test_generate_xai_tts_speed_clamped_to_valid_range(tmp_path, monkeypatch):
-    """speed values outside xAI's 0.7..1.5 band are clamped, not sent raw."""
+    """Speed values outside xAI's 0.7..1.5 band are clamped, not sent raw."""
     captured = {}
 
     fake_response = Mock()
@@ -411,7 +411,7 @@ def test_generate_xai_tts_speed_clamped_to_valid_range(tmp_path, monkeypatch):
 
 
 def test_generate_xai_tts_omits_speed_when_exactly_default(tmp_path, monkeypatch):
-    """speed == 1.0 is the API default; the field stays out of the payload."""
+    """Speed == 1.0 is the API default; the field stays out of the payload."""
     captured = {}
 
     fake_response = Mock()

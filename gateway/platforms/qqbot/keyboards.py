@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ UPDATE_PROMPT_PREFIX = "update_prompt:"
 # session_key may itself contain colons (e.g. agent:main:qqbot:c2c:OPENID),
 # so the session_key group is greedy but trails the decision.
 _APPROVAL_DATA_RE = re.compile(
-    r"^approve:(.+):(allow-once|allow-always|deny)$"
+    r"^approve:(.+):(allow-once|allow-always|deny)$",
 )
 
 # Pattern: update_prompt:y | update_prompt:n
@@ -57,9 +58,10 @@ _UPDATE_PROMPT_RE = re.compile(r"^update_prompt:(y|n)$")
 @dataclass
 class KeyboardButtonPermission:
     """Button permission metadata. ``type=2`` means all users can click."""
+
     type: int = 2
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"type": self.type}
 
 
@@ -74,14 +76,15 @@ class KeyboardButtonAction:
     :param permission: :class:`KeyboardButtonPermission`.
     :param click_limit: Max clicks per user (``1`` = single-use).
     """
+
     type: int
     data: str
     permission: KeyboardButtonPermission = field(
-        default_factory=KeyboardButtonPermission
+        default_factory=KeyboardButtonPermission,
     )
     click_limit: int = 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type,
             "data": self.data,
@@ -98,11 +101,12 @@ class KeyboardButtonRenderData:
     :param visited_label: Post-click label (button stays greyed in place).
     :param style: ``0`` = grey, ``1`` = blue.
     """
+
     label: str
     visited_label: str
     style: int = 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "label": self.label,
             "visited_label": self.visited_label,
@@ -117,12 +121,13 @@ class KeyboardButton:
     :param group_id: Buttons sharing a ``group_id`` are mutually exclusive —
         clicking one greys the rest.
     """
+
     id: str
     render_data: KeyboardButtonRenderData
     action: KeyboardButtonAction
     group_id: str = "default"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "render_data": self.render_data.to_dict(),
@@ -133,32 +138,33 @@ class KeyboardButton:
 
 @dataclass
 class KeyboardRow:
-    buttons: List[KeyboardButton] = field(default_factory=list)
+    buttons: list[KeyboardButton] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"buttons": [b.to_dict() for b in self.buttons]}
 
 
 @dataclass
 class KeyboardContent:
-    rows: List[KeyboardRow] = field(default_factory=list)
+    rows: list[KeyboardRow] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"rows": [r.to_dict() for r in self.rows]}
 
 
 @dataclass
 class InlineKeyboard:
     """Top-level keyboard payload — goes into ``MessageToCreate.keyboard``."""
+
     content: KeyboardContent = field(default_factory=KeyboardContent)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"content": self.content.to_dict()}
 
 
 # ── INTERACTION_CREATE parsing ───────────────────────────────────────
 
-def parse_approval_button_data(button_data: str) -> Optional[tuple[str, str]]:
+def parse_approval_button_data(button_data: str) -> tuple[str, str] | None:
     """Parse approval ``button_data`` into ``(session_key, decision)``.
 
     :param button_data: Raw ``data.resolved.button_data`` from
@@ -171,7 +177,7 @@ def parse_approval_button_data(button_data: str) -> Optional[tuple[str, str]]:
     return m.group(1), m.group(2)
 
 
-def parse_update_prompt_button_data(button_data: str) -> Optional[str]:
+def parse_update_prompt_button_data(button_data: str) -> str | None:
     """Parse update-prompt ``button_data`` into ``'y'`` or ``'n'``."""
     m = _UPDATE_PROMPT_RE.match(button_data or "")
     if not m:
@@ -239,8 +245,8 @@ def build_approval_keyboard(session_key: str) -> InlineKeyboard:
                         group_id="approval",
                     ),
                 ]),
-            ]
-        )
+            ],
+        ),
     )
 
 
@@ -267,8 +273,8 @@ def build_update_prompt_keyboard() -> InlineKeyboard:
                         group_id="update_prompt",
                     ),
                 ]),
-            ]
-        )
+            ],
+        ),
     )
 
 
@@ -287,6 +293,7 @@ class ApprovalRequest:
     :param severity: ``'critical' | 'info' | ''``.
     :param timeout_sec: Seconds until the approval expires.
     """
+
     session_key: str
     title: str
     description: str = ""
@@ -305,7 +312,7 @@ def build_approval_text(req: ApprovalRequest) -> str:
 
 
 def _build_exec_text(req: ApprovalRequest) -> str:
-    lines: List[str] = ["🔐 **命令执行审批**", ""]
+    lines: list[str] = ["🔐 **命令执行审批**", ""]
     if req.command_preview:
         preview = req.command_preview[:300]
         lines.append(f"```\n{preview}\n```")
@@ -326,7 +333,7 @@ def _build_plugin_text(req: ApprovalRequest) -> str:
         else "🔵" if req.severity == "info"
         else "🟡"
     )
-    lines: List[str] = [f"{icon} **审批请求**", ""]
+    lines: list[str] = [f"{icon} **审批请求**", ""]
     lines.append(f"📋 {req.title}")
     if req.description:
         lines.append(f"📝 {req.description}")
@@ -339,7 +346,7 @@ def _build_plugin_text(req: ApprovalRequest) -> str:
 
 # ── ApprovalSender ───────────────────────────────────────────────────
 
-PostMessageFn = Callable[..., Awaitable[Dict[str, Any]]]
+PostMessageFn = Callable[..., Awaitable[dict[str, Any]]]
 """Signature of an async POST to ``/v2/{users|groups}/{id}/messages``.
 
 Implementations accept a body dict and return the raw API response.
@@ -369,7 +376,7 @@ class ApprovalSender:
         chat_type: str,
         chat_id: str,
         req: ApprovalRequest,
-        msg_id: Optional[str] = None,
+        msg_id: str | None = None,
     ) -> bool:
         """Send an approval message to *chat_id*.
 
@@ -419,6 +426,7 @@ class InteractionEvent:
 
     See https://bot.q.qq.com/wiki/develop/api-v2/dev-prepare/interface-framework/event-emit.html
     """
+
     id: str = ""
     """Interaction event id — required for the ``PUT /interactions/{id}`` ACK."""
 
@@ -451,7 +459,7 @@ class InteractionEvent:
         )
 
 
-def parse_interaction_event(raw: Dict[str, Any]) -> InteractionEvent:
+def parse_interaction_event(raw: dict[str, Any]) -> InteractionEvent:
     """Parse a raw ``INTERACTION_CREATE`` dispatch payload (``d``)."""
     data_raw = raw.get("data") or {}
     resolved = data_raw.get("resolved") or {}

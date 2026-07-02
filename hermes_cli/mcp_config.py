@@ -1,5 +1,4 @@
-"""
-MCP Server Management CLI — ``hermes mcp`` subcommand.
+"""MCP Server Management CLI — ``hermes mcp`` subcommand.
 
 Implements ``hermes mcp add/remove/list/test/configure`` for interactive
 MCP server lifecycle management (issue #690 Phase 2).
@@ -13,19 +12,19 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
+from hermes_cli.colors import Colors, color
 from hermes_cli.config import (
     cfg_get,
+    get_env_value,
+    get_hermes_home,  # noqa: F401 — used by test mocks
     load_config,
     save_config,
-    get_env_value,
     save_env_value,
-    get_hermes_home,  # noqa: F401 — used by test mocks
 )
-from hermes_cli.colors import Colors, color
-from hermes_constants import display_hermes_home
 from hermes_cli.mcp_security import validate_mcp_server_entry
+from hermes_constants import display_hermes_home
 from tools.mcp_tool import _ENV_VAR_PATTERN
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-_MCP_PRESETS: Dict[str, Dict[str, Any]] = {
+_MCP_PRESETS: dict[str, dict[str, Any]] = {
     "codex": {
         "command": "codex",
         "args": ["mcp-server"],
@@ -46,11 +45,14 @@ _MCP_PRESETS: Dict[str, Dict[str, Any]] = {
 def _info(text: str):
     print(color(f"  {text}", Colors.DIM))
 
+
 def _success(text: str):
     print(color(f"  ✓ {text}", Colors.GREEN))
 
+
 def _warning(text: str):
     print(color(f"  ⚠ {text}", Colors.YELLOW))
+
 
 def _error(text: str):
     print(color(f"  ✗ {text}", Colors.RED))
@@ -75,7 +77,7 @@ def _prompt(question: str, *, password: bool = False, default: str = "") -> str:
 
 # ─── Config Helpers ───────────────────────────────────────────────────────────
 
-def _get_mcp_servers(config: Optional[dict] = None) -> Dict[str, dict]:
+def _get_mcp_servers(config: dict | None = None) -> dict[str, dict]:
     """Return the ``mcp_servers`` dict from config, or empty dict."""
     if config is None:
         config = load_config()
@@ -137,9 +139,9 @@ def _strip_bearer_prefix(token: str) -> str:
     return stripped
 
 
-def _parse_env_assignments(raw_env: Optional[List[str]]) -> Dict[str, str]:
+def _parse_env_assignments(raw_env: list[str] | None) -> dict[str, str]:
     """Parse ``KEY=VALUE`` strings from CLI args into an env dict."""
-    parsed: Dict[str, str] = {}
+    parsed: dict[str, str] = {}
     for item in raw_env or []:
         text = str(item or "").strip()
         if not text:
@@ -159,12 +161,12 @@ def _parse_env_assignments(raw_env: Optional[List[str]]) -> Dict[str, str]:
 def _apply_mcp_preset(
     name: str,
     *,
-    preset_name: Optional[str],
-    url: Optional[str],
-    command: Optional[str],
-    cmd_args: List[str],
-    server_config: Dict[str, Any],
-) -> tuple[Optional[str], Optional[str], List[str], bool]:
+    preset_name: str | None,
+    url: str | None,
+    command: str | None,
+    cmd_args: list[str],
+    server_config: dict[str, Any],
+) -> tuple[str | None, str | None, list[str], bool]:
     """Apply a known MCP preset when transport details were omitted."""
     if not preset_name:
         return url, command, cmd_args, False
@@ -214,8 +216,8 @@ def _resolve_mcp_server_config(config: dict) -> dict:
 
 
 def _probe_single_server(
-    name: str, config: dict, connect_timeout: float = 30
-) -> List[Tuple[str, str]]:
+    name: str, config: dict, connect_timeout: float = 30,
+) -> list[tuple[str, str]]:
     """Temporarily connect to one MCP server, list its tools, disconnect.
 
     Returns list of ``(tool_name, description)`` tuples.
@@ -226,9 +228,9 @@ def _probe_single_server(
         raise ValueError("; ".join(issues))
 
     from tools.mcp_tool import (
+        _connect_server,
         _ensure_mcp_loop,
         _run_on_mcp_loop,
-        _connect_server,
         _stop_mcp_loop_if_idle,
     )
 
@@ -236,11 +238,11 @@ def _probe_single_server(
 
     _ensure_mcp_loop()
 
-    tools_found: List[Tuple[str, str]] = []
+    tools_found: list[tuple[str, str]] = []
 
     async def _probe():
         server = await asyncio.wait_for(
-            _connect_server(name, config), timeout=connect_timeout
+            _connect_server(name, config), timeout=connect_timeout,
         )
         try:
             for t in server._tools:
@@ -311,7 +313,7 @@ def cmd_mcp_add(args):
     preset_name = getattr(args, "preset", None)
     raw_env = getattr(args, "env", None)
 
-    server_config: Dict[str, Any] = {}
+    server_config: dict[str, Any] = {}
     try:
         explicit_env = _parse_env_assignments(raw_env)
         url, command, cmd_args, _preset_applied = _apply_mcp_preset(
@@ -335,8 +337,8 @@ def cmd_mcp_add(args):
         _error("Must specify --url <endpoint>, --command <cmd>, or --preset <name>")
         _info("Examples:")
         _info('  hermes mcp add ink --url "https://mcp.ml.ink/mcp"')
-        _info('  hermes mcp add github --command npx --args @modelcontextprotocol/server-github')
-        _info('  hermes mcp add myserver --preset mypreset')
+        _info("  hermes mcp add github --command npx --args @modelcontextprotocol/server-github")
+        _info("  hermes mcp add myserver --preset mypreset")
         return
 
     # Check if server already exists
@@ -375,7 +377,7 @@ def cmd_mcp_add(args):
             if oauth_auth:
                 server_config["auth"] = "oauth"
                 _success("OAuth configured (tokens will be acquired on first connection)")
-                oauth_ok=True
+                oauth_ok = True
             else:
                 _warning("OAuth setup failed — MCP SDK auth module not available")
         except Exception as exc:
@@ -395,25 +397,24 @@ def cmd_mcp_add(args):
         print()
         _info(f"Connecting to {url}")
         needs_auth = _confirm("Does this server require authentication?", default=True)
-        if needs_auth:
-            if auth_type == "header" or not auth_type:
-                env_key = _env_key_for_server(name)
-                existing_key = get_env_value(env_key)
-                if existing_key:
-                    _success(f"{env_key}: already configured")
-                    api_key = existing_key
-                else:
-                    api_key = _prompt("API key / Bearer token", password=True)
-                    if api_key:
-                        api_key = _strip_bearer_prefix(api_key)
-                        save_env_value(env_key, api_key)
-                        _success(f"Saved to {display_hermes_home()}/.env as {env_key}")
+        if needs_auth and (auth_type == "header" or not auth_type):
+            env_key = _env_key_for_server(name)
+            existing_key = get_env_value(env_key)
+            if existing_key:
+                _success(f"{env_key}: already configured")
+                api_key = existing_key
+            else:
+                api_key = _prompt("API key / Bearer token", password=True)
+                if api_key:
+                    api_key = _strip_bearer_prefix(api_key)
+                    save_env_value(env_key, api_key)
+                    _success(f"Saved to {display_hermes_home()}/.env as {env_key}")
 
-                # Set header with env var interpolation
-                if api_key or existing_key:
-                    server_config["headers"] = {
-                        "Authorization": f"Bearer ${{{env_key}}}"
-                    }
+            # Set header with env var interpolation
+            if api_key or existing_key:
+                server_config["headers"] = {
+                    "Authorization": f"Bearer ${{{env_key}}}",
+                }
 
     # ── Discovery: connect and list tools ─────────────────────────────
 
@@ -451,7 +452,7 @@ def cmd_mcp_add(args):
     # Ask: enable all, select, or cancel
     try:
         choice = input(
-            color(f"  Enable all {len(tools)} tools? [Y/n/select]: ", Colors.YELLOW)
+            color(f"  Enable all {len(tools)} tools? [Y/n/select]: ", Colors.YELLOW),
         ).strip().lower()
     except (KeyboardInterrupt, EOFError):
         print()
@@ -541,8 +542,8 @@ def cmd_mcp_list(args=None):
         _info("No MCP servers configured.")
         print()
         _info("Add one with:")
-        _info('  hermes mcp add <name> --url <endpoint>')
-        _info('  hermes mcp add <name> --command <cmd> --args <args...>')
+        _info("  hermes mcp add <name> --url <endpoint>")
+        _info("  hermes mcp add <name> --command <cmd> --args <args...>")
         print()
         return
 
@@ -723,22 +724,22 @@ def cmd_mcp_login(args):
         if not _oauth_tokens_present(name):
             _warning(
                 "Server responded, but no OAuth token was obtained — "
-                "authentication did not complete."
+                "authentication did not complete.",
             )
             print()
             _info(
                 "Some providers (e.g. Google Drive, Atlassian) do not support "
                 "automatic client registration. For those you must create an "
-                "OAuth client yourself and add its credentials to config.yaml:"
+                "OAuth client yourself and add its credentials to config.yaml:",
             )
             print()
-            print(color(f"    mcp_servers:", Colors.DIM))
+            print(color("    mcp_servers:", Colors.DIM))
             print(color(f"      {name}:", Colors.DIM))
             print(color(f"        url: {url}", Colors.DIM))
-            print(color(f"        auth: oauth", Colors.DIM))
-            print(color(f"        oauth:", Colors.DIM))
-            print(color(f"          client_id: \"<your-oauth-client-id>\"", Colors.DIM))
-            print(color(f"          client_secret: \"<your-oauth-client-secret>\"", Colors.DIM))
+            print(color("        auth: oauth", Colors.DIM))
+            print(color("        oauth:", Colors.DIM))
+            print(color('          client_id: "<your-oauth-client-id>"', Colors.DIM))
+            print(color('          client_secret: "<your-oauth-client-secret>"', Colors.DIM))
             print()
             _info("Then re-run `hermes mcp login " + name + "`.")
             return
@@ -871,8 +872,9 @@ def mcp_command(args):
         show_catalog()
         return
     if action == "install":
-        from hermes_cli.mcp_picker import install_by_name
         import sys as _sys
+
+        from hermes_cli.mcp_picker import install_by_name
         rc = install_by_name(getattr(args, "identifier", "") or "")
         if rc:
             _sys.exit(rc)

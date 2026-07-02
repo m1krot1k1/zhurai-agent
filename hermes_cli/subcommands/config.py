@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_config_parser(subparsers, *, cmd_config: Callable) -> None:
@@ -30,7 +30,7 @@ def build_config_parser(subparsers, *, cmd_config: Callable) -> None:
     # config set
     config_set = config_subparsers.add_parser("set", help="Set a configuration value")
     config_set.add_argument(
-        "key", nargs="?", help="Configuration key (e.g., model, terminal.backend)"
+        "key", nargs="?", help="Configuration key (e.g., model, terminal.backend)",
     )
     config_set.add_argument("value", nargs="?", help="Value to set")
 

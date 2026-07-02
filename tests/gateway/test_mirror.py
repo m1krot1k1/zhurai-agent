@@ -1,12 +1,12 @@
 """Tests for gateway/mirror.py — session mirroring."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import gateway.mirror as mirror_mod
 from gateway.mirror import (
-    mirror_to_session,
     _find_session_id,
+    mirror_to_session,
 )
 
 
@@ -26,7 +26,7 @@ class TestFindSessionId:
                 "session_id": "sess_abc",
                 "origin": {"platform": "telegram", "chat_id": "12345"},
                 "updated_at": "2026-01-01T00:00:00",
-            }
+            },
         })
 
         with patch.object(mirror_mod, "_SESSIONS_DIR", sessions_dir), \
@@ -121,7 +121,7 @@ class TestFindSessionId:
                 "session_id": "sess_1",
                 "origin": {"platform": "discord", "chat_id": "999"},
                 "updated_at": "2026-01-01T00:00:00",
-            }
+            },
         })
 
         with patch.object(mirror_mod, "_SESSIONS_INDEX", index_file):
@@ -141,14 +141,13 @@ class TestFindSessionId:
                 "session_id": "sess_1",
                 "origin": {"platform": "Telegram", "chat_id": "123"},
                 "updated_at": "2026-01-01T00:00:00",
-            }
+            },
         })
 
         with patch.object(mirror_mod, "_SESSIONS_INDEX", index_file):
             result = _find_session_id("telegram", "123")
 
         assert result == "sess_1"
-
 
 
 class TestMirrorToSession:
@@ -158,7 +157,7 @@ class TestMirrorToSession:
                 "session_id": "sess_abc",
                 "origin": {"platform": "telegram", "chat_id": "12345"},
                 "updated_at": "2026-01-01T00:00:00",
-            }
+            },
         })
 
         with patch.object(mirror_mod, "_SESSIONS_DIR", sessions_dir), \

@@ -26,9 +26,10 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs, urlunparse
+from typing import Any
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 from agent.context_compressor import ContextCompressor
 from agent.iteration_budget import IterationBudget
@@ -40,6 +41,7 @@ from agent.model_metadata import (
     query_ollama_num_ctx,
 )
 from agent.process_bootstrap import _install_safe_stdio
+from agent.rate_limit_tracker import RateLimitState
 from agent.subdirectory_hints import SubdirectoryHintTracker
 from agent.think_scrubber import StreamingThinkScrubber
 from agent.tool_guardrails import (
@@ -72,7 +74,7 @@ def _ra():
     return run_agent
 
 
-def _build_codex_gpt55_autoraise_notice(autoraise: Dict[str, float]) -> str:
+def _build_codex_gpt55_autoraise_notice(autoraise: dict[str, float]) -> str:
     """Build the one-time notice shown when Codex gpt-5.5 raises compaction.
 
     ``autoraise`` is ``{"from": <old_ratio>, "to": <new_ratio>}``. The same
@@ -96,7 +98,7 @@ def _normalized_custom_base_url(value: Any) -> str:
     return value.strip().rstrip("/")
 
 
-def _custom_provider_model_matches(agent_model: str, entry: Dict[str, Any]) -> bool:
+def _custom_provider_model_matches(agent_model: str, entry: dict[str, Any]) -> bool:
     provider_model = str(entry.get("model", "") or "").strip().lower()
     if not provider_model:
         return True
@@ -108,8 +110,8 @@ def _custom_provider_extra_body_for_agent(
     provider: str,
     model: str,
     base_url: str,
-    custom_providers: List[Dict[str, Any]],
-) -> Optional[Dict[str, Any]]:
+    custom_providers: list[dict[str, Any]],
+) -> dict[str, Any] | None:
     if (provider or "").strip().lower() != "custom":
         return None
 
@@ -117,7 +119,7 @@ def _custom_provider_extra_body_for_agent(
     if not target_url:
         return None
 
-    fallback: Optional[Dict[str, Any]] = None
+    fallback: dict[str, Any] | None = None
     for entry in custom_providers or []:
         if not isinstance(entry, dict):
             continue
@@ -136,7 +138,7 @@ def _custom_provider_extra_body_for_agent(
     return fallback
 
 
-def _merge_custom_provider_extra_body(agent, custom_providers: List[Dict[str, Any]]) -> None:
+def _merge_custom_provider_extra_body(agent, custom_providers: list[dict[str, Any]]) -> None:
     extra_body = _custom_provider_extra_body_for_agent(
         provider=agent.provider,
         model=agent.model,
@@ -168,8 +170,8 @@ def init_agent(
     model: str = "",
     max_iterations: int = 90,  # Default tool-calling iterations (shared with subagents)
     tool_delay: float = 1.0,
-    enabled_toolsets: List[str] = None,
-    disabled_toolsets: List[str] = None,
+    enabled_toolsets: list[str] = None,
+    disabled_toolsets: list[str] = None,
     save_trajectories: bool = False,
     verbose_logging: bool = False,
     quiet_mode: bool = False,
@@ -177,13 +179,13 @@ def init_agent(
     ephemeral_system_prompt: str = None,
     log_prefix_chars: int = 100,
     log_prefix: str = "",
-    providers_allowed: List[str] = None,
-    providers_ignored: List[str] = None,
-    providers_order: List[str] = None,
+    providers_allowed: list[str] = None,
+    providers_ignored: list[str] = None,
+    providers_order: list[str] = None,
     provider_sort: str = None,
     provider_require_parameters: bool = False,
     provider_data_collection: str = None,
-    openrouter_min_coding_score: Optional[float] = None,
+    openrouter_min_coding_score: float | None = None,
     session_id: str = None,
     tool_progress_callback: callable = None,
     tool_start_callback: callable = None,
@@ -199,12 +201,12 @@ def init_agent(
     status_callback: callable = None,
     notice_callback: callable = None,
     notice_clear_callback: callable = None,
-    event_callback: Optional[Callable[[str, dict], None]] = None,
+    event_callback: Callable[[str, dict], None] | None = None,
     max_tokens: int = None,
-    reasoning_config: Dict[str, Any] = None,
+    reasoning_config: dict[str, Any] = None,
     service_tier: str = None,
-    request_overrides: Dict[str, Any] = None,
-    prefill_messages: List[Dict[str, Any]] = None,
+    request_overrides: dict[str, Any] = None,
+    prefill_messages: list[dict[str, Any]] = None,
     platform: str = None,
     user_id: str = None,
     user_id_alt: str = None,
@@ -219,8 +221,8 @@ def init_agent(
     skip_memory: bool = False,
     session_db=None,
     parent_session_id: str = None,
-    iteration_budget: "IterationBudget" = None,
-    fallback_model: Dict[str, Any] = None,
+    iteration_budget: IterationBudget = None,
+    fallback_model: dict[str, Any] = None,
     credential_pool=None,
     checkpoints_enabled: bool = False,
     checkpoint_max_snapshots: int = 20,
@@ -228,8 +230,7 @@ def init_agent(
     checkpoint_max_file_size_mb: int = 10,
     pass_session_id: bool = False,
 ):
-    """
-    Initialize the AI Agent.
+    """Initialize the AI Agent.
 
     Args:
         base_url (str): Base URL for the model API (optional)
@@ -276,6 +277,7 @@ def init_agent(
         load_soul_identity (bool): If True, still use ~/.hermes/SOUL.md as the primary
             identity even when skip_context_files=True. Project context files from the cwd
             remain skipped.
+
     """
     _install_safe_stdio()
     # Best-effort local bootstrap so Headroom savings/metrics are available
@@ -326,9 +328,7 @@ def init_agent(
     agent.acp_args = list(acp_args or args or [])
     if api_mode in {"chat_completions", "codex_responses", "anthropic_messages", "bedrock_converse", "codex_app_server"}:
         agent.api_mode = api_mode
-    elif agent.provider == "openai-codex":
-        agent.api_mode = "codex_responses"
-    elif agent.provider in {"xai", "xai-oauth"}:
+    elif agent.provider == "openai-codex" or agent.provider in {"xai", "xai-oauth"}:
         agent.api_mode = "codex_responses"
     elif (provider_name is None) and (
         agent._base_url_hostname == "chatgpt.com"
@@ -451,7 +451,6 @@ def init_agent(
     agent.event_callback = event_callback
     agent.tool_gen_callback = tool_gen_callback
 
-    
     # Tool execution state — allows _vprint during tool execution
     # even when stream consumers are registered (no tokens streaming then)
     agent._executing_tools = False
@@ -472,7 +471,7 @@ def init_agent(
     # last tool result's content so the model sees it on its next
     # iteration. Message-role alternation is preserved (we modify an
     # existing tool message rather than inserting a new user turn).
-    agent._pending_steer: Optional[str] = None
+    agent._pending_steer: str | None = None
     agent._pending_steer_lock = threading.Lock()
 
     # Concurrent-tool worker thread tracking.  `_execute_tool_calls_concurrent`
@@ -484,7 +483,7 @@ def init_agent(
     # their tids explicitly.
     agent._tool_worker_threads: set[int] = set()
     agent._tool_worker_threads_lock = threading.Lock()
-    
+
     # Subagent delegation state
     agent._delegate_depth = 0        # 0 = top-level agent, incremented for children
     agent._active_children = []      # Running child AIAgents (for interrupt propagation)
@@ -493,7 +492,7 @@ def init_agent(
     # from a previous session don't block handoff/fanout on session resume.
     agent._start_handoff_done = False
     agent._orchestrator_fanout_done = False
-    
+
     # Store OpenRouter provider preferences
     agent.providers_allowed = providers_allowed
     agent.providers_ignored = providers_ignored
@@ -506,7 +505,7 @@ def init_agent(
     # Store toolset filtering options
     agent.enabled_toolsets = enabled_toolsets
     agent.disabled_toolsets = disabled_toolsets
-    
+
     # Model response configuration
     agent.max_tokens = max_tokens  # None = use model default
     agent.reasoning_config = reasoning_config  # None = use default (medium for OpenRouter)
@@ -514,7 +513,7 @@ def init_agent(
     agent.request_overrides = dict(request_overrides or {})
     agent.prefill_messages = prefill_messages or []  # Prefilled conversation turns
     agent._force_ascii_payload = False
-    
+
     # Anthropic prompt caching: auto-enabled for Claude models on native
     # Anthropic, OpenRouter, and third-party gateways that speak the
     # Anthropic protocol (``api_mode == 'anthropic_messages'``). Reduces
@@ -566,7 +565,7 @@ def init_agent(
     agent._tool_snapshot_generation = 0
     # Rate limit tracking — updated from x-ratelimit-* response headers
     # after each API call.  Accessed by /usage slash command.
-    agent._rate_limit_state: Optional["RateLimitState"] = None
+    agent._rate_limit_state: RateLimitState | None = None
 
     # Credits tracking (dev-only, L0 usage-aware-credits) — updated from
     # x-nous-credits-* response headers after each API call.  Session-start
@@ -602,7 +601,7 @@ def init_agent(
         # console. Any future noise reduction belongs at the
         # handler level inside hermes_logging.py, not here.
         pass
-    
+
     # Internal stream callback (set during streaming TTS).
     # Initialized here so _vprint can reference it before run_conversation.
     agent._stream_callback = None
@@ -636,7 +635,7 @@ def init_agent(
     # Cache anthropic image-to-text fallbacks per image payload/URL so a
     # single tool loop does not repeatedly re-run auxiliary vision on the
     # same image history.
-    agent._anthropic_image_fallback_cache: Dict[str, str] = {}
+    agent._anthropic_image_fallback_cache: dict[str, str] = {}
 
     # Initialize LLM client via centralized provider router.
     # The router handles auth resolution, base URL, headers, and
@@ -653,7 +652,10 @@ def init_agent(
     _provider_timeout = get_provider_request_timeout(agent.provider, agent.model)
 
     if agent.api_mode == "anthropic_messages":
-        from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token
+        from agent.anthropic_adapter import (
+            build_anthropic_client,
+            resolve_anthropic_token,
+        )
         # Bedrock + Claude → use AnthropicBedrock SDK for full feature parity
         # (prompt caching, thinking budgets, adaptive thinking).
         _is_bedrock_anthropic = agent.provider == "bedrock"
@@ -899,16 +901,16 @@ def init_agent(
                         raise RuntimeError(
                             f"Provider '{_explicit}' is set in config.yaml but no API key "
                             f"was found. Set the {_env_hint} environment "
-                            f"variable, or switch to a different provider with `hermes model`."
+                            f"variable, or switch to a different provider with `hermes model`.",
                         )
                 if not getattr(agent, "_fallback_activated", False):
                     # No provider configured — reject with a clear message.
                     raise RuntimeError(
                         "No LLM provider configured. Run `hermes model` to "
                         "select a provider, or run `hermes setup` for first-time "
-                        "configuration."
+                        "configuration.",
                     )
-        
+
         agent._client_kwargs = client_kwargs  # stored for rebuilding after interrupt
 
         # Keep the actual transport endpoint aligned with Headroom routing.
@@ -975,7 +977,7 @@ def init_agent(
                     print("⚠️  Warning: API key appears invalid or missing")
         except Exception as e:
             raise RuntimeError(f"Failed to initialize OpenAI client: {e}")
-    
+
     # Provider fallback chain — ordered list of backup providers tried
     # when the primary is exhausted (rate-limit, overload, connection
     # failure).  Supports both legacy single-dict ``fallback_model`` and
@@ -1014,7 +1016,7 @@ def init_agent(
         disabled_toolsets=disabled_toolsets,
         quiet_mode=agent.quiet_mode,
     )
-    
+
     # Show tool configuration and store valid tool names for validation
     agent.valid_tool_names = set()
     if agent.tools:
@@ -1047,16 +1049,16 @@ def init_agent(
         missing_reqs = [name for name, available in requirements.items() if not available]
         if missing_reqs:
             print(f"⚠️  Some tools may not work due to missing requirements: {missing_reqs}")
-    
+
     # Show trajectory saving status
     if agent.save_trajectories and not agent.quiet_mode:
         print("📝 Trajectory saving enabled")
-    
+
     # Show ephemeral system prompt status
     if agent.ephemeral_system_prompt and not agent.quiet_mode:
         prompt_preview = agent.ephemeral_system_prompt[:60] + "..." if len(agent.ephemeral_system_prompt) > 60 else agent.ephemeral_system_prompt
         print(f"🔒 Ephemeral system prompt: '{prompt_preview}' (not saved to trajectories)")
-    
+
     # Show prompt caching status
     if agent._use_prompt_caching and not agent.quiet_mode:
         if agent._use_native_cache_layout and agent.provider == "anthropic":
@@ -1066,7 +1068,7 @@ def init_agent(
         else:
             source = "Claude via OpenRouter"
         print(f"💾 Prompt caching: ENABLED ({source}, {agent._cache_ttl} TTL)")
-    
+
     # Session logging setup - auto-save conversation trajectories for debugging
     agent.session_start = datetime.now()
     if session_id:
@@ -1106,9 +1108,9 @@ def init_agent(
         pass
     # logs_dir is retained unconditionally for request_dump_*.json (debug
     # breadcrumb path written by agent_runtime_helpers.dump_api_request_debug).
-    
+
     # Track conversation messages for session logging
-    agent._session_messages: List[Dict[str, Any]] = []
+    agent._session_messages: list[dict[str, Any]] = []
     # Responses encrypted reasoning replay state.  Some OpenAI-compatible
     # routes accept GPT-5 Responses requests but later reject replayed
     # encrypted reasoning blobs (HTTP 400 ``invalid_encrypted_content``).
@@ -1118,10 +1120,10 @@ def init_agent(
     agent._codex_reasoning_replay_enabled = True
     agent._memory_write_origin = "assistant_tool"
     agent._memory_write_context = "foreground"
-    
+
     # Cached system prompt -- built once per session, only rebuilt on compression
-    agent._cached_system_prompt: Optional[str] = None
-    
+    agent._cached_system_prompt: str | None = None
+
     # Filesystem checkpoint manager (transparent — not a tool)
     from tools.checkpoint_manager import CheckpointManager
     agent._checkpoint_mgr = CheckpointManager(
@@ -1130,7 +1132,7 @@ def init_agent(
         max_total_size_mb=checkpoint_max_total_size_mb,
         max_file_size_mb=checkpoint_max_file_size_mb,
     )
-    
+
     # SQLite session store (optional -- provided by CLI or gateway)
     agent._session_db = session_db
     agent._parent_session_id = parent_session_id
@@ -1147,11 +1149,11 @@ def init_agent(
         "reasoning_config": reasoning_config,
         "max_tokens": max_tokens,
     }
-    
+
     # In-memory todo list for task planning (one per agent/session)
     from tools.todo_tool import TodoStore
     agent._todo_store = TodoStore()
-    
+
     # Load config once for memory, skills, and compression sections
     try:
         from hermes_cli.config import load_config as _load_agent_config
@@ -1161,8 +1163,8 @@ def init_agent(
     try:
         agent._tool_guardrails = ToolCallGuardrailController(
             ToolCallGuardrailConfig.from_mapping(
-                _agent_cfg.get("tool_loop_guardrails", {})
-            )
+                _agent_cfg.get("tool_loop_guardrails", {}),
+            ),
         )
     except Exception as _tlg_err:
         _ra().logger.warning("Tool loop guardrail config ignored: %s", _tlg_err)
@@ -1193,8 +1195,6 @@ def init_agent(
                 agent._memory_store.load_from_disk()
         except Exception:
             pass  # Memory is optional -- don't break agent init
-    
-
 
     # Memory provider plugin (external — one at a time, alongside built-in)
     # Reads memory.provider from config to select which plugin to activate.
@@ -1264,7 +1264,9 @@ def init_agent(
             _ra().logger.warning("Memory provider plugin init failed: %s", _mpe)
             agent._memory_manager = None
 
-    from agent.memory_manager import inject_memory_provider_tools as _inject_memory_provider_tools
+    from agent.memory_manager import (
+        inject_memory_provider_tools as _inject_memory_provider_tools,
+    )
     _inject_memory_provider_tools(agent)
 
     # Skills config: nudge interval for skill creation reminders
@@ -1341,12 +1343,14 @@ def init_agent(
     # fires we stash a one-time notification (replayed on the first turn) that
     # tells the user what changed and how to revert.
     _codex_gpt55_autoraise = str(
-        _compression_cfg.get("codex_gpt55_autoraise", True)
+        _compression_cfg.get("codex_gpt55_autoraise", True),
     ).lower() in {"true", "1", "yes"}
     agent._compression_threshold_autoraised = None
     try:
         from agent.auxiliary_client import (
             _compression_threshold_for_model as _cthresh_fn,
+        )
+        from agent.auxiliary_client import (
             _is_codex_gpt55 as _is_codex_gpt55_fn,
         )
         _model_cthresh = _cthresh_fn(
@@ -1381,10 +1385,10 @@ def init_agent(
     # is a legitimate (and common) configuration for long-running
     # rolling-compaction sessions.
     compression_protect_first = max(
-        0, int(_compression_cfg.get("protect_first_n", 3))
+        0, int(_compression_cfg.get("protect_first_n", 3)),
     )
     compression_abort_on_summary_failure = str(
-        _compression_cfg.get("abort_on_summary_failure", False)
+        _compression_cfg.get("abort_on_summary_failure", False),
     ).lower() in {"true", "1", "yes"}
     # In-place compaction: when True, compress_context() rewrites the message
     # list + rebuilds the system prompt WITHOUT rotating the session id (no
@@ -1392,7 +1396,7 @@ def init_agent(
     # agent/conversation_compression.py. Consumed by compress_context(), not the
     # compressor, so it rides on the agent.
     compression_in_place = is_truthy_value(
-        _compression_cfg.get("in_place"), default=False
+        _compression_cfg.get("in_place"), default=False,
     )
 
     # Read optional explicit context_length override for the auxiliary
@@ -1534,8 +1538,6 @@ def init_agent(
 
     agent._ensure_lmstudio_runtime_loaded(_config_context_length)
 
-
-
     # Select context engine: config-driven (like memory providers).
     # 1. Check config.yaml context.engine setting
     # 2. Check plugins/context_engine/<name>/ directory (repo-shipped)
@@ -1625,7 +1627,7 @@ def init_agent(
             f"which is below the minimum {MINIMUM_CONTEXT_LENGTH:,} required "
             f"by Hermes Agent.  Choose a model with at least "
             f"{MINIMUM_CONTEXT_LENGTH // 1000}K context, or set "
-            f"model.context_length in config.yaml to override."
+            f"model.context_length in config.yaml to override.",
         )
 
     # Inject context engine tool schemas (e.g. lcm_grep, lcm_describe, lcm_expand).
@@ -1700,7 +1702,7 @@ def init_agent(
     agent.session_estimated_cost_usd = 0.0
     agent.session_cost_status = "unknown"
     agent.session_cost_source = "none"
-    
+
     # ── Ollama num_ctx injection ──
     # Ollama defaults to 2048 context regardless of the model's capabilities.
     # When running against an Ollama server, detect the model's max context
@@ -1752,7 +1754,7 @@ def init_agent(
 
     if not agent.quiet_mode:
         if compression_enabled:
-            print(f"📊 Context limit: {agent.context_compressor.context_length:,} tokens (compress at {int(compression_threshold*100)}% = {agent.context_compressor.threshold_tokens:,})")
+            print(f"📊 Context limit: {agent.context_compressor.context_length:,} tokens (compress at {int(compression_threshold * 100)}% = {agent.context_compressor.threshold_tokens:,})")
         else:
             print(f"📊 Context limit: {agent.context_compressor.context_length:,} tokens (auto-compression disabled)")
         # One-time notice when the Codex gpt-5.5 autoraise kicked in, with the
@@ -1811,7 +1813,6 @@ def init_agent(
             "anthropic_base_url": agent._anthropic_base_url,
             "is_anthropic_oauth": agent._is_anthropic_oauth,
         })
-
 
 
 __all__ = ["init_agent"]

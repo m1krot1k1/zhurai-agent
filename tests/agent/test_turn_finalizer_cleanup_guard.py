@@ -113,7 +113,7 @@ def _run(
             "role": "assistant",
             "content": "",
             "tool_calls": [
-                {"id": "c1", "function": {"name": "read_file", "arguments": "{}"}}
+                {"id": "c1", "function": {"name": "read_file", "arguments": "{}"}},
             ],
         },
         {"role": "tool", "tool_call_id": "c1", "content": "file contents"},
@@ -137,7 +137,7 @@ def _run(
 
 def test_all_cleanup_steps_raise_response_still_returned():
     agent = _StubAgent(
-        raise_in=("save_trajectory", "cleanup_task_resources", "persist_session")
+        raise_in=("save_trajectory", "cleanup_task_resources", "persist_session"),
     )
     result = _run(agent)
     assert result["final_response"] == "PARTIAL SUMMARY FROM MODEL"
@@ -146,7 +146,7 @@ def test_all_cleanup_steps_raise_response_still_returned():
 
 
 @pytest.mark.parametrize(
-    "step", ["save_trajectory", "cleanup_task_resources", "persist_session"]
+    "step", ["save_trajectory", "cleanup_task_resources", "persist_session"],
 )
 def test_single_cleanup_step_raises_does_not_skip_others(step):
     agent = _StubAgent(raise_in=(step,))
@@ -159,7 +159,7 @@ def test_single_cleanup_step_raises_does_not_skip_others(step):
             e
             for e in result["cleanup_errors"]
             if e.startswith(step)
-        )
+        ),
     ]
     assert len(result["cleanup_errors"]) == 1
 

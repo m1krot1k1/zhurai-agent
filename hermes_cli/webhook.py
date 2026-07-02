@@ -17,12 +17,10 @@ import secrets
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict
 
+from hermes_cli.config import cfg_get
 from hermes_constants import display_hermes_home
 from utils import atomic_replace
-from hermes_cli.config import cfg_get
-
 
 _SUBSCRIPTIONS_FILENAME = "webhook_subscriptions.json"
 _SUBSCRIPTIONS_FILE_MODE = 0o600
@@ -37,7 +35,7 @@ def _subscriptions_path() -> Path:
     return _hermes_home() / _SUBSCRIPTIONS_FILENAME
 
 
-def _load_subscriptions() -> Dict[str, dict]:
+def _load_subscriptions() -> dict[str, dict]:
     path = _subscriptions_path()
     if not path.exists():
         return {}
@@ -48,7 +46,7 @@ def _load_subscriptions() -> Dict[str, dict]:
         return {}
 
 
-def _save_subscriptions(subs: Dict[str, dict]) -> None:
+def _save_subscriptions(subs: dict[str, dict]) -> None:
     path = _subscriptions_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     # webhook_subscriptions.json contains per-route HMAC secrets — write
@@ -67,11 +65,11 @@ def _save_subscriptions(subs: Dict[str, dict]) -> None:
             json.dump(subs, fh, indent=2, ensure_ascii=False)
             fh.flush()
             os.fsync(fh.fileno())
-        os.chmod(tmp_path, _SUBSCRIPTIONS_FILE_MODE)
+        Path(tmp_path).chmod(_SUBSCRIPTIONS_FILE_MODE)
         atomic_replace(tmp_path, path)
         # Re-assert after rename in case the destination existed with a
         # broader mode and atomic_replace preserved it.
-        os.chmod(path, _SUBSCRIPTIONS_FILE_MODE)
+        Path(path).chmod(_SUBSCRIPTIONS_FILE_MODE)
     except Exception:
         try:
             tmp_path.unlink(missing_ok=True)
@@ -160,7 +158,7 @@ def webhook_command(args):
 
 def _cmd_subscribe(args):
     name = args.name.strip().lower().replace(" ", "-")
-    if not re.match(r'^[a-z0-9][a-z0-9_-]*$', name):
+    if not re.match(r"^[a-z0-9][a-z0-9_-]*$", name):
         print(f"Error: Invalid name '{name}'. Use lowercase alphanumeric with hyphens/underscores.")
         return
 
@@ -184,7 +182,7 @@ def _cmd_subscribe(args):
         if route["deliver"] == "log":
             print(
                 "Error: --deliver-only requires --deliver to be a real target "
-                "(telegram, discord, slack, github_comment, etc.) — not 'log'."
+                "(telegram, discord, slack, github_comment, etc.) — not 'log'.",
             )
             return
         route["deliver_only"] = True
@@ -212,9 +210,9 @@ def _cmd_subscribe(args):
         prompt_preview = route["prompt"][:80] + ("..." if len(route["prompt"]) > 80 else "")
         label = "Message" if route.get("deliver_only") else "Prompt"
         print(f"  {label}: {prompt_preview}")
-    print(f"\n  Configure your service to POST to the URL above.")
-    print(f"  Use the secret for HMAC-SHA256 signature validation.")
-    print(f"  The gateway must be running to receive events (hermes gateway run).\n")
+    print("\n  Configure your service to POST to the URL above.")
+    print("  Use the secret for HMAC-SHA256 signature validation.")
+    print("  The gateway must be running to receive events (hermes gateway run).\n")
 
 
 def _cmd_list(args):
@@ -271,10 +269,10 @@ def _cmd_test(args):
 
     payload = args.payload or '{"test": true, "event_type": "test", "message": "Hello from hermes webhook test"}'
 
-    import hmac
     import hashlib
+    import hmac
     sig = "sha256=" + hmac.new(
-        secret.encode(), payload.encode(), hashlib.sha256
+        secret.encode(), payload.encode(), hashlib.sha256,
     ).hexdigest()
 
     print(f"  Sending test POST to {url}")

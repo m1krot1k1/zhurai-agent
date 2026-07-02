@@ -3,7 +3,6 @@ import sys
 import types
 from types import SimpleNamespace
 
-
 sys.modules.setdefault("fire", types.SimpleNamespace(Fire=lambda *a, **k: None))
 sys.modules.setdefault("firecrawl", types.SimpleNamespace(Firecrawl=object))
 sys.modules.setdefault("fal_client", types.SimpleNamespace())
@@ -27,10 +26,10 @@ def _patch_agent_bootstrap(monkeypatch):
                     "description": "Run shell commands.",
                     "parameters": {"type": "object", "properties": {}},
                 },
-            }
+            },
         ],
     )
-    monkeypatch.setattr(run_agent, "check_toolset_requirements", lambda: {})
+    monkeypatch.setattr(run_agent, "check_toolset_requirements", dict)
 
 
 def _codex_message_response(text: str):
@@ -39,7 +38,7 @@ def _codex_message_response(text: str):
             SimpleNamespace(
                 type="message",
                 content=[SimpleNamespace(type="output_text", text=text)],
-            )
+            ),
         ],
         usage=SimpleNamespace(input_tokens=5, output_tokens=3, total_tokens=8),
         status="completed",
@@ -85,7 +84,7 @@ class _Codex401ThenSuccessAgent(run_agent.AIAgent):
         def _fake_api_call(api_kwargs):
             calls["api"] += 1
             if calls["api"] == 1:
-                raise _UnauthorizedError()
+                raise _UnauthorizedError
             return _codex_message_response("Recovered via refresh")
 
         self._interruptible_api_call = _fake_api_call
@@ -111,7 +110,7 @@ def test_cron_run_job_codex_path_handles_internal_401_refresh(monkeypatch):
     _Codex401ThenSuccessAgent.last_init = {}
 
     success, output, final_response, error = cron_scheduler.run_job(
-        {"id": "job-1", "name": "Codex Refresh Test", "prompt": "ping", "model": "gpt-5.3-codex"}
+        {"id": "job-1", "name": "Codex Refresh Test", "prompt": "ping", "model": "gpt-5.3-codex"},
     )
 
     assert success is True
@@ -151,7 +150,7 @@ def test_gateway_run_agent_codex_path_handles_internal_401_refresh(monkeypatch):
     runner._provider_routing = {}
     runner._fallback_model = None
     runner._running_agents = {}
-    from unittest.mock import MagicMock, AsyncMock
+    from unittest.mock import AsyncMock, MagicMock
     runner.hooks = MagicMock()
     runner.hooks.emit = AsyncMock()
     runner.hooks.loaded_hooks = []
@@ -183,7 +182,7 @@ def test_gateway_run_agent_codex_path_handles_internal_401_refresh(monkeypatch):
             source=source,
             session_id="session-1",
             session_key="agent:main:local:dm",
-        )
+        ),
     )
 
     assert result["final_response"] == "Recovered via refresh"

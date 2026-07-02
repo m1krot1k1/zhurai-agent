@@ -8,7 +8,7 @@ import pytest
 
 from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.platforms.base import MessageEvent, MessageType
-from gateway.run import GatewayRunner, _AGENT_PENDING_SENTINEL
+from gateway.run import _AGENT_PENDING_SENTINEL, GatewayRunner
 from gateway.session import SessionSource, build_session_key
 
 
@@ -199,7 +199,7 @@ def test_skill_command_that_would_start_agent_is_blocked_at_limit(monkeypatch):
 
     with patch.object(GatewayRunner, "_handle_message_with_agent", fail_if_agent_runs):
         result = asyncio.run(
-            runner._handle_message(_make_event("/demo please", chat_id="new"))
+            runner._handle_message(_make_event("/demo please", chat_id="new")),
         )
 
     assert result == (

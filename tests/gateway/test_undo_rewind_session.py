@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from hermes_state import SessionDB
 from gateway.config import GatewayConfig
 from gateway.session import SessionStore
+from hermes_state import SessionDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def store(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Toolsets Module
+"""Toolsets Module
 
 This module provides a flexible system for defining and managing tool aliases/toolsets.
 Toolsets allow you to group tools together for specific scenarios and can be composed
@@ -23,8 +22,7 @@ Usage:
     all_tools = resolve_toolset("full_stack")
 """
 
-from typing import List, Dict, Any, Set, Optional
-
+from typing import Any
 
 # Shared tool list for CLI and all messaging platform toolsets.
 # Edit this once to update all platforms simultaneously.
@@ -91,13 +89,13 @@ TOOLSETS = {
     "web": {
         "description": "Web research and content extraction tools",
         "tools": ["web_search", "web_extract"],
-        "includes": []  # No other toolsets included
+        "includes": [],  # No other toolsets included
     },
-    
+
     "search": {
         "description": "Web search only (no content extraction/scraping)",
         "tools": ["web_search"],
-        "includes": []
+        "includes": [],
     },
 
     "x_search": {
@@ -108,25 +106,25 @@ TOOLSETS = {
             "enable in `hermes tools` → X (Twitter) Search."
         ),
         "tools": ["x_search"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "vision": {
         "description": "Image analysis and vision tools",
         "tools": ["vision_analyze"],
-        "includes": []
+        "includes": [],
     },
 
     "video": {
         "description": "Video analysis and understanding tools (opt-in, not in default toolset)",
         "tools": ["video_analyze"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "image_gen": {
         "description": "Creative generation tools (images)",
         "tools": ["image_generate"],
-        "includes": []
+        "includes": [],
     },
 
     "video_gen": {
@@ -137,7 +135,7 @@ TOOLSETS = {
             "``hermes tools`` → Video Generation."
         ),
         "tools": ["video_generate"],
-        "includes": []
+        "includes": [],
     },
 
     "computer_use": {
@@ -147,27 +145,27 @@ TOOLSETS = {
             "user's cursor or keyboard focus. Works with any tool-capable model."
         ),
         "tools": ["computer_use"],
-        "includes": []
+        "includes": [],
     },
 
     "terminal": {
         "description": "Terminal/command execution and process management tools",
         "tools": ["terminal", "process"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "moa": {
         "description": "Advanced reasoning and problem-solving tools",
         "tools": ["mixture_of_agents"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "skills": {
         "description": "Access, create, edit, and manage skill documents with specialized instructions and knowledge",
         "tools": ["skills_list", "skill_view", "skill_manage"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "browser": {
         "description": "Browser automation for web interaction (navigate, click, type, scroll, iframes, hold-click) with web search for finding URLs",
         "tools": [
@@ -175,70 +173,70 @@ TOOLSETS = {
             "browser_type", "browser_scroll", "browser_back",
             "browser_press", "browser_get_images",
             "browser_vision", "browser_console", "browser_cdp",
-            "browser_dialog", "web_search"
+            "browser_dialog", "web_search",
         ],
-        "includes": []
+        "includes": [],
     },
-    
+
     "cronjob": {
         "description": "Cronjob management tool - create, list, update, pause, resume, remove, and trigger scheduled tasks",
         "tools": ["cronjob"],
-        "includes": []
+        "includes": [],
     },
-    
+
 
     "file": {
         "description": "File manipulation tools: read, write, patch (with fuzzy matching), and search (content + files)",
         "tools": ["read_file", "write_file", "patch", "search_files"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "tts": {
         "description": "Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI",
         "tools": ["text_to_speech"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "todo": {
         "description": "Task planning and tracking for multi-step work",
         "tools": ["todo"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "memory": {
         "description": "Persistent memory across sessions (personal notes + user profile)",
         "tools": ["memory"],
-        "includes": []
+        "includes": [],
     },
 
     "context_engine": {
         "description": "Runtime tools exposed by the active context engine",
         "tools": [],
-        "includes": []
+        "includes": [],
     },
-    
+
     "session_search": {
         "description": "Search and recall past conversations with summarization",
         "tools": ["session_search"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "clarify": {
         "description": "Ask the user clarifying questions (multiple-choice or open-ended)",
         "tools": ["clarify"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "code_execution": {
         "description": "Run Python scripts that call tools programmatically (reduces LLM round trips)",
         "tools": ["execute_code"],
-        "includes": []
+        "includes": [],
     },
-    
+
     "delegation": {
         "description": "Spawn subagents with isolated context for complex subtasks",
         "tools": ["delegate_task"],
-        "includes": []
+        "includes": [],
     },
 
     # "honcho" toolset removed — Honcho is now a memory provider plugin.
@@ -247,7 +245,7 @@ TOOLSETS = {
     "homeassistant": {
         "description": "Home Assistant smart home control and monitoring",
         "tools": ["ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service"],
-        "includes": []
+        "includes": [],
     },
 
     "kanban": {
@@ -290,13 +288,13 @@ TOOLSETS = {
             "yb_search_sticker",
             "yb_send_sticker",
         ],
-        "includes": []
+        "includes": [],
     },
 
     "feishu_doc": {
         "description": "Read Feishu/Lark document content",
         "tools": ["feishu_doc_read"],
-        "includes": []
+        "includes": [],
     },
 
     "feishu_drive": {
@@ -305,7 +303,7 @@ TOOLSETS = {
             "feishu_drive_list_comments", "feishu_drive_list_comment_replies",
             "feishu_drive_reply_comment", "feishu_drive_add_comment",
         ],
-        "includes": []
+        "includes": [],
     },
 
     "spotify": {
@@ -314,22 +312,22 @@ TOOLSETS = {
             "spotify_playback", "spotify_devices", "spotify_queue", "spotify_search",
             "spotify_playlists", "spotify_albums", "spotify_library",
         ],
-        "includes": []
+        "includes": [],
     },
 
 
     # Scenario-specific toolsets
-    
+
     "debugging": {
         "description": "Debugging and troubleshooting toolkit",
         "tools": ["terminal", "process"],
-        "includes": ["web", "file"]  # For searching error messages and solutions, and file operations
+        "includes": ["web", "file"],  # For searching error messages and solutions, and file operations
     },
-    
+
     "safe": {
         "description": "Safe toolkit without terminal access",
         "tools": [],
-        "includes": ["web", "vision", "image_gen"]
+        "includes": ["web", "vision", "image_gen"],
     },
 
     # Coding posture (base Hermes — CLI/TUI/desktop/ACP). Auto-selected in a
@@ -358,7 +356,7 @@ TOOLSETS = {
         # non-configurable-toolset recovery loop in hermes_cli/tools_config.py).
         "posture": True,
     },
-    
+
     # ==========================================================================
     # Full Hermes toolsets (CLI + messaging platforms)
     #
@@ -384,7 +382,7 @@ TOOLSETS = {
             "session_search",
             "execute_code", "delegate_task",
         ],
-        "includes": []
+        "includes": [],
     },
 
     "hermes-api-server": {
@@ -417,13 +415,13 @@ TOOLSETS = {
             "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
 
         ],
-        "includes": []
+        "includes": [],
     },
-    
+
     "hermes-cli": {
         "description": "Full interactive CLI toolset - all default tools plus cronjob management",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-cron": {
@@ -434,76 +432,76 @@ TOOLSETS = {
         # the user explicitly enables them.
         "description": "Default cron toolset - same core tools as hermes-cli; gated by `hermes tools`",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-telegram": {
         "description": "Telegram bot toolset - full access for personal use (terminal has safety checks)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
-    
+
     "hermes-discord": {
         "description": "Discord bot toolset - full access (terminal has safety checks via dangerous command approval)",
         "tools": _HERMES_CORE_TOOLS + [
             "discord",
             "discord_admin",
         ],
-        "includes": []
+        "includes": [],
     },
-    
+
     "hermes-whatsapp": {
         "description": "WhatsApp bot toolset - similar to Telegram (personal messaging, more trusted)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
-    
+
     "hermes-slack": {
         "description": "Slack bot toolset - full access for workspace use (terminal has safety checks)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
-    
+
     "hermes-signal": {
         "description": "Signal bot toolset - encrypted messaging platform (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-bluebubbles": {
         "description": "BlueBubbles iMessage bot toolset - Apple iMessage via local BlueBubbles server",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-homeassistant": {
         "description": "Home Assistant bot toolset - smart home event monitoring and control",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-email": {
         "description": "Email bot toolset - interact with Hermes via email (IMAP/SMTP)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-mattermost": {
         "description": "Mattermost bot toolset - self-hosted team messaging (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-matrix": {
         "description": "Matrix bot toolset - decentralized encrypted messaging (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-dingtalk": {
         "description": "DingTalk bot toolset - enterprise messaging platform (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-feishu": {
@@ -515,31 +513,31 @@ TOOLSETS = {
             "feishu_drive_reply_comment",
             "feishu_drive_add_comment",
         ],
-        "includes": []
+        "includes": [],
     },
 
     "hermes-weixin": {
         "description": "Weixin bot toolset - personal WeChat messaging via iLink (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-qqbot": {
         "description": "QQBot toolset - QQ messaging via Official Bot API v2 (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-wecom": {
         "description": "WeCom bot toolset - enterprise WeChat messaging (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-wecom-callback": {
         "description": "WeCom callback toolset - enterprise self-built app messaging (full access)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-yuanbao": {
@@ -552,33 +550,31 @@ TOOLSETS = {
             "yb_send_sticker",
         ],
         "module": "tools.yuanbao_tools",
-        "includes": []
+        "includes": [],
     },
 
     "hermes-sms": {
         "description": "SMS bot toolset - interact with Hermes via SMS (Twilio)",
         "tools": _HERMES_CORE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-webhook": {
         "description": "Webhook toolset - receive and process external webhook events",
         "tools": _HERMES_WEBHOOK_SAFE_TOOLS,
-        "includes": []
+        "includes": [],
     },
 
     "hermes-gateway": {
         "description": "Gateway toolset - union of all messaging platform tools",
         "tools": [],
-        "includes": ["hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack", "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email", "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk", "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin", "hermes-qqbot", "hermes-webhook", "hermes-yuanbao"]
-    }
+        "includes": ["hermes-telegram", "hermes-discord", "hermes-whatsapp", "hermes-slack", "hermes-signal", "hermes-bluebubbles", "hermes-homeassistant", "hermes-email", "hermes-sms", "hermes-mattermost", "hermes-matrix", "hermes-dingtalk", "hermes-feishu", "hermes-wecom", "hermes-wecom-callback", "hermes-weixin", "hermes-qqbot", "hermes-webhook", "hermes-yuanbao"],
+    },
 }
 
 
-
-def get_toolset(name: str) -> Optional[Dict[str, Any]]:
-    """
-    Get a toolset definition by name.
+def get_toolset(name: str) -> dict[str, Any] | None:
+    """Get a toolset definition by name.
     
     Args:
         name (str): Name of the toolset
@@ -586,18 +582,19 @@ def get_toolset(name: str) -> Optional[Dict[str, Any]]:
     Returns:
         Dict: Toolset definition with description, tools, and includes
         None: If toolset not found
+
     """
     toolset = TOOLSETS.get(name)
 
     try:
         from tools.registry import registry
     except Exception:
-        return toolset if toolset else None
+        return toolset or None
 
     if toolset:
         merged_tools = sorted(
             set(toolset.get("tools", []))
-            | set(registry.get_tool_names_for_toolset(name))
+            | set(registry.get_tool_names_for_toolset(name)),
         )
         return {**toolset, "tools": merged_tools}
 
@@ -627,7 +624,7 @@ def get_toolset(name: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def bundle_non_core_tools(toolset_name: str) -> Set[str]:
+def bundle_non_core_tools(toolset_name: str) -> set[str]:
     """Return a ``hermes-*`` bundle's platform-specific tools, excluding core.
 
     Platform bundles are defined as ``_HERMES_CORE_TOOLS + [platform extras]``.
@@ -655,9 +652,8 @@ def bundle_non_core_tools(toolset_name: str) -> Set[str]:
     return to_remove
 
 
-def resolve_toolset(name: str, visited: Set[str] = None) -> List[str]:
-    """
-    Recursively resolve a toolset to get all tool names.
+def resolve_toolset(name: str, visited: set[str] = None) -> list[str]:
+    """Recursively resolve a toolset to get all tool names.
     
     This function handles toolset composition by recursively resolving
     included toolsets and combining all tools.
@@ -668,14 +664,15 @@ def resolve_toolset(name: str, visited: Set[str] = None) -> List[str]:
         
     Returns:
         List[str]: List of all tool names in the toolset
+
     """
     if visited is None:
         visited = set()
-    
+
     # Special aliases that represent all tools across every toolset
     # This ensures future toolsets are automatically included without changes.
     if name in {"all", "*"}:
-        all_tools: Set[str] = set()
+        all_tools: set[str] = set()
         for toolset_name in get_toolset_names():
             # Use a fresh visited set per branch to avoid cross-branch contamination
             resolved = resolve_toolset(toolset_name, visited.copy())
@@ -725,30 +722,30 @@ def resolve_toolset(name: str, visited: Set[str] = None) -> List[str]:
     for included_name in toolset.get("includes", []):
         included_tools = resolve_toolset(included_name, visited)
         tools.update(included_tools)
-    
+
     return sorted(tools)
 
 
-def resolve_multiple_toolsets(toolset_names: List[str]) -> List[str]:
-    """
-    Resolve multiple toolsets and combine their tools.
+def resolve_multiple_toolsets(toolset_names: list[str]) -> list[str]:
+    """Resolve multiple toolsets and combine their tools.
     
     Args:
         toolset_names (List[str]): List of toolset names to resolve
         
     Returns:
         List[str]: Combined list of all tool names (deduplicated)
+
     """
     all_tools = set()
-    
+
     for name in toolset_names:
         tools = resolve_toolset(name)
         all_tools.update(tools)
-    
+
     return sorted(all_tools)
 
 
-def _get_plugin_toolset_names() -> Set[str]:
+def _get_plugin_toolset_names() -> set[str]:
     """Return toolset names registered by plugins (from the tool registry).
 
     These are toolsets that exist in the registry but not in the static
@@ -765,7 +762,7 @@ def _get_plugin_toolset_names() -> Set[str]:
         return set()
 
 
-def _get_registry_toolset_aliases() -> Dict[str, str]:
+def _get_registry_toolset_aliases() -> dict[str, str]:
     """Return explicit toolset aliases registered in the live registry."""
     try:
         from tools.registry import registry
@@ -774,14 +771,14 @@ def _get_registry_toolset_aliases() -> Dict[str, str]:
         return {}
 
 
-def get_all_toolsets() -> Dict[str, Dict[str, Any]]:
-    """
-    Get all available toolsets with their definitions.
+def get_all_toolsets() -> dict[str, dict[str, Any]]:
+    """Get all available toolsets with their definitions.
 
     Includes both statically-defined toolsets and plugin-registered ones.
     
     Returns:
         Dict: All toolset definitions
+
     """
     result = dict(TOOLSETS)
     aliases = _get_registry_toolset_aliases()
@@ -799,14 +796,14 @@ def get_all_toolsets() -> Dict[str, Dict[str, Any]]:
     return result
 
 
-def get_toolset_names() -> List[str]:
-    """
-    Get names of all available toolsets (excluding aliases).
+def get_toolset_names() -> list[str]:
+    """Get names of all available toolsets (excluding aliases).
 
     Includes plugin-registered toolset names.
     
     Returns:
         List[str]: List of toolset names
+
     """
     names = set(TOOLSETS.keys())
     aliases = _get_registry_toolset_aliases()
@@ -820,17 +817,15 @@ def get_toolset_names() -> List[str]:
     return sorted(names)
 
 
-
-
 def validate_toolset(name: str) -> bool:
-    """
-    Check if a toolset name is valid.
+    """Check if a toolset name is valid.
     
     Args:
         name (str): Toolset name to validate
         
     Returns:
         bool: True if valid, False otherwise
+
     """
     # Accept special alias names for convenience
     if name in {"all", "*"}:
@@ -845,43 +840,41 @@ def validate_toolset(name: str) -> bool:
 def create_custom_toolset(
     name: str,
     description: str,
-    tools: List[str] = None,
-    includes: List[str] = None
+    tools: list[str] = None,
+    includes: list[str] = None,
 ) -> None:
-    """
-    Create a custom toolset at runtime.
+    """Create a custom toolset at runtime.
     
     Args:
         name (str): Name for the new toolset
         description (str): Description of the toolset
         tools (List[str]): Direct tools to include
         includes (List[str]): Other toolsets to include
+
     """
     TOOLSETS[name] = {
         "description": description,
         "tools": tools or [],
-        "includes": includes or []
+        "includes": includes or [],
     }
 
 
-
-
-def get_toolset_info(name: str) -> Dict[str, Any]:
-    """
-    Get detailed information about a toolset including resolved tools.
+def get_toolset_info(name: str) -> dict[str, Any]:
+    """Get detailed information about a toolset including resolved tools.
     
     Args:
         name (str): Toolset name
         
     Returns:
         Dict: Detailed toolset information
+
     """
     toolset = get_toolset(name)
     if not toolset:
         return None
-    
+
     resolved_tools = resolve_toolset(name)
-    
+
     return {
         "name": name,
         "description": toolset["description"],
@@ -889,16 +882,14 @@ def get_toolset_info(name: str) -> Dict[str, Any]:
         "includes": toolset["includes"],
         "resolved_tools": resolved_tools,
         "tool_count": len(resolved_tools),
-        "is_composite": bool(toolset["includes"])
+        "is_composite": bool(toolset["includes"]),
     }
-
-
 
 
 if __name__ == "__main__":
     print("Toolsets System Demo")
     print("=" * 60)
-    
+
     print("\nAvailable Toolsets:")
     print("-" * 40)
     for name, toolset in get_all_toolsets().items():
@@ -906,27 +897,27 @@ if __name__ == "__main__":
         composite = "[composite]" if info["is_composite"] else "[leaf]"
         print(f"  {composite} {name:20} - {toolset['description']}")
         print(f"     Tools: {len(info['resolved_tools'])} total")
-    
+
     print("\nToolset Resolution Examples:")
     print("-" * 40)
     for name in ["web", "terminal", "safe", "debugging"]:
         tools = resolve_toolset(name)
         print(f"\n  {name}:")
         print(f"    Resolved to {len(tools)} tools: {', '.join(sorted(tools))}")
-    
+
     print("\nMultiple Toolset Resolution:")
     print("-" * 40)
     combined = resolve_multiple_toolsets(["web", "vision", "terminal"])
     print("  Combining ['web', 'vision', 'terminal']:")
     print(f"    Result: {', '.join(sorted(combined))}")
-    
+
     print("\nCustom Toolset Creation:")
     print("-" * 40)
     create_custom_toolset(
         name="my_custom",
         description="My custom toolset for specific tasks",
         tools=["web_search"],
-        includes=["terminal", "vision"]
+        includes=["terminal", "vision"],
     )
     custom_info = get_toolset_info("my_custom")
     print("  Created 'my_custom' toolset:")

@@ -22,7 +22,7 @@ import os
 from typing import Optional
 
 
-def relay_url() -> Optional[str]:
+def relay_url() -> str | None:
     """The connector relay endpoint URL, or None when relay is not configured.
 
     Checks ``GATEWAY_RELAY_URL`` (convenient for Docker) first, then
@@ -55,7 +55,7 @@ def relay_platform_identity() -> tuple[str, str]:
     return platform, bot_id
 
 
-def relay_connection_auth() -> tuple[Optional[str], Optional[str]]:
+def relay_connection_auth() -> tuple[str | None, str | None]:
     """The (gateway_id, upgrade_secret) this gateway authenticates the WS upgrade with.
 
     Both come from enrollment (``hermes gateway enroll`` writes them to
@@ -79,7 +79,7 @@ def relay_connection_auth() -> tuple[Optional[str], Optional[str]]:
     return (gateway_id or None, secret or None)
 
 
-def relay_endpoint() -> Optional[str]:
+def relay_endpoint() -> str | None:
     """The gateway's own PUBLIC inbound URL, asserted to the connector at provision.
 
     The connector delivers signed inbound POSTs to this URL and stores it on the
@@ -131,7 +131,7 @@ def relay_route_keys() -> list[str]:
     return [k.strip() for k in raw.split(",") if k.strip()]
 
 
-def relay_instance_id() -> Optional[str]:
+def relay_instance_id() -> str | None:
     """Stable per-instance id this gateway forwards at provision (Phase 6 Unit α).
 
     Binds the connector's ``gatewayId -> instanceId`` so the connector can route
@@ -165,8 +165,7 @@ def _provision_url(relay_dial_url: str) -> str:
         raw = "http://" + raw[len("ws://"):]
     elif raw.startswith("wss://"):
         raw = "https://" + raw[len("wss://"):]
-    if raw.endswith("/relay"):
-        raw = raw[: -len("/relay")]
+    raw = raw.removesuffix("/relay")
     return f"{raw}/relay/provision"
 
 
@@ -181,12 +180,11 @@ def _policy_url(relay_dial_url: str) -> str:
         raw = "http://" + raw[len("ws://"):]
     elif raw.startswith("wss://"):
         raw = "https://" + raw[len("wss://"):]
-    if raw.endswith("/relay"):
-        raw = raw[: -len("/relay")]
+    raw = raw.removesuffix("/relay")
     return f"{raw}/relay/policy"
 
 
-def relay_relevance_policy() -> Optional[dict]:
+def relay_relevance_policy() -> dict | None:
     """Project this gateway's RELEVANCE config into the connector's generic vocabulary.
 
     The connector's relevance gate (Phase 6 Unit ζ) reasons over a
@@ -271,9 +269,9 @@ def _post_provision(
     gateway_id: str,
     platform: str,
     bot_id: str,
-    gateway_endpoint: Optional[str],
+    gateway_endpoint: str | None,
     route_keys: list[str],
-    instance_id: Optional[str] = None,
+    instance_id: str | None = None,
     timeout: float = 15.0,
 ) -> dict:
     """POST to the connector's ``/relay/provision`` and return the JSON body.
@@ -320,7 +318,7 @@ def _post_provision(
         except Exception:
             pass
         raise RuntimeError(
-            f"connector returned HTTP {exc.code}" + (f": {detail}" if detail else "")
+            f"connector returned HTTP {exc.code}" + (f": {detail}" if detail else ""),
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"could not reach connector: {exc.reason}") from exc
@@ -536,7 +534,7 @@ def send_relay_policy() -> bool:
     return False
 
 
-def register_relay_adapter(force: bool = False, url: Optional[str] = None) -> bool:
+def register_relay_adapter(force: bool = False, url: str | None = None) -> bool:
     """Register the generic ``relay`` platform via the platform registry.
 
     Registers when a relay URL is configured (or ``force=True`` for tests, which
@@ -595,6 +593,6 @@ def register_relay_adapter(force: bool = False, url: Optional[str] = None) -> bo
             check_fn=lambda: True,
             source="builtin",
             emoji="\U0001f50c",
-        )
+        ),
     )
     return True

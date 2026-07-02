@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get_json  # noqa: E402
+from _http import get_json
 
 ENDPOINT = "https://lda.senate.gov/api/v1/filings/"
 COLUMNS = [
@@ -102,7 +102,7 @@ def fetch(
                     "issues": "; ".join(issues),
                     "government_entities": "; ".join(sorted(set(entities))),
                     "filing_date": (r.get("dt_posted") or "")[:10],
-                }
+                },
             )
         next_url = payload.get("next")
         if not next_url:
@@ -112,7 +112,7 @@ def fetch(
         time.sleep(1.0 if not token else 0.3)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)

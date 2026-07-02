@@ -19,7 +19,7 @@ def _restore_stdout():
     sys.stdout = _original_stdout
 
 
-@pytest.fixture()
+@pytest.fixture
 def server():
     with patch.dict("sys.modules", {
         "hermes_constants": MagicMock(get_hermes_home=MagicMock(return_value="/tmp/hermes_test")),
@@ -43,7 +43,7 @@ def server():
         mod._answers.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def capture(server):
     """Redirect server's real stdout to a StringIO and return (server, buf)."""
     buf = io.StringIO()
@@ -104,11 +104,13 @@ def test_write_json_unicode_encode_error_re_raises(server):
     """A non-UTF-8 stdout encoding raises UnicodeEncodeError (a ValueError
     subclass).  It must NOT be swallowed as 'peer gone' — that would let
     `entry.py` exit cleanly via the False path and hide the real config
-    bug.  We re-raise so the existing crash-log infrastructure records it."""
+    bug.  We re-raise so the existing crash-log infrastructure records it.
+    """
 
     class _AsciiOnly:
         def write(self, line):
             line.encode("ascii")  # raises UnicodeEncodeError on non-ascii
+
         def flush(self): pass
 
     server._real_stdout = _AsciiOnly()
@@ -118,7 +120,8 @@ def test_write_json_unicode_encode_error_re_raises(server):
 
 def test_write_json_unrelated_value_error_re_raises(server):
     """Only ValueError('...closed file...') means peer gone.  Other
-    ValueErrors are programming errors and must surface."""
+    ValueErrors are programming errors and must surface.
+    """
 
     class _BadValue:
         def write(self, _): raise ValueError("something else entirely")
@@ -132,7 +135,8 @@ def test_write_json_unrelated_value_error_re_raises(server):
 def test_write_json_non_serializable_payload_re_raises(server):
     """Non-JSON-safe payloads are programming errors — they must NOT be
     silently dropped via the False path (which would trigger a clean exit
-    in entry.py and mask the real bug)."""
+    in entry.py and mask the real bug).
+    """
     import io
 
     server._real_stdout = io.StringIO()
@@ -142,7 +146,8 @@ def test_write_json_non_serializable_payload_re_raises(server):
 
 def test_write_json_peer_gone_oserror_on_flush_returns_false(server):
     """A flush that raises a peer-gone OSError (EPIPE) must not strand
-    the lock or crash; it returns False so the dispatcher exits cleanly."""
+    the lock or crash; it returns False so the dispatcher exits cleanly.
+    """
     import errno
 
     written = []
@@ -159,7 +164,8 @@ def test_write_json_peer_gone_oserror_on_flush_returns_false(server):
 def test_write_json_non_peer_gone_oserror_re_raises(server):
     """Host I/O failures (ENOSPC, EACCES, EIO …) are NOT peer-gone — they
     must re-raise so the crash log records them instead of looking like
-    a clean disconnect via the False path."""
+    a clean disconnect via the False path.
+    """
     import errno
 
     class _DiskFull:
@@ -203,7 +209,8 @@ def test_disable_flush_env_var_actually_wires_to_module_constant(monkeypatch):
     `tui_gateway.transport` fresh actually flips `_DISABLE_FLUSH` true.
 
     Reloads only the transport module — server.py is untouched so its
-    atexit hooks/worker pool stay intact."""
+    atexit hooks/worker pool stay intact.
+    """
     import importlib
 
     monkeypatch.setenv("HERMES_TUI_GATEWAY_NO_FLUSH", "1")
@@ -324,7 +331,7 @@ def test_session_resume_returns_hydrated_messages(server, monkeypatch):
             "id": "r1",
             "method": "session.resume",
             "params": {"session_id": "20260409_010101_abc123", "cols": 100},
-        }
+        },
     )
 
     assert "error" not in resp
@@ -338,8 +345,8 @@ def test_session_resume_returns_hydrated_messages(server, monkeypatch):
 
 def test_session_resume_handles_multimodal_list_content(server, monkeypatch):
     """A user message persisted with list-shaped multimodal content used to
-    crash session resume with ``'list' object has no attribute 'strip'``."""
-
+    crash session resume with ``'list' object has no attribute 'strip'``.
+    """
     multimodal_user = {
         "role": "user",
         "content": [
@@ -375,7 +382,7 @@ def test_session_resume_handles_multimodal_list_content(server, monkeypatch):
             "id": "r1",
             "method": "session.resume",
             "params": {"session_id": "20260502_000000_listcontent", "cols": 100},
-        }
+        },
     )
 
     assert "error" not in resp
@@ -398,8 +405,8 @@ def test_session_resume_lazy_registers_watch_session_without_agent(server, monke
     """``lazy: true`` (subagent watch windows) must register the live session
     — keyed for the child mirror, on this transport — WITHOUT building an
     agent. The eager build is what made opening a subagent window contend
-    with the already-running parent turn."""
-
+    with the already-running parent turn.
+    """
     target = "20260612_000000_child99"
 
     class _DB:
@@ -428,7 +435,7 @@ def test_session_resume_lazy_registers_watch_session_without_agent(server, monke
             "id": "r1",
             "method": "session.resume",
             "params": {"session_id": target, "cols": 100, "lazy": True},
-        }
+        },
     )
 
     assert "error" not in resp
@@ -460,7 +467,7 @@ def test_session_resume_lazy_registers_watch_session_without_agent(server, monke
             "id": "r2",
             "method": "session.resume",
             "params": {"session_id": target, "cols": 100, "lazy": True},
-        }
+        },
     )
     assert "error" not in resp2
     assert resp2["result"]["session_id"] == sid
@@ -471,8 +478,8 @@ def test_session_resume_lazy_reports_running_for_inflight_child(server, monkeypa
     """A watch window attaching to a child mid-delegation must learn the run is
     live from the resume response itself — the child can sit silent inside a
     long tool call, so waiting for the next stream event leaves the window
-    looking dead."""
-
+    looking dead.
+    """
     target = "20260612_000000_child42"
 
     class _DB:
@@ -490,7 +497,7 @@ def test_session_resume_lazy_reports_running_for_inflight_child(server, monkeypa
 
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
     monkeypatch.setattr(
-        server, "_make_agent", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no build"))
+        server, "_make_agent", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no build")),
     )
     server._active_child_runs[target] = time.time()
     try:
@@ -499,7 +506,7 @@ def test_session_resume_lazy_reports_running_for_inflight_child(server, monkeypa
                 "id": "r1",
                 "method": "session.resume",
                 "params": {"session_id": target, "cols": 100, "lazy": True},
-            }
+            },
         )
     finally:
         server._active_child_runs.pop(target, None)
@@ -522,7 +529,6 @@ def test_session_resume_lazy_tolerates_missing_row_for_active_child(server, monk
     (``_child_run_active``), the lazy resume must instead register the live
     session with empty history so the mirror can stream the turn.
     """
-
     target = "20260616_131212_racey"
 
     class _DB:
@@ -542,7 +548,7 @@ def test_session_resume_lazy_tolerates_missing_row_for_active_child(server, monk
 
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
     monkeypatch.setattr(
-        server, "_make_agent", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no build"))
+        server, "_make_agent", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no build")),
     )
     # Child is live in the relay registry even though its row isn't written.
     server._active_child_runs[target] = time.time()
@@ -552,7 +558,7 @@ def test_session_resume_lazy_tolerates_missing_row_for_active_child(server, monk
                 "id": "r1",
                 "method": "session.resume",
                 "params": {"session_id": target, "cols": 100, "lazy": True},
-            }
+            },
         )
     finally:
         server._active_child_runs.pop(target, None)
@@ -578,7 +584,6 @@ def test_session_resume_missing_row_non_lazy_still_errors(server, monkeypatch):
     A normal (non-lazy) resume of a genuinely unknown id must still fail fast
     with "session not found" rather than silently registering an empty session.
     """
-
     target = "20260616_000000_ghost"
 
     class _DB:
@@ -596,7 +601,7 @@ def test_session_resume_missing_row_non_lazy_still_errors(server, monkeypatch):
             "id": "r1",
             "method": "session.resume",
             "params": {"session_id": target, "cols": 100},
-        }
+        },
     )
     assert "error" in resp
     assert "session not found" in resp["error"]["message"].lower()
@@ -608,7 +613,7 @@ def test_session_resume_missing_row_non_lazy_still_errors(server, monkeypatch):
             "id": "r2",
             "method": "session.resume",
             "params": {"session_id": target, "cols": 100, "lazy": True},
-        }
+        },
     )
     assert "error" in resp2
     assert "session not found" in resp2["error"]["message"].lower()
@@ -616,7 +621,6 @@ def test_session_resume_missing_row_non_lazy_still_errors(server, monkeypatch):
 
 def test_session_resume_reuses_existing_live_session(server, monkeypatch):
     """Repeated resume must not allocate duplicate live agents."""
-
     target = "20260409_010101_abc123"
     created_sids: list[str] = []
     closed_sids: list[str] = []
@@ -689,7 +693,7 @@ def test_session_resume_reuses_existing_live_session(server, monkeypatch):
                     "id": "first",
                     "method": "session.resume",
                     "params": {"session_id": target, "cols": 100},
-                }
+                },
             )
 
         first_thread = threading.Thread(target=resume_first)
@@ -704,7 +708,7 @@ def test_session_resume_reuses_existing_live_session(server, monkeypatch):
                     "id": "second",
                     "method": "session.resume",
                     "params": {"session_id": target, "cols": 120},
-                }
+                },
             )
 
         second_thread = threading.Thread(target=resume_second)
@@ -736,7 +740,6 @@ def test_session_resume_reuses_existing_live_session(server, monkeypatch):
 
 def test_session_resume_live_payload_uses_current_history_with_ancestors(server, monkeypatch):
     """Live resume should not reuse a stale ancestor-inclusive snapshot."""
-
     target = "20260409_010101_child"
     ancestor_history = [{"role": "user", "content": "ancestor"}]
     current_history = [
@@ -768,7 +771,7 @@ def test_session_resume_live_payload_uses_current_history_with_ancestors(server,
         server,
         "_make_agent",
         lambda _sid, key, session_id=None, session_db=None: types.SimpleNamespace(
-            model="test/model", session_id=session_id or key
+            model="test/model", session_id=session_id or key,
         ),
     )
     monkeypatch.setattr(server, "_SlashWorker", lambda _key, _model: _Worker())
@@ -797,7 +800,7 @@ def test_session_resume_live_payload_uses_current_history_with_ancestors(server,
                 "id": "first",
                 "method": "session.resume",
                 "params": {"session_id": target, "cols": 100},
-            }
+            },
         )
 
         assert "error" not in first
@@ -819,7 +822,7 @@ def test_session_resume_live_payload_uses_current_history_with_ancestors(server,
                 "id": "second",
                 "method": "session.resume",
                 "params": {"session_id": target, "cols": 120},
-            }
+            },
         )
 
     assert "error" not in second
@@ -862,7 +865,7 @@ def test_session_activate_rebinds_orphaned_ws_session_to_current_transport(serve
     )
 
     resp = server.handle_request(
-        {"id": "activate", "method": "session.activate", "params": {"session_id": sid}}
+        {"id": "activate", "method": "session.activate", "params": {"session_id": sid}},
     )
 
     assert "error" not in resp
@@ -906,7 +909,7 @@ def test_session_branch_persists_branched_from_marker(server, monkeypatch):
         server,
         "_make_agent",
         lambda _sid, key, session_id=None, session_db=None: types.SimpleNamespace(
-            model="test/model", session_id=session_id or key
+            model="test/model", session_id=session_id or key,
         ),
     )
     monkeypatch.setattr(server, "_init_session", lambda *_a, **_k: None)
@@ -924,7 +927,7 @@ def test_session_branch_persists_branched_from_marker(server, monkeypatch):
     }
 
     resp = server.handle_request(
-        {"id": "b1", "method": "session.branch", "params": {"session_id": parent_sid}}
+        {"id": "b1", "method": "session.branch", "params": {"session_id": parent_sid}},
     )
 
     assert "error" not in resp, resp
@@ -954,7 +957,7 @@ def test_make_agent_accepts_list_system_prompt(server, monkeypatch):
                 "base_url": None,
                 "api_key": None,
                 "api_mode": None,
-            }
+            },
         ),
     )
     monkeypatch.setattr(server, "_load_cfg", lambda: {"agent": {"system_prompt": ["one", "two"]}})
@@ -1217,7 +1220,7 @@ def test_skills_manage_search_uses_tools_hub_sources(server):
 
     assert "error" not in resp
     assert resp["result"] == {
-        "results": [{"description": "Build better terminal demos", "name": "showroom"}]
+        "results": [{"description": "Build better terminal demos", "name": "showroom"}],
     }
     auth.assert_called_once_with()
     router.assert_called_once_with("auth")
@@ -1301,7 +1304,7 @@ def test_command_dispatch_retry_handles_multipart_content(server):
     history = [
         {"role": "user", "content": [
             {"type": "text", "text": "analyze this"},
-            {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}},
         ]},
         {"role": "assistant", "content": "I see the image."},
     ]

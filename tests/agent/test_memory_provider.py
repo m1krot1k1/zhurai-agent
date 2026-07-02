@@ -1,12 +1,13 @@
 """Tests for the memory provider interface, manager, and builtin provider."""
 
 import json
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from agent.memory_provider import MemoryProvider
+import pytest
+
 from agent.memory_manager import MemoryManager, inject_memory_provider_tools
+from agent.memory_provider import MemoryProvider
 
 # ---------------------------------------------------------------------------
 # Concrete test provider
@@ -287,10 +288,10 @@ class TestMemoryManager:
     def test_tool_schemas_collected(self):
         mgr = MemoryManager()
         p1 = FakeMemoryProvider("builtin", tools=[
-            {"name": "recall_builtin", "description": "Builtin recall", "parameters": {}}
+            {"name": "recall_builtin", "description": "Builtin recall", "parameters": {}},
         ])
         p2 = FakeMemoryProvider("external", tools=[
-            {"name": "recall_ext", "description": "External recall", "parameters": {}}
+            {"name": "recall_ext", "description": "External recall", "parameters": {}},
         ])
         mgr.add_provider(p1)
         mgr.add_provider(p2)
@@ -302,10 +303,10 @@ class TestMemoryManager:
     def test_tool_name_conflict_first_wins(self):
         mgr = MemoryManager()
         p1 = FakeMemoryProvider("builtin", tools=[
-            {"name": "shared_tool", "description": "From builtin", "parameters": {}}
+            {"name": "shared_tool", "description": "From builtin", "parameters": {}},
         ])
         p2 = FakeMemoryProvider("external", tools=[
-            {"name": "shared_tool", "description": "From external", "parameters": {}}
+            {"name": "shared_tool", "description": "From external", "parameters": {}},
         ])
         mgr.add_provider(p1)
         mgr.add_provider(p2)
@@ -323,10 +324,10 @@ class TestMemoryManager:
     def test_tool_routing(self):
         mgr = MemoryManager()
         p1 = FakeMemoryProvider("builtin", tools=[
-            {"name": "builtin_tool", "description": "Builtin", "parameters": {}}
+            {"name": "builtin_tool", "description": "Builtin", "parameters": {}},
         ])
         p2 = FakeMemoryProvider("external", tools=[
-            {"name": "ext_tool", "description": "External", "parameters": {}}
+            {"name": "ext_tool", "description": "External", "parameters": {}},
         ])
         mgr.add_provider(p1)
         mgr.add_provider(p2)
@@ -457,10 +458,10 @@ class TestUserInstalledProviderDiscovery:
             "    def initialize(self, **kw): pass\n"
             "    def sync_turn(self, *a, **kw): pass\n"
             "    def get_tool_schemas(self): return []\n"
-            "    def handle_tool_call(self, *a, **kw): return '{}'\n"
+            "    def handle_tool_call(self, *a, **kw): return '{}'\n",
         )
         (plugin_dir / "plugin.yaml").write_text(
-            f"name: {name}\ndescription: Test user provider\n"
+            f"name: {name}\ndescription: Test user provider\n",
         )
         return plugin_dir
 
@@ -492,7 +493,7 @@ class TestUserInstalledProviderDiscovery:
 
     def test_bundled_takes_precedence(self, tmp_path, monkeypatch):
         """Bundled provider wins when user plugin has the same name."""
-        from plugins.memory import load_memory_provider, discover_memory_providers
+        from plugins.memory import discover_memory_providers, load_memory_provider
         # Create user plugin named "holographic" (same as bundled)
         plugin_dir = tmp_path / "plugins" / "holographic"
         plugin_dir.mkdir(parents=True)
@@ -505,7 +506,7 @@ class TestUserInstalledProviderDiscovery:
             "    def initialize(self, **kw): pass\n"
             "    def sync_turn(self, *a, **kw): pass\n"
             "    def get_tool_schemas(self): return []\n"
-            "    def handle_tool_call(self, *a, **kw): return '{}'\n"
+            "    def handle_tool_call(self, *a, **kw): return '{}'\n",
         )
         monkeypatch.setattr(
             "plugins.memory._get_user_plugins_dir",
@@ -527,7 +528,7 @@ class TestUserInstalledProviderDiscovery:
         plugin_dir = tmp_path / "plugins" / "notmemory"
         plugin_dir.mkdir(parents=True)
         (plugin_dir / "__init__.py").write_text(
-            "def register(ctx):\n    ctx.register_tool('foo', 'bar', {}, lambda: None)\n"
+            "def register(ctx):\n    ctx.register_tool('foo', 'bar', {}, lambda: None)\n",
         )
         monkeypatch.setattr(
             "plugins.memory._get_user_plugins_dir",
@@ -560,7 +561,7 @@ class TestUserInstalledProviderDiscovery:
             "    def initialize(self, **kw): pass\n"
             "    def sync_turn(self, *a, **kw): pass\n"
             "    def get_tool_schemas(self): return []\n"
-            "    def handle_tool_call(self, *a, **kw): return '{}'\n"
+            "    def handle_tool_call(self, *a, **kw): return '{}'\n",
         )
         monkeypatch.setattr(
             "plugins.memory._get_user_plugins_dir",
@@ -591,12 +592,12 @@ class TestUserInstalledProviderDiscovery:
             "    def initialize(self, **kw): pass\n"
             "    def sync_turn(self, *a, **kw): pass\n"
             "    def get_tool_schemas(self): return []\n"
-            "    def handle_tool_call(self, *a, **kw): return '{}'\n"
+            "    def handle_tool_call(self, *a, **kw): return '{}'\n",
         )
         (plugin_dir / "__init__.py").write_text(
             "from .adapters.hermes import MyProvider\n"
             "def register(ctx):\n"
-            "    ctx.register_memory_provider(MyProvider())\n"
+            "    ctx.register_memory_provider(MyProvider())\n",
         )
         monkeypatch.setattr(
             "plugins.memory._get_user_plugins_dir",
@@ -631,13 +632,13 @@ class TestUserInstalledProviderCli:
             "    def get_tool_schemas(self): return []\n"
             "    def handle_tool_call(self, *a, **kw): return '{}'\n"
             "def register(ctx):\n"
-            "    ctx.register_memory_provider(MyProvider())\n"
+            "    ctx.register_memory_provider(MyProvider())\n",
         )
         (plugin_dir / "config.py").write_text("STATUS = 'ok'\n")
         (plugin_dir / "cli.py").write_text(
             "from . import config\n"
             "def register_cli(subparser):\n"
-            "    subparser.add_argument('--status', action='store_true')\n"
+            "    subparser.add_argument('--status', action='store_true')\n",
         )
         return plugin_dir
 
@@ -652,7 +653,7 @@ class TestUserInstalledProviderCli:
         )
 
     def test_cli_discovered_for_user_plugin_with_relative_import(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """discover_plugin_cli_commands() loads a user provider's cli.py."""
         from plugins.memory import discover_plugin_cli_commands
@@ -904,7 +905,7 @@ class TestSetupFieldFiltering:
         assert model_default == "gpt-4o-mini"
 
     def test_when_and_default_from_combined(self):
-        """when clause and default_from work together correctly."""
+        """When clause and default_from work together correctly."""
         provider_models = {"groq": "openai/gpt-oss-120b", "openai": "gpt-4o-mini"}
         schema = [
             {"key": "mode", "default": "local"},
@@ -936,12 +937,13 @@ class TestSetupFieldFiltering:
 
 class TestMemoryContextFencing:
     """Prefetch context must be wrapped in <memory-context> fence so the model
-    does not treat recalled memory as user discourse."""
+    does not treat recalled memory as user discourse.
+    """
 
     def test_build_memory_context_block_wraps_content(self):
         from agent.memory_manager import build_memory_context_block
         result = build_memory_context_block(
-            "## Holographic Memory\n- [0.8] user likes dark mode"
+            "## Holographic Memory\n- [0.8] user likes dark mode",
         )
         assert result.startswith("<memory-context>")
         assert result.rstrip().endswith("</memory-context>")
@@ -1145,7 +1147,7 @@ class TestOnMemoryWriteBridge:
                     "execution_context": "foreground",
                     "session_id": "sess-1",
                 },
-            )
+            ),
         ]
 
     def test_on_memory_write_metadata_keeps_legacy_provider_compatible(self):
@@ -1265,6 +1267,7 @@ class TestHonchoCadenceTracking:
         p._recall_mode = "context"
         p._session_key = "test-session"
         # Simulate a manager that records prefetch calls
+
         class FakeManager:
             def prefetch_context(self, key, query=None):
                 pass
@@ -1450,7 +1453,7 @@ class TestContextEngineToolsetGate:
 
     def _compressor_with(self, *tool_names):
         return self._FakeCompressor(
-            [{"name": n, "description": n, "parameters": {}} for n in tool_names]
+            [{"name": n, "description": n, "parameters": {}} for n in tool_names],
         )
 
     def test_none_toolsets_injects(self):
@@ -1463,7 +1466,7 @@ class TestContextEngineToolsetGate:
         """enabled_toolsets including 'context_engine' injects the tools."""
         c = self._compressor_with("lcm_grep")
         tools, names, engine_names = self._run_context_engine_injection(
-            ["terminal", "context_engine"], c
+            ["terminal", "context_engine"], c,
         )
         assert "lcm_grep" in engine_names
 
@@ -1478,7 +1481,7 @@ class TestContextEngineToolsetGate:
         """A toolset list that doesn't name 'context_engine' suppresses injection."""
         c = self._compressor_with("lcm_grep", "lcm_describe")
         tools, names, engine_names = self._run_context_engine_injection(
-            ["terminal", "memory"], c
+            ["terminal", "memory"], c,
         )
         assert tools == []
         assert engine_names == set()

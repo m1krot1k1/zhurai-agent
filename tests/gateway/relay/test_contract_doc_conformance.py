@@ -55,7 +55,7 @@ def _parse_descriptor_table(text: str) -> dict[str, bool]:
     fields: dict[str, bool] = {}
     # Restrict to the §2 section so §3/§4 tables don't bleed in.
     section = text.split("## 2. CapabilityDescriptor", 1)[-1].split("## 3.", 1)[0]
-    row_re = re.compile(r"^\|\s*`([a-z_]+)`\s*\|[^|]*\|\s*(yes|no)\s*\|", re.M)
+    row_re = re.compile(r"^\|\s*`([a-z_]+)`\s*\|[^|]*\|\s*(yes|no)\s*\|", re.MULTILINE)
     for name, required in row_re.findall(section):
         fields[name] = required.strip() == "yes"
     return fields

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ──────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -94,7 +93,7 @@ class TestParseJudgeResponse:
         from hermes_cli.goals import _parse_judge_response
 
         v, reason, pf, wait = _parse_judge_response(
-            '{"verdict": "wait", "wait_on_pid": 4242, "reason": "CI running"}'
+            '{"verdict": "wait", "wait_on_pid": 4242, "reason": "CI running"}',
         )
         assert v == "wait"
         assert pf is False
@@ -105,7 +104,7 @@ class TestParseJudgeResponse:
         from hermes_cli.goals import _parse_judge_response
 
         v, _, _, wait = _parse_judge_response(
-            '{"verdict": "wait", "wait_for_seconds": 90, "reason": "rate limited"}'
+            '{"verdict": "wait", "wait_for_seconds": 90, "reason": "rate limited"}',
         )
         assert v == "wait"
         assert wait == {"seconds": 90}
@@ -193,9 +192,9 @@ class TestJudgeGoal:
         fake_client.chat.completions.create.return_value = MagicMock(
             choices=[
                 MagicMock(
-                    message=MagicMock(content='{"done": true, "reason": "achieved"}')
-                )
-            ]
+                    message=MagicMock(content='{"done": true, "reason": "achieved"}'),
+                ),
+            ],
         )
         with patch(
             "agent.auxiliary_client.get_text_auxiliary_client",
@@ -212,9 +211,9 @@ class TestJudgeGoal:
         fake_client.chat.completions.create.return_value = MagicMock(
             choices=[
                 MagicMock(
-                    message=MagicMock(content='{"done": false, "reason": "not yet"}')
-                )
-            ]
+                    message=MagicMock(content='{"done": false, "reason": "not yet"}'),
+                ),
+            ],
         )
         with patch(
             "agent.auxiliary_client.get_text_auxiliary_client",
@@ -374,7 +373,8 @@ class TestGoalManager:
     def test_continuation_prompt_shape(self, hermes_home):
         """The continuation prompt must include the goal text verbatim —
         and must be safe to inject as a user-role message (prompt-cache
-        invariants: no system-prompt mutation)."""
+        invariants: no system-prompt mutation).
+        """
         from hermes_cli.goals import GoalManager
 
         mgr = GoalManager(session_id="cont-sid")
@@ -399,7 +399,7 @@ def test_goal_command_in_registry():
 
 
 def test_goal_command_dispatches_in_cli_registry_helpers():
-    """goal shows up in autocomplete / help categories alongside other Session cmds."""
+    """Goal shows up in autocomplete / help categories alongside other Session cmds."""
     from hermes_cli.commands import COMMANDS, COMMANDS_BY_CATEGORY
 
     assert "/goal" in COMMANDS
@@ -415,7 +415,8 @@ def test_goal_command_dispatches_in_cli_registry_helpers():
 class TestJudgeParseFailureAutoPause:
     """Regression: weak judge models (e.g. deepseek-v4-flash) that return
     empty strings or non-JSON prose must auto-pause the loop after N turns
-    instead of burning the whole turn budget."""
+    instead of burning the whole turn budget.
+    """
 
     def test_parse_response_flags_empty_as_parse_failure(self):
         from hermes_cli.goals import _parse_judge_response
@@ -429,7 +430,7 @@ class TestJudgeParseFailureAutoPause:
         from hermes_cli.goals import _parse_judge_response
 
         verdict, reason, parse_failed, _w = _parse_judge_response(
-            "Let me analyze whether the goal is fully satisfied based on the agent's response..."
+            "Let me analyze whether the goal is fully satisfied based on the agent's response...",
         )
         assert verdict == "continue"
         assert parse_failed is True
@@ -439,7 +440,7 @@ class TestJudgeParseFailureAutoPause:
         from hermes_cli.goals import _parse_judge_response
 
         verdict, _, parse_failed, _w = _parse_judge_response(
-            '{"done": false, "reason": "more work"}'
+            '{"done": false, "reason": "more work"}',
         )
         assert verdict == "continue"
         assert parse_failed is False
@@ -464,7 +465,7 @@ class TestJudgeParseFailureAutoPause:
 
         fake_client = MagicMock()
         fake_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content=""))]
+            choices=[MagicMock(message=MagicMock(content=""))],
         )
         with patch(
             "agent.auxiliary_client.get_text_auxiliary_client",
@@ -477,14 +478,14 @@ class TestJudgeParseFailureAutoPause:
     def test_auto_pause_after_three_consecutive_parse_failures(self, hermes_home):
         """N=3 consecutive parse failures → auto-pause with config pointer."""
         from hermes_cli import goals
-        from hermes_cli.goals import GoalManager, DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES
+        from hermes_cli.goals import DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES, GoalManager
 
         assert DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES == 3
         mgr = GoalManager(session_id="parse-fail-sid-1", default_max_turns=20)
         mgr.set("do a thing")
 
         with patch.object(
-            goals, "judge_goal", return_value=("continue", "judge returned empty response", True, None)
+            goals, "judge_goal", return_value=("continue", "judge returned empty response", True, None),
         ):
             d1 = mgr.evaluate_after_turn("step 1")
             assert d1["should_continue"] is True
@@ -513,7 +514,7 @@ class TestJudgeParseFailureAutoPause:
 
         # Two parse failures…
         with patch.object(
-            goals, "judge_goal", return_value=("continue", "not json", True, None)
+            goals, "judge_goal", return_value=("continue", "not json", True, None),
         ):
             mgr.evaluate_after_turn("step 1")
             mgr.evaluate_after_turn("step 2")
@@ -521,7 +522,7 @@ class TestJudgeParseFailureAutoPause:
 
         # …then one clean reply resets the counter.
         with patch.object(
-            goals, "judge_goal", return_value=("continue", "making progress", False, None)
+            goals, "judge_goal", return_value=("continue", "making progress", False, None),
         ):
             d = mgr.evaluate_after_turn("step 3")
             assert d["should_continue"] is True
@@ -536,7 +537,7 @@ class TestJudgeParseFailureAutoPause:
         mgr.set("goal")
 
         with patch.object(
-            goals, "judge_goal", return_value=("continue", "judge error: RuntimeError", False, None)
+            goals, "judge_goal", return_value=("continue", "judge error: RuntimeError", False, None),
         ):
             for _ in range(5):
                 d = mgr.evaluate_after_turn("still going")
@@ -545,7 +546,7 @@ class TestJudgeParseFailureAutoPause:
             assert mgr.state.status == "active"
 
     def test_consecutive_parse_failures_persists_across_goalmanager_reloads(
-        self, hermes_home
+        self, hermes_home,
     ):
         """The counter must be durable so cross-session resumes see it."""
         from hermes_cli import goals
@@ -555,7 +556,7 @@ class TestJudgeParseFailureAutoPause:
         mgr.set("persistent goal")
 
         with patch.object(
-            goals, "judge_goal", return_value=("continue", "empty", True, None)
+            goals, "judge_goal", return_value=("continue", "empty", True, None),
         ):
             mgr.evaluate_after_turn("r")
             mgr.evaluate_after_turn("r")
@@ -573,7 +574,8 @@ class TestJudgeParseFailureAutoPause:
 class TestGoalStateSubgoalsBackcompat:
     def test_old_state_meta_row_loads_without_subgoals(self):
         """A goal serialized BEFORE the subgoals field existed must
-        round-trip with an empty list, not crash."""
+        round-trip with an empty list, not crash.
+        """
         from hermes_cli.goals import GoalState
 
         legacy = json.dumps({
@@ -600,10 +602,16 @@ class TestMigrateGoalToSession:
     """migrate_goal_to_session carries a /goal from a parent session to its
     compression continuation child (#33618). load_goal does a flat
     per-session lookup with no lineage walk, so without migration an active
-    goal silently dies when compression rotates session_id."""
+    goal silently dies when compression rotates session_id.
+    """
 
     def test_migrates_active_goal_to_child(self, hermes_home):
-        from hermes_cli.goals import save_goal, load_goal, migrate_goal_to_session, GoalState
+        from hermes_cli.goals import (
+            GoalState,
+            load_goal,
+            migrate_goal_to_session,
+            save_goal,
+        )
         save_goal("parent-sid", GoalState(goal="ship the feature"))
         assert migrate_goal_to_session("parent-sid", "child-sid", reason="compression") is True
         child = load_goal("child-sid")
@@ -613,24 +621,35 @@ class TestMigrateGoalToSession:
         assert parent is not None and parent.status == "cleared"
 
     def test_no_goal_to_migrate_returns_false(self, hermes_home):
-        from hermes_cli.goals import migrate_goal_to_session, load_goal
+        from hermes_cli.goals import load_goal, migrate_goal_to_session
         assert migrate_goal_to_session("empty-parent", "child2") is False
         assert load_goal("child2") is None
 
     def test_does_not_clobber_existing_child_goal(self, hermes_home):
-        from hermes_cli.goals import save_goal, load_goal, migrate_goal_to_session, GoalState
+        from hermes_cli.goals import (
+            GoalState,
+            load_goal,
+            migrate_goal_to_session,
+            save_goal,
+        )
         save_goal("p3", GoalState(goal="parent goal"))
         save_goal("c3", GoalState(goal="child already has one"))
         assert migrate_goal_to_session("p3", "c3") is False
         assert load_goal("c3").goal == "child already has one"
 
     def test_same_id_is_noop(self, hermes_home):
-        from hermes_cli.goals import save_goal, migrate_goal_to_session, GoalState
+        from hermes_cli.goals import GoalState, migrate_goal_to_session, save_goal
         save_goal("same", GoalState(goal="g"))
         assert migrate_goal_to_session("same", "same") is False
 
     def test_cleared_goal_not_migrated(self, hermes_home):
-        from hermes_cli.goals import save_goal, clear_goal, migrate_goal_to_session, load_goal, GoalState
+        from hermes_cli.goals import (
+            GoalState,
+            clear_goal,
+            load_goal,
+            migrate_goal_to_session,
+            save_goal,
+        )
         save_goal("p4", GoalState(goal="done already"))
         clear_goal("p4")
         assert migrate_goal_to_session("p4", "c4") is False
@@ -648,6 +667,7 @@ class TestGoalManagerSubgoals:
 
     def test_add_subgoal_requires_active_goal(self, hermes_home):
         import pytest
+
         from hermes_cli.goals import GoalManager
         mgr = GoalManager(session_id="sub-noactive")
         with pytest.raises(RuntimeError):
@@ -655,6 +675,7 @@ class TestGoalManagerSubgoals:
 
     def test_add_empty_subgoal_rejected(self, hermes_home):
         import pytest
+
         from hermes_cli.goals import GoalManager
         mgr = GoalManager(session_id="sub-empty")
         mgr.set("g")
@@ -674,6 +695,7 @@ class TestGoalManagerSubgoals:
 
     def test_remove_subgoal_out_of_range(self, hermes_home):
         import pytest
+
         from hermes_cli.goals import GoalManager
         mgr = GoalManager(session_id="sub-oob")
         mgr.set("g")
@@ -737,16 +759,20 @@ class TestJudgeGoalWithSubgoals:
         capture the prompt that would be sent.
         """
         from unittest.mock import patch
+
         from hermes_cli import goals
 
         captured = {}
 
         class _FakeMsg:
             content = '{"done": true, "reason": "all done"}'
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -780,16 +806,20 @@ class TestJudgeGoalWithSubgoals:
 
     def test_judge_uses_original_template_when_no_subgoals(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
 
         captured = {}
 
         class _FakeMsg:
             content = '{"done": true, "reason": "ok"}'
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -836,7 +866,8 @@ class TestStatusLineSubgoalCount:
 
 class TestWaitBarrier:
     """The /goal wait barrier parks the loop on a live PID and resumes when
-    the process exits, without burning turns or calling the judge."""
+    the process exits, without burning turns or calling the judge.
+    """
 
     @staticmethod
     def _spawn_sleeper():
@@ -982,7 +1013,8 @@ class TestWaitBarrier:
 
     def test_old_state_row_loads_without_barrier_fields(self, hermes_home):
         """Backwards-compat: a state_meta row written before the barrier
-        existed must load with no barrier."""
+        existed must load with no barrier.
+        """
         from hermes_cli.goals import GoalState
 
         legacy = json.dumps({
@@ -1006,11 +1038,13 @@ class TestWaitBarrier:
 
 class TestJudgeDrivenWait:
     """The judge returns a `wait` verdict (given live background-process
-    context) and the loop parks automatically — no manual /goal wait."""
+    context) and the loop parks automatically — no manual /goal wait.
+    """
 
     @staticmethod
     def _spawn_sleeper():
-        import subprocess, sys
+        import subprocess
+        import sys
         return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
 
     def test_judge_wait_pid_parks_loop(self, hermes_home):
@@ -1108,12 +1142,14 @@ class TestSessionTriggerBarrier:
     """The session barrier (wait_on_session) releases when a process's own
     trigger fires — a watch_patterns match mid-run (process may never exit)
     OR exit — not only on PID exit. CI-safe: uses synthetic registry session
-    objects, no real child processes."""
+    objects, no real child processes.
+    """
 
     @staticmethod
     def _inject(sid, *, watch_patterns=None, exited=False):
         import time as _t
-        from tools.process_registry import process_registry, ProcessSession
+
+        from tools.process_registry import ProcessSession, process_registry
         s = ProcessSession(id=sid, command="watcher.sh", task_id="t",
                            session_key="", cwd="/tmp", started_at=_t.time())
         if watch_patterns:
@@ -1207,7 +1243,7 @@ class TestSessionTriggerBarrier:
     def test_session_directive_parsed_from_judge(self, hermes_home):
         from hermes_cli.goals import _parse_judge_response
         v, _, pf, wd = _parse_judge_response(
-            '{"verdict": "wait", "wait_on_session": "proc_abc", "reason": "r"}'
+            '{"verdict": "wait", "wait_on_session": "proc_abc", "reason": "r"}',
         )
         assert v == "wait"
         assert pf is False
@@ -1277,7 +1313,7 @@ class TestParseContract:
 
 class TestGoalContractSerialization:
     def test_roundtrip_with_contract(self):
-        from hermes_cli.goals import GoalState, GoalContract
+        from hermes_cli.goals import GoalContract, GoalState
 
         state = GoalState(
             goal="ship it",
@@ -1314,7 +1350,7 @@ class TestGoalContractSerialization:
 
 class TestGoalManagerContract:
     def test_set_with_contract(self, hermes_home):
-        from hermes_cli.goals import GoalManager, GoalContract
+        from hermes_cli.goals import GoalContract, GoalManager
 
         mgr = GoalManager(session_id="c-set")
         mgr.set("ship it", contract=GoalContract(verification="tests pass"))
@@ -1330,7 +1366,7 @@ class TestGoalManagerContract:
         assert "contract" not in mgr.status_line()
 
     def test_continuation_prompt_includes_contract(self, hermes_home):
-        from hermes_cli.goals import GoalManager, GoalContract
+        from hermes_cli.goals import GoalContract, GoalManager
 
         mgr = GoalManager(session_id="c-cont")
         mgr.set("ship it", contract=GoalContract(verification="run pytest"))
@@ -1340,7 +1376,7 @@ class TestGoalManagerContract:
         assert "concrete evidence" in prompt
 
     def test_set_contract_after_the_fact(self, hermes_home):
-        from hermes_cli.goals import GoalManager, GoalContract
+        from hermes_cli.goals import GoalContract, GoalManager
 
         mgr = GoalManager(session_id="c-after")
         mgr.set("ship it")
@@ -1352,10 +1388,10 @@ class TestGoalManagerContract:
         assert GM2(session_id="c-after").has_contract()
 
     def test_persistence_roundtrip(self, hermes_home):
-        from hermes_cli.goals import GoalManager, GoalContract
+        from hermes_cli.goals import GoalContract, GoalManager
 
         GoalManager(session_id="c-persist").set(
-            "ship it", contract=GoalContract(outcome="O", verification="V")
+            "ship it", contract=GoalContract(outcome="O", verification="V"),
         )
         reloaded = GoalManager(session_id="c-persist")
         assert reloaded.state.contract.outcome == "O"
@@ -1367,10 +1403,13 @@ class TestJudgeWithContract:
         class _FakeMsg:
             pass
         _FakeMsg.content = content
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -1382,6 +1421,7 @@ class TestJudgeWithContract:
 
     def test_judge_uses_contract_template(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
         from hermes_cli.goals import GoalContract
 
@@ -1395,7 +1435,7 @@ class TestJudgeWithContract:
                 contract=GoalContract(verification="pytest -q passes"),
             )
         user_msg = next(
-            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), ""
+            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), "",
         )
         assert "completion contract" in user_msg.lower()
         assert "pytest -q passes" in user_msg
@@ -1403,6 +1443,7 @@ class TestJudgeWithContract:
 
     def test_contract_plus_subgoals_combine(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
         from hermes_cli.goals import GoalContract
 
@@ -1417,7 +1458,7 @@ class TestJudgeWithContract:
                 contract=GoalContract(verification="pytest passes"),
             )
         user_msg = next(
-            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), ""
+            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), "",
         )
         assert "pytest passes" in user_msg
         assert "write changelog" in user_msg
@@ -1426,6 +1467,7 @@ class TestJudgeWithContract:
 class TestDraftContract:
     def test_draft_parses_json(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
 
         class _FakeMsg:
@@ -1434,10 +1476,13 @@ class TestDraftContract:
                 '"constraints": "no API change", "boundaries": "services/auth", '
                 '"stop_when": "schema change needed"}'
             )
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -1456,14 +1501,18 @@ class TestDraftContract:
 
     def test_draft_returns_none_on_bad_json(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
 
         class _FakeMsg:
             content = "I cannot produce JSON, sorry"
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -1478,6 +1527,7 @@ class TestDraftContract:
 
     def test_draft_returns_none_when_no_client(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
 
         with patch("agent.auxiliary_client.get_text_auxiliary_client",
@@ -1493,16 +1543,20 @@ class TestDraftContract:
 class TestContractAndBackgroundCompose:
     """A contract goal blocked on a background process must surface BOTH
     the contract block and the background-process list to the judge, so it
-    can return either done (evidence met) or wait (parked on the poller)."""
+    can return either done (evidence met) or wait (parked on the poller).
+    """
 
     def _capture_client(self, captured, content='{"verdict": "wait", "wait_on_pid": 4242, "reason": "CI still running"}'):
         class _FakeMsg:
             pass
         _FakeMsg.content = content
+
         class _FakeChoice:
             message = _FakeMsg()
+
         class _FakeResp:
             choices = [_FakeChoice()]
+
         class _FakeClient:
             class chat:
                 class completions:
@@ -1514,6 +1568,7 @@ class TestContractAndBackgroundCompose:
 
     def test_judge_prompt_carries_contract_and_background(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
         from hermes_cli.goals import GoalContract
 
@@ -1533,7 +1588,7 @@ class TestContractAndBackgroundCompose:
                 background_processes=bg,
             )
         user_msg = next(
-            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), ""
+            (m["content"] for m in (captured.get("messages") or []) if m["role"] == "user"), "",
         )
         # Both surfaces present in one prompt.
         assert "completion contract" in user_msg.lower()
@@ -1546,6 +1601,7 @@ class TestContractAndBackgroundCompose:
 
     def test_contract_goal_can_still_complete_on_evidence(self, hermes_home):
         from unittest.mock import patch
+
         from hermes_cli import goals
         from hermes_cli.goals import GoalContract
 

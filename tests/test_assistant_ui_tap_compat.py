@@ -35,7 +35,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TAP = "@assistant-ui/tap"
 
@@ -114,7 +113,7 @@ def test_assistant_ui_cluster_agrees_on_one_tap() -> None:
         if peer_meta.get("optional"):
             continue
         spec = meta.get("dependencies", {}).get(TAP) or meta.get(
-            "peerDependencies", {}
+            "peerDependencies", {},
         ).get(TAP)
         if not spec:
             continue

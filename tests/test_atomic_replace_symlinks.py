@@ -28,7 +28,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 from utils import atomic_json_write, atomic_replace, atomic_yaml_write
 
-
 # ─── Direct helper ────────────────────────────────────────────────────────────
 
 
@@ -129,7 +128,7 @@ def test_atomic_json_write_preserves_symlink_permissions(tmp_path: Path) -> None
     real = tmp_path / "real.json"
     link = tmp_path / "link.json"
     real.write_text("{}", encoding="utf-8")
-    os.chmod(real, 0o644)
+    Path(real).chmod(0o644)
     link.symlink_to(real)
 
     atomic_json_write(link, {"x": 1})
@@ -166,7 +165,7 @@ def test_atomic_replace_broken_symlink_creates_target(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("fail_errno", [errno.EXDEV, errno.EBUSY])
 def test_atomic_replace_copy_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_errno: int
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_errno: int,
 ) -> None:
     target = tmp_path / "config.yaml"
     target.write_text("old\n", encoding="utf-8")
@@ -183,7 +182,7 @@ def test_atomic_replace_copy_fallback(
 
 
 def test_atomic_replace_copy_fallback_preserves_symlink(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     real = tmp_path / "real.yaml"
     link = tmp_path / "link.yaml"
@@ -203,16 +202,16 @@ def test_atomic_replace_copy_fallback_preserves_symlink(
 
 
 def test_atomic_replace_copy_fallback_preserves_metadata(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if os.name != "posix":
         pytest.skip("POSIX-only")
 
     target = tmp_path / "config.yaml"
     target.write_text("old\n", encoding="utf-8")
-    os.chmod(target, 0o600)
+    Path(target).chmod(0o600)
     tmp = _write_tmp(tmp_path, "new\n")
-    os.chmod(tmp, 0o644)
+    Path(tmp).chmod(0o644)
 
     def fail_replace(src: str, dst: str) -> None:
         raise OSError(errno.EBUSY, os.strerror(errno.EBUSY), src, None, dst)
@@ -225,7 +224,7 @@ def test_atomic_replace_copy_fallback_preserves_metadata(
 
 
 def test_atomic_replace_other_oserror_propagates(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     target = tmp_path / "config.yaml"
     target.write_text("old\n", encoding="utf-8")

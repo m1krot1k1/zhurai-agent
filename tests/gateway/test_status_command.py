@@ -1,7 +1,7 @@
 """Tests for gateway /status behavior and token persistence."""
 
-from datetime import datetime
 import time
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -35,7 +35,7 @@ def _make_runner(session_entry: SessionEntry, *, platform: Platform = Platform.T
 
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={platform: PlatformConfig(enabled=True, token="***")}
+        platforms={platform: PlatformConfig(enabled=True, token="***")},
     )
     adapter = MagicMock()
     adapter.send = AsyncMock()
@@ -130,7 +130,8 @@ async def test_status_command_includes_session_title_when_present():
 async def test_status_command_reads_token_totals_from_session_db():
     """Regression test for #17158: /status must source token totals from the
     SQLite SessionDB (where run_agent.py persists them) and sum all component
-    counts, not from SessionEntry (which the agent never writes)."""
+    counts, not from SessionEntry (which the agent never writes).
+    """
     session_entry = SessionEntry(
         session_key=build_session_key(_make_source()),
         session_id="sess-1",
@@ -158,7 +159,8 @@ async def test_status_command_reads_token_totals_from_session_db():
 @pytest.mark.asyncio
 async def test_status_command_tokens_zero_when_session_db_row_missing():
     """When the SessionDB has no row for the current session yet (fresh
-    session, no agent calls), /status reports 0 without raising."""
+    session, no agent calls), /status reports 0 without raising.
+    """
     session_entry = SessionEntry(
         session_key=build_session_key(_make_source()),
         session_id="sess-1",
@@ -306,7 +308,7 @@ async def test_agents_command_reports_active_agents_and_processes(monkeypatch):
                     "status": "running",
                     "uptime_seconds": 17,
                     "command": "sleep 30",
-                }
+                },
             ]
 
     monkeypatch.setattr("tools.process_registry.process_registry", _FakeRegistry())
@@ -368,7 +370,7 @@ async def test_handle_message_persists_agent_token_counts(monkeypatch):
             "input_tokens": 120,
             "output_tokens": 45,
             "model": "openai/test-model",
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "***"})
@@ -411,7 +413,7 @@ async def test_first_run_slack_home_channel_onboarding_uses_parent_command(monke
             "input_tokens": 0,
             "output_tokens": 0,
             "model": "openai/test-model",
-        }
+        },
     )
 
     monkeypatch.delenv("SLACK_HOME_CHANNEL", raising=False)
@@ -455,7 +457,7 @@ async def test_first_run_non_slack_home_channel_onboarding_keeps_direct_command(
             "input_tokens": 0,
             "output_tokens": 0,
             "model": "openai/test-model",
-        }
+        },
     )
 
     monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
@@ -588,15 +590,16 @@ async def test_handle_message_stale_result_keeps_newer_generation_callback(monke
     assert adapter._post_delivery_callbacks[session_key][0] == 2
 
 
-
 @pytest.mark.asyncio
 async def test_status_command_bypasses_active_session_guard():
     """When an agent is running, /status must be dispatched immediately via
-    base.handle_message — not queued or treated as an interrupt (#5046)."""
+    base.handle_message — not queued or treated as an interrupt (#5046).
+    """
     import asyncio
+
+    from gateway.config import Platform, PlatformConfig
     from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType
     from gateway.session import build_session_key
-    from gateway.config import Platform, PlatformConfig
 
     source = _make_source()
     session_key = build_session_key(source)
@@ -683,6 +686,7 @@ async def test_post_delivery_callback_generation_snapshot_happens_after_bind():
     fire a fresher run's callbacks.
     """
     import asyncio
+
     from gateway.platforms.base import BasePlatformAdapter
 
     source = _make_source()
@@ -698,13 +702,13 @@ async def test_post_delivery_callback_generation_snapshot_happens_after_bind():
         async def get_chat_info(self, chat_id): return {}
 
     adapter = _ConcreteAdapter(
-        PlatformConfig(enabled=True, token="***"), Platform.TELEGRAM
+        PlatformConfig(enabled=True, token="***"), Platform.TELEGRAM,
     )
 
     async def fake_handler(event):
         # Simulate what _bind_adapter_run_generation does mid-run.
         interrupt_event = adapter._active_sessions.get(session_key)
-        setattr(interrupt_event, "_hermes_run_generation", 1)
+        interrupt_event._hermes_run_generation = 1
         # Stale run registers its callback at generation=1.
         adapter.register_post_delivery_callback(
             session_key,
@@ -717,7 +721,6 @@ async def test_post_delivery_callback_generation_snapshot_happens_after_bind():
             lambda: fired.append("newer"),
             generation=2,
         )
-        return None
 
     adapter.set_message_handler(fake_handler)
     event = MessageEvent(text="hello", source=source, message_id="m1")

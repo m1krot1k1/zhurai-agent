@@ -13,8 +13,8 @@ from hermes_constants import (
     find_node_executable_on_path,
     get_default_hermes_root,
     get_hermes_home,
-    iter_hermes_node_dirs,
     is_container,
+    iter_hermes_node_dirs,
     parse_reasoning_effort,
     secure_parent_dir,
     with_hermes_node_path,
@@ -66,7 +66,8 @@ class TestGetDefaultHermesRoot:
 
     def test_docker_profile_active(self, tmp_path, monkeypatch):
         """When a Docker profile is active (HERMES_HOME=<root>/profiles/<name>),
-        returns the Docker root, not the profile dir."""
+        returns the Docker root, not the profile dir.
+        """
         docker_root = tmp_path / "opt" / "data"
         profile = docker_root / "profiles" / "coder"
         profile.mkdir(parents=True)
@@ -250,7 +251,7 @@ class TestIsContainer:
         assert is_container() is True
 
     def test_detects_cgroup_v2_via_mountinfo(self, monkeypatch, tmp_path):
-        """cgroup v2 (0::/ only) falls back to containerd marker in mountinfo."""
+        """Cgroup v2 (0::/ only) falls back to containerd marker in mountinfo."""
         import builtins
         self._reset_cache(monkeypatch)
         monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
@@ -259,7 +260,7 @@ class TestIsContainer:
         cgroup_file.write_text("0::/\n")  # cgroup v2 — no runtime marker
         mountinfo_file = tmp_path / "mountinfo"
         mountinfo_file.write_text(
-            "1234 1233 0:42 /containerd/.../rootfs / rw - overlay overlay rw\n"
+            "1234 1233 0:42 /containerd/.../rootfs / rw - overlay overlay rw\n",
         )
         _real_open = builtins.open
 
@@ -381,6 +382,7 @@ class TestSecureParentDir:
 
         # Mock Path.resolve to return a short path regardless of OS quirks
         original_resolve = Path.resolve
+
         def mock_resolve(self):
             if str(self) == "/x/y":
                 return Path("/x")

@@ -47,7 +47,8 @@ def test_uncontended_tick_runs_and_is_not_skipped(conn):
 
 def test_held_lock_skips_the_tick_without_writes(conn):
     """While another holder owns the board lock, dispatch_once must skip and
-    must NOT invoke spawn_fn (no DB writes happen on a skipped tick)."""
+    must NOT invoke spawn_fn (no DB writes happen on a skipped tick).
+    """
     kb.create_task(conn, title="t", assignee="w")
     db_path = kb.kanban_db_path(board="default")
 
@@ -82,7 +83,8 @@ def test_lock_releases_so_next_tick_runs(conn):
 
 def test_lock_is_board_scoped(conn):
     """Holding board A's dispatch lock must not block a tick on board B —
-    distinct boards have distinct DB files and tick independently."""
+    distinct boards have distinct DB files and tick independently.
+    """
     db_default = kb.kanban_db_path(board="default")
     db_other = db_default.with_name("other-board-kanban.db")
 
@@ -95,7 +97,8 @@ def test_lock_is_board_scoped(conn):
 
 def test_reentrant_same_path_lock_is_exclusive(conn):
     """A second acquisition of the SAME board's lock from a sibling context
-    must report not-held (the flock is exclusive within the host)."""
+    must report not-held (the flock is exclusive within the host).
+    """
     db_path = kb.kanban_db_path(board="default")
     with kb._dispatch_tick_lock(db_path) as held_a:
         assert held_a is True

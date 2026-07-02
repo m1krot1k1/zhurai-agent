@@ -36,17 +36,17 @@ import importlib
 import json
 import logging
 import os
+import pathlib
 import queue
 import sys
 import threading
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Any, Dict, List
 
 from agent.memory_provider import MemoryProvider
+from hermes_cli.config import cfg_get
 from hermes_constants import get_hermes_home
 from tools.registry import tool_error
-from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +112,12 @@ def _export_port_health_grace_timeout(config: dict[str, Any]) -> None:
         seconds = float(raw)
     except (TypeError, ValueError):
         logger.warning(
-            "Invalid Hindsight port_health_grace_timeout %r; ignoring.", raw
+            "Invalid Hindsight port_health_grace_timeout %r; ignoring.", raw,
         )
         return
     if seconds < 0:
         logger.warning(
-            "Negative Hindsight port_health_grace_timeout %r; ignoring.", raw
+            "Negative Hindsight port_health_grace_timeout %r; ignoring.", raw,
         )
         return
     # setdefault: an explicit env var the operator set wins over config.
@@ -158,7 +158,7 @@ def _ensure_cloud_client_dependency() -> None:
 # Cache of API_URL -> bool (whether that API supports update_mode='append').
 # Probed once per URL per process — every provider talking to the same API
 # gets the same answer without re-hitting /version on each initialize().
-_append_capability_cache: Dict[str, bool] = {}
+_append_capability_cache: dict[str, bool] = {}
 _append_capability_lock = threading.Lock()
 
 
@@ -387,12 +387,12 @@ def _load_config() -> dict:
                 "bankId": os.environ.get("HINDSIGHT_BANK_ID", "hermes"),
                 "budget": os.environ.get("HINDSIGHT_BUDGET", "mid"),
                 "enabled": True,
-            }
+            },
         },
     }
 
 
-def _normalize_retain_tags(value: Any) -> List[str]:
+def _normalize_retain_tags(value: Any) -> list[str]:
     """Normalize tag config/tool values to a deduplicated list of strings."""
     if value is None:
         return []
@@ -481,7 +481,7 @@ def _normalize_observation_scopes(value: Any) -> Any:
 
 def _utc_timestamp() -> str:
     """Return current UTC timestamp in ISO-8601 with milliseconds and Z suffix."""
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _embedded_profile_name(config: dict[str, Any]) -> str:
@@ -537,7 +537,7 @@ def _build_embedded_profile_env(config: dict[str, Any], *, llm_api_key: str | No
     )
     if idle_timeout is not None and idle_timeout != "":
         env_values["HINDSIGHT_EMBED_DAEMON_IDLE_TIMEOUT"] = str(
-            _parse_int_setting(idle_timeout, _DEFAULT_IDLE_TIMEOUT)
+            _parse_int_setting(idle_timeout, _DEFAULT_IDLE_TIMEOUT),
         )
     return env_values
 
@@ -559,6 +559,7 @@ def _materialize_embedded_profile_env(config: dict[str, Any], *, llm_api_key: st
     )
     return profile_env
 
+
 def _sanitize_bank_segment(value: str) -> str:
     """Sanitize a bank_id_template placeholder value.
 
@@ -574,10 +575,9 @@ def _sanitize_bank_segment(value: str) -> str:
         if ch.isalnum() or ch == "-" or ch == "_":
             out.append(ch)
             prev_dash = False
-        else:
-            if not prev_dash:
-                out.append("-")
-                prev_dash = True
+        elif not prev_dash:
+            out.append("-")
+            prev_dash = True
     return "".join(out).strip("-_")
 
 
@@ -621,9 +621,10 @@ def _resolve_bank_id_template(template: str, fallback: str, **placeholders: str)
 class HindsightMemoryProvider(MemoryProvider):
     """Hindsight long-term memory with knowledge graph and multi-strategy retrieval."""
 
-    def backup_paths(self) -> List[str]:
+    def backup_paths(self) -> list[str]:
         """Hindsight's legacy shared config and embedded-mode profile env
-        files live under ~/.hindsight (see _load_config / line ~509)."""
+        files live under ~/.hindsight (see _load_config / line ~509).
+        """
         try:
             from pathlib import Path
             legacy_dir = Path.home() / ".hindsight"
@@ -641,7 +642,7 @@ class HindsightMemoryProvider(MemoryProvider):
         self._llm_base_url = ""
         self._memory_mode = "hybrid"  # "context", "tools", or "hybrid"
         self._prefetch_method = "recall"  # "recall" or "reflect"
-        self._retain_tags: List[str] = []
+        self._retain_tags: list[str] = []
         self._retain_source = ""
         self._retain_user_prefix = "User"
         self._retain_assistant_prefix = "Assistant"
@@ -729,7 +730,7 @@ class HindsightMemoryProvider(MemoryProvider):
             has_key = bool(
                 cfg.get("apiKey")
                 or cfg.get("api_key")
-                or os.environ.get("HINDSIGHT_API_KEY", "")
+                or os.environ.get("HINDSIGHT_API_KEY", ""),
             )
             has_url = bool(cfg.get("api_url") or os.environ.get("HINDSIGHT_API_URL", ""))
             return has_key or has_url
@@ -755,15 +756,17 @@ class HindsightMemoryProvider(MemoryProvider):
 
     def post_setup(self, hermes_home: str, config: dict) -> None:
         """Custom setup wizard — installs only the deps needed for the selected mode."""
-        import subprocess
         import shutil
-        import sys
+        import subprocess
         from pathlib import Path
 
         from hermes_cli.config import save_config
+        from hermes_cli.memory_setup import (
+            _CANCELLED,
+            _curses_select,
+            _print_cancelled_setup,
+        )
         from hermes_cli.secret_prompt import masked_secret_prompt
-
-        from hermes_cli.memory_setup import _CANCELLED, _curses_select, _print_cancelled_setup
 
         print("\n  Configuring Hindsight memory:\n")
 
@@ -999,7 +1002,7 @@ class HindsightMemoryProvider(MemoryProvider):
             {"key": "auto_recall", "description": "Automatically recall memories before each turn", "default": True},
             {"key": "auto_retain", "description": "Automatically retain conversation turns", "default": True},
             {"key": "retain_every_n_turns", "description": "Retain every N turns (1 = every turn)", "default": 1},
-            {"key": "retain_async","description": "Process retain asynchronously on the Hindsight server", "default": True},
+            {"key": "retain_async", "description": "Process retain asynchronously on the Hindsight server", "default": True},
             {"key": "retain_context", "description": "Context label for retained memories", "default": "conversation between Hermes Agent and the User"},
             {"key": "recall_max_tokens", "description": "Maximum tokens for recall results", "default": 4096},
             {"key": "recall_max_input_chars", "description": "Maximum input query length for auto-recall", "default": 800},
@@ -1017,7 +1020,7 @@ class HindsightMemoryProvider(MemoryProvider):
                 if not available:
                     raise RuntimeError(
                         "Hindsight local runtime is unavailable"
-                        + (f": {reason}" if reason else "")
+                        + (f": {reason}" if reason else ""),
                     )
                 try:
                     from tools.lazy_deps import ensure as _lazy_ensure
@@ -1214,6 +1217,7 @@ class HindsightMemoryProvider(MemoryProvider):
         # Check client version and auto-upgrade if needed
         try:
             from importlib.metadata import version as pkg_version
+
             from packaging.version import Version
             installed = pkg_version("hindsight-client")
             if Version(installed) < Version(_MIN_CLIENT_VERSION):
@@ -1311,23 +1315,23 @@ class HindsightMemoryProvider(MemoryProvider):
         # Tags
         self._retain_tags = _normalize_retain_tags(
             self._config.get("retain_tags")
-            or os.environ.get("HINDSIGHT_RETAIN_TAGS", "")
+            or os.environ.get("HINDSIGHT_RETAIN_TAGS", ""),
         )
         self._tags = self._retain_tags or None
         self._observation_scopes = _normalize_observation_scopes(
             self._config.get("observation_scopes")
-            or os.environ.get("HINDSIGHT_RETAIN_OBSERVATION_SCOPES", "")
+            or os.environ.get("HINDSIGHT_RETAIN_OBSERVATION_SCOPES", ""),
         )
         self._recall_tags = self._config.get("recall_tags") or None
         self._recall_tags_match = self._config.get("recall_tags_match", "any")
         self._retain_source = str(
-            self._config.get("retain_source") or os.environ.get("HINDSIGHT_RETAIN_SOURCE", "")
+            self._config.get("retain_source") or os.environ.get("HINDSIGHT_RETAIN_SOURCE", ""),
         ).strip()
         self._retain_user_prefix = str(
-            self._config.get("retain_user_prefix") or os.environ.get("HINDSIGHT_RETAIN_USER_PREFIX", "User")
+            self._config.get("retain_user_prefix") or os.environ.get("HINDSIGHT_RETAIN_USER_PREFIX", "User"),
         ).strip() or "User"
         self._retain_assistant_prefix = str(
-            self._config.get("retain_assistant_prefix") or os.environ.get("HINDSIGHT_RETAIN_ASSISTANT_PREFIX", "Assistant")
+            self._config.get("retain_assistant_prefix") or os.environ.get("HINDSIGHT_RETAIN_ASSISTANT_PREFIX", "Assistant"),
         ).strip() or "Assistant"
 
         # Retain controls
@@ -1410,7 +1414,7 @@ class HindsightMemoryProvider(MemoryProvider):
                     # would capture output from other threads.
                     import hindsight_embed.daemon_embed_manager as dem
                     from rich.console import Console
-                    dem.console = Console(file=open(log_path, "a", encoding="utf-8"), force_terminal=False)
+                    dem.console = Console(file=pathlib.Path(log_path).open("a", encoding="utf-8"), force_terminal=False)
 
                     client = self._get_client()
                     profile = self._config.get("profile", "hermes")
@@ -1426,15 +1430,15 @@ class HindsightMemoryProvider(MemoryProvider):
                     if config_changed:
                         profile_env = _materialize_embedded_profile_env(self._config)
                         if client._manager.is_running(profile):
-                            with open(log_path, "a", encoding="utf-8") as f:
+                            with pathlib.Path(log_path).open("a", encoding="utf-8") as f:
                                 f.write("\n=== Config changed, restarting daemon ===\n")
                             client._manager.stop(profile)
 
                     client._ensure_started()
-                    with open(log_path, "a", encoding="utf-8") as f:
+                    with pathlib.Path(log_path).open("a", encoding="utf-8") as f:
                         f.write("\n=== Daemon started successfully ===\n")
                 except Exception as e:
-                    with open(log_path, "a", encoding="utf-8") as f:
+                    with pathlib.Path(log_path).open("a", encoding="utf-8") as f:
                         f.write(f"\n=== Daemon startup failed: {e} ===\n")
                         traceback.print_exc(file=f)
 
@@ -1526,8 +1530,8 @@ class HindsightMemoryProvider(MemoryProvider):
         self._prefetch_thread = threading.Thread(target=_run, daemon=True, name="hindsight-prefetch")
         self._prefetch_thread.start()
 
-    def _build_turn_messages(self, user_content: str, assistant_content: str) -> List[Dict[str, str]]:
-        now = datetime.now(timezone.utc).isoformat()
+    def _build_turn_messages(self, user_content: str, assistant_content: str) -> list[dict[str, str]]:
+        now = datetime.now(UTC).isoformat()
         return [
             {
                 "role": "user",
@@ -1541,8 +1545,8 @@ class HindsightMemoryProvider(MemoryProvider):
             },
         ]
 
-    def _build_metadata(self, *, message_count: int, turn_index: int) -> Dict[str, str]:
-        metadata: Dict[str, str] = {
+    def _build_metadata(self, *, message_count: int, turn_index: int) -> dict[str, str]:
+        metadata: dict[str, str] = {
             "retained_at": _utc_timestamp(),
             "message_count": str(message_count),
             "turn_index": str(turn_index),
@@ -1575,11 +1579,11 @@ class HindsightMemoryProvider(MemoryProvider):
         *,
         context: str | None = None,
         document_id: str | None = None,
-        metadata: Dict[str, str] | None = None,
-        tags: List[str] | None = None,
+        metadata: dict[str, str] | None = None,
+        tags: list[str] | None = None,
         retain_async: bool | None = None,
-    ) -> Dict[str, Any]:
-        kwargs: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
             "bank_id": self._bank_id,
             "content": content,
             "metadata": metadata or self._build_metadata(message_count=1, turn_index=self._turn_index),
@@ -1683,7 +1687,7 @@ class HindsightMemoryProvider(MemoryProvider):
                     items=[item],
                     document_id=document_id,
                     retain_async=retain_async_flag,
-                )
+                ),
             )
             logger.debug("Hindsight retain succeeded")
 
@@ -1695,7 +1699,7 @@ class HindsightMemoryProvider(MemoryProvider):
         if update_mode == "append":
             self._last_retained_turn_count = len(self._session_turns)
 
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         if self._memory_mode == "context":
             return []
         return [RETAIN_SCHEMA, RECALL_SCHEMA, REFLECT_SCHEMA]
@@ -1718,7 +1722,7 @@ class HindsightMemoryProvider(MemoryProvider):
                 logger.debug("Tool hindsight_retain: bank=%s, content_len=%d, context=%s",
                              self._bank_id, len(content), context)
                 self._run_hindsight_operation(
-                    lambda client: client.aretain_batch(bank_id=self._bank_id, items=[item])
+                    lambda client: client.aretain_batch(bank_id=self._bank_id, items=[item]),
                 )
                 logger.debug("Tool hindsight_retain: success")
                 return json.dumps({"result": "Memory stored successfully."})
@@ -1762,8 +1766,8 @@ class HindsightMemoryProvider(MemoryProvider):
                              self._bank_id, len(query), self._budget)
                 resp = self._run_hindsight_operation(
                     lambda client: client.areflect(
-                        bank_id=self._bank_id, query=query, budget=self._budget
-                    )
+                        bank_id=self._bank_id, query=query, budget=self._budget,
+                    ),
                 )
                 logger.debug("Tool hindsight_reflect: response_len=%d", len(resp.text or ""))
                 return json.dumps({"result": resp.text or "No relevant memories found."})
@@ -1839,7 +1843,7 @@ class HindsightMemoryProvider(MemoryProvider):
             # session's document either way (legacy: per-process unique;
             # ≥0.5.0: stable session-scoped + append).
             old_document_id, old_update_mode = self._resolve_retain_target(
-                self._document_id
+                self._document_id,
             )
 
             def _flush():
@@ -1864,7 +1868,7 @@ class HindsightMemoryProvider(MemoryProvider):
                             items=[item],
                             document_id=old_document_id,
                             retain_async=self._retain_async,
-                        )
+                        ),
                     )
                 except Exception as e:
                     logger.warning("Hindsight flush-on-switch failed: %s", e, exc_info=True)

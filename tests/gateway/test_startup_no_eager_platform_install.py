@@ -50,7 +50,7 @@ def _register_fake_platform(name, *, check_fn, is_connected):
             check_fn=check_fn,
             is_connected=is_connected,
             source="plugin",
-        )
+        ),
     )
 
 
@@ -59,7 +59,7 @@ def test_unconfigured_platform_is_not_probed_for_install(isolated_registry):
     # without ever calling check_fn (which would lazy-install the SDK).
     check_fn = MagicMock(return_value=True)
     _register_fake_platform(
-        "discord", check_fn=check_fn, is_connected=lambda cfg: False
+        "discord", check_fn=check_fn, is_connected=lambda cfg: False,
     )
 
     config = GatewayConfig()
@@ -75,7 +75,7 @@ def test_configured_platform_is_still_installed_and_enabled(isolated_registry):
     # before the fix.
     check_fn = MagicMock(return_value=True)
     _register_fake_platform(
-        "discord", check_fn=check_fn, is_connected=lambda cfg: True
+        "discord", check_fn=check_fn, is_connected=lambda cfg: True,
     )
 
     config = GatewayConfig()
@@ -90,7 +90,7 @@ def test_failed_install_does_not_enable_configured_platform(isolated_registry):
     # (check_fn returns False) → platform must not be enabled.
     check_fn = MagicMock(return_value=False)
     _register_fake_platform(
-        "discord", check_fn=check_fn, is_connected=lambda cfg: True
+        "discord", check_fn=check_fn, is_connected=lambda cfg: True,
     )
 
     config = GatewayConfig()

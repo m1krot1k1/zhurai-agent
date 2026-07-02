@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-MCP OAuth 2.1 Client Support
+"""MCP OAuth 2.1 Client Support
 
 Implements the browser-based OAuth 2.1 authorization code flow with PKCE
 for MCP servers that require OAuth authentication instead of static bearer
@@ -48,6 +47,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
 from hermes_constants import secure_parent_dir
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 # Lazy imports -- MCP SDK with OAuth support is optional
 # ---------------------------------------------------------------------------
 
-_OAUTH_AVAILABLE=False
+_OAUTH_AVAILABLE = False
 try:
     from mcp.client.auth import OAuthClientProvider
     from mcp.shared.auth import (
@@ -66,7 +66,7 @@ try:
         OAuthToken,
     )
 
-    _OAUTH_AVAILABLE=True
+    _OAUTH_AVAILABLE = True
 except ImportError:
     logger.debug("MCP OAuth types not available -- OAuth MCP auth disabled")
 
@@ -201,7 +201,7 @@ def _write_json(path: Path, data: dict) -> None:
             json.dump(data, fh, indent=2, default=str)
             fh.flush()
             os.fsync(fh.fileno())
-        os.replace(tmp, path)
+        Path(tmp).replace(path)
     except OSError:
         try:
             tmp.unlink(missing_ok=True)
@@ -364,7 +364,7 @@ def _make_callback_handler() -> tuple[type, dict]:
     result: dict[str, Any] = {"auth_code": None, "state": None, "error": None}
 
     class _Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             params = parse_qs(urlparse(self.path).query)
             code = params.get("code", [None])[0]
             state = params.get("state", [None])[0]
@@ -467,11 +467,12 @@ async def _wait_for_callback() -> tuple[str, str | None]:
         RuntimeError: If ``_oauth_port`` has not been set, which would indicate
             that ``build_oauth_auth`` was skipped — the asserting form below
             was a silent bug when running Python with ``-O``/``-OO``.
+
     """
     if _oauth_port is None:
         raise RuntimeError(
             "OAuth callback port not set — build_oauth_auth must be called "
-            "before _wait_for_oauth_callback"
+            "before _wait_for_oauth_callback",
         )
 
     # The callback server is already running (started in build_oauth_auth).
@@ -486,7 +487,7 @@ async def _wait_for_callback() -> tuple[str, str | None]:
         # Fall back to polling the server started by build_oauth_auth.
         raise OAuthNonInteractiveError(
             "OAuth callback timed out — could not bind callback port. "
-            "Complete the authorization in a browser first, then retry."
+            "Complete the authorization in a browser first, then retry.",
         )
 
     server_thread = threading.Thread(target=server.handle_request, daemon=True)
@@ -506,7 +507,7 @@ async def _wait_for_callback() -> tuple[str, str | None]:
             flush=True,
         )
         paste_thread = threading.Thread(
-            target=_paste_callback_reader, args=(result,), daemon=True
+            target=_paste_callback_reader, args=(result,), daemon=True,
         )
         paste_thread.start()
 
@@ -529,7 +530,7 @@ async def _wait_for_callback() -> tuple[str, str | None]:
     if result["auth_code"] is None:
         raise OAuthNonInteractiveError(
             "OAuth callback timed out — no authorization code received. "
-            "Ensure you completed the browser authorization flow."
+            "Ensure you completed the browser authorization flow.",
         )
 
     return result["auth_code"], result["state"]
@@ -585,8 +586,7 @@ def _paste_callback_reader(result: dict) -> None:
     if "?" in line:
         # Either a full URL or "?code=...". Take everything after the first "?".
         query = line.split("?", 1)[1]
-    if query.startswith("?"):
-        query = query[1:]
+    query = query.removeprefix("?")
 
     try:
         params = parse_qs(query)
@@ -670,7 +670,7 @@ def _build_client_metadata(cfg: dict) -> "OAuthClientMetadata":
     port = cfg.get("_resolved_port")
     if port is None:
         raise ValueError(
-            "_configure_callback_port() must be called before _build_client_metadata()"
+            "_configure_callback_port() must be called before _build_client_metadata()",
         )
     client_name = cfg.get("client_name", "Hermes Agent")
     scope = cfg.get("scope")
@@ -741,6 +741,7 @@ def build_oauth_auth(
     Returns:
         An ``OAuthClientProvider`` instance, or None if the MCP SDK lacks
         OAuth support.
+
     """
     if not _OAUTH_AVAILABLE:
         logger.warning(
@@ -759,7 +760,7 @@ def build_oauth_auth(
             f"'{server_name}': non-interactive environment and no cached tokens "
             "found. The OAuth flow requires browser authorization. Run "
             f"`hermes mcp login {server_name}` interactively first to complete "
-            "initial authorization, then cached tokens will be reused."
+            "initial authorization, then cached tokens will be reused.",
         )
 
     _configure_callback_port(cfg)

@@ -1,5 +1,4 @@
-"""
-Verify that every gateway platform — built-in and plugin — has a connection
+"""Verify that every gateway platform — built-in and plugin — has a connection
 checker so ``GatewayConfig.get_connected_platforms()`` doesn't silently drop
 platforms with bespoke auth requirements.
 """
@@ -8,7 +7,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gateway.config import Platform, _PLATFORM_CONNECTED_CHECKERS, _BUILTIN_PLATFORM_VALUES
+from gateway.config import (
+    _BUILTIN_PLATFORM_VALUES,
+    _PLATFORM_CONNECTED_CHECKERS,
+    Platform,
+)
 
 
 def test_all_builtins_have_checker_or_generic_token_path():
@@ -40,8 +43,8 @@ def test_all_builtins_have_checker_or_generic_token_path():
     # registry fallback rather than _PLATFORM_CONNECTED_CHECKERS.
     plugin_checker_values: set[str] = set()
     try:
-        from hermes_cli.plugins import discover_plugins
         from gateway.platform_registry import platform_registry
+        from hermes_cli.plugins import discover_plugins
         discover_plugins()
         for _entry in platform_registry.all_entries():
             if _entry.is_connected is not None or _entry.validate_config is not None:

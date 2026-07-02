@@ -36,10 +36,8 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from hermes_cli import kanban_db as kb
-
 from utils import env_int
 
 HERMES_KANBAN_SPECIFY_MAX_TOKENS = max(
@@ -96,7 +94,7 @@ class SpecifyOutcome:
     task_id: str
     ok: bool
     reason: str = ""
-    new_title: Optional[str] = None
+    new_title: str | None = None
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -108,9 +106,10 @@ def _truncate(text: str, limit: int) -> str:
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
 
-def _extract_json_blob(raw: str) -> Optional[dict]:
+def _extract_json_blob(raw: str) -> dict | None:
     """Lenient JSON extraction — tolerates fenced code blocks and
-    leading/trailing whitespace. Returns None if nothing parses."""
+    leading/trailing whitespace. Returns None if nothing parses.
+    """
     if not raw:
         return None
     stripped = _FENCE_RE.sub("", raw.strip())
@@ -131,7 +130,8 @@ def _extract_json_blob(raw: str) -> Optional[dict]:
 
 def _profile_author() -> str:
     """Mirror of ``hermes_cli.kanban._profile_author``. Kept local to
-    avoid a circular import when kanban.py imports this module."""
+    avoid a circular import when kanban.py imports this module.
+    """
     return (
         os.environ.get("HERMES_PROFILE")
         or os.environ.get("USER")
@@ -142,8 +142,8 @@ def _profile_author() -> str:
 def specify_task(
     task_id: str,
     *,
-    author: Optional[str] = None,
-    timeout: Optional[int] = None,
+    author: str | None = None,
+    timeout: int | None = None,
 ) -> SpecifyOutcome:
     """Specify a single triage task and promote it to ``todo``.
 
@@ -158,11 +158,14 @@ def specify_task(
         return SpecifyOutcome(task_id, False, "unknown task id")
     if task.status != "triage":
         return SpecifyOutcome(
-            task_id, False, f"task is not in triage (status={task.status!r})"
+            task_id, False, f"task is not in triage (status={task.status!r})",
         )
 
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:  # pragma: no cover — import smoke test
         logger.debug("specify: auxiliary client import failed: %s", exc)
         return SpecifyOutcome(task_id, False, "auxiliary client unavailable")
@@ -175,7 +178,7 @@ def specify_task(
 
     if client is None or not model:
         return SpecifyOutcome(
-            task_id, False, "no auxiliary client configured"
+            task_id, False, "no auxiliary client configured",
         )
 
     user_msg = _USER_TEMPLATE.format(
@@ -202,7 +205,7 @@ def specify_task(
             task_id, exc,
         )
         return SpecifyOutcome(
-            task_id, False, f"LLM error: {type(exc).__name__}"
+            task_id, False, f"LLM error: {type(exc).__name__}",
         )
 
     try:
@@ -212,8 +215,8 @@ def specify_task(
 
     parsed = _extract_json_blob(raw)
 
-    new_title: Optional[str]
-    new_body: Optional[str]
+    new_title: str | None
+    new_body: str | None
     if parsed is None:
         # Fall back: treat the whole reply as the body, leave title as-is.
         # Worst case the user edits afterward — still better than stranding
@@ -221,7 +224,7 @@ def specify_task(
         stripped_raw = raw.strip()
         if not stripped_raw:
             return SpecifyOutcome(
-                task_id, False, "LLM returned an empty response"
+                task_id, False, "LLM returned an empty response",
             )
         new_title = None
         new_body = stripped_raw
@@ -238,7 +241,7 @@ def specify_task(
         )
         if new_body is None and new_title is None:
             return SpecifyOutcome(
-                task_id, False, "LLM response missing title and body"
+                task_id, False, "LLM response missing title and body",
             )
 
     with kb.connect_closing() as conn:
@@ -253,12 +256,12 @@ def specify_task(
         # Race: someone else promoted / archived the task between our
         # read above and the write. Report, don't crash.
         return SpecifyOutcome(
-            task_id, False, "task moved out of triage before promotion"
+            task_id, False, "task moved out of triage before promotion",
         )
     return SpecifyOutcome(task_id, True, "specified", new_title=new_title)
 
 
-def list_triage_ids(*, tenant: Optional[str] = None) -> list[str]:
+def list_triage_ids(*, tenant: str | None = None) -> list[str]:
     """Return task ids currently in the triage column.
 
     ``tenant`` narrows the sweep; ``None`` returns every triage task.

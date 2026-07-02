@@ -23,11 +23,11 @@ Limitations (documented, not fixable at pre-flight level):
     where redirect handling is on their servers.
 """
 
+import asyncio
 import ipaddress
 import logging
 import os
 import socket
-import asyncio
 from urllib.parse import quote, urlparse, urlsplit, urlunsplit
 
 from utils import is_truthy_value
@@ -75,6 +75,7 @@ def normalize_url_for_request(url: str) -> str:
 
     return urlunsplit((parsed.scheme, netloc, path, query, fragment))
 
+
 # Hostnames that should always be blocked regardless of IP resolution
 # or any config toggle.  These are cloud metadata endpoints that an
 # attacker could use to steal instance credentials.
@@ -106,7 +107,7 @@ _ALWAYS_BLOCKED_IPS = frozenset({
 })
 _ALWAYS_BLOCKED_NETWORKS = (
     ipaddress.ip_network("169.254.0.0/16"),    # Entire link-local range (no legit agent target)
-    ipaddress.ip_network("::ffff:169.254.0.0/112"), # IPv4-mapped link-local range
+    ipaddress.ip_network("::ffff:169.254.0.0/112"),  # IPv4-mapped link-local range
 )
 
 # Exact HTTPS hostnames allowed to resolve to private/benchmark-space IPs.
@@ -163,14 +164,14 @@ def _global_allow_private_urls() -> bool:
         # security.allow_private_urls (preferred)
         sec = cfg.get("security", {})
         if isinstance(sec, dict) and is_truthy_value(
-            sec.get("allow_private_urls"), default=False
+            sec.get("allow_private_urls"), default=False,
         ):
             _cached_allow_private = True
             return _cached_allow_private
         # browser.allow_private_urls (legacy fallback)
         browser = cfg.get("browser", {})
         if isinstance(browser, dict) and is_truthy_value(
-            browser.get("allow_private_urls"), default=False
+            browser.get("allow_private_urls"), default=False,
         ):
             _cached_allow_private = True
             return _cached_allow_private
@@ -275,15 +276,15 @@ def is_always_blocked_url(url: str) -> bool:
         # always-blocked (caller's ordinary path handles that).
         try:
             addr_info = socket.getaddrinfo(
-                hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM
+                hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM,
             )
         except socket.gaierror:
             return False
 
         for _family, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
-            if '%' in ip_str:
-                ip_str = ip_str.split('%')[0]
+            if "%" in ip_str:
+                ip_str = ip_str.split("%")[0]
             try:
                 resolved = ipaddress.ip_address(ip_str)
             except ValueError:
@@ -356,8 +357,8 @@ def is_safe_url(url: str) -> bool:
 
         for family, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
-            if '%' in ip_str:
-                ip_str = ip_str.split('%')[0]
+            if "%" in ip_str:
+                ip_str = ip_str.split("%")[0]
             try:
                 ip = ipaddress.ip_address(ip_str)
             except ValueError:

@@ -15,7 +15,6 @@ from tools.computer_use.tool import (
 )
 from tools.registry import registry
 
-
 registry.register(
     name="computer_use",
     toolset="computer_use",
@@ -33,7 +32,7 @@ registry.register(
 
 
 __all__ = [
+    "check_computer_use_requirements",
     "handle_computer_use",
     "set_approval_callback",
-    "check_computer_use_requirements",
 ]

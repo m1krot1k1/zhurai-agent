@@ -9,7 +9,7 @@ cap pathological lengths.
 """
 from __future__ import annotations
 
-from model_tools import _sanitize_tool_error, _TOOL_ERROR_MAX_LEN
+from model_tools import _TOOL_ERROR_MAX_LEN, _sanitize_tool_error
 
 
 class TestRoleTagStripping:
@@ -56,7 +56,7 @@ class TestCDATAStripping:
 
 class TestCodeFenceStripping:
     def test_strips_leading_fence_with_lang(self):
-        out = _sanitize_tool_error("```json\n{\"x\": 1}")
+        out = _sanitize_tool_error('```json\n{"x": 1}')
         assert not out.replace("[TOOL_ERROR] ", "").startswith("```")
 
     def test_strips_trailing_fence(self):
@@ -111,6 +111,7 @@ class TestHandleFunctionCallIntegration:
 
     def test_exception_path_error_is_sanitized(self):
         import json
+
         from model_tools import handle_function_call
         from tools.registry import registry as _registry
 

@@ -13,9 +13,9 @@ from decimal import Decimal
 
 import pytest
 
-import tui_gateway.server as srv
-import hermes_cli.nous_billing as nb
 import agent.billing_view as bv
+import hermes_cli.nous_billing as nb
+import tui_gateway.server as srv
 from agent.billing_view import BillingState, CardInfo, MonthlyCap
 
 
@@ -37,12 +37,12 @@ def test_billing_state_serializes_decimals_as_strings(monkeypatch):
         role="OWNER",
         balance_usd=Decimal("142.5"),
         cli_billing_enabled=True,
-        charge_presets=(Decimal("100"), Decimal("250")),
-        min_usd=Decimal("10"),
-        max_usd=Decimal("10000"),
+        charge_presets=(Decimal(100), Decimal(250)),
+        min_usd=Decimal(10),
+        max_usd=Decimal(10000),
         card=CardInfo(brand="visa", last4="4242"),
         monthly_cap=MonthlyCap(
-            limit_usd=Decimal("1000"), spent_this_month_usd=Decimal("180"), is_default_ceiling=True
+            limit_usd=Decimal(1000), spent_this_month_usd=Decimal(180), is_default_ceiling=True,
         ),
         portal_url="https://portal/billing?topup=open",
     )
@@ -191,7 +191,7 @@ def test_billing_auto_reload_requires_fields():
 
 
 def test_billing_step_up_granted(monkeypatch):
-    import hermes_cli.auth as auth
+    from hermes_cli import auth
 
     monkeypatch.setattr(auth, "step_up_nous_billing_scope", lambda **kw: True)
     res = _call("billing.step_up", {})
@@ -199,7 +199,7 @@ def test_billing_step_up_granted(monkeypatch):
 
 
 def test_billing_step_up_downscoped(monkeypatch):
-    import hermes_cli.auth as auth
+    from hermes_cli import auth
 
     monkeypatch.setattr(auth, "step_up_nous_billing_scope", lambda **kw: False)
     res = _call("billing.step_up", {})

@@ -1,5 +1,4 @@
-"""
-Shell-script hooks bridge.
+"""Shell-script hooks bridge.
 
 Reads the ``hooks:`` block from ``cli-config.yaml``, prompts the user for
 consent on first use of each ``(event, command)`` pair, and registers
@@ -116,11 +115,12 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any
 
 try:
     import fcntl  # POSIX only; Windows falls back to best-effort without flock.
@@ -143,7 +143,7 @@ _DEFAULT_BLOCK_MESSAGE = "Blocked by shell hook."
 # the same event (e.g. one entry per tool the user wants to gate).
 # Second registration attempts for the exact same triple become no-ops
 # so the CLI and gateway can both call register_from_config() safely.
-_registered: Set[Tuple[str, Optional[str], str]] = set()
+_registered: set[tuple[str, str | None, str]] = set()
 _registered_lock = threading.Lock()
 
 # Intra-process lock for allowlist read-modify-write on platforms that
@@ -161,9 +161,9 @@ class ShellHookSpec:
 
     event: str
     command: str
-    matcher: Optional[str] = None
+    matcher: str | None = None
     timeout: int = DEFAULT_TIMEOUT_SECONDS
-    compiled_matcher: Optional[re.Pattern] = field(default=None, repr=False)
+    compiled_matcher: re.Pattern | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         # Strip whitespace introduced by YAML quirks (e.g. multi-line string
@@ -171,7 +171,7 @@ class ShellHookSpec:
         # to match "terminal" without any diagnostic.
         if isinstance(self.matcher, str):
             stripped = self.matcher.strip()
-            self.matcher = stripped if stripped else None
+            self.matcher = stripped or None
         if self.matcher:
             try:
                 self.compiled_matcher = re.compile(self.matcher)
@@ -182,7 +182,7 @@ class ShellHookSpec:
                 )
                 self.compiled_matcher = None
 
-    def matches_tool(self, tool_name: Optional[str]) -> bool:
+    def matches_tool(self, tool_name: str | None) -> bool:
         if not self.matcher:
             return True
         if tool_name is None:
@@ -199,10 +199,10 @@ class ShellHookSpec:
 # ---------------------------------------------------------------------------
 
 def register_from_config(
-    cfg: Optional[Dict[str, Any]],
+    cfg: dict[str, Any] | None,
     *,
     accept_hooks: bool = False,
-) -> List[ShellHookSpec]:
+) -> list[ShellHookSpec]:
     """Register every configured shell hook on the plugin manager.
 
     ``cfg`` is the full parsed config dict (``hermes_cli.config.load_config``
@@ -228,7 +228,7 @@ def register_from_config(
     if not specs:
         return []
 
-    registered: List[ShellHookSpec] = []
+    registered: list[ShellHookSpec] = []
 
     # Import lazily — avoids circular imports at module-load time.
     from hermes_cli.plugins import get_plugin_manager
@@ -246,18 +246,17 @@ def register_from_config(
                 continue
             already_allowlisted = _is_allowlisted(spec.event, spec.command)
 
-        if not already_allowlisted:
-            if not _prompt_and_record(
-                spec.event, spec.command, accept_hooks=effective_accept,
-            ):
-                logger.warning(
-                    "shell hook for %s (%s) not allowlisted — skipped. "
-                    "Use --accept-hooks / HERMES_ACCEPT_HOOKS=1 / "
-                    "hooks_auto_accept: true, or approve at the TTY "
-                    "prompt next run.",
-                    spec.event, spec.command,
-                )
-                continue
+        if not already_allowlisted and not _prompt_and_record(
+            spec.event, spec.command, accept_hooks=effective_accept,
+        ):
+            logger.warning(
+                "shell hook for %s (%s) not allowlisted — skipped. "
+                "Use --accept-hooks / HERMES_ACCEPT_HOOKS=1 / "
+                "hooks_auto_accept: true, or approve at the TTY "
+                "prompt next run.",
+                spec.event, spec.command,
+            )
+            continue
 
         with _registered_lock:
             if key in _registered:
@@ -273,9 +272,10 @@ def register_from_config(
     return registered
 
 
-def iter_configured_hooks(cfg: Optional[Dict[str, Any]]) -> List[ShellHookSpec]:
+def iter_configured_hooks(cfg: dict[str, Any] | None) -> list[ShellHookSpec]:
     """Return the parsed ``ShellHookSpec`` entries from config without
-    registering anything.  Used by ``hermes hooks list`` and ``doctor``."""
+    registering anything.  Used by ``hermes hooks list`` and ``doctor``.
+    """
     if not isinstance(cfg, dict):
         return []
     return _parse_hooks_block(cfg.get("hooks"))
@@ -291,7 +291,7 @@ def reset_for_tests() -> None:
 # Config parsing
 # ---------------------------------------------------------------------------
 
-def _parse_hooks_block(hooks_cfg: Any) -> List[ShellHookSpec]:
+def _parse_hooks_block(hooks_cfg: Any) -> list[ShellHookSpec]:
     """Normalise the ``hooks:`` dict into a flat list of ``ShellHookSpec``.
 
     Malformed entries warn-and-skip — we never raise from config parsing
@@ -302,7 +302,7 @@ def _parse_hooks_block(hooks_cfg: Any) -> List[ShellHookSpec]:
     if not isinstance(hooks_cfg, dict):
         return []
 
-    specs: List[ShellHookSpec] = []
+    specs: list[ShellHookSpec] = []
 
     for event_name, entries in hooks_cfg.items():
         if event_name not in VALID_HOOKS:
@@ -341,7 +341,7 @@ def _parse_hooks_block(hooks_cfg: Any) -> List[ShellHookSpec]:
 
 def _parse_single_entry(
     event: str, index: int, raw: Any,
-) -> Optional[ShellHookSpec]:
+) -> ShellHookSpec | None:
     if not isinstance(raw, dict):
         logger.warning(
             "hooks.%s[%d] must be a mapping with a 'command' key; got %s",
@@ -413,7 +413,7 @@ def _parse_single_entry(
 _TOP_LEVEL_PAYLOAD_KEYS = {"tool_name", "args", "session_id", "parent_session_id"}
 
 
-def _spawn(spec: ShellHookSpec, stdin_json: str) -> Dict[str, Any]:
+def _spawn(spec: ShellHookSpec, stdin_json: str) -> dict[str, Any]:
     """Run ``spec.command`` as a subprocess with ``stdin_json`` on stdin.
 
     Returns a diagnostic dict with the same keys for every outcome
@@ -423,7 +423,7 @@ def _spawn(spec: ShellHookSpec, stdin_json: str) -> Dict[str, Any]:
     (:func:`_make_callback`) and the CLI test helper (:func:`run_once`)
     go through it.
     """
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "returncode": None,
         "stdout": "",
         "stderr": "",
@@ -471,10 +471,10 @@ def _spawn(spec: ShellHookSpec, stdin_json: str) -> Dict[str, Any]:
     return result
 
 
-def _make_callback(spec: ShellHookSpec) -> Callable[..., Optional[Dict[str, Any]]]:
+def _make_callback(spec: ShellHookSpec) -> Callable[..., dict[str, Any] | None]:
     """Build the closure that ``invoke_hook()`` will call per firing."""
 
-    def _callback(**kwargs: Any) -> Optional[Dict[str, Any]]:
+    def _callback(**kwargs: Any) -> dict[str, Any] | None:
         # Matcher gate — only meaningful for tool-scoped events.
         if spec.event in {"pre_tool_call", "post_tool_call"}:
             if not spec.matches_tool(kwargs.get("tool_name")):
@@ -515,9 +515,10 @@ def _make_callback(spec: ShellHookSpec) -> Callable[..., Optional[Dict[str, Any]
     return _callback
 
 
-def _serialize_payload(event: str, kwargs: Dict[str, Any]) -> str:
+def _serialize_payload(event: str, kwargs: dict[str, Any]) -> str:
     """Render the stdin JSON payload.  Unserialisable values are
-    stringified via ``default=str`` rather than dropped."""
+    stringified via ``default=str`` rather than dropped.
+    """
     extras = {k: v for k, v in kwargs.items() if k not in _TOP_LEVEL_PAYLOAD_KEYS}
     try:
         cwd = str(Path.cwd())
@@ -545,7 +546,7 @@ def _block_message(primary: Any, secondary: Any) -> str:
     return raw if isinstance(raw, str) and raw else _DEFAULT_BLOCK_MESSAGE
 
 
-def _parse_response(event: str, stdout: str) -> Optional[Dict[str, Any]]:
+def _parse_response(event: str, stdout: str) -> dict[str, Any] | None:
     """Translate stdout JSON into a Hermes wire-shape dict.
 
     For ``pre_tool_call`` the Claude-Code-style ``{"decision": "block",
@@ -600,7 +601,7 @@ def allowlist_path() -> Path:
     return get_hermes_home() / ALLOWLIST_FILENAME
 
 
-def load_allowlist() -> Dict[str, Any]:
+def load_allowlist() -> dict[str, Any]:
     """Return the parsed allowlist, or an empty skeleton if absent."""
     try:
         raw = json.loads(allowlist_path().read_text())
@@ -614,12 +615,13 @@ def load_allowlist() -> Dict[str, Any]:
     return raw
 
 
-def save_allowlist(data: Dict[str, Any]) -> None:
+def save_allowlist(data: dict[str, Any]) -> None:
     """Atomically persist the allowlist via per-process ``mkstemp`` +
     ``os.replace``.  Cross-process read-modify-write races are handled
     by :func:`_locked_update_approvals` (``fcntl.flock``).  On OSError
     the failure is logged; the in-process hook still registers but
-    the approval won't survive across runs."""
+    the approval won't survive across runs.
+    """
     p = allowlist_path()
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -632,7 +634,7 @@ def save_allowlist(data: Dict[str, Any]) -> None:
             atomic_replace(tmp_path, p)
         except Exception:
             try:
-                os.unlink(tmp_path)
+                Path(tmp_path).unlink()
             except OSError:
                 pass
             raise
@@ -657,7 +659,7 @@ def _is_allowlisted(event: str, command: str) -> bool:
 
 
 @contextmanager
-def _locked_update_approvals() -> Iterator[Dict[str, Any]]:
+def _locked_update_approvals() -> Iterator[dict[str, Any]]:
     """Serialise read-modify-write on the allowlist across processes.
 
     Holds an exclusive ``flock`` on a sibling lock file for the duration
@@ -677,7 +679,7 @@ def _locked_update_approvals() -> Iterator[Dict[str, Any]]:
             save_allowlist(data)
         return
 
-    with open(lock_path, "a+", encoding="utf-8") as lock_fh:
+    with Path(lock_path).open("a+", encoding="utf-8") as lock_fh:
         fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
         try:
             data = load_allowlist()
@@ -686,7 +688,7 @@ def _locked_update_approvals() -> Iterator[Dict[str, Any]]:
         finally:
             try:
                 fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
-            except (OSError, IOError):
+            except OSError:
                 pass
 
 
@@ -713,7 +715,7 @@ def _prompt_and_record(
         f"    Event:   {event}\n"
         f"    Command: {command}\n\n"
         f"  Commands run with your full user credentials.  Only approve\n"
-        f"  commands you trust."
+        f"  commands you trust.",
     )
     try:
         answer = input("Allow this hook to run? [y/N]: ").strip().lower()
@@ -747,7 +749,7 @@ def _record_approval(event: str, command: str) -> None:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(tz=timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
 
 
 def revoke(command: str) -> int:
@@ -767,7 +769,7 @@ def revoke(command: str) -> int:
     return before - after
 
 
-_SCRIPT_EXTENSIONS: Tuple[str, ...] = (
+_SCRIPT_EXTENSIONS: tuple[str, ...] = (
     ".sh", ".bash", ".zsh", ".fish",
     ".py", ".pyw",
     ".rb", ".pl", ".lua",
@@ -803,7 +805,7 @@ def _command_script_path(command: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _resolve_effective_accept(
-    cfg: Dict[str, Any], accept_hooks_arg: bool,
+    cfg: dict[str, Any], accept_hooks_arg: bool,
 ) -> bool:
     """Combine all three opt-in channels into a single boolean.
 
@@ -829,7 +831,7 @@ def _resolve_effective_accept(
 # Introspection (used by `hermes hooks` CLI)
 # ---------------------------------------------------------------------------
 
-def allowlist_entry_for(event: str, command: str) -> Optional[Dict[str, Any]]:
+def allowlist_entry_for(event: str, command: str) -> dict[str, Any] | None:
     """Return the allowlist record for this pair, if any."""
     for e in load_allowlist().get("approvals", []):
         if (
@@ -841,16 +843,17 @@ def allowlist_entry_for(event: str, command: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def script_mtime_iso(command: str) -> Optional[str]:
+def script_mtime_iso(command: str) -> str | None:
     """ISO-8601 mtime of the resolved script path, or ``None`` if the
-    script is missing."""
+    script is missing.
+    """
     path = _command_script_path(command)
     if not path:
         return None
     try:
         expanded = os.path.expanduser(path)
         return datetime.fromtimestamp(
-            os.path.getmtime(expanded), tz=timezone.utc,
+            Path(expanded).stat().st_mtime, tz=UTC,
         ).isoformat().replace("+00:00", "Z")
     except OSError:
         return None
@@ -863,12 +866,13 @@ def script_is_executable(command: str) -> bool:
     executable.  For interpreter-prefixed commands (``python3
     /path/hook.py``, ``/usr/bin/env bash hook.sh``) the script just has
     to be readable — the interpreter doesn't care about the ``X_OK``
-    bit.  Mirrors what ``_spawn`` would actually do at runtime."""
+    bit.  Mirrors what ``_spawn`` would actually do at runtime.
+    """
     path = _command_script_path(command)
     if not path:
         return False
     expanded = os.path.expanduser(path)
-    if not os.path.isfile(expanded):
+    if not Path(expanded).is_file():
         return False
     try:
         argv = shlex.split(command)
@@ -880,8 +884,8 @@ def script_is_executable(command: str) -> bool:
 
 
 def run_once(
-    spec: ShellHookSpec, kwargs: Dict[str, Any],
-) -> Dict[str, Any]:
+    spec: ShellHookSpec, kwargs: dict[str, Any],
+) -> dict[str, Any]:
     """Fire a single shell-hook invocation with a synthetic payload.
     Used by ``hermes hooks test`` and ``hermes hooks doctor``.
 
@@ -892,7 +896,8 @@ def run_once(
     diverge silently from production behaviour.
 
     Returns the :func:`_spawn` diagnostic dict plus a ``parsed`` field
-    holding the canonical Hermes-wire-shape response."""
+    holding the canonical Hermes-wire-shape response.
+    """
     stdin_json = _serialize_payload(spec.event, kwargs)
     result = _spawn(spec, stdin_json)
     result["parsed"] = _parse_response(spec.event, result["stdout"])

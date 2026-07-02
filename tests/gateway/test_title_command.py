@@ -180,7 +180,7 @@ class TestHandleTitleCommand:
 
         assert "My Topic Name" in result
         runner._schedule_telegram_topic_title_rename.assert_called_once_with(
-            event.source, "test_session_123", "My Topic Name"
+            event.source, "test_session_123", "My Topic Name",
         )
         db.close()
 
@@ -238,8 +238,9 @@ class TestTitleInHelp:
 
     def test_title_is_known_command(self):
         """The /title command is in the _known_commands set."""
-        from gateway.run import GatewayRunner
         import inspect
+
+        from gateway.run import GatewayRunner
         source = inspect.getsource(GatewayRunner._handle_message)
         assert '"title"' in source
 
@@ -262,7 +263,7 @@ class TestResetCommandWithTitle:
 
         runner = object.__new__(GatewayRunner)
         runner.config = GatewayConfig(
-            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")}
+            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")},
         )
         adapter = MagicMock()
         adapter.send = AsyncMock()
@@ -307,7 +308,7 @@ class TestResetCommandWithTitle:
 
         runner.session_store.reset_session.assert_called_once()
         runner._session_db.set_session_title.assert_called_once_with(
-            "sess-new", "Custom Name"
+            "sess-new", "Custom Name",
         )
         # Header reflects the applied title
         assert "Custom Name" in str(result)
@@ -322,7 +323,7 @@ class TestResetCommandWithTitle:
 
         runner = object.__new__(GatewayRunner)
         runner.config = GatewayConfig(
-            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")}
+            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")},
         )
         adapter = MagicMock()
         adapter.send = AsyncMock()
@@ -358,7 +359,7 @@ class TestResetCommandWithTitle:
         runner._pending_approvals = {}
         runner._session_db = MagicMock()
         runner._session_db.set_session_title.side_effect = ValueError(
-            "Title 'Dup' is already in use by session abc-123"
+            "Title 'Dup' is already in use by session abc-123",
         )
         runner._agent_cache = {}
         runner._agent_cache_lock = None

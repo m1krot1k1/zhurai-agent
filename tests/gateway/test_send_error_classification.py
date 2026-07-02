@@ -97,7 +97,7 @@ def test_telegram_send_failure_populates_error_kind():
     # Minimal bot whose send_message raises a parse/entity rejection.
     bot = MagicMock()
     bot.send_message = AsyncMock(
-        side_effect=Exception("Bad Request: can't parse entities: bad tag")
+        side_effect=Exception("Bad Request: can't parse entities: bad tag"),
     )
     bot.send_chat_action = AsyncMock()
     # Force the legacy (non-rich) path and a connected bot.
@@ -124,7 +124,7 @@ def test_telegram_too_long_sets_too_long_kind():
 
     bot = MagicMock()
     bot.send_message = AsyncMock(
-        side_effect=Exception("Bad Request: message is too long")
+        side_effect=Exception("Bad Request: message is too long"),
     )
     bot.send_chat_action = AsyncMock()
     adapter._bot = bot

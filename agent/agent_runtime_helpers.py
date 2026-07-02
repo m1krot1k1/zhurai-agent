@@ -29,15 +29,23 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from hermes_cli.timeouts import get_provider_request_timeout
-from agent.prompt_builder import format_steer_marker
-from agent.tool_dispatch_helpers import _trajectory_normalize_msg, make_tool_result_message
-from agent.trajectory import convert_scratchpad_to_think
 from agent.credential_pool import STATUS_EXHAUSTED
 from agent.error_classifier import FailoverReason
-from utils import base_url_host_matches, base_url_hostname, env_var_enabled, atomic_json_write
+from agent.prompt_builder import format_steer_marker
+from agent.tool_dispatch_helpers import (
+    _trajectory_normalize_msg,
+    make_tool_result_message,
+)
+from agent.trajectory import convert_scratchpad_to_think
+from hermes_cli.timeouts import get_provider_request_timeout
+from utils import (
+    atomic_json_write,
+    base_url_host_matches,
+    base_url_hostname,
+    env_var_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +57,7 @@ def _ra():
 
 
 AGENT_RUNTIME_POST_HOOK_TOOL_NAMES = frozenset(
-    {"todo", "session_search", "memory", "clarify", "read_terminal", "delegate_task"}
+    {"todo", "session_search", "memory", "clarify", "read_terminal", "delegate_task"},
 )
 
 
@@ -63,9 +71,8 @@ def agent_runtime_owns_post_tool_hook(agent: Any, function_name: str) -> bool:
     return bool(memory_manager and memory_manager.has_tool(function_name))
 
 
-def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_query: str, completed: bool) -> List[Dict[str, Any]]:
-    """
-    Convert internal message format to trajectory format for saving.
+def convert_to_trajectory_format(agent, messages: list[dict[str, Any]], user_query: str, completed: bool) -> list[dict[str, Any]]:
+    """Convert internal message format to trajectory format for saving.
     
     Args:
         messages (List[Dict]): Internal message history
@@ -74,13 +81,14 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
         
     Returns:
         List[Dict]: Messages in trajectory format
+
     """
     # Normalize multimodal tool results — trajectories are text-only, so
     # replace image-bearing tool messages with their text_summary to avoid
     # embedding ~1MB base64 blobs into every saved trajectory.
     messages = [_trajectory_normalize_msg(m) for m in messages]
     trajectory = []
-    
+
     # Add system message with tool definitions
     system_msg = (
         "You are a function calling AI model. You are provided with function signatures within <tools> </tools> XML tags. "
@@ -95,42 +103,42 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
         "Each function call should be enclosed within <tool_call> </tool_call> XML tags.\n"
         "Example:\n<tool_call>\n{'name': <function-name>,'arguments': <args-dict>}\n</tool_call>"
     )
-    
+
     trajectory.append({
         "from": "system",
-        "value": system_msg
+        "value": system_msg,
     })
-    
+
     # Add the actual user prompt (from the dataset) as the first human message
     trajectory.append({
         "from": "human",
-        "value": user_query
+        "value": user_query,
     })
-    
+
     # Skip the first message (the user query) since we already added it above.
     # Prefill messages are injected at API-call time only (not in the messages
     # list), so no offset adjustment is needed here.
     i = 1
-    
+
     while i < len(messages):
         msg = messages[i]
-        
+
         if msg["role"] == "assistant":
             # Check if this message has tool calls
-            if "tool_calls" in msg and msg["tool_calls"]:
+            if msg.get("tool_calls"):
                 # Format assistant message with tool calls
                 # Add <think> tags around reasoning for trajectory storage
                 content = ""
-                
+
                 # Prepend reasoning in <think> tags if available (native thinking tokens)
                 if msg.get("reasoning") and msg["reasoning"].strip():
                     content = f"<think>\n{msg['reasoning']}\n</think>\n"
-                
+
                 if msg.get("content") and msg["content"].strip():
                     # Convert any <REASONING_SCRATCHPAD> tags to <think> tags
                     # (used when native thinking is disabled and model reasons via XML)
                     content += convert_scratchpad_to_think(msg["content"]) + "\n"
-                
+
                 # Add tool calls wrapped in XML tags
                 for tool_call in msg["tool_calls"]:
                     if not tool_call or not isinstance(tool_call, dict): continue
@@ -143,23 +151,23 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
                         # but if it does, log warning and use empty dict
                         logger.warning(f"Unexpected invalid JSON in trajectory conversion: {tool_call['function']['arguments'][:100]}")
                         arguments = {}
-                    
+
                     tool_call_json = {
                         "name": tool_call["function"]["name"],
-                        "arguments": arguments
+                        "arguments": arguments,
                     }
                     content += f"<tool_call>\n{json.dumps(tool_call_json, ensure_ascii=False)}\n</tool_call>\n"
-                
+
                 # Ensure every gpt turn has a <think> block (empty if no reasoning)
                 # so the format is consistent for training data
                 if "<think>" not in content:
                     content = "<think>\n</think>\n" + content
-                
+
                 trajectory.append({
                     "from": "gpt",
-                    "value": content.rstrip()
+                    "value": content.rstrip(),
                 })
-                
+
                 # Collect all subsequent tool responses
                 tool_responses = []
                 j = i + 1
@@ -167,7 +175,7 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
                     tool_msg = messages[j]
                     # Format tool response with XML tags
                     tool_response = "<tool_response>\n"
-                    
+
                     # Try to parse tool content as JSON if it looks like JSON
                     tool_content = tool_msg["content"]
                     try:
@@ -175,7 +183,7 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
                             tool_content = json.loads(tool_content)
                     except (json.JSONDecodeError, AttributeError):
                         pass  # Keep as string if not valid JSON
-                    
+
                     tool_index = len(tool_responses)
                     tool_name = (
                         msg["tool_calls"][tool_index]["function"]["name"]
@@ -185,53 +193,52 @@ def convert_to_trajectory_format(agent, messages: List[Dict[str, Any]], user_que
                     tool_response += json.dumps({
                         "tool_call_id": tool_msg.get("tool_call_id", ""),
                         "name": tool_name,
-                        "content": tool_content
+                        "content": tool_content,
                     }, ensure_ascii=False)
                     tool_response += "\n</tool_response>"
                     tool_responses.append(tool_response)
                     j += 1
-                
+
                 # Add all tool responses as a single message
                 if tool_responses:
                     trajectory.append({
                         "from": "tool",
-                        "value": "\n".join(tool_responses)
+                        "value": "\n".join(tool_responses),
                     })
                     i = j - 1  # Skip the tool messages we just processed
-            
+
             else:
                 # Regular assistant message without tool calls
                 # Add <think> tags around reasoning for trajectory storage
                 content = ""
-                
+
                 # Prepend reasoning in <think> tags if available (native thinking tokens)
                 if msg.get("reasoning") and msg["reasoning"].strip():
                     content = f"<think>\n{msg['reasoning']}\n</think>\n"
-                
+
                 # Convert any <REASONING_SCRATCHPAD> tags to <think> tags
                 # (used when native thinking is disabled and model reasons via XML)
                 raw_content = msg["content"] or ""
                 content += convert_scratchpad_to_think(raw_content)
-                
+
                 # Ensure every gpt turn has a <think> block (empty if no reasoning)
                 if "<think>" not in content:
                     content = "<think>\n</think>\n" + content
-                
+
                 trajectory.append({
                     "from": "gpt",
-                    "value": content.strip()
+                    "value": content.strip(),
                 })
-        
+
         elif msg["role"] == "user":
             trajectory.append({
                 "from": "human",
-                "value": msg["content"]
+                "value": msg["content"],
             })
-        
-        i += 1
-    
-    return trajectory
 
+        i += 1
+
+    return trajectory
 
 
 def sanitize_tool_call_arguments(
@@ -343,8 +350,7 @@ def sanitize_tool_call_arguments(
     return repaired
 
 
-
-def repair_message_sequence(agent, messages: List[Dict]) -> int:
+def repair_message_sequence(agent, messages: list[dict]) -> int:
     """Collapse malformed role-alternation left in the live history.
 
     Providers (OpenAI, OpenRouter, Anthropic) expect strict alternation:
@@ -383,7 +389,7 @@ def repair_message_sequence(agent, messages: List[Dict]) -> int:
     # assistant tool_call_id. Uses a rolling set of known ids refreshed
     # on each assistant message.
     known_tool_ids: set = set()
-    filtered: List[Dict] = []
+    filtered: list[dict] = []
     for msg in messages:
         if not isinstance(msg, dict):
             filtered.append(msg)
@@ -412,7 +418,7 @@ def repair_message_sequence(agent, messages: List[Dict]) -> int:
 
     # Pass 2: merge consecutive user messages. Preserves all user input
     # so nothing the user typed is lost.
-    merged: List[Dict] = []
+    merged: list[dict] = []
     for msg in filtered:
         if (
             merged
@@ -445,7 +451,7 @@ def repair_message_sequence(agent, messages: List[Dict]) -> int:
     return repairs
 
 
-def repair_message_sequence_with_cursor(agent, messages: List[Dict]) -> int:
+def repair_message_sequence_with_cursor(agent, messages: list[dict]) -> int:
     """Run :func:`repair_message_sequence` and keep the SessionDB flush
     cursor consistent with the compacted list (#44837).
 
@@ -478,11 +484,10 @@ def repair_message_sequence_with_cursor(agent, messages: List[Dict]) -> int:
             )
         else:
             agent._last_flushed_db_idx = min(
-                agent._last_flushed_db_idx, len(messages)
+                agent._last_flushed_db_idx, len(messages),
             )
 
     return repairs
-
 
 
 def strip_think_blocks(agent, content: str) -> str:
@@ -521,19 +526,19 @@ def strip_think_blocks(agent, content: str) -> str:
     # 1. Closed tag pairs — case-insensitive for all variants so
     #    mixed-case tags (<THINK>, <Thinking>) don't slip through to
     #    the unterminated-tag pass and take trailing content with them.
-    content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
-    content = re.sub(r'<thinking>.*?</thinking>', '', content, flags=re.DOTALL | re.IGNORECASE)
-    content = re.sub(r'<reasoning>.*?</reasoning>', '', content, flags=re.DOTALL | re.IGNORECASE)
-    content = re.sub(r'<REASONING_SCRATCHPAD>.*?</REASONING_SCRATCHPAD>', '', content, flags=re.DOTALL | re.IGNORECASE)
-    content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<thinking>.*?</thinking>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<reasoning>.*?</reasoning>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<REASONING_SCRATCHPAD>.*?</REASONING_SCRATCHPAD>", "", content, flags=re.DOTALL | re.IGNORECASE)
+    content = re.sub(r"<thought>.*?</thought>", "", content, flags=re.DOTALL | re.IGNORECASE)
     # 1b. Tool-call XML blocks (openclaw/openclaw#67318). Handle the
     #     generic tag names first — they have no attribute gating since
     #     a literal <tool_call> in prose is already vanishingly rare.
     for _tc_name in ("tool_call", "tool_calls", "tool_result",
                       "function_call", "function_calls"):
         content = re.sub(
-            rf'<{_tc_name}\b[^>]*>.*?</{_tc_name}>',
-            '',
+            rf"<{_tc_name}\b[^>]*>.*?</{_tc_name}>",
+            "",
             content,
             flags=re.DOTALL | re.IGNORECASE,
         )
@@ -543,10 +548,10 @@ def strip_think_blocks(agent, content: str) -> str:
     #     punctuation) AND carries a name="..." attribute. This keeps
     #     prose mentions like "Use <function> to declare" safe.
     content = re.sub(
-        r'(?:(?<=^)|(?<=[\n\r.!?:]))[ \t]*'
-        r'<function\b[^>]*\bname\s*=[^>]*>'
-        r'(?:(?:(?!</function>).)*)</function>',
-        '',
+        r"(?:(?<=^)|(?<=[\n\r.!?:]))[ \t]*"
+        r"<function\b[^>]*\bname\s*=[^>]*>"
+        r"(?:(?:(?!</function>).)*)</function>",
+        "",
         content,
         flags=re.DOTALL | re.IGNORECASE,
     )
@@ -555,15 +560,15 @@ def strip_think_blocks(agent, content: str) -> str:
     #    Strip from the tag to end of string.  Fixes #8878 / #9568
     #    (MiniMax M2.7 leaking raw reasoning into assistant content).
     content = re.sub(
-        r'(?:^|\n)[ \t]*<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\b[^>]*>.*$',
-        '',
+        r"(?:^|\n)[ \t]*<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\b[^>]*>.*$",
+        "",
         content,
         flags=re.DOTALL | re.IGNORECASE,
     )
     # 3. Stray orphan open/close tags that slipped through.
     content = re.sub(
-        r'</?(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>\s*',
-        '',
+        r"</?(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>\s*",
+        "",
         content,
         flags=re.IGNORECASE,
     )
@@ -572,22 +577,21 @@ def strip_think_blocks(agent, content: str) -> str:
     #     during streaming may still be valuable to the user; matches
     #     OpenClaw's intentional asymmetry.)
     content = re.sub(
-        r'</(?:tool_call|tool_calls|tool_result|function_call|function_calls|function)>\s*',
-        '',
+        r"</(?:tool_call|tool_calls|tool_result|function_call|function_calls|function)>\s*",
+        "",
         content,
         flags=re.IGNORECASE,
     )
     return content
 
 
-
 def recover_with_credential_pool(
     agent,
     *,
-    status_code: Optional[int],
+    status_code: int | None,
     has_retried_429: bool,
-    classified_reason: Optional[FailoverReason] = None,
-    error_context: Optional[Dict[str, Any]] = None,
+    classified_reason: FailoverReason | None = None,
+    error_context: dict[str, Any] | None = None,
 ) -> tuple[bool, bool]:
     """Attempt credential recovery via pool rotation.
 
@@ -794,7 +798,6 @@ def recover_with_credential_pool(
     return False, has_retried_429
 
 
-
 def try_recover_primary_transport(
     agent, api_error: Exception, *, retry_count: int, max_retries: int,
 ) -> bool:
@@ -878,12 +881,11 @@ def try_recover_primary_transport(
 # ── End provider fallback ──────────────────────────────────────────────
 
 
-
 def drop_thinking_only_and_merge_users(
-    messages: List[Dict[str, Any]],
+    messages: list[dict[str, Any]],
     *,
     drop_codex_reasoning_items: bool = True,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Drop thinking-only assistant turns; merge any adjacent user messages left behind.
 
     Runs on the per-call ``api_messages`` copy only. The stored
@@ -916,7 +918,7 @@ def drop_thinking_only_and_merge_users(
         return messages
 
     # Pass 2: merge any newly-adjacent user messages.
-    merged: List[Dict[str, Any]] = []
+    merged: list[dict[str, Any]] = []
     merges = 0
     for m in kept:
         prev = merged[-1] if merged else None
@@ -943,12 +945,12 @@ def drop_thinking_only_and_merge_users(
             elif isinstance(prev_content, list) and isinstance(cur_content, str):
                 if cur_content:
                     prev_copy["content"] = list(prev_content) + [
-                        {"type": "text", "text": cur_content}
+                        {"type": "text", "text": cur_content},
                     ]
                 else:
                     prev_copy["content"] = list(prev_content)
             elif isinstance(prev_content, str) and isinstance(cur_content, list):
-                new_blocks: List[Dict[str, Any]] = []
+                new_blocks: list[dict[str, Any]] = []
                 if prev_content:
                     new_blocks.append({"type": "text", "text": prev_content})
                 new_blocks.extend(cur_content)
@@ -970,7 +972,6 @@ def drop_thinking_only_and_merge_users(
         merges,
     )
     return merged
-
 
 
 def restore_primary_runtime(agent) -> bool:
@@ -1064,6 +1065,7 @@ def restore_primary_runtime(agent) -> bool:
         logger.warning("Failed to restore primary runtime: %s", e)
         return False
 
+
 # Which error types indicate a transient transport failure worth
 # one more attempt with a rebuilt client / connection pool.
 _TRANSIENT_TRANSPORT_ERRORS = frozenset({
@@ -1073,10 +1075,8 @@ _TRANSIENT_TRANSPORT_ERRORS = frozenset({
 })
 
 
-
-def extract_reasoning(agent, assistant_message) -> Optional[str]:
-    """
-    Extract reasoning/thinking content from an assistant message.
+def extract_reasoning(agent, assistant_message) -> str | None:
+    """Extract reasoning/thinking content from an assistant message.
     
     OpenRouter and various providers can return reasoning in multiple formats:
     1. message.reasoning - Direct reasoning field (DeepSeek, Qwen, etc.)
@@ -1088,30 +1088,31 @@ def extract_reasoning(agent, assistant_message) -> Optional[str]:
         
     Returns:
         Combined reasoning text, or None if no reasoning found
+
     """
     reasoning_parts = []
-    
+
     # Check direct reasoning field
-    if hasattr(assistant_message, 'reasoning') and assistant_message.reasoning:
+    if hasattr(assistant_message, "reasoning") and assistant_message.reasoning:
         reasoning_parts.append(assistant_message.reasoning)
-    
+
     # Check reasoning_content field (alternative name used by some providers)
-    if hasattr(assistant_message, 'reasoning_content') and assistant_message.reasoning_content:
+    if hasattr(assistant_message, "reasoning_content") and assistant_message.reasoning_content:
         # Don't duplicate if same as reasoning
         if assistant_message.reasoning_content not in reasoning_parts:
             reasoning_parts.append(assistant_message.reasoning_content)
-    
+
     # Check reasoning_details array (OpenRouter unified format)
     # Format: [{"type": "reasoning.summary", "summary": "...", ...}, ...]
-    if hasattr(assistant_message, 'reasoning_details') and assistant_message.reasoning_details:
+    if hasattr(assistant_message, "reasoning_details") and assistant_message.reasoning_details:
         for detail in assistant_message.reasoning_details:
             if isinstance(detail, dict):
                 # Extract summary from reasoning detail object
                 summary = (
-                    detail.get('summary')
-                    or detail.get('thinking')
-                    or detail.get('content')
-                    or detail.get('text')
+                    detail.get("summary")
+                    or detail.get("thinking")
+                    or detail.get("content")
+                    or detail.get("text")
                 )
                 if summary and summary not in reasoning_parts:
                     reasoning_parts.append(summary)
@@ -1147,24 +1148,22 @@ def extract_reasoning(agent, assistant_message) -> Optional[str]:
                 cleaned = block.strip()
                 if cleaned and cleaned not in reasoning_parts:
                     reasoning_parts.append(cleaned)
-    
+
     # Combine all reasoning parts
     if reasoning_parts:
         return "\n\n".join(reasoning_parts)
-    
-    return None
 
+    return None
 
 
 def dump_api_request_debug(
     agent,
-    api_kwargs: Dict[str, Any],
+    api_kwargs: dict[str, Any],
     *,
     reason: str,
-    error: Optional[Exception] = None,
-) -> Optional[Path]:
-    """
-    Dump a debug-friendly HTTP request record for the active inference API.
+    error: Exception | None = None,
+) -> Path | None:
+    """Dump a debug-friendly HTTP request record for the active inference API.
 
     Captures the request body from api_kwargs (excluding transport-only keys
     like timeout). Intended for debugging provider-side 4xx failures where
@@ -1181,7 +1180,7 @@ def dump_api_request_debug(
         except Exception as e:
             _ra().logger.debug("Could not extract API key for debug dump: %s", e)
 
-        dump_payload: Dict[str, Any] = {
+        dump_payload: dict[str, Any] = {
             "timestamp": datetime.now().isoformat(),
             "session_id": agent.session_id,
             "reason": reason,
@@ -1197,7 +1196,7 @@ def dump_api_request_debug(
         }
 
         if error is not None:
-            error_info: Dict[str, Any] = {
+            error_info: dict[str, Any] = {
                 "type": type(error).__name__,
                 "message": str(error),
             }
@@ -1243,18 +1242,17 @@ def dump_api_request_debug(
         return dump_file
     except Exception as dump_error:
         if agent.verbose_logging:
-            logger.warning(f"Failed to dump API request debug payload: {dump_error}")
+            logger.warning("Failed to dump API request debug payload: %s", dump_error)
         return None
-
 
 
 def anthropic_prompt_cache_policy(
     agent,
     *,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    api_mode: Optional[str] = None,
-    model: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_mode: str | None = None,
+    model: str | None = None,
 ) -> tuple[bool, bool]:
     """Decide whether to apply Anthropic prompt caching and which layout to use.
 
@@ -1353,7 +1351,6 @@ def anthropic_prompt_cache_policy(
     return False, False
 
 
-
 def create_openai_client(agent, client_kwargs: dict, *, reason: str, shared: bool) -> Any:
     from agent.auxiliary_client import _validate_base_url, _validate_proxy_env_urls
     # Treat client_kwargs as read-only. Callers pass agent._client_kwargs (or shallow
@@ -1379,7 +1376,10 @@ def create_openai_client(agent, client_kwargs: dict, *, reason: str, shared: boo
         )
         return client
     if agent.provider == "gemini":
-        from agent.gemini_native_adapter import GeminiNativeClient, is_native_gemini_base_url
+        from agent.gemini_native_adapter import (
+            GeminiNativeClient,
+            is_native_gemini_base_url,
+        )
 
         base_url = str(client_kwargs.get("base_url", "") or "")
         if is_native_gemini_base_url(base_url):
@@ -1432,7 +1432,7 @@ def create_openai_client(agent, client_kwargs: dict, *, reason: str, shared: boo
     return client
 
 
-def switch_model(agent, new_model, new_provider, api_key='', base_url='', api_mode=''):
+def switch_model(agent, new_model, new_provider, api_key="", base_url="", api_mode=""):
     """Switch the model/provider in-place for a live agent.
 
     Called by the /model command handlers (CLI and gateway) after
@@ -1526,9 +1526,9 @@ def switch_model(agent, new_model, new_provider, api_key='', base_url='', api_mo
         # ── Build new client ──
         if api_mode == "anthropic_messages":
             from agent.anthropic_adapter import (
+                _is_oauth_token,
                 build_anthropic_client,
                 resolve_anthropic_token,
-                _is_oauth_token,
             )
             # Only fall back to ANTHROPIC_TOKEN when the provider is actually Anthropic.
             # Other anthropic_messages providers (MiniMax, Alibaba, etc.) must use their own
@@ -1613,7 +1613,7 @@ def switch_model(agent, new_model, new_provider, api_key='', base_url='', api_mo
         # custom provider mid-session (closes #15779).
         _sm_custom_providers = None
         try:
-            from hermes_cli.config import load_config, get_compatible_custom_providers
+            from hermes_cli.config import get_compatible_custom_providers, load_config
             _sm_cfg = load_config()
             _sm_custom_providers = get_compatible_custom_providers(_sm_cfg)
         except Exception:
@@ -1698,12 +1698,11 @@ def switch_model(agent, new_model, new_provider, api_key='', base_url='', api_mo
     )
 
 
-
 def invoke_tool(agent, function_name: str, function_args: dict, effective_task_id: str,
-                 tool_call_id: Optional[str] = None, messages: list = None,
+                 tool_call_id: str | None = None, messages: list = None,
                  pre_tool_block_checked: bool = False,
                  skip_tool_request_middleware: bool = False,
-                 tool_request_middleware_trace: Optional[List[Dict[str, Any]]] = None) -> str:
+                 tool_request_middleware_trace: list[dict[str, Any]] | None = None) -> str:
     """Invoke a single tool and return the result string. No display logic.
 
     Handles both agent-level tools (todo, memory, etc.) and registry-dispatched
@@ -1733,7 +1732,7 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
         logger.debug("tool_request middleware error: %s", _mw_err)
 
     # Check plugin hooks for a block directive before executing anything.
-    block_message: Optional[str] = None
+    block_message: str | None = None
     if not pre_tool_block_checked:
         try:
             from hermes_cli.plugins import get_pre_tool_call_block_message
@@ -1773,7 +1772,7 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
 
     tool_start_time = time.monotonic()
 
-    def _finish_agent_tool(result: Any, observed_args: Optional[dict] = None) -> Any:
+    def _finish_agent_tool(result: Any, observed_args: dict | None = None) -> Any:
         hook_args = observed_args if isinstance(observed_args, dict) else function_args
         try:
             from model_tools import _emit_post_tool_call_hook
@@ -1867,7 +1866,9 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
             )
     elif function_name == "read_terminal":
         def _execute(next_args: dict) -> Any:
-            from tools.read_terminal_tool import read_terminal_tool as _read_terminal_tool
+            from tools.read_terminal_tool import (
+                read_terminal_tool as _read_terminal_tool,
+            )
             return _finish_agent_tool(
                 _read_terminal_tool(
                     start_line=next_args.get("start_line"),
@@ -1908,7 +1909,6 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
         turn_id=getattr(agent, "_current_turn_id", "") or "",
         api_request_id=getattr(agent, "_current_api_request_id", "") or "",
     )
-
 
 
 def repair_tool_call(agent, tool_name: str) -> str | None:
@@ -2005,8 +2005,7 @@ def repair_tool_call(agent, tool_name: str) -> str | None:
     return None
 
 
-
-def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def sanitize_api_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Fix orphaned tool_call / tool_result pairs before every LLM call.
 
     Runs unconditionally — not gated on whether the context compressor
@@ -2056,7 +2055,7 @@ def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     # 2. Inject stub results for calls whose result was dropped
     missing_results = surviving_call_ids - result_call_ids
     if missing_results:
-        patched: List[Dict[str, Any]] = []
+        patched: list[dict[str, Any]] = []
         for msg in messages:
             patched.append(msg)
             if msg.get("role") == "assistant":
@@ -2077,12 +2076,11 @@ def sanitize_api_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return messages
 
 
-
 def looks_like_codex_intermediate_ack(
     agent,
     user_message: str,
     assistant_content: str,
-    messages: List[Dict[str, Any]],
+    messages: list[dict[str, Any]],
 ) -> bool:
     """Detect a planning/ack message that should continue instead of ending the turn."""
     if any(isinstance(msg, dict) and msg.get("role") == "tool" for msg in messages):
@@ -2095,7 +2093,7 @@ def looks_like_codex_intermediate_ack(
         return False
 
     has_future_ack = bool(
-        re.search(r"\b(i['’]ll|i will|let me|i can do that|i can help with that)\b", assistant_text)
+        re.search(r"\b(i['’]ll|i will|let me|i can do that|i can help with that)\b", assistant_text),
     )
     if not has_future_ack:
         return False
@@ -2148,8 +2146,6 @@ def looks_like_codex_intermediate_ack(
         marker in assistant_text for marker in workspace_markers
     )
     return (user_targets_workspace or assistant_targets_workspace) and assistant_mentions_action
-
-
 
 
 def copy_reasoning_content_for_api(agent, source_msg: dict, api_msg: dict) -> None:
@@ -2278,13 +2274,12 @@ def reapply_reasoning_echo_for_provider(agent, api_messages: list) -> int:
             copy_reasoning_content_for_api(agent, api_msg, api_msg)
             if api_msg.get("reasoning_content"):
                 changed += 1
-        else:
-            # Strict provider — strip any stale reasoning_content pad left
-            # over from a reasoning primary so the fallback request doesn't
-            # 400/422 on it.
-            if "reasoning_content" in api_msg:
-                api_msg.pop("reasoning_content", None)
-                changed += 1
+        # Strict provider — strip any stale reasoning_content pad left
+        # over from a reasoning primary so the fallback request doesn't
+        # 400/422 on it.
+        elif "reasoning_content" in api_msg:
+            api_msg.pop("reasoning_content", None)
+            changed += 1
     return changed
 
 
@@ -2402,10 +2397,9 @@ def cleanup_dead_connections(agent) -> bool:
     return False
 
 
-
-def extract_api_error_context(error: Exception) -> Dict[str, Any]:
+def extract_api_error_context(error: Exception) -> dict[str, Any]:
     """Extract structured rate-limit details from provider errors."""
-    context: Dict[str, Any] = {}
+    context: dict[str, Any] = {}
 
     body = getattr(error, "body", None)
     payload = None
@@ -2482,7 +2476,6 @@ def extract_api_error_context(error: Exception) -> Dict[str, Any]:
     return context
 
 
-
 def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: int) -> None:
     """Append any pending /steer text to the last tool result in this turn.
 
@@ -2496,6 +2489,7 @@ def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: in
         messages: The running messages list.
         num_tool_msgs: Number of tool results appended in this batch;
             used to locate the tail slice safely.
+
     """
     if num_tool_msgs <= 0 or not messages:
         return
@@ -2545,7 +2539,6 @@ def apply_pending_steer_to_tool_results(agent, messages: list, num_tool_msgs: in
         len(steer_text),
         steer_text[:120] + ("..." if len(steer_text) > 120 else ""),
     )
-
 
 
 def force_close_tcp_sockets(client: Any) -> int:
@@ -2601,29 +2594,28 @@ def force_close_tcp_sockets(client: Any) -> int:
     return shutdown_count
 
 
-
 __all__ = [
-    "convert_to_trajectory_format",
-    "sanitize_tool_call_arguments",
-    "repair_message_sequence",
-    "strip_think_blocks",
-    "recover_with_credential_pool",
-    "try_recover_primary_transport",
-    "drop_thinking_only_and_merge_users",
-    "restore_primary_runtime",
-    "extract_reasoning",
-    "dump_api_request_debug",
-    "anthropic_prompt_cache_policy",
-    "create_openai_client",
-    "switch_model",
-    "invoke_tool",
-    "repair_tool_call",
-    "sanitize_api_messages",
-    "looks_like_codex_intermediate_ack",
-    "copy_reasoning_content_for_api",
-    "cleanup_dead_connections",
-    "extract_api_error_context",
-    "apply_pending_steer_to_tool_results",
     "_iter_pool_sockets",
+    "anthropic_prompt_cache_policy",
+    "apply_pending_steer_to_tool_results",
+    "cleanup_dead_connections",
+    "convert_to_trajectory_format",
+    "copy_reasoning_content_for_api",
+    "create_openai_client",
+    "drop_thinking_only_and_merge_users",
+    "dump_api_request_debug",
+    "extract_api_error_context",
+    "extract_reasoning",
     "force_close_tcp_sockets",
+    "invoke_tool",
+    "looks_like_codex_intermediate_ack",
+    "recover_with_credential_pool",
+    "repair_message_sequence",
+    "repair_tool_call",
+    "restore_primary_runtime",
+    "sanitize_api_messages",
+    "sanitize_tool_call_arguments",
+    "strip_think_blocks",
+    "switch_model",
+    "try_recover_primary_transport",
 ]

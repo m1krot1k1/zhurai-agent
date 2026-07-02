@@ -16,7 +16,7 @@ import os
 
 import pytest
 
-import gateway.relay as relay
+from gateway import relay
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +34,7 @@ def _clean_env(monkeypatch):
     ):
         monkeypatch.delenv(k, raising=False)
     # Never read config.yaml off disk in these tests.
-    monkeypatch.setattr("gateway.run._load_gateway_config", lambda: {}, raising=False)
+    monkeypatch.setattr("gateway.run._load_gateway_config", dict, raising=False)
 
 
 def _stub_post(captured: dict):
@@ -184,7 +184,8 @@ def test_outbound_only_when_no_endpoint(monkeypatch):
 
 def test_forwards_instance_id_to_provision(monkeypatch):
     """A managed agent stamped with GATEWAY_RELAY_INSTANCE_ID forwards it to the
-    connector so it can bind gatewayId -> instanceId (per-instance routing)."""
+    connector so it can bind gatewayId -> instanceId (per-instance routing).
+    """
     _arm(monkeypatch)
     monkeypatch.setenv("GATEWAY_RELAY_INSTANCE_ID", "inst-abc")
     captured: dict = {}
@@ -196,7 +197,8 @@ def test_forwards_instance_id_to_provision(monkeypatch):
 
 def test_instance_id_absent_forwards_none(monkeypatch):
     """No stamp (self-hosted / pre-Phase-6) -> instance_id None; the connector
-    stores null and per-instance routing simply has no binding yet."""
+    stores null and per-instance routing simply has no binding yet.
+    """
     _arm(monkeypatch)
     captured: dict = {}
     monkeypatch.setattr(relay, "_post_provision", _stub_post(captured))
@@ -208,7 +210,8 @@ def test_instance_id_absent_forwards_none(monkeypatch):
 def test_post_provision_body_includes_instanceId_only_when_set(monkeypatch):
     """The real _post_provision adds `instanceId` to the JSON body ONLY when a
     value is supplied — omitting it lets the connector store null (back-compat),
-    rather than binding an empty string."""
+    rather than binding an empty string.
+    """
     import json
 
     sent: dict = {}
@@ -260,7 +263,8 @@ def test_post_provision_body_includes_instanceId_only_when_set(monkeypatch):
 def test_no_nas_token_is_non_fatal(monkeypatch):
     """A self-hosted box with a relay URL but no resolvable NAS identity skips
     quietly (this is the branch that replaces the old is_managed() gate for the
-    non-NAS case)."""
+    non-NAS case).
+    """
     monkeypatch.setattr(relay, "relay_url", lambda: "wss://connector.example/relay")
 
     def _boom():

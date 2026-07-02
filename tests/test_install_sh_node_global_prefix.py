@@ -13,7 +13,6 @@ node/npm/npx), scoped to the bundled Node via its prefix-local global npmrc.
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL_SH = REPO_ROOT / "scripts" / "install.sh"
 NODE_BOOTSTRAP = REPO_ROOT / "scripts" / "lib" / "node-bootstrap.sh"
@@ -32,7 +31,8 @@ def test_install_sh_redirects_bundled_npm_global_prefix_to_link_dir() -> None:
 def test_install_sh_repairs_existing_managed_node_on_rerun() -> None:
     """The redirect must run on every install (not just fresh Node installs),
     so re-running the installer repairs pre-existing managed installs whose
-    Node is already up to date and would otherwise skip install_node."""
+    Node is already up to date and would otherwise skip install_node.
+    """
     text = INSTALL_SH.read_text()
 
     check_node_body = text.split("check_node()", 1)[1].split("\ninstall_node()", 1)[0]

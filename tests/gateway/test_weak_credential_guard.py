@@ -9,8 +9,7 @@ import logging
 
 import pytest
 
-from gateway.config import PlatformConfig, Platform, _validate_gateway_config
-
+from gateway.config import Platform, PlatformConfig, _validate_gateway_config
 
 # ---------------------------------------------------------------------------
 # Helper: create a minimal GatewayConfig with one enabled platform
@@ -70,7 +69,7 @@ class TestPlatformTokenPlaceholderGuard:
     def test_accepts_real_token(self, caplog):
         """A real-looking bot token should pass validation."""
         config = _make_gateway_config(
-            Platform.TELEGRAM, "7123456789:AAHdqTcvCH1vGWJxfSeOfSAs0K5PALDsaw"
+            Platform.TELEGRAM, "7123456789:AAHdqTcvCH1vGWJxfSeOfSAs0K5PALDsaw",
         )
         with caplog.at_level(logging.ERROR):
             _validate_and_return(config)
@@ -114,7 +113,7 @@ class TestAPIServerPlaceholderKeyGuard:
         from gateway.platforms.api_server import APIServerAdapter
 
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "changeme"})
+            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "changeme"}),
         )
         result = await adapter.connect()
         assert result is False
@@ -124,7 +123,7 @@ class TestAPIServerPlaceholderKeyGuard:
         from gateway.platforms.api_server import APIServerAdapter
 
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "***"})
+            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "***"}),
         )
         result = await adapter.connect()
         assert result is False
@@ -135,7 +134,7 @@ class TestAPIServerPlaceholderKeyGuard:
         from gateway.platforms.base import is_network_accessible
 
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "127.0.0.1", "key": "changeme"})
+            PlatformConfig(enabled=True, extra={"host": "127.0.0.1", "key": "changeme"}),
         )
         # On loopback the placeholder guard doesn't fire
         assert is_network_accessible(adapter._host) is False
@@ -152,7 +151,7 @@ class TestAPIServerPlaceholderKeyGuard:
         from gateway.platforms.api_server import APIServerAdapter
 
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "a1b2c3d4e5f6"})
+            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "a1b2c3d4e5f6"}),
         )
         result = await adapter.connect()
         assert result is False
@@ -162,14 +161,15 @@ class TestAPIServerPlaceholderKeyGuard:
         """A 32-char random key clears the entropy floor (connect proceeds past
         the credential guard). We don't assert full startup success here — the
         port/runner setup is environment-dependent — only that the weak-key
-        guard does not reject it."""
+        guard does not reject it.
+        """
         from gateway.platforms.api_server import APIServerAdapter
         from hermes_cli.auth import has_usable_secret
 
         strong = "0123456789abcdef0123456789abcdef"
         assert has_usable_secret(strong, min_length=16) is True
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": strong})
+            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": strong}),
         )
         # The credential guard itself accepts the key (start may still fail on
         # later env-specific steps, which is out of scope for this guard test).

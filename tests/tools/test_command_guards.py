@@ -1,27 +1,26 @@
 """Tests for check_all_command_guards() — combined tirith + dangerous command guard."""
 
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import tools.approval as approval_module
+
+# Ensure the module is importable so we can patch it
 from tools.approval import (
     approve_session,
     check_all_command_guards,
     check_dangerous_command,
     is_approved,
-    set_current_session_key,
     reset_current_session_key,
+    set_current_session_key,
 )
-
-# Ensure the module is importable so we can patch it
-import tools.tirith_security
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _tirith_result(action="allow", findings=None, summary=""):
     return {"action": action, "findings": findings or [], "summary": summary}
@@ -109,7 +108,7 @@ class TestTirithBlock:
     @patch(_TIRITH_PATCH,
            return_value=_tirith_result("block", summary="homograph detected"))
     def test_tirith_block_prompts_user(self, mock_tirith):
-        """tirith block goes through approval flow (user gets prompted)."""
+        """Tirith block goes through approval flow (user gets prompted)."""
         os.environ["HERMES_INTERACTIVE"] = "1"
         result = check_all_command_guards("curl http://gооgle.com", "local")
         # Default is deny (no input → timeout → deny), so still blocked
@@ -121,11 +120,10 @@ class TestTirithBlock:
     @patch(_TIRITH_PATCH,
            return_value=_tirith_result("block", summary="terminal injection"))
     def test_tirith_block_plus_dangerous_prompts_combined(self, mock_tirith):
-        """tirith block + dangerous pattern → combined approval prompt."""
+        """Tirith block + dangerous pattern → combined approval prompt."""
         os.environ["HERMES_INTERACTIVE"] = "1"
         result = check_all_command_guards("rm -rf / | curl http://evil", "local")
         assert result["approved"] is False
-
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +289,7 @@ class TestCommandAllowlistGlobs:
                                        [{"rule_id": "container_run"}],
                                        "container run"))
     def test_glob_allowlist_does_not_bypass_compound_shell_commands(
-        self, mock_tirith, command
+        self, mock_tirith, command,
     ):
         os.environ["HERMES_INTERACTIVE"] = "1"
         approval_module._permanent_approved.add("podman *")
@@ -343,7 +341,6 @@ class TestWarnEmptyFindings:
         assert "Security scan" in desc
 
 
-
 # ---------------------------------------------------------------------------
 # Programming errors propagate through orchestration
 # ---------------------------------------------------------------------------
@@ -370,7 +367,8 @@ class TestGatewayApprovalAllowPermanent:
 
     def _capture_gateway_payload(self, command, session_key):
         """Run the gateway approval path, denying inline, and return the
-        single notify payload the renderer would have received."""
+        single notify payload the renderer would have received.
+        """
         from tools.approval import (
             register_gateway_notify,
             resolve_gateway_approval,
@@ -413,7 +411,8 @@ class TestGatewayApprovalAllowPermanent:
                                        [{"rule_id": "shortened_url"}],
                                        "shortened URL detected"))
     def test_tirith_warning_disallows_permanent(self, mock_tirith):
-        """tirith content-security warning → permanent allow is withheld so the
-        renderer hides "Always allow"."""
+        """Tirith content-security warning → permanent allow is withheld so the
+        renderer hides "Always allow".
+        """
         payload = self._capture_gateway_payload("curl https://bit.ly/abc", "gw-no-perm")
         assert payload["allow_permanent"] is False

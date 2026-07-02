@@ -14,12 +14,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from gateway.config import PlatformConfig
-from gateway.platforms.base import SendResult
-from plugins.platforms.telegram.adapter import TelegramAdapter
 from telegram.error import BadRequest, NetworkError, TimedOut
 
+from gateway.config import PlatformConfig
+from plugins.platforms.telegram.adapter import TelegramAdapter
 
 # Content exercising rich-only constructs: a heading, a real Markdown table,
 # and a task list. Pipes / brackets must survive untouched into the payload.
@@ -40,11 +38,11 @@ DANGEROUS_DETAILS_MATH = (
 EndPointNotFound = type("EndPointNotFound", (Exception,), {})
 InvalidToken = type("InvalidToken", (Exception,), {})
 PTB_ENDPOINT_NOT_FOUND = EndPointNotFound(
-    "Endpoint 'sendRichMessage' not found in Bot API"
+    "Endpoint 'sendRichMessage' not found in Bot API",
 )
 PTB_INVALID_TOKEN_404 = InvalidToken(
     "Either the bot token was rejected by Telegram or the endpoint "
-    "'sendRichMessage' does not exist."
+    "'sendRichMessage' does not exist.",
 )
 
 
@@ -213,7 +211,8 @@ async def test_rich_messages_opt_out_accepts_string_false():
 async def test_rich_messages_default_is_legacy_copyable_path():
     """Rich messages stay opt-in because current Telegram clients can make
     Bot API rich messages hard to copy as plain text. Rich-eligible content
-    defaults to the legacy MarkdownV2 path unless the user opts in."""
+    defaults to the legacy MarkdownV2 path unless the user opts in.
+    """
     config = PlatformConfig(enabled=True, token="fake-token")
     adapter = TelegramAdapter(config)
     bot = MagicMock()
@@ -234,9 +233,10 @@ async def test_rich_messages_default_is_legacy_copyable_path():
 @pytest.mark.asyncio
 async def test_rich_messages_can_be_opted_in():
     """Setting platforms.telegram.extra.rich_messages: true enables native
-    Bot API rich rendering for tables/task lists/details/math."""
+    Bot API rich rendering for tables/task lists/details/math.
+    """
     config = PlatformConfig(
-        enabled=True, token="fake-token", extra={"rich_messages": True}
+        enabled=True, token="fake-token", extra={"rich_messages": True},
     )
     adapter = TelegramAdapter(config)
     bot = MagicMock()
@@ -257,9 +257,10 @@ async def test_rich_messages_can_be_opted_in():
 @pytest.mark.asyncio
 async def test_rich_messages_can_be_opted_out():
     """Setting platforms.telegram.extra.rich_messages: false keeps every reply
-    on the legacy MarkdownV2 path even for rich-eligible content."""
+    on the legacy MarkdownV2 path even for rich-eligible content.
+    """
     config = PlatformConfig(
-        enabled=True, token="fake-token", extra={"rich_messages": False}
+        enabled=True, token="fake-token", extra={"rich_messages": False},
     )
     adapter = TelegramAdapter(config)
     bot = MagicMock()
@@ -278,7 +279,8 @@ async def test_rich_messages_can_be_opted_out():
 @pytest.mark.asyncio
 async def test_plain_markdown_stays_on_legacy_path():
     """Ordinary replies (no table/task-list/details/math) stay on the legacy
-    MarkdownV2 path for consistent client rendering, even with rich enabled."""
+    MarkdownV2 path for consistent client rendering, even with rich enabled.
+    """
     adapter = _make_adapter()
 
     result = await adapter.send("12345", "Hello **there**\n\nA normal reply.")
@@ -379,7 +381,8 @@ async def test_unknown_endpoint_error_falls_back_to_legacy():
 @pytest.mark.asyncio
 async def test_capability_error_latches_rich_send_off():
     """Endpoint-missing errors latch rich off so later sends skip the
-    doomed extra roundtrip entirely."""
+    doomed extra roundtrip entirely.
+    """
     adapter = _make_adapter()
     adapter._bot.do_api_request = AsyncMock(side_effect=RuntimeError("Method not found"))
 
@@ -417,7 +420,7 @@ async def test_rich_payload_preserves_link_preview_disable():
     adapter = _make_adapter(extra={"disable_link_previews": True})
 
     result = await adapter.send(
-        "12345", "| Link | Note |\n|---|---|\n| See https://example.com | x |"
+        "12345", "| Link | Note |\n|---|---|\n| See https://example.com | x |",
     )
 
     assert result.success is True
@@ -428,7 +431,8 @@ async def test_rich_payload_preserves_link_preview_disable():
 @pytest.mark.asyncio
 async def test_per_message_bad_request_does_not_latch_off():
     """A parser/limit BadRequest is per-message — rich must stay enabled
-    for subsequent messages."""
+    for subsequent messages.
+    """
     adapter = _make_adapter()
     adapter._bot.do_api_request = AsyncMock(side_effect=BadRequest("can't parse rich message"))
 
@@ -701,7 +705,8 @@ def _rich_edit_kwargs(adapter):
 async def test_finalize_edit_uses_rich_for_table_content():
     """Finalizing a streamed preview whose content is a table edits the
     existing message IN PLACE via editMessageText's rich_message param —
-    no fresh send, no delete, no duplicate."""
+    no fresh send, no delete, no duplicate.
+    """
     adapter = _make_adapter()
 
     result = await adapter.edit_message(
@@ -722,7 +727,8 @@ async def test_finalize_edit_uses_rich_for_table_content():
 @pytest.mark.asyncio
 async def test_finalize_edit_plain_content_stays_legacy():
     """Finalizing plain content (no table/task-list/details/math) uses the
-    legacy MarkdownV2 edit_message_text path, not the rich edit endpoint."""
+    legacy MarkdownV2 edit_message_text path, not the rich edit endpoint.
+    """
     adapter = _make_adapter()
 
     result = await adapter.edit_message(
@@ -750,7 +756,8 @@ async def test_finalize_edit_cjk_rich_content_stays_legacy_to_avoid_tdesktop_gar
 @pytest.mark.asyncio
 async def test_finalize_edit_rich_capability_error_falls_back_to_legacy():
     """A capability error on the rich edit latches rich off and falls back to
-    the legacy MarkdownV2 edit so the user still gets the final answer."""
+    the legacy MarkdownV2 edit so the user still gets the final answer.
+    """
     adapter = _make_adapter()
     adapter._bot.do_api_request = AsyncMock(side_effect=PTB_ENDPOINT_NOT_FOUND)
 
@@ -766,10 +773,11 @@ async def test_finalize_edit_rich_capability_error_falls_back_to_legacy():
 @pytest.mark.asyncio
 async def test_finalize_edit_rich_not_modified_is_success_noop():
     """'Message is not modified' on a rich edit is a no-op success — must NOT
-    fall through to a redundant legacy edit."""
+    fall through to a redundant legacy edit.
+    """
     adapter = _make_adapter()
     adapter._bot.do_api_request = AsyncMock(
-        side_effect=BadRequest("Message is not modified")
+        side_effect=BadRequest("Message is not modified"),
     )
 
     result = await adapter.edit_message(
@@ -783,7 +791,8 @@ async def test_finalize_edit_rich_not_modified_is_success_noop():
 @pytest.mark.asyncio
 async def test_non_finalize_edit_never_uses_rich():
     """Intermediate (non-finalize) stream edits stay on the plain edit path;
-    rich is only applied on the final edit."""
+    rich is only applied on the final edit.
+    """
     adapter = _make_adapter()
 
     result = await adapter.edit_message(
@@ -798,7 +807,8 @@ async def test_non_finalize_edit_never_uses_rich():
 @pytest.mark.asyncio
 async def test_finalize_edit_opt_out_uses_legacy():
     """With rich_messages: false, even a table finalizes via the legacy
-    MarkdownV2 edit path."""
+    MarkdownV2 edit path.
+    """
     adapter = _make_adapter(extra={"rich_messages": False})
 
     result = await adapter.edit_message(
@@ -814,7 +824,8 @@ async def test_finalize_edit_opt_out_uses_legacy():
 async def test_finalize_edit_rich_over_markdownv2_limit_not_split():
     """A rich table that exceeds the 4,096 MarkdownV2 limit but fits the 32,768
     rich cap is edited in place as one rich message, NOT split into legacy
-    chunks."""
+    chunks.
+    """
     adapter = _make_adapter()
     big_table = "| a | b |\n|---|---|\n" + "\n".join(
         f"| {'x' * 50} | {'y' * 50} |" for _ in range(40)
@@ -902,8 +913,8 @@ def _reply_message_with_rich_blocks(
 async def test_rich_reply_records_and_recovers_text(monkeypatch, tmp_path):
     """A reply to a rich-sent message resolves the original text via the index."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from gateway.platforms.base import MessageType
     from gateway import rich_sent_store
+    from gateway.platforms.base import MessageType
 
     adapter = _make_adapter()
 
@@ -911,7 +922,7 @@ async def test_rich_reply_records_and_recovers_text(monkeypatch, tmp_path):
     # rich send. Drive that path directly so the test doesn't depend on send()
     # gating heuristics (length, content shape) choosing the rich path.
     adapter._bot.do_api_request = AsyncMock(
-        return_value=SimpleNamespace(message_id=678)
+        return_value=SimpleNamespace(message_id=678),
     )
     send_result = await adapter._try_send_rich(
         "12345", "Your morning briefing: CI is green.", None, None,
@@ -946,8 +957,8 @@ async def test_rich_reply_lookup_miss_leaves_text_none(monkeypatch, tmp_path):
 async def test_rich_reply_native_quote_wins_over_lookup(monkeypatch, tmp_path):
     """A native partial quote takes precedence over the send-time index."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from gateway.platforms.base import MessageType
     from gateway import rich_sent_store
+    from gateway.platforms.base import MessageType
 
     rich_sent_store.record("12345", "678", "full recorded body")
     adapter = _make_adapter()
@@ -961,8 +972,8 @@ async def test_rich_reply_native_quote_wins_over_lookup(monkeypatch, tmp_path):
 async def test_rich_reply_caption_wins_over_lookup(monkeypatch, tmp_path):
     """When Telegram DOES echo a caption, it wins over the index fallback."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from gateway.platforms.base import MessageType
     from gateway import rich_sent_store
+    from gateway.platforms.base import MessageType
 
     rich_sent_store.record("12345", "678", "recorded body")
     adapter = _make_adapter()
@@ -996,8 +1007,8 @@ async def test_rich_reply_native_blocks_fill_reply_text_without_index(monkeypatc
 async def test_rich_reply_native_blocks_win_over_index(monkeypatch, tmp_path):
     """Native rich echo should beat the local send-time index fallback."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    from gateway.platforms.base import MessageType
     from gateway import rich_sent_store
+    from gateway.platforms.base import MessageType
 
     rich_sent_store.record("12345", "678", "recorded body")
     adapter = _make_adapter()

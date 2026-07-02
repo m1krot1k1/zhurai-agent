@@ -9,19 +9,23 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
-from hermes_constants import display_hermes_home
 from agent.skill_preprocessing import (
     expand_inline_shell as _expand_inline_shell,
+)
+from agent.skill_preprocessing import (
     load_skills_config as _load_skills_config,
+)
+from agent.skill_preprocessing import (
     substitute_template_vars as _substitute_template_vars,
 )
+from hermes_constants import display_hermes_home
 
 logger = logging.getLogger(__name__)
 
-_skill_commands: Dict[str, Dict[str, Any]] = {}
-_skill_commands_platform: Optional[str] = None
+_skill_commands: dict[str, dict[str, Any]] = {}
+_skill_commands_platform: str | None = None
 # Patterns for sanitizing skill names into clean hyphen-separated slugs.
 _SKILL_INVALID_CHARS = re.compile(r"[^a-z0-9-]")
 _SKILL_MULTI_HYPHEN = re.compile(r"-{2,}")
@@ -58,7 +62,7 @@ _BUNDLE_USER_INSTRUCTION = "\nUser instruction: "
 _BUNDLE_FIRST_SKILL_BLOCK = "\n\n[Loaded as part of the "
 
 
-def extract_user_instruction_from_skill_message(content: Any) -> Optional[str]:
+def extract_user_instruction_from_skill_message(content: Any) -> str | None:
     """Recover the user's instruction from a slash-skill-expanded turn.
 
     Returns:
@@ -69,6 +73,7 @@ def extract_user_instruction_from_skill_message(content: Any) -> Optional[str]:
           instruction (i.e. a bare ``/skill`` invocation). Callers that feed
           memory providers should skip the turn in that case — there is no
           user content worth storing.
+
     """
     if not isinstance(content, str):
         return None
@@ -85,7 +90,7 @@ def extract_user_instruction_from_skill_message(content: Any) -> Optional[str]:
     return None
 
 
-def _extract_single_skill_user_instruction(message: str) -> Optional[str]:
+def _extract_single_skill_user_instruction(message: str) -> str | None:
     # Single-skill format appends the user instruction after the skill body, so
     # the last occurrence is the user-provided one; the body may quote this text.
     marker_idx = message.rfind(_SINGLE_SKILL_INSTRUCTION)
@@ -100,7 +105,7 @@ def _extract_single_skill_user_instruction(message: str) -> Optional[str]:
     return instruction or None
 
 
-def _extract_bundle_user_instruction(message: str) -> Optional[str]:
+def _extract_bundle_user_instruction(message: str) -> str | None:
     # Bundle format puts the user instruction before the loaded skills, so the
     # first occurrence is the user-provided one.
     marker_idx = message.find(_BUNDLE_USER_INSTRUCTION)
@@ -115,7 +120,7 @@ def _extract_bundle_user_instruction(message: str) -> Optional[str]:
     return instruction or None
 
 
-def _resolve_skill_commands_platform() -> Optional[str]:
+def _resolve_skill_commands_platform() -> str | None:
     """Return the current platform scope used for disabled-skill filtering.
 
     Used to detect when the active platform has shifted so
@@ -138,6 +143,7 @@ def _resolve_skill_commands_platform() -> Optional[str]:
         resolved_platform = os.getenv("HERMES_PLATFORM")
     return resolved_platform or None
 
+
 def _load_skill_payload(skill_identifier: str, task_id: str | None = None) -> tuple[dict[str, Any], Path | None, str] | None:
     """Load a skill by name/path and return (loaded_payload, skill_dir, display_name)."""
     raw_identifier = (skill_identifier or "").strip()
@@ -145,8 +151,8 @@ def _load_skill_payload(skill_identifier: str, task_id: str | None = None) -> tu
         return None
 
     try:
-        from tools.skills_tool import SKILLS_DIR, skill_view
         from agent.skill_utils import get_external_skills_dirs
+        from tools.skills_tool import SKILLS_DIR, skill_view
 
         identifier_path = Path(raw_identifier).expanduser()
         if identifier_path.is_absolute():
@@ -179,7 +185,7 @@ def _load_skill_payload(skill_identifier: str, task_id: str | None = None) -> tu
             normalized = raw_identifier.lstrip("/")
 
         loaded_skill = json.loads(
-            skill_view(normalized, task_id=task_id, preprocess=False)
+            skill_view(normalized, task_id=task_id, preprocess=False),
         )
     except Exception:
         return None
@@ -278,7 +284,7 @@ def _build_skill_message(
         parts.append(
             "Resolve any relative paths in this skill (e.g. `scripts/foo.js`, "
             "`templates/config.yaml`) against that directory, then run them "
-            "with the terminal tool using the absolute path."
+            "with the terminal tool using the absolute path.",
         )
 
     # ── Inject resolved skill config values ──
@@ -289,21 +295,21 @@ def _build_skill_message(
             [
                 "",
                 "[Skill setup note: Required environment setup was skipped. Continue loading the skill and explain any reduced functionality if it matters.]",
-            ]
+            ],
         )
     elif loaded_skill.get("gateway_setup_hint"):
         parts.extend(
             [
                 "",
                 f"[Skill setup note: {loaded_skill['gateway_setup_hint']}]",
-            ]
+            ],
         )
     elif loaded_skill.get("setup_needed") and loaded_skill.get("setup_note"):
         parts.extend(
             [
                 "",
                 f"[Skill setup note: {loaded_skill['setup_note']}]",
-            ]
+            ],
         )
 
     supporting = []
@@ -334,7 +340,7 @@ def _build_skill_message(
         parts.append(
             f'\nLoad any of these with skill_view(name="{skill_view_target}", '
             f'file_path="<path>"), or run scripts directly by absolute path '
-            f"(e.g. `node {skill_dir}/scripts/foo.js`)."
+            f"(e.g. `node {skill_dir}/scripts/foo.js`).",
         )
 
     if user_instruction:
@@ -348,18 +354,25 @@ def _build_skill_message(
     return "\n".join(parts)
 
 
-def scan_skill_commands() -> Dict[str, Dict[str, Any]]:
+def scan_skill_commands() -> dict[str, dict[str, Any]]:
     """Scan ~/.hermes/skills/ and return a mapping of /command -> skill info.
 
     Returns:
         Dict mapping "/skill-name" to {name, description, skill_md_path, skill_dir}.
+
     """
     global _skill_commands, _skill_commands_platform
     _skill_commands_platform = _resolve_skill_commands_platform()
     _skill_commands = {}
     try:
-        from tools.skills_tool import SKILLS_DIR, _parse_frontmatter, skill_matches_platform, skill_matches_environment, _get_disabled_skill_names
         from agent.skill_utils import get_external_skills_dirs, iter_skill_index_files
+        from tools.skills_tool import (
+            SKILLS_DIR,
+            _get_disabled_skill_names,
+            _parse_frontmatter,
+            skill_matches_environment,
+            skill_matches_platform,
+        )
         disabled = _get_disabled_skill_names()
         seen_names: set = set()
 
@@ -371,10 +384,10 @@ def scan_skill_commands() -> Dict[str, Dict[str, Any]]:
 
         for scan_dir in dirs_to_scan:
             for skill_md in iter_skill_index_files(scan_dir, "SKILL.md"):
-                if any(part in {'.git', '.github', '.hub', '.archive'} for part in skill_md.parts):
+                if any(part in {".git", ".github", ".hub", ".archive"} for part in skill_md.parts):
                     continue
                 try:
-                    content = skill_md.read_text(encoding='utf-8')
+                    content = skill_md.read_text(encoding="utf-8")
                     frontmatter, body = _parse_frontmatter(content)
                     # Skip skills incompatible with the current OS platform
                     if not skill_matches_platform(frontmatter):
@@ -383,26 +396,26 @@ def scan_skill_commands() -> Dict[str, Dict[str, Any]]:
                     # (kanban/docker/s6). Offer-time only; explicit load bypasses.
                     if not skill_matches_environment(frontmatter):
                         continue
-                    name = frontmatter.get('name', skill_md.parent.name)
+                    name = frontmatter.get("name", skill_md.parent.name)
                     if name in seen_names:
                         continue
                     # Respect user's disabled skills config
                     if name in disabled:
                         continue
-                    description = frontmatter.get('description', '')
+                    description = frontmatter.get("description", "")
                     if not description:
-                        for line in body.strip().split('\n'):
+                        for line in body.strip().split("\n"):
                             line = line.strip()
-                            if line and not line.startswith('#'):
+                            if line and not line.startswith("#"):
                                 description = line[:80]
                                 break
                     seen_names.add(name)
                     # Normalize to hyphen-separated slug, stripping
                     # non-alnum chars (e.g. +, /) to avoid invalid
                     # Telegram command names downstream.
-                    cmd_name = name.lower().replace(' ', '-').replace('_', '-')
-                    cmd_name = _SKILL_INVALID_CHARS.sub('', cmd_name)
-                    cmd_name = _SKILL_MULTI_HYPHEN.sub('-', cmd_name).strip('-')
+                    cmd_name = name.lower().replace(" ", "-").replace("_", "-")
+                    cmd_name = _SKILL_INVALID_CHARS.sub("", cmd_name)
+                    cmd_name = _SKILL_MULTI_HYPHEN.sub("-", cmd_name).strip("-")
                     if not cmd_name:
                         continue
                     _skill_commands[f"/{cmd_name}"] = {
@@ -418,7 +431,7 @@ def scan_skill_commands() -> Dict[str, Dict[str, Any]]:
     return _skill_commands
 
 
-def get_skill_commands() -> Dict[str, Dict[str, Any]]:
+def get_skill_commands() -> dict[str, dict[str, Any]]:
     """Return the current skill commands mapping (scan first if empty).
 
     Rescans when the active platform scope changes (e.g. a gateway
@@ -433,7 +446,7 @@ def get_skill_commands() -> Dict[str, Dict[str, Any]]:
     return _skill_commands
 
 
-def reload_skills() -> Dict[str, Any]:
+def reload_skills() -> dict[str, Any]:
     """Re-scan the skills directory and return a diff of what changed.
 
     Rescans ``~/.hermes/skills/`` and any ``skills.external_dirs`` so the
@@ -460,13 +473,14 @@ def reload_skills() -> Dict[str, Any]:
         ``description`` is the skill's full SKILL.md frontmatter
         ``description:`` field — the same string the system prompt renders
         as ``    - name: description`` for pre-existing skills.
+
     """
     # Snapshot pre-reload state (name -> description) from the current
     # slash-command cache. Using dicts lets the post-rescan diff carry
     # descriptions for newly-visible or just-removed skills without a
     # second disk walk.
-    def _snapshot(cmds: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
-        out: Dict[str, str] = {}
+    def _snapshot(cmds: dict[str, dict[str, Any]]) -> dict[str, str]:
+        out: dict[str, str] = {}
         for slash_key, info in cmds.items():
             bare = slash_key.lstrip("/")
             out[bare] = (info or {}).get("description") or ""
@@ -498,7 +512,7 @@ def reload_skills() -> Dict[str, Any]:
     }
 
 
-def resolve_skill_command_key(command: str) -> Optional[str]:
+def resolve_skill_command_key(command: str) -> str | None:
     """Resolve a user-typed /command to its canonical skill_cmds key.
 
     Skills are always stored with hyphens — ``scan_skill_commands`` normalizes
@@ -535,7 +549,7 @@ def build_skill_invocation_message(
     user_instruction: str = "",
     task_id: str | None = None,
     runtime_note: str = "",
-) -> Optional[str]:
+) -> str | None:
     """Build the user message content for a skill slash command invocation.
 
     Args:
@@ -544,6 +558,7 @@ def build_skill_invocation_message(
 
     Returns:
         The formatted message string, or None if the skill wasn't found.
+
     """
     commands = get_skill_commands()
     skill_info = commands.get(cmd_key)
@@ -624,7 +639,7 @@ def build_preloaded_skills_prompt(
                 skill_dir,
                 activation_note,
                 session_id=task_id,
-            )
+            ),
         )
         loaded_names.append(skill_name)
 

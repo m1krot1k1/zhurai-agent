@@ -40,7 +40,7 @@ def stage2_text() -> str:
 def test_stage2_does_not_write_install_method_into_home(stage2_text: str) -> None:
     # No write/tee of the home-scoped install-method stamp anywhere.
     assert not re.search(
-        r"(tee|>)\s*\"?\$HERMES_HOME/\.install_method", stage2_text
+        r"(tee|>)\s*\"?\$HERMES_HOME/\.install_method", stage2_text,
     ), (
         "stage2 must not stamp $HERMES_HOME/.install_method — that data dir "
         "may be shared with a host install whose marker would be clobbered"

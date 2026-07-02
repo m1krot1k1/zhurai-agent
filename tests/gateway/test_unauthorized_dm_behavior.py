@@ -104,13 +104,14 @@ def test_simplex_allowlist_accepts_display_name(monkeypatch):
     """SIMPLEX_ALLOWED_USERS should match the contact's display name as well
     as the numeric contactId. The SimpleX UI surfaces only display names, so
     operators naturally put those in the env var — and the adapter sets
-    user_id=contactId for stability. Both forms must work. (#TBD)"""
+    user_id=contactId for stability. Both forms must work. (#TBD)
+    """
     _clear_auth_env(monkeypatch)
     monkeypatch.delenv("SIMPLEX_ALLOWED_USERS", raising=False)
     monkeypatch.setenv("SIMPLEX_ALLOWED_USERS", "hujikuji")
 
     # Register the simplex plugin so the env-var lookup resolves.
-    from gateway.platform_registry import platform_registry, PlatformEntry
+    from gateway.platform_registry import PlatformEntry, platform_registry
     platform_registry.register(PlatformEntry(
         name="simplex",
         label="SimpleX Chat",
@@ -140,12 +141,13 @@ def test_simplex_allowlist_accepts_display_name(monkeypatch):
 
 def test_simplex_allowlist_accepts_numeric_contact_id(monkeypatch):
     """The numeric contactId form must still work — the new display-name
-    matching must not regress existing setups."""
+    matching must not regress existing setups.
+    """
     _clear_auth_env(monkeypatch)
     monkeypatch.delenv("SIMPLEX_ALLOWED_USERS", raising=False)
     monkeypatch.setenv("SIMPLEX_ALLOWED_USERS", "4")
 
-    from gateway.platform_registry import platform_registry, PlatformEntry
+    from gateway.platform_registry import PlatformEntry, platform_registry
     platform_registry.register(PlatformEntry(
         name="simplex",
         label="SimpleX Chat",
@@ -177,7 +179,7 @@ def test_simplex_allowlist_denies_unlisted(monkeypatch):
     monkeypatch.delenv("SIMPLEX_ALLOWED_USERS", raising=False)
     monkeypatch.setenv("SIMPLEX_ALLOWED_USERS", "hujikuji")
 
-    from gateway.platform_registry import platform_registry, PlatformEntry
+    from gateway.platform_registry import PlatformEntry, platform_registry
     platform_registry.register(PlatformEntry(
         name="simplex",
         label="SimpleX Chat",
@@ -598,7 +600,7 @@ async def test_unauthorized_dm_pairs_by_default(monkeypatch):
             Platform.WHATSAPP,
             "15551234567@s.whatsapp.net",
             "15551234567@s.whatsapp.net",
-        )
+        ),
     )
 
     assert result is None
@@ -629,7 +631,7 @@ async def test_unauthorized_whatsapp_dm_can_be_ignored(monkeypatch):
             Platform.WHATSAPP,
             "15551234567@s.whatsapp.net",
             "15551234567@s.whatsapp.net",
-        )
+        ),
     )
 
     assert result is None
@@ -652,7 +654,7 @@ async def test_rate_limited_user_gets_no_response(monkeypatch):
             Platform.WHATSAPP,
             "15551234567@s.whatsapp.net",
             "15551234567@s.whatsapp.net",
-        )
+        ),
     )
 
     assert result is None
@@ -663,7 +665,8 @@ async def test_rate_limited_user_gets_no_response(monkeypatch):
 @pytest.mark.asyncio
 async def test_rejection_message_records_rate_limit(monkeypatch):
     """After sending a 'too many requests' rejection, rate limit is recorded
-    so subsequent messages are silently ignored."""
+    so subsequent messages are silently ignored.
+    """
     _clear_auth_env(monkeypatch)
     config = GatewayConfig(
         platforms={Platform.WHATSAPP: PlatformConfig(enabled=True)},
@@ -676,14 +679,14 @@ async def test_rejection_message_records_rate_limit(monkeypatch):
             Platform.WHATSAPP,
             "15551234567@s.whatsapp.net",
             "15551234567@s.whatsapp.net",
-        )
+        ),
     )
 
     assert result is None
     adapter.send.assert_awaited_once()
     assert "Too many" in adapter.send.await_args.args[1]
     runner.pairing_store._record_rate_limit.assert_called_once_with(
-        "whatsapp", "15551234567@s.whatsapp.net"
+        "whatsapp", "15551234567@s.whatsapp.net",
     )
 
 
@@ -701,7 +704,7 @@ async def test_global_ignore_suppresses_pairing_reply(monkeypatch):
             Platform.TELEGRAM,
             "12345",
             "12345",
-        )
+        ),
     )
 
     assert result is None
@@ -731,7 +734,7 @@ async def test_signal_with_allowlist_ignores_unauthorized_dm(monkeypatch):
     runner, adapter = _make_runner(Platform.SIGNAL, config)
 
     result = await runner._handle_message(
-        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999")  # not in allowlist
+        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999"),  # not in allowlist
     )
 
     assert result is None
@@ -751,7 +754,7 @@ async def test_telegram_with_allowlist_ignores_unauthorized_dm(monkeypatch):
     runner, adapter = _make_runner(Platform.TELEGRAM, config)
 
     result = await runner._handle_message(
-        _make_event(Platform.TELEGRAM, "999999999", "999999999")
+        _make_event(Platform.TELEGRAM, "999999999", "999999999"),
     )
 
     assert result is None
@@ -771,7 +774,7 @@ async def test_global_allowlist_ignores_unauthorized_dm(monkeypatch):
     runner, adapter = _make_runner(Platform.SIGNAL, config)
 
     result = await runner._handle_message(
-        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999")
+        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999"),
     )
 
     assert result is None
@@ -792,7 +795,7 @@ async def test_no_allowlist_still_pairs_by_default(monkeypatch):
     runner.pairing_store.generate_code.return_value = "PAIR1234"
 
     result = await runner._handle_message(
-        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999")
+        _make_event(Platform.SIGNAL, "+15559999999", "+15559999999"),
     )
 
     assert result is None
@@ -813,7 +816,7 @@ async def test_email_no_allowlist_ignores_unknown_senders_by_default(monkeypatch
     runner.pairing_store.generate_code.return_value = "EMAIL123"
 
     result = await runner._handle_message(
-        _make_event(Platform.EMAIL, "stranger@example.com", "stranger@example.com")
+        _make_event(Platform.EMAIL, "stranger@example.com", "stranger@example.com"),
     )
 
     assert result is None
@@ -837,7 +840,7 @@ async def test_email_pairing_requires_explicit_platform_opt_in(monkeypatch):
     runner.pairing_store.generate_code.return_value = "EMAIL123"
 
     result = await runner._handle_message(
-        _make_event(Platform.EMAIL, "stranger@example.com", "stranger@example.com")
+        _make_event(Platform.EMAIL, "stranger@example.com", "stranger@example.com"),
     )
 
     assert result is None

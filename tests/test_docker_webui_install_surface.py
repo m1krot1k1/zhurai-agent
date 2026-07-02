@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import runpy
+from pathlib import Path
 
-from setuptools import Distribution
 import setuptools
-
+from setuptools import Distribution
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,5 +82,5 @@ def test_setup_uses_temporary_outputs_when_source_tree_is_read_only(
     assert source_relative_egg_info.egg_base is not None
     assert not _is_under(source_relative_egg_info.egg_base, REPO_ROOT)
     assert Path(source_relative_egg_info.egg_base).name.startswith(
-        "hermes-agent-egg-info"
+        "hermes-agent-egg-info",
     )

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Raw Chrome DevTools Protocol (CDP) passthrough tool.
+"""Raw Chrome DevTools Protocol (CDP) passthrough tool.
 
 Exposes a single tool, ``browser_cdp``, that sends arbitrary CDP commands to
 the browser's DevTools WebSocket endpoint.  Works when a CDP URL is
@@ -20,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from tools.registry import registry, tool_error
 
@@ -78,7 +77,9 @@ def _resolve_cdp_endpoint() -> str:
     2. ``browser.cdp_url`` in ``config.yaml``
     """
     try:
-        from tools.browser_tool import _get_cdp_override  # type: ignore[import-not-found]
+        from tools.browser_tool import (
+            _get_cdp_override,  # type: ignore[import-not-found]
+        )
 
         return (_get_cdp_override() or "").strip()
     except Exception as exc:  # pragma: no cover — defensive
@@ -94,10 +95,10 @@ def _resolve_cdp_endpoint() -> str:
 async def _cdp_call(
     ws_url: str,
     method: str,
-    params: Dict[str, Any],
-    target_id: Optional[str],
+    params: dict[str, Any],
+    target_id: str | None,
     timeout: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Make a single CDP call, optionally attaching to a target first.
 
     When ``target_id`` is provided, we call ``Target.attachToTarget`` with
@@ -117,7 +118,7 @@ async def _cdp_call(
         ping_interval=None,  # CDP server doesn't expect pings
     ) as ws:
         next_id = 1
-        session_id: Optional[str] = None
+        session_id: str | None = None
 
         # --- Step 1: attach to target if requested ---
         if target_id:
@@ -129,27 +130,27 @@ async def _cdp_call(
                         "id": attach_id,
                         "method": "Target.attachToTarget",
                         "params": {"targetId": target_id, "flatten": True},
-                    }
-                )
+                    },
+                ),
             )
             deadline = asyncio.get_running_loop().time() + timeout
             while True:
                 remaining = deadline - asyncio.get_running_loop().time()
                 if remaining <= 0:
                     raise TimeoutError(
-                        f"Timed out attaching to target {target_id}"
+                        f"Timed out attaching to target {target_id}",
                     )
                 raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
                 msg = json.loads(raw)
                 if msg.get("id") == attach_id:
                     if "error" in msg:
                         raise RuntimeError(
-                            f"Target.attachToTarget failed: {msg['error']}"
+                            f"Target.attachToTarget failed: {msg['error']}",
                         )
                     session_id = msg.get("result", {}).get("sessionId")
                     if not session_id:
                         raise RuntimeError(
-                            "Target.attachToTarget did not return a sessionId"
+                            "Target.attachToTarget did not return a sessionId",
                         )
                     break
                 # Ignore events (messages without "id") while waiting
@@ -157,7 +158,7 @@ async def _cdp_call(
         # --- Step 2: dispatch the real method ---
         call_id = next_id
         next_id += 1
-        req: Dict[str, Any] = {
+        req: dict[str, Any] = {
             "id": call_id,
             "method": method,
             "params": params or {},
@@ -171,7 +172,7 @@ async def _cdp_call(
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
                 raise TimeoutError(
-                    f"Timed out waiting for response to {method}"
+                    f"Timed out waiting for response to {method}",
                 )
             raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
             msg = json.loads(raw)
@@ -191,7 +192,7 @@ def _browser_cdp_via_supervisor(
     task_id: str,
     frame_id: str,
     method: str,
-    params: Optional[Dict[str, Any]],
+    params: dict[str, Any] | None,
     timeout: float,
 ) -> str:
     """Route a CDP call through the live supervisor session for an OOPIF frame.
@@ -202,12 +203,14 @@ def _browser_cdp_via_supervisor(
     ``asyncio.run_coroutine_threadsafe`` onto the supervisor loop).
     """
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+        from tools.browser_supervisor import (
+            SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+        )
     except Exception as exc:  # pragma: no cover — defensive
         return tool_error(
             f"CDP supervisor is not available: {exc}. frame_id routing requires "
             f"a running supervisor attached via /browser connect or an active "
-            f"Browserbase session."
+            f"Browserbase session.",
         )
 
     supervisor = SUPERVISOR_REGISTRY.get(task_id)
@@ -216,13 +219,13 @@ def _browser_cdp_via_supervisor(
             f"No CDP supervisor is attached for task={task_id!r}. Call "
             f"browser_navigate or /browser connect first so the supervisor "
             f"can attach. Once attached, browser_snapshot will populate "
-            f"frame_tree with frame_ids you can pass here."
+            f"frame_tree with frame_ids you can pass here.",
         )
 
     snap = supervisor.snapshot()
     # Search both the top frame and the children for the requested id.
     top = snap.frame_tree.get("top")
-    frame_info: Optional[Dict[str, Any]] = None
+    frame_info: dict[str, Any] | None = None
     if top and top.get("frame_id") == frame_id:
         frame_info = top
     else:
@@ -240,7 +243,7 @@ def _browser_cdp_via_supervisor(
     if frame_info is None:
         return tool_error(
             f"frame_id {frame_id!r} not found in supervisor state. "
-            f"Call browser_snapshot to see current frame_tree."
+            f"Call browser_snapshot to see current frame_tree.",
         )
 
     child_sid = frame_info.get("session_id")
@@ -253,7 +256,7 @@ def _browser_cdp_via_supervisor(
             f"dedicated CDP session). For same-origin iframes, use "
             f"`browser_cdp(method='Runtime.evaluate', params={{'expression': "
             f"\"document.querySelector('iframe').contentDocument.title\"}})` "
-            f"at the top-level page instead."
+            f"at the top-level page instead.",
         )
 
     # Dispatch onto the supervisor's loop.
@@ -261,7 +264,7 @@ def _browser_cdp_via_supervisor(
     if loop is None or not loop.is_running():
         return tool_error(
             "CDP supervisor loop is not running. Try reconnecting with "
-            "/browser connect."
+            "/browser connect.",
         )
 
     async def _do_cdp():
@@ -287,7 +290,7 @@ def _browser_cdp_via_supervisor(
             cdp_docs=CDP_DOCS_URL,
         )
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "success": True,
         "method": method,
         "frame_id": frame_id,
@@ -299,11 +302,11 @@ def _browser_cdp_via_supervisor(
 
 def browser_cdp(
     method: str,
-    params: Optional[Dict[str, Any]] = None,
-    target_id: Optional[str] = None,
-    frame_id: Optional[str] = None,
+    params: dict[str, Any] | None = None,
+    target_id: str | None = None,
+    frame_id: str | None = None,
     timeout: float = 30.0,
-    task_id: Optional[str] = None,
+    task_id: str | None = None,
 ) -> str:
     """Send a raw CDP command.  See ``CDP_DOCS_URL`` for method documentation.
 
@@ -329,6 +332,7 @@ def browser_cdp(
     Returns:
         JSON string ``{"success": True, "method": ..., "result": {...}}`` on
         success, or ``{"error": "..."}`` on failure.
+
     """
     # --- Route iframe-scoped calls through the supervisor ---------------
     if frame_id:
@@ -350,7 +354,7 @@ def browser_cdp(
     if not _WS_AVAILABLE:
         return tool_error(
             "The 'websockets' Python package is required but not installed. "
-            "Install it with: pip install websockets"
+            "Install it with: pip install websockets",
         )
 
     endpoint = _resolve_cdp_endpoint()
@@ -368,13 +372,13 @@ def browser_cdp(
             f"CDP endpoint is not a WebSocket URL: {endpoint!r}. "
             "Expected ws://... or wss://... — the /browser connect "
             "resolver should have rewritten this. Check that a Chromium-family "
-            "browser is actually listening on the debug port."
+            "browser is actually listening on the debug port.",
         )
 
-    call_params: Dict[str, Any] = params or {}
+    call_params: dict[str, Any] = params or {}
     if not isinstance(call_params, dict):
         return tool_error(
-            f"'params' must be an object/dict, got {type(call_params).__name__}"
+            f"'params' must be an object/dict, got {type(call_params).__name__}",
         )
 
     try:
@@ -385,9 +389,9 @@ def browser_cdp(
 
     try:
         result = _run_async(
-            _cdp_call(endpoint, method, call_params, target_id, safe_timeout)
+            _cdp_call(endpoint, method, call_params, target_id, safe_timeout),
         )
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         return tool_error(
             f"CDP call timed out after {safe_timeout}s: {exc}",
             method=method,
@@ -409,7 +413,7 @@ def browser_cdp(
             method=method,
         )
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "success": True,
         "method": method,
         "result": result,
@@ -424,7 +428,7 @@ def browser_cdp(
 # ---------------------------------------------------------------------------
 
 
-BROWSER_CDP_SCHEMA: Dict[str, Any] = {
+BROWSER_CDP_SCHEMA: dict[str, Any] = {
     "name": "browser_cdp",
     "description": (
         "Send a raw Chrome DevTools Protocol (CDP) command. Escape hatch for "

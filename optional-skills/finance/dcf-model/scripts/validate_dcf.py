@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""
-DCF Model Validation Script
+"""DCF Model Validation Script
 Validates Excel DCF models for formula errors and common DCF mistakes
 """
 
-import sys
 import json
+import sys
 from pathlib import Path
 
 
@@ -29,13 +28,13 @@ class DCFModelValidator:
         self.errors = []
         self.warnings = []
         self.info = []
-        
+
     def validate_all(self) -> dict:
-        """
-        Run all validation checks
+        """Run all validation checks
 
         Returns:
             Dict with validation results
+
         """
         from datetime import datetime
 
@@ -44,21 +43,21 @@ class DCFModelValidator:
         self.check_dcf_logic()
 
         results = {
-            'file': self.excel_path,
-            'validation_date': datetime.now().isoformat(),
-            'status': 'PASS' if len(self.errors) == 0 else 'FAIL',
-            'error_count': len(self.errors),
-            'warning_count': len(self.warnings),
-            'errors': self.errors,
-            'warnings': self.warnings,
-            'info': self.info
+            "file": self.excel_path,
+            "validation_date": datetime.now().isoformat(),
+            "status": "PASS" if len(self.errors) == 0 else "FAIL",
+            "error_count": len(self.errors),
+            "warning_count": len(self.warnings),
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "info": self.info,
         }
 
         return results
-    
+
     def check_sheet_structure(self):
         """Verify required sheets exist"""
-        required_sheets = ['DCF', 'WACC', 'Sensitivity']
+        required_sheets = ["DCF", "WACC", "Sensitivity"]
         sheet_names = self.workbook_values.sheetnames
 
         for sheet in required_sheets:
@@ -69,7 +68,7 @@ class DCFModelValidator:
 
     def check_formula_errors(self):
         """Check for Excel formula errors in all sheets"""
-        excel_errors = ['#VALUE!', '#DIV/0!', '#REF!', '#NAME?', '#NULL!', '#NUM!', '#N/A']
+        excel_errors = ["#VALUE!", "#DIV/0!", "#REF!", "#NAME?", "#NULL!", "#NUM!", "#N/A"]
         error_details = {err: [] for err in excel_errors}
         total_errors = 0
         total_formulas = 0
@@ -83,7 +82,7 @@ class DCFModelValidator:
                     formula_cell = ws_formulas[cell.coordinate]
 
                     # Count formulas
-                    if formula_cell.value and isinstance(formula_cell.value, str) and formula_cell.value.startswith('='):
+                    if formula_cell.value and isinstance(formula_cell.value, str) and formula_cell.value.startswith("="):
                         total_formulas += 1
 
                     # Check for errors
@@ -104,7 +103,7 @@ class DCFModelValidator:
             self.errors.append(f"Total formula errors: {total_errors}")
 
         return error_details, total_errors
-    
+
     def check_dcf_logic(self):
         """Validate DCF-specific logic and calculations"""
         self._check_terminal_growth_vs_wacc()
@@ -114,7 +113,7 @@ class DCFModelValidator:
     def _check_terminal_growth_vs_wacc(self):
         """Critical check: Terminal growth must be less than WACC"""
         try:
-            dcf_sheet = self.workbook_values['DCF']
+            dcf_sheet = self.workbook_values["DCF"]
 
             terminal_growth = None
             wacc = None
@@ -124,14 +123,14 @@ class DCFModelValidator:
                 for cell in row:
                     if cell.value and isinstance(cell.value, str):
                         cell_str = cell.value.lower()
-                        if 'terminal' in cell_str and 'growth' in cell_str:
+                        if "terminal" in cell_str and "growth" in cell_str:
                             # Look for value in adjacent cells
                             for offset in range(1, 5):
                                 adjacent = dcf_sheet.cell(cell.row, cell.column + offset).value
                                 if isinstance(adjacent, (int, float)) and 0 < adjacent < 1:
                                     terminal_growth = adjacent
                                     break
-                        if 'wacc' in cell_str and wacc is None:
+                        if "wacc" in cell_str and wacc is None:
                             for offset in range(1, 5):
                                 adjacent = dcf_sheet.cell(cell.row, cell.column + offset).value
                                 if isinstance(adjacent, (int, float)) and 0 < adjacent < 1:
@@ -142,11 +141,11 @@ class DCFModelValidator:
                 if terminal_growth >= wacc:
                     self.errors.append(
                         f"CRITICAL: Terminal growth ({terminal_growth:.2%}) >= WACC ({wacc:.2%}). "
-                        "This creates infinite value and is mathematically invalid."
+                        "This creates infinite value and is mathematically invalid.",
                     )
                 else:
                     self.info.append(
-                        f"✓ Terminal growth ({terminal_growth:.2%}) < WACC ({wacc:.2%})"
+                        f"✓ Terminal growth ({terminal_growth:.2%}) < WACC ({wacc:.2%})",
                     )
             else:
                 self.warnings.append("Could not locate terminal growth and WACC values")
@@ -154,18 +153,18 @@ class DCFModelValidator:
         except KeyError:
             self.warnings.append("DCF sheet not found")
         except Exception as e:
-            self.warnings.append(f"Could not validate terminal growth vs WACC: {str(e)}")
+            self.warnings.append(f"Could not validate terminal growth vs WACC: {e!s}")
 
     def _check_wacc_range(self):
         """Check if WACC is in reasonable range"""
         try:
-            wacc_sheet = self.workbook_values.get('WACC') or self.workbook_values['DCF']
+            wacc_sheet = self.workbook_values.get("WACC") or self.workbook_values["DCF"]
             wacc = None
 
             for row in wacc_sheet.iter_rows(max_row=100, max_col=20):
                 for cell in row:
                     if cell.value and isinstance(cell.value, str):
-                        if 'wacc' in cell.value.lower():
+                        if "wacc" in cell.value.lower():
                             for offset in range(1, 5):
                                 adjacent = wacc_sheet.cell(cell.row, cell.column + offset).value
                                 if isinstance(adjacent, (int, float)) and 0 < adjacent < 1:
@@ -175,7 +174,7 @@ class DCFModelValidator:
             if wacc is not None:
                 if wacc < 0.05 or wacc > 0.20:
                     self.warnings.append(
-                        f"WACC ({wacc:.2%}) is outside typical range (5%-20%). Verify calculation."
+                        f"WACC ({wacc:.2%}) is outside typical range (5%-20%). Verify calculation.",
                     )
                 else:
                     self.info.append(f"✓ WACC ({wacc:.2%}) in reasonable range")
@@ -183,12 +182,12 @@ class DCFModelValidator:
                 self.warnings.append("Could not locate WACC value")
 
         except Exception as e:
-            self.warnings.append(f"Could not validate WACC range: {str(e)}")
+            self.warnings.append(f"Could not validate WACC range: {e!s}")
 
     def _check_terminal_value_proportion(self):
         """Check if terminal value is reasonable proportion of enterprise value"""
         try:
-            dcf_sheet = self.workbook_values['DCF']
+            dcf_sheet = self.workbook_values["DCF"]
 
             terminal_value = None
             enterprise_value = None
@@ -197,13 +196,13 @@ class DCFModelValidator:
                 for cell in row:
                     if cell.value and isinstance(cell.value, str):
                         cell_str = cell.value.lower()
-                        if 'terminal' in cell_str and 'value' in cell_str and 'pv' in cell_str:
+                        if "terminal" in cell_str and "value" in cell_str and "pv" in cell_str:
                             for offset in range(1, 5):
                                 adjacent = dcf_sheet.cell(cell.row, cell.column + offset).value
                                 if isinstance(adjacent, (int, float)) and adjacent > 0:
                                     terminal_value = adjacent
                                     break
-                        if 'enterprise' in cell_str and 'value' in cell_str:
+                        if "enterprise" in cell_str and "value" in cell_str:
                             for offset in range(1, 5):
                                 adjacent = dcf_sheet.cell(cell.row, cell.column + offset).value
                                 if isinstance(adjacent, (int, float)) and adjacent > 0:
@@ -215,12 +214,12 @@ class DCFModelValidator:
                 if proportion > 0.80:
                     self.warnings.append(
                         f"Terminal value is {proportion:.1%} of EV (typically should be 50-70%). "
-                        "Model may be over-reliant on terminal assumptions."
+                        "Model may be over-reliant on terminal assumptions.",
                     )
                 elif proportion < 0.40:
                     self.warnings.append(
                         f"Terminal value is {proportion:.1%} of EV (typically should be 50-70%). "
-                        "Check if terminal assumptions are too conservative."
+                        "Check if terminal assumptions are too conservative.",
                     )
                 else:
                     self.info.append(f"✓ Terminal value is {proportion:.1%} of EV")
@@ -228,19 +227,18 @@ class DCFModelValidator:
                 self.warnings.append("Could not locate terminal value and enterprise value")
 
         except Exception as e:
-            self.warnings.append(f"Could not validate terminal value proportion: {str(e)}")
-    
+            self.warnings.append(f"Could not validate terminal value proportion: {e!s}")
 
 
 def validate_dcf_model(excel_path: str) -> dict:
-    """
-    Validate a DCF model Excel file
+    """Validate a DCF model Excel file
 
     Args:
         excel_path: Path to Excel DCF model
 
     Returns:
         Dict with validation results
+
     """
     validator = DCFModelValidator(excel_path)
     return validator.validate_all()
@@ -271,17 +269,17 @@ def main():
 
         # Save to file if requested
         if output_file:
-            with open(output_file, 'w') as f:
+            with Path(output_file).open("w") as f:
                 json.dump(results, f, indent=2)
 
         # Exit with error code if validation failed
-        sys.exit(0 if results['status'] == 'PASS' else 1)
+        sys.exit(0 if results["status"] == "PASS" else 1)
 
     except Exception as e:
         error_result = {
-            'file': excel_file,
-            'status': 'ERROR',
-            'error': str(e)
+            "file": excel_file,
+            "status": "ERROR",
+            "error": str(e),
         }
         print(json.dumps(error_result, indent=2))
         sys.exit(1)

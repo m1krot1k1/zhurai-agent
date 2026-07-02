@@ -20,7 +20,7 @@ class FakeRequestClient:
         self._responder = responder
         self._client = SimpleNamespace(is_closed=False)
         self.chat = SimpleNamespace(
-            completions=SimpleNamespace(create=self._create)
+            completions=SimpleNamespace(create=self._create),
         )
         self.responses = SimpleNamespace()
         self.close_calls = 0
@@ -172,7 +172,6 @@ def test_concurrent_requests_do_not_break_each_other_when_one_client_closes(monk
     assert sum(isinstance(value, APIConnectionError) for value in values) == 1
     assert values.count({"ok": "second"}) == 1
     assert len(factory.calls) == 2
-
 
 
 def test_streaming_call_recreates_closed_shared_client_before_request(monkeypatch):

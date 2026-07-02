@@ -24,7 +24,7 @@ Pure helpers that read the agent's state.  AIAgent keeps thin forwarders.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY,
@@ -110,7 +110,7 @@ def _resolve_platform_hint(agent: Any, platform_key: str, default_hint: str) -> 
     return base
 
 
-def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) -> Dict[str, str]:
+def build_system_prompt_parts(agent: Any, system_message: str | None = None) -> dict[str, str]:
     """Assemble the system prompt as three ordered parts.
 
     Returns a dict with three keys:
@@ -137,7 +137,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # to it (dynamic cap — see prompt_builder._dynamic_context_file_max_chars).
     # None falls back to the historical flat default. This value is stable for
     # the life of the conversation, so it does not threaten prompt caching.
-    _ctx_len: Optional[int] = None
+    _ctx_len: int | None = None
     _cc = getattr(agent, "context_compressor", None)
     if _cc is not None:
         _cc_len = getattr(_cc, "context_length", None)
@@ -145,7 +145,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             _ctx_len = _cc_len
 
     # ── Stable tier ────────────────────────────────────────────────
-    stable_parts: List[str] = []
+    stable_parts: list[str] = []
 
     # Try SOUL.md as primary identity unless the caller explicitly skipped it.
     # Some execution modes (cron) still want HERMES_HOME persona while keeping
@@ -257,7 +257,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             if "gpt" in _model_lower or "codex" in _model_lower or "grok" in _model_lower:
                 stable_parts.append(OPENAI_MODEL_EXECUTION_GUIDANCE)
 
-    has_skills_tools = any(name in agent.valid_tool_names for name in ['skills_list', 'skill_view', 'skill_manage'])
+    has_skills_tools = any(name in agent.valid_tool_names for name in ["skills_list", "skill_view", "skill_manage"])
     if has_skills_tools:
         avail_toolsets = {
             toolset
@@ -275,7 +275,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             from agent.coding_context import coding_compact_skill_categories
 
             _compact_cats = coding_compact_skill_categories(
-                platform=agent.platform, cwd=resolve_context_cwd()
+                platform=agent.platform, cwd=resolve_context_cwd(),
             )
         except Exception:
             _compact_cats = frozenset()
@@ -300,7 +300,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             f"You are powered by the model named {_model_short}. "
             f"The exact model ID is {agent.model}. "
             f"When asked what model you are, always answer based on this information, "
-            f"not on any model name returned by the API."
+            f"not on any model name returned by the API.",
         )
 
     # Environment hints (WSL, Termux, etc.) — tell the agent about the
@@ -324,7 +324,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
                     platform=agent.platform,
                     cwd=resolve_context_cwd(),
                     model=agent.model,
-                )
+                ),
             )
         except Exception:
             # Coding-context probing must never block prompt build.
@@ -366,7 +366,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             "skills/, plugins/, cron/, and memories/ that affect a different "
             "session than this one. Do not modify another profile's "
             "skills/plugins/cron/memories unless the user explicitly directs "
-            "you to."
+            "you to.",
         )
     else:
         stable_parts.append(
@@ -378,7 +378,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             f"another profile's skills/plugins/cron/memories unless the user "
             f"explicitly directs you to. The cross-profile write guard will "
             f"refuse such writes by default; pass cross_profile=True only "
-            f"after explicit direction."
+            f"after explicit direction.",
         )
 
     platform_key = (agent.platform or "").lower().strip()
@@ -402,7 +402,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
         stable_parts.append(_effective_hint)
 
     # ── Context tier (cwd-dependent, may change between sessions) ─
-    context_parts: List[str] = []
+    context_parts: list[str] = []
 
     # Note: ephemeral_system_prompt is NOT included here. It's injected at
     # API-call time only so it stays out of the cached/stored system prompt.
@@ -421,7 +421,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
             context_parts.append(context_files_prompt)
 
     # ── Volatile tier (changes per session/turn — never cached) ───
-    volatile_parts: List[str] = []
+    volatile_parts: list[str] = []
 
     if agent._memory_store:
         if agent._memory_enabled:
@@ -461,13 +461,13 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     volatile_parts.append(timestamp_line)
 
     return {
-        "stable":   "\n\n".join(p.strip() for p in stable_parts   if p and p.strip()),
-        "context":  "\n\n".join(p.strip() for p in context_parts  if p and p.strip()),
+        "stable":   "\n\n".join(p.strip() for p in stable_parts if p and p.strip()),
+        "context":  "\n\n".join(p.strip() for p in context_parts if p and p.strip()),
         "volatile": "\n\n".join(p.strip() for p in volatile_parts if p and p.strip()),
     }
 
 
-def build_system_prompt(agent: Any, system_message: Optional[str] = None) -> str:
+def build_system_prompt(agent: Any, system_message: str | None = None) -> str:
     """Assemble the full system prompt from all layers.
 
     Called once per session (cached on ``agent._cached_system_prompt``) and
@@ -509,6 +509,7 @@ def format_tools_for_system_message(agent: Any) -> str:
 
     Returns:
         str: JSON string representation of tool definitions
+
     """
     if not agent.tools:
         return "[]"
@@ -521,7 +522,7 @@ def format_tools_for_system_message(agent: Any) -> str:
             "name": func["name"],
             "description": func.get("description", ""),
             "parameters": func.get("parameters", {}),
-            "required": None  # Match the format in the example
+            "required": None,  # Match the format in the example
         }
         formatted_tools.append(formatted_tool)
 
@@ -529,8 +530,8 @@ def format_tools_for_system_message(agent: Any) -> str:
 
 
 __all__ = [
-    "build_system_prompt_parts",
     "build_system_prompt",
-    "invalidate_system_prompt",
+    "build_system_prompt_parts",
     "format_tools_for_system_message",
+    "invalidate_system_prompt",
 ]

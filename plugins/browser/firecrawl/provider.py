@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 import requests
 
@@ -65,25 +65,25 @@ class FirecrawlBrowserProvider(BrowserProvider):
     def _api_url(self) -> str:
         return os.environ.get("FIRECRAWL_API_URL", _BASE_URL)
 
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         api_key = os.environ.get("FIRECRAWL_API_KEY")
         if not api_key:
             raise ValueError(
                 "FIRECRAWL_API_KEY environment variable is required. "
-                "Get your key at https://firecrawl.dev"
+                "Get your key at https://firecrawl.dev",
             )
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}",
         }
 
-    def create_session(self, task_id: str) -> Dict[str, object]:
+    def create_session(self, task_id: str) -> dict[str, object]:
         try:
             ttl = int(os.environ.get("FIRECRAWL_BROWSER_TTL", "300"))
         except (ValueError, TypeError):
             ttl = 300
 
-        body: Dict[str, object] = {"ttl": ttl}
+        body: dict[str, object] = {"ttl": ttl}
 
         try:
             response = requests.post(
@@ -94,13 +94,13 @@ class FirecrawlBrowserProvider(BrowserProvider):
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"Firecrawl API connection failed: {exc}"
+                f"Firecrawl API connection failed: {exc}",
             ) from exc
 
         if not response.ok:
             raise RuntimeError(
                 f"Failed to create Firecrawl browser session: "
-                f"{response.status_code} {response.text}"
+                f"{response.status_code} {response.text}",
             )
 
         data = response.json()
@@ -125,14 +125,13 @@ class FirecrawlBrowserProvider(BrowserProvider):
             if response.status_code in {200, 201, 204}:
                 logger.debug("Successfully closed Firecrawl session %s", session_id)
                 return True
-            else:
-                logger.warning(
-                    "Failed to close Firecrawl session %s: HTTP %s - %s",
-                    session_id,
-                    response.status_code,
-                    response.text[:200],
-                )
-                return False
+            logger.warning(
+                "Failed to close Firecrawl session %s: HTTP %s - %s",
+                session_id,
+                response.status_code,
+                response.text[:200],
+            )
+            return False
         except Exception as e:
             logger.error("Exception closing Firecrawl session %s: %s", session_id, e)
             return False
@@ -152,10 +151,10 @@ class FirecrawlBrowserProvider(BrowserProvider):
             )
         except Exception as e:
             logger.debug(
-                "Emergency cleanup failed for Firecrawl session %s: %s", session_id, e
+                "Emergency cleanup failed for Firecrawl session %s: %s", session_id, e,
             )
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Firecrawl",
             "badge": "paid",

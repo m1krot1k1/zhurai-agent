@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 from agent.model_metadata import fetch_endpoint_model_metadata, fetch_model_metadata
 from utils import base_url_host_matches
 
 DEFAULT_PRICING = {"input": 0.0, "output": 0.0}
 
-_ZERO = Decimal("0")
-_ONE_MILLION = Decimal("1000000")
+_ZERO = Decimal(0)
+_ONE_MILLION = Decimal(1000000)
 _NOUS_DEFAULT_BASE_URL = "https://inference-api.nousresearch.com/v1"
 
 CostStatus = Literal["actual", "estimated", "included", "unknown"]
@@ -35,7 +35,7 @@ class CanonicalUsage:
     cache_write_tokens: int = 0
     reasoning_tokens: int = 0
     request_count: int = 1
-    raw_usage: Optional[dict[str, Any]] = None
+    raw_usage: dict[str, Any] | None = None
 
     @property
     def prompt_tokens(self) -> int:
@@ -56,34 +56,34 @@ class BillingRoute:
 
 @dataclass(frozen=True)
 class PricingEntry:
-    input_cost_per_million: Optional[Decimal] = None
-    output_cost_per_million: Optional[Decimal] = None
-    cache_read_cost_per_million: Optional[Decimal] = None
-    cache_write_cost_per_million: Optional[Decimal] = None
-    request_cost: Optional[Decimal] = None
+    input_cost_per_million: Decimal | None = None
+    output_cost_per_million: Decimal | None = None
+    cache_read_cost_per_million: Decimal | None = None
+    cache_write_cost_per_million: Decimal | None = None
+    request_cost: Decimal | None = None
     source: CostSource = "none"
-    source_url: Optional[str] = None
-    pricing_version: Optional[str] = None
-    fetched_at: Optional[datetime] = None
+    source_url: str | None = None
+    pricing_version: str | None = None
+    fetched_at: datetime | None = None
 
 
 @dataclass(frozen=True)
 class CostResult:
-    amount_usd: Optional[Decimal]
+    amount_usd: Decimal | None
     status: CostStatus
     source: CostSource
     label: str
-    fetched_at: Optional[datetime] = None
-    pricing_version: Optional[str] = None
+    fetched_at: datetime | None = None
+    pricing_version: str | None = None
     notes: tuple[str, ...] = ()
 
 
-_UTC_NOW = lambda: datetime.now(timezone.utc)
+_UTC_NOW = lambda: datetime.now(UTC)
 
 
 # Official docs snapshot entries. Models whose published pricing and cache
 # semantics are stable enough to encode exactly.
-_OFFICIAL_DOCS_PRICING: Dict[tuple[str, str], PricingEntry] = {
+_OFFICIAL_DOCS_PRICING: dict[tuple[str, str], PricingEntry] = {
     # ── Anthropic Claude 4.8 ─────────────────────────────────────────────
     # Same $5/$25 base pricing as 4.6/4.7.  Fast-mode variant is a separate
     # model ID with 2x premium (vs the 6x premium on older Opus generations).
@@ -545,7 +545,7 @@ _OFFICIAL_DOCS_PRICING: Dict[tuple[str, str], PricingEntry] = {
 }
 
 
-def _to_decimal(value: Any) -> Optional[Decimal]:
+def _to_decimal(value: Any) -> Decimal | None:
     if value is None:
         return None
     try:
@@ -563,8 +563,8 @@ def _to_int(value: Any) -> int:
 
 def resolve_billing_route(
     model_name: str,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
 ) -> BillingRoute:
     provider_name = (provider or "").strip().lower()
     base = (base_url or "").strip().lower()
@@ -621,15 +621,14 @@ def _normalize_anthropic_model_name(model: str) -> str:
       - Strips anthropic/ prefix if present
     """
     name = model.lower().strip()
-    if name.startswith("anthropic/"):
-        name = name[len("anthropic/"):]
+    name = name.removeprefix("anthropic/")
     # Normalize dots to dashes in version numbers (e.g. 4.7 → 4-7, 4.6 → 4-6)
     # But preserve the rest of the name structure
     name = re.sub(r"(\d+)\.(\d+)", r"\1-\2", name)
     return name
 
 
-def _lookup_official_docs_pricing(route: BillingRoute) -> Optional[PricingEntry]:
+def _lookup_official_docs_pricing(route: BillingRoute) -> PricingEntry | None:
     model = route.model.lower()
     # Direct lookup first
     entry = _OFFICIAL_DOCS_PRICING.get((route.provider, model))
@@ -653,7 +652,7 @@ def _lookup_official_docs_pricing(route: BillingRoute) -> Optional[PricingEntry]
     return None
 
 
-def _openrouter_pricing_entry(route: BillingRoute) -> Optional[PricingEntry]:
+def _openrouter_pricing_entry(route: BillingRoute) -> PricingEntry | None:
     return _pricing_entry_from_metadata(
         fetch_model_metadata(),
         route.model,
@@ -663,12 +662,12 @@ def _openrouter_pricing_entry(route: BillingRoute) -> Optional[PricingEntry]:
 
 
 def _pricing_entry_from_metadata(
-    metadata: Dict[str, Dict[str, Any]],
+    metadata: dict[str, dict[str, Any]],
     model_id: str,
     *,
     source_url: str,
     pricing_version: str,
-) -> Optional[PricingEntry]:
+) -> PricingEntry | None:
     if model_id not in metadata:
         return None
     pricing = metadata[model_id].get("pricing") or {}
@@ -678,17 +677,17 @@ def _pricing_entry_from_metadata(
     cache_read = _to_decimal(
         pricing.get("cache_read")
         or pricing.get("cached_prompt")
-        or pricing.get("input_cache_read")
+        or pricing.get("input_cache_read"),
     )
     cache_write = _to_decimal(
         pricing.get("cache_write")
         or pricing.get("cache_creation")
-        or pricing.get("input_cache_write")
+        or pricing.get("input_cache_write"),
     )
     if prompt is None and completion is None and request is None:
         return None
 
-    def _per_token_to_per_million(value: Optional[Decimal]) -> Optional[Decimal]:
+    def _per_token_to_per_million(value: Decimal | None) -> Decimal | None:
         if value is None:
             return None
         return value * _ONE_MILLION
@@ -708,10 +707,10 @@ def _pricing_entry_from_metadata(
 
 def get_pricing_entry(
     model_name: str,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
-) -> Optional[PricingEntry]:
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+) -> PricingEntry | None:
     route = resolve_billing_route(model_name, provider=provider, base_url=base_url)
     if route.billing_mode == "subscription_included":
         return PricingEntry(
@@ -739,8 +738,8 @@ def get_pricing_entry(
 def normalize_usage(
     response_usage: Any,
     *,
-    provider: Optional[str] = None,
-    api_mode: Optional[str] = None,
+    provider: str | None = None,
+    api_mode: str | None = None,
 ) -> CanonicalUsage:
     """Normalize raw API response usage into canonical token buckets.
 
@@ -770,7 +769,7 @@ def normalize_usage(
         details = getattr(response_usage, "input_tokens_details", None)
         cache_read_tokens = _to_int(getattr(details, "cached_tokens", 0) if details else 0)
         cache_write_tokens = _to_int(
-            getattr(details, "cache_creation_tokens", 0) if details else 0
+            getattr(details, "cache_creation_tokens", 0) if details else 0,
         )
         input_tokens = max(0, input_total - cache_read_tokens - cache_write_tokens)
     else:
@@ -787,11 +786,11 @@ def normalize_usage(
         if not cache_read_tokens:
             cache_read_tokens = _to_int(getattr(response_usage, "cache_read_input_tokens", 0))
         cache_write_tokens = _to_int(
-            getattr(details, "cache_write_tokens", 0) if details else 0
+            getattr(details, "cache_write_tokens", 0) if details else 0,
         )
         if not cache_write_tokens:
             cache_write_tokens = _to_int(
-                getattr(response_usage, "cache_creation_input_tokens", 0)
+                getattr(response_usage, "cache_creation_input_tokens", 0),
             )
         input_tokens = max(0, prompt_total - cache_read_tokens - cache_write_tokens)
 
@@ -813,9 +812,9 @@ def estimate_usage_cost(
     model_name: str,
     usage: CanonicalUsage,
     *,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> CostResult:
     route = resolve_billing_route(model_name, provider=provider, base_url=base_url)
     if route.billing_mode == "subscription_included":
@@ -838,24 +837,22 @@ def estimate_usage_cost(
         return CostResult(amount_usd=None, status="unknown", source=entry.source, label="n/a")
     if usage.output_tokens and entry.output_cost_per_million is None:
         return CostResult(amount_usd=None, status="unknown", source=entry.source, label="n/a")
-    if usage.cache_read_tokens:
-        if entry.cache_read_cost_per_million is None:
-            return CostResult(
-                amount_usd=None,
-                status="unknown",
-                source=entry.source,
-                label="n/a",
-                notes=("cache-read pricing unavailable for route",),
-            )
-    if usage.cache_write_tokens:
-        if entry.cache_write_cost_per_million is None:
-            return CostResult(
-                amount_usd=None,
-                status="unknown",
-                source=entry.source,
-                label="n/a",
-                notes=("cache-write pricing unavailable for route",),
-            )
+    if usage.cache_read_tokens and entry.cache_read_cost_per_million is None:
+        return CostResult(
+            amount_usd=None,
+            status="unknown",
+            source=entry.source,
+            label="n/a",
+            notes=("cache-read pricing unavailable for route",),
+        )
+    if usage.cache_write_tokens and entry.cache_write_cost_per_million is None:
+        return CostResult(
+            amount_usd=None,
+            status="unknown",
+            source=entry.source,
+            label="n/a",
+            notes=("cache-write pricing unavailable for route",),
+        )
 
     if entry.input_cost_per_million is not None:
         amount += Decimal(usage.input_tokens) * entry.input_cost_per_million / _ONE_MILLION
@@ -890,9 +887,9 @@ def estimate_usage_cost(
 
 def has_known_pricing(
     model_name: str,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> bool:
     """Check whether we have pricing data for this model+route.
 
@@ -904,7 +901,6 @@ def has_known_pricing(
         return True
     entry = get_pricing_entry(model_name, provider=provider, base_url=base_url, api_key=api_key)
     return entry is not None
-
 
 
 def format_duration_compact(seconds: float) -> str:

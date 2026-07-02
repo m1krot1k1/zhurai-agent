@@ -25,12 +25,14 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from agent.context_engine import ContextEngine
+
 logger = logging.getLogger(__name__)
 
 _CONTEXT_ENGINE_PLUGINS_DIR = Path(__file__).parent
 
 
-def discover_context_engines() -> List[Tuple[str, str, bool]]:
+def discover_context_engines() -> list[tuple[str, str, bool]]:
     """Scan plugins/context_engine/ for available engines.
 
     Returns list of (name, description, is_available) tuples.
@@ -54,7 +56,7 @@ def discover_context_engines() -> List[Tuple[str, str, bool]]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with Path(yaml_file).open(encoding="utf-8-sig") as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
             except Exception:
@@ -76,7 +78,7 @@ def discover_context_engines() -> List[Tuple[str, str, bool]]:
     return results
 
 
-def load_context_engine(name: str) -> Optional["ContextEngine"]:
+def load_context_engine(name: str) -> ContextEngine | None:
     """Load and return a ContextEngine instance by name.
 
     Returns None if the engine is not found or fails to load.
@@ -97,7 +99,7 @@ def load_context_engine(name: str) -> Optional["ContextEngine"]:
         return None
 
 
-def _load_engine_from_dir(engine_dir: Path) -> Optional["ContextEngine"]:
+def _load_engine_from_dir(engine_dir: Path) -> ContextEngine | None:
     """Import an engine module and extract the ContextEngine instance.
 
     The module must have either:
@@ -126,7 +128,7 @@ def _load_engine_from_dir(engine_dir: Path) -> Optional["ContextEngine"]:
                 if parent_init.exists():
                     spec = importlib.util.spec_from_file_location(
                         parent, str(parent_init),
-                        submodule_search_locations=[str(parent_path)]
+                        submodule_search_locations=[str(parent_path)],
                     )
                     if spec:
                         parent_mod = importlib.util.module_from_spec(spec)
@@ -139,7 +141,7 @@ def _load_engine_from_dir(engine_dir: Path) -> Optional["ContextEngine"]:
         # Now load the engine module
         spec = importlib.util.spec_from_file_location(
             module_name, str(init_file),
-            submodule_search_locations=[str(engine_dir)]
+            submodule_search_locations=[str(engine_dir)],
         )
         if not spec:
             return None
@@ -155,7 +157,7 @@ def _load_engine_from_dir(engine_dir: Path) -> Optional["ContextEngine"]:
             full_sub_name = f"{module_name}.{sub_name}"
             if full_sub_name not in sys.modules:
                 sub_spec = importlib.util.spec_from_file_location(
-                    full_sub_name, str(sub_file)
+                    full_sub_name, str(sub_file),
                 )
                 if sub_spec:
                     sub_mod = importlib.util.module_from_spec(sub_spec)

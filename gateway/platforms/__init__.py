@@ -1,5 +1,4 @@
-"""
-Platform adapters for messaging integrations.
+"""Platform adapters for messaging integrations.
 
 Each adapter handles:
 - Receiving messages from a platform
@@ -25,18 +24,18 @@ from .base import BasePlatformAdapter, MessageEvent, SendResult
 __all__ = [
     "BasePlatformAdapter",
     "MessageEvent",
+    "QQAdapter",  # noqa: F822 — lazy-loaded via __getattr__ below
     "SendResult",
-    "QQAdapter",
-    "YuanbaoAdapter",
+    "YuanbaoAdapter",  # noqa: F822 — lazy-loaded via __getattr__ below
 ]
 
 
 def __getattr__(name):
     if name == "QQAdapter":
-        from .qqbot import QQAdapter  # noqa: F401
+        from .qqbot import QQAdapter
         return QQAdapter
     if name == "YuanbaoAdapter":
-        from .yuanbao import YuanbaoAdapter  # noqa: F401
+        from .yuanbao import YuanbaoAdapter
         return YuanbaoAdapter
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

@@ -14,7 +14,6 @@ import pytest
 from gateway.config import PlatformConfig
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
-
 from tests.gateway.relay.stub_connector import StubConnector
 
 
@@ -61,11 +60,12 @@ async def test_interrupt_unknown_session_is_noop(adapter):
 @pytest.mark.asyncio
 async def test_outbound_interrupt_reaches_connector(adapter):
     """The gateway-side /stop egress: send_interrupt is carried to the connector
-    so it can forward down the socket owning the session_key."""
+    so it can forward down the socket owning the session_key.
+    """
     stub = adapter._transport
     await stub.send_interrupt("agent:main:discord:group:chanA:userX", reason="stop")
     assert stub.interrupts == [
-        {"session_key": "agent:main:discord:group:chanA:userX", "reason": "stop"}
+        {"session_key": "agent:main:discord:group:chanA:userX", "reason": "stop"},
     ]
 
 
@@ -73,7 +73,8 @@ async def test_outbound_interrupt_reaches_connector(adapter):
 async def test_connect_wires_inbound_interrupt_over_ws(adapter):
     """WS-only inbound: connect() registers BOTH the inbound message handler AND
     the interrupt_inbound handler on the transport, so a connector-delivered
-    interrupt_inbound frame (no HTTP receiver) reaches the right session."""
+    interrupt_inbound frame (no HTTP receiver) reaches the right session.
+    """
     await adapter.connect()
     stub = adapter._transport
     # Both connector->gateway handlers are wired post-connect.

@@ -11,8 +11,11 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-
-from hermes_cli.main import _web_ui_build_needed, _build_web_ui, _run_npm_install_deterministic
+from hermes_cli.main import (
+    _build_web_ui,
+    _run_npm_install_deterministic,
+    _web_ui_build_needed,
+)
 
 
 def _touch(path: Path, offset: float = 0.0) -> None:
@@ -175,7 +178,7 @@ class TestBuildWebUISkipsWhenFresh:
         assert install_cmd[install_cmd.index("--workspace") + 1] == "web"
 
     def test_web_install_omits_workspace_when_web_has_own_lockfile(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """web/ with its own lockfile => _workspace_root returns web_dir, so
         --workspace web would fail (npm can't find that workspace from inside
@@ -205,7 +208,7 @@ class TestBuildWebUISkipsWhenFresh:
         assert kwargs["cwd"] == web_dir
 
     def test_web_build_uses_idle_timeout_helper(self, tmp_path):
-        """npm run build now goes through _run_with_idle_timeout (issue #33788).
+        """Npm run build now goes through _run_with_idle_timeout (issue #33788).
 
         The install step keeps its capture_output behavior (the existing
         retry-on-EPERM contract depends on it); only the long-running build
@@ -253,7 +256,7 @@ class TestBuildWebUISkipsWhenFresh:
         assert kwargs["cwd"] == tmp_path
 
     def test_desktop_web_install_uses_existing_workspace_root(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         web_dir, _ = _make_web_dir(tmp_path)
         (tmp_path / "package-lock.json").write_text("{}", encoding="utf-8")

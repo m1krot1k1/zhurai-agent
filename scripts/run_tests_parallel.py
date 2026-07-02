@@ -44,10 +44,8 @@ import subprocess
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Tuple
-
 
 # Default test discovery roots.
 _DEFAULT_ROOTS = ["tests"]
@@ -84,7 +82,7 @@ _DURATIONS_FILE = "test_durations.json"
 
 
 def _count_tests(
-    files: List[Path], repo_root: Path, pytest_passthrough: List[str]
+    files: list[Path], repo_root: Path, pytest_passthrough: list[str],
 ) -> dict[Path, int]:
     """Run ``pytest --co -q`` once to count individual tests per file.
 
@@ -104,7 +102,7 @@ def _count_tests(
     # Build --ignore flags for skipped dirs so the --co collection
     # mirrors what we'll actually run (not what pytest might find via
     # conftest walking or directory traversal).
-    ignore_args: List[str] = []
+    ignore_args: list[str] = []
     for root in [repo_root / p for p in _DEFAULT_ROOTS]:
         for part in _SKIP_PARTS:
             d = root / part
@@ -141,7 +139,7 @@ def _count_tests(
     return counts
 
 
-def _discover_files(roots: List[Path]) -> List[Path]:
+def _discover_files(roots: list[Path]) -> list[Path]:
     """Return every ``test_*.py`` under the given roots (sorted).
 
     Roots may be directories (recursed for ``test_*.py``) or explicit
@@ -156,7 +154,7 @@ def _discover_files(roots: List[Path]) -> List[Path]:
     the sharded matrix from blowing up, not to block targeted runs.
     """
     seen: set[Path] = set()
-    out: List[Path] = []
+    out: list[Path] = []
     for root in roots:
         if not root.exists():
             continue
@@ -188,7 +186,7 @@ def _discover_files(roots: List[Path]) -> List[Path]:
     return sorted(out)
 
 
-def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
+def _kill_tree(proc: subprocess.Popen, pgid: int | None = None) -> None:
     """Kill the pytest subprocess and every descendant it spawned.
 
     A test run can spin up uvicorn servers, async runtimes, or other
@@ -220,7 +218,7 @@ def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
 
     if sys.platform == "win32":
         try:
-            
+
             subprocess.run(
                 ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                 stdout=subprocess.DEVNULL,
@@ -229,15 +227,14 @@ def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
             )  # windows-footgun: ok
         except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             pass
-    else:
-        # POSIX: kill the captured pgid. Local-import signal so the
-        # SIGKILL attribute is never referenced on Windows.
-        if pgid is not None:
-            try:
-                import signal as _signal
-                os.killpg(pgid, _signal.SIGKILL)  # windows-footgun: ok
-            except (ProcessLookupError, PermissionError, OSError):
-                pass
+    # POSIX: kill the captured pgid. Local-import signal so the
+    # SIGKILL attribute is never referenced on Windows.
+    elif pgid is not None:
+        try:
+            import signal as _signal
+            os.killpg(pgid, _signal.SIGKILL)  # windows-footgun: ok
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
 
     # Belt-and-suspenders: ensure subprocess.communicate() sees the exit.
     try:
@@ -248,10 +245,10 @@ def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
 
 def _run_one_file(
     file: Path,
-    pytest_args: List[str],
+    pytest_args: list[str],
     repo_root: Path,
     file_timeout: float,
-) -> Tuple[Path, int, str, dict[str, int], float]:
+) -> tuple[Path, int, str, dict[str, int], float]:
     """Run ``python -m pytest <file> <pytest_args>`` in a fresh subprocess.
 
     Returns (file, returncode, captured_combined_output, summary_counts, subprocess_wall_seconds).
@@ -278,7 +275,7 @@ def _run_one_file(
     bound a pathologically slow or hung file as a whole.
     """
     cmd = [sys.executable, "-m", "pytest", str(file), *pytest_args]
-    
+
     subproc_start = time.monotonic()
     # launch the pytest process
     proc = subprocess.Popen(
@@ -288,7 +285,7 @@ def _run_one_file(
         stderr=subprocess.STDOUT,
         text=True,
         # skipping writing bytecode because we're running a bunch of parallel python processes on the same code
-        env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1'},
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
         # POSIX: place the child at the head of its own process group so
         # _kill_tree can SIGKILL the group atomically.
         # Windows: this maps to CREATE_NEW_PROCESS_GROUP in CPython 3.12+;
@@ -331,7 +328,7 @@ def _run_one_file(
         # case it left grandchildren behind; already-dead is a no-op.
         _kill_tree(proc, pgid=pgid)
 
-        output +=  "\n"
+        output += "\n"
 
     if rc == 5:
         # No tests collected — every test in the file was filtered out.
@@ -465,7 +462,7 @@ def _print_progress(
 
 
 def _print_inline_failure(
-    file: Path, output: str, repo_root: Path, pytest_passthrough: List[str]
+    file: Path, output: str, repo_root: Path, pytest_passthrough: list[str],
 ) -> None:
     """Print a compact failure summary immediately when a file fails.
 
@@ -489,9 +486,9 @@ def _print_inline_failure(
     print(f"  ╔╍ Failed: {rel} ╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍", flush=True)
     for line in tail.splitlines():
         print(f"  ║ {line}", flush=True)
-    print(f"  ║", flush=True)
+    print("  ║", flush=True)
     print(f"  ║  Repro: {repro}", flush=True)
-    print(f"  ╚╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍", flush=True)
+    print("  ╚╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍", flush=True)
     print(flush=True)
 
 
@@ -512,7 +509,7 @@ def _load_durations(repo_root: Path) -> dict[str, float]:
 
 
 def _save_durations(
-    file_times: List[Tuple[Path, float]],
+    file_times: list[tuple[Path, float]],
     repo_root: Path,
 ) -> None:
     """Write the duration cache so future ``--slice`` runs can use it.
@@ -531,12 +528,12 @@ def _save_durations(
 
 
 def _slice_files(
-    files: List[Path],
+    files: list[Path],
     slice_index: int,
     slice_count: int,
     durations: dict[str, float],
     repo_root: Path,
-) -> List[Path]:
+) -> list[Path]:
     """Return the subset of *files* belonging to slice *slice_index*.
 
     Uses **Longest Processing Time first** (LPT) distribution: sort files
@@ -563,7 +560,7 @@ def _slice_files(
 
     # Build (file, estimated_duration) pairs.
     default_dur = 2.0
-    file_durs: List[Tuple[Path, float]] = []
+    file_durs: list[tuple[Path, float]] = []
     for f in files:
         rel = _format_file(f, repo_root)
         dur = durations.get(rel, default_dur)
@@ -574,8 +571,8 @@ def _slice_files(
 
     # Greedy assignment: for each file, add it to the slice with the
     # smallest current total.
-    bucket_files: List[List[Path]] = [[] for _ in range(slice_count)]
-    bucket_totals: List[float] = [0.0] * slice_count
+    bucket_files: list[list[Path]] = [[] for _ in range(slice_count)]
+    bucket_totals: list[float] = [0.0] * slice_count
 
     for f, dur in file_durs:
         # Find the least-loaded bucket.
@@ -622,12 +619,12 @@ def main() -> int:
         "--file-timeout",
         type=float,
         default=float(
-            os.environ.get("HERMES_TEST_FILE_TIMEOUT", _DEFAULT_FILE_TIMEOUT_SECONDS)
+            os.environ.get("HERMES_TEST_FILE_TIMEOUT", _DEFAULT_FILE_TIMEOUT_SECONDS),
         ),
         help=(
             "Per-file wall-clock cap in seconds. On timeout, the pytest "
             "subprocess and its full process tree are SIGKILL'd. "
-            f"Default: {_DEFAULT_FILE_TIMEOUT_SECONDS}s ({round(_DEFAULT_FILE_TIMEOUT_SECONDS/60)} min), env: HERMES_TEST_FILE_TIMEOUT."
+            f"Default: {_DEFAULT_FILE_TIMEOUT_SECONDS}s ({round(_DEFAULT_FILE_TIMEOUT_SECONDS / 60)} min), env: HERMES_TEST_FILE_TIMEOUT."
         ),
     )
     parser.add_argument(
@@ -721,8 +718,8 @@ def main() -> int:
 
     # Capture and print on completion (out-of-order is fine — keeps the
     # terminal clean rather than interleaving N parallel pytest outputs).
-    failures: List[Tuple[Path, str, Dict[str, int]]] = []
-    file_times: List[Tuple[Path, float]] = []  # (file, subprocess_wall) for distribution
+    failures: list[tuple[Path, str, dict[str, int]]] = []
+    file_times: list[tuple[Path, float]] = []  # (file, subprocess_wall) for distribution
     started = time.monotonic()
     files_done = 0
     tests_done = 0
@@ -732,7 +729,7 @@ def main() -> int:
     tests_failed = 0
     lock = threading.Lock()
 
-    def _on_done(file: Path, started_at: float, fut: "Future[Tuple[Path, int, str, dict[str, int], float]]") -> None:
+    def _on_done(file: Path, started_at: float, fut: Future[tuple[Path, int, str, dict[str, int], float]]) -> None:
         nonlocal files_done, tests_done, pass_count, fail_count, tests_passed, tests_failed
         n_tests = test_counts.get(file, 0)
         try:
@@ -775,11 +772,11 @@ def main() -> int:
                 _print_inline_failure(fpath, output, repo_root, pytest_passthrough)
 
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futures: List[Future] = []
+        futures: list[Future] = []
         for file in files:
             t0 = time.monotonic()
             fut = pool.submit(
-                _run_one_file, file, pytest_passthrough, repo_root, args.file_timeout
+                _run_one_file, file, pytest_passthrough, repo_root, args.file_timeout,
             )
             fut.add_done_callback(lambda f, file=file, t0=t0: _on_done(file, t0, f))
             futures.append(fut)
@@ -817,14 +814,14 @@ def main() -> int:
         fast = sum(1 for t in times if t < 1.0)
         fast_2s = sum(1 for t in times if t < 2.0)
         print()
-        print(f"=== Per-file subprocess time distribution ===")
+        print("=== Per-file subprocess time distribution ===")
         print(f"  Files:   {len(times)}")
         print(f"  Total subprocess CPU-wall: {total_subproc:.1f}s  (runner wall: {elapsed:.1f}s, parallelism: {args.jobs}x)")
         print(f"  P50: {p50:.2f}s  P90: {p90:.2f}s  P95: {p95:.2f}s  P99: {p99:.2f}s  Max: {max_t:.2f}s")
-        print(f"  <1s: {fast} files ({fast/len(times)*100:.0f}%)  <2s: {fast_2s} files ({fast_2s/len(times)*100:.0f}%)")
+        print(f"  <1s: {fast} files ({fast / len(times) * 100:.0f}%)  <2s: {fast_2s} files ({fast_2s / len(times) * 100:.0f}%)")
         # Top 10 slowest files — likely the ones dragging the run.
         slowest = sorted(file_times, key=lambda x: x[1], reverse=True)[:10]
-        print(f"  Top 10 slowest:")
+        print("  Top 10 slowest:")
         for f, t in slowest:
             print(f"    {t:>6.2f}s  {_format_file(f, repo_root)}")
 

@@ -76,8 +76,8 @@ class TestChatVerboseArg:
         assert args.verbose is True
 
     def test_cmd_chat_forwards_none_when_verbose_is_absent(self, monkeypatch):
-        import types
         import sys
+        import types
 
         import hermes_cli.main as main_mod
         from hermes_cli._parser import build_top_level_parser
@@ -91,11 +91,11 @@ class TestChatVerboseArg:
         def fake_main(**kwargs):
             captured.update(kwargs)
 
-        setattr(fake_cli, "main", fake_main)
+        fake_cli.main = fake_main
         fake_banner = types.ModuleType("hermes_cli.banner")
-        setattr(fake_banner, "prefetch_update_check", lambda: None)
+        fake_banner.prefetch_update_check = lambda: None
         fake_skills_sync = types.ModuleType("tools.skills_sync")
-        setattr(fake_skills_sync, "sync_skills", lambda quiet=True: None)
+        fake_skills_sync.sync_skills = lambda quiet=True: None
 
         monkeypatch.setitem(sys.modules, "cli", fake_cli)
         monkeypatch.setitem(sys.modules, "hermes_cli.banner", fake_banner)
@@ -151,7 +151,8 @@ class TestAcceptHooksOnAgentSubparsers:
     after the leaf subcommand) for gateway/cron/mcp/acp.  Regression
     against prior behaviour where the flag only worked on the root
     parser and `chat`, so `hermes gateway run --accept-hooks` failed
-    with `unrecognized arguments`."""
+    with `unrecognized arguments`.
+    """
 
     @pytest.mark.parametrize("argv", [
         ["--accept-hooks", "gateway", "run", "--help"],
@@ -168,7 +169,8 @@ class TestAcceptHooksOnAgentSubparsers:
     ])
     def test_accepted_at_every_position(self, argv):
         """Invoking `hermes <argv>` must exit 0 (help) rather than
-        failing with `unrecognized arguments`."""
+        failing with `unrecognized arguments`.
+        """
         import subprocess
         result = subprocess.run(
             [sys.executable, "-m", "hermes_cli.main", *argv],

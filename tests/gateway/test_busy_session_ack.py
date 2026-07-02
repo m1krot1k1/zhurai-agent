@@ -3,15 +3,15 @@
 Verifies that users get an immediate status response instead of total silence
 when the agent is working on a task. See PR fix for the @Lonely__MH report.
 """
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
 # ---------------------------------------------------------------------------
 # Minimal stubs so we can import gateway code without heavy deps
 # ---------------------------------------------------------------------------
-import sys, types
+import sys
+import time
+import types
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 _tg = types.ModuleType("telegram")
 _tg.constants = types.ModuleType("telegram.constants")
@@ -32,10 +32,10 @@ from gateway.platforms.base import (
     build_session_key,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_event(text="hello", chat_id="123", platform_val="telegram"):
     """Build a minimal MessageEvent."""
@@ -56,7 +56,7 @@ def _make_event(text="hello", chat_id="123", platform_val="telegram"):
 
 def _make_runner():
     """Build a minimal GatewayRunner-like object for testing."""
-    from gateway.run import GatewayRunner, _AGENT_PENDING_SENTINEL
+    from gateway.run import _AGENT_PENDING_SENTINEL, GatewayRunner
 
     runner = object.__new__(GatewayRunner)
     runner._running_agents = {}
@@ -357,7 +357,8 @@ class TestBusySessionAck:
         mashed-together turn (#43066 sub-bug 2). Before the fix the
         interrupt/steer-fallback path called merge_pending_message_event
         with merge_text=True, collapsing 'first' and 'second' into
-        'first\\nsecond' and destroying message boundaries."""
+        'first\\nsecond' and destroying message boundaries.
+        """
         runner, _sentinel = _make_runner()
         runner._busy_input_mode = "interrupt"
         runner._queued_events = {}
@@ -610,7 +611,7 @@ class TestBusySessionOnboardingHint:
         monkeypatch.setattr(_gr, "_hermes_home", tmp_path)
         # mark_seen imports utils.atomic_yaml_write; make sure it resolves
         # against a writable dir by pointing _hermes_home at tmp_path.
-        monkeypatch.setattr(_gr, "_load_gateway_config", lambda: {})
+        monkeypatch.setattr(_gr, "_load_gateway_config", dict)
 
         runner, _sentinel = _make_runner()
         runner._busy_input_mode = "interrupt"
@@ -648,8 +649,9 @@ class TestBusySessionOnboardingHint:
     @pytest.mark.asyncio
     async def test_second_busy_ack_omits_hint(self, tmp_path, monkeypatch):
         """Once the flag is marked, the hint never appears again."""
-        import gateway.run as _gr
         import yaml
+
+        import gateway.run as _gr
 
         monkeypatch.setattr(_gr, "_hermes_home", tmp_path)
         # Pre-populate the config so is_seen() returns True from the start.
@@ -693,7 +695,7 @@ class TestBusySessionOnboardingHint:
         import gateway.run as _gr
 
         monkeypatch.setattr(_gr, "_hermes_home", tmp_path)
-        monkeypatch.setattr(_gr, "_load_gateway_config", lambda: {})
+        monkeypatch.setattr(_gr, "_load_gateway_config", dict)
 
         runner, _sentinel = _make_runner()
         runner._busy_input_mode = "queue"
@@ -734,7 +736,7 @@ class TestLongRunningNotificationOwnership:
         runner._running_agents["sess"] = replacement_agent
 
         assert runner._should_emit_long_running_notification(
-            "sess", original_agent, executor_task=None
+            "sess", original_agent, executor_task=None,
         ) is False
 
     def test_notification_stops_after_executor_finishes(self):
@@ -748,7 +750,7 @@ class TestLongRunningNotificationOwnership:
         done_task.done.return_value = True
 
         assert runner._should_emit_long_running_notification(
-            "sess", agent, executor_task=done_task
+            "sess", agent, executor_task=done_task,
         ) is False
 
     def test_notification_stops_when_agent_is_gone(self):
@@ -758,7 +760,7 @@ class TestLongRunningNotificationOwnership:
         runner._running_agents = {}
 
         assert runner._should_emit_long_running_notification(
-            "sess", None, executor_task=None
+            "sess", None, executor_task=None,
         ) is False
 
     def test_notification_continues_for_live_active_run(self):
@@ -772,5 +774,5 @@ class TestLongRunningNotificationOwnership:
         live_task.done.return_value = False
 
         assert runner._should_emit_long_running_notification(
-            "sess", agent, executor_task=live_task
+            "sess", agent, executor_task=live_task,
         ) is True

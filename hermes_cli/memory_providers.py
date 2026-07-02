@@ -14,7 +14,8 @@ declarations against config.yaml, the provider config file, and the env store.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 
 # Field kinds understood by the generic renderer.
 KIND_TEXT = "text"
@@ -145,5 +146,4 @@ MEMORY_PROVIDERS: dict[str, MemoryProvider] = {
 
 def get_memory_provider(name: str) -> MemoryProvider | None:
     """Return the declared provider for ``name``, or ``None`` if undeclared."""
-
     return MEMORY_PROVIDERS.get(name)

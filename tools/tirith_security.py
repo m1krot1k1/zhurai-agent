@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import os
+import pathlib
 import platform
 import shutil
 import stat
@@ -47,6 +48,7 @@ _COSIGN_ISSUER = "https://token.actions.githubusercontent.com"
 # ---------------------------------------------------------------------------
 # Config helpers
 # ---------------------------------------------------------------------------
+
 
 def _env_bool(key: str, default: bool) -> bool:
     val = os.getenv(key)
@@ -113,7 +115,8 @@ _warned_lock = threading.Lock()
 def _warn_once(key: str, message: str, *args) -> None:
     """``logger.warning`` but at-most-once per ``key`` for the process
     lifetime. Used to avoid drowning the log when a fail-open tirith
-    misconfiguration fires on every command."""
+    misconfiguration fires on every command.
+    """
     with _warned_lock:
         if key in _warned_messages:
             return
@@ -128,6 +131,7 @@ def _reset_spawn_warning_state() -> None:
     """
     with _warned_lock:
         _warned_messages.clear()
+
 
 # Disk-persistent failure marker — avoids retry across process restarts
 _MARKER_TTL = 86400  # 24 hours
@@ -151,10 +155,10 @@ def _read_failure_reason() -> str | None:
     """
     try:
         p = _failure_marker_path()
-        mtime = os.path.getmtime(p)
+        mtime = pathlib.Path(p).stat().st_mtime
         if (time.time() - mtime) >= _MARKER_TTL:
             return None
-        with open(p, "r", encoding="utf-8") as f:
+        with pathlib.Path(p).open("r", encoding="utf-8") as f:
             return f.read().strip()
     except OSError:
         return None
@@ -184,12 +188,12 @@ def _mark_install_failed(reason: str = ""):
         reason: Short tag identifying the failure cause. Use "cosign_missing"
                 when cosign is not on PATH so the marker can be auto-cleared
                 once cosign becomes available.
+
     """
     try:
         p = _failure_marker_path()
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w", encoding="utf-8") as f:
-            f.write(reason)
+        pathlib.Path(os.path.dirname(p)).mkdir(exist_ok=True, parents=True)
+        pathlib.Path(p).write_text(reason, encoding="utf-8")
     except OSError:
         pass
 
@@ -201,7 +205,7 @@ def _clear_install_failed():
     # silently suppressed by a stale dedupe key from before the fix.
     _reset_spawn_warning_state()
     try:
-        os.unlink(_failure_marker_path())
+        pathlib.Path(_failure_marker_path()).unlink()
     except OSError:
         pass
 
@@ -209,7 +213,7 @@ def _clear_install_failed():
 def _hermes_bin_dir() -> str:
     """Return $HERMES_HOME/bin, creating it if needed."""
     d = os.path.join(_get_hermes_home(), "bin")
-    os.makedirs(d, exist_ok=True)
+    pathlib.Path(d).mkdir(exist_ok=True, parents=True)
     return d
 
 
@@ -257,7 +261,7 @@ def _download_file(url: str, dest: str, timeout: int = 10):
     token = os.getenv("GITHUB_TOKEN")
     if token:
         req.add_header("Authorization", f"token {token}")
-    with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as f:
+    with urllib.request.urlopen(req, timeout=timeout) as resp, pathlib.Path(dest).open("wb") as f:
         shutil.copyfileobj(resp, f)
 
 
@@ -271,6 +275,7 @@ def _verify_cosign(checksums_path: str, sig_path: str, cert_path: str) -> bool |
 
     The caller treats both False and None as "abort auto-install" — only
     True allows the install to proceed.
+
     """
     cosign = shutil.which("cosign")
     if not cosign:
@@ -293,10 +298,9 @@ def _verify_cosign(checksums_path: str, sig_path: str, cert_path: str) -> bool |
         if result.returncode == 0:
             logger.info("cosign provenance verification passed")
             return True
-        else:
-            logger.warning("cosign verification failed (exit %d): %s",
-                          result.returncode, result.stderr.strip())
-            return False
+        logger.warning("cosign verification failed (exit %d): %s",
+                      result.returncode, result.stderr.strip())
+        return False
     except (OSError, subprocess.TimeoutExpired) as exc:
         logger.warning("cosign execution failed: %s", exc)
         return None
@@ -305,7 +309,7 @@ def _verify_cosign(checksums_path: str, sig_path: str, cert_path: str) -> bool |
 def _verify_checksum(archive_path: str, checksums_path: str, archive_name: str) -> bool:
     """Verify SHA-256 of the archive against checksums.txt."""
     expected = None
-    with open(checksums_path, encoding="utf-8") as f:
+    with pathlib.Path(checksums_path).open(encoding="utf-8") as f:
         for line in f:
             # Format: "<hash>  <filename>"
             parts = line.strip().split("  ", 1)
@@ -317,7 +321,7 @@ def _verify_checksum(archive_path: str, checksums_path: str, archive_name: str) 
         return False
 
     sha = hashlib.sha256()
-    with open(archive_path, "rb") as f:
+    with pathlib.Path(archive_path).open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             sha.update(chunk)
     actual = sha.hexdigest()
@@ -343,7 +347,7 @@ def _extract_tirith_binary(tar: tarfile.TarFile, dest_dir: str, log) -> tuple[st
 
             dest_path = os.path.join(dest_dir, "tirith")
             try:
-                with open(dest_path, "wb") as out:
+                with pathlib.Path(dest_path).open("wb") as out:
                     shutil.copyfileobj(src_file, out)
             finally:
                 src_file.close()
@@ -437,11 +441,11 @@ def _install_tirith(*, log_failures: bool = True) -> tuple[str | None, str]:
             except OSError:
                 # Clean up partial dest to prevent a non-executable retry loop
                 try:
-                    os.unlink(dest)
+                    pathlib.Path(dest).unlink()
                 except OSError:
                     pass
                 return None, "cross_device_copy_failed"
-        os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        pathlib.Path(dest).chmod(os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         verification = "cosign + SHA-256" if cosign_verified else "SHA-256 only"
         logger.info("tirith installed to %s (%s)", dest, verification)
@@ -492,7 +496,7 @@ def _resolve_tirith_path(configured_path: str) -> str:
 
     # Explicit path: check it and stop. Never auto-download a replacement.
     if explicit:
-        if os.path.isfile(expanded) and os.access(expanded, os.X_OK):
+        if pathlib.Path(expanded).is_file() and os.access(expanded, os.X_OK):
             _resolved_path = expanded
             return expanded
         # Also try shutil.which in case it's a bare name on PATH
@@ -516,7 +520,7 @@ def _resolve_tirith_path(configured_path: str) -> str:
         return found
 
     hermes_bin = os.path.join(_hermes_bin_dir(), "tirith")
-    if os.path.isfile(hermes_bin) and os.access(hermes_bin, os.X_OK):
+    if pathlib.Path(hermes_bin).is_file() and os.access(hermes_bin, os.X_OK):
         _resolved_path = hermes_bin
         _install_failure_reason = ""
         _clear_install_failed()
@@ -580,7 +584,7 @@ def _background_install(*, log_failures: bool = True):
             return
 
         hermes_bin = os.path.join(_hermes_bin_dir(), "tirith")
-        if os.path.isfile(hermes_bin) and os.access(hermes_bin, os.X_OK):
+        if pathlib.Path(hermes_bin).is_file() and os.access(hermes_bin, os.X_OK):
             _resolved_path = hermes_bin
             _install_failure_reason = ""
             return
@@ -612,7 +616,7 @@ def ensure_installed(*, log_failures: bool = True):
     # Already resolved from a previous call
     if _resolved_path is not None and _resolved_path is not _INSTALL_FAILED:
         path = _resolved_path
-        if os.path.isfile(path) and os.access(path, os.X_OK):
+        if pathlib.Path(path).is_file() and os.access(path, os.X_OK):
             return path
         return None
 
@@ -630,7 +634,7 @@ def ensure_installed(*, log_failures: bool = True):
 
     # Explicit path: synchronous check only, no download
     if explicit:
-        if os.path.isfile(expanded) and os.access(expanded, os.X_OK):
+        if pathlib.Path(expanded).is_file() and os.access(expanded, os.X_OK):
             _resolved_path = expanded
             return expanded
         found = shutil.which(expanded)
@@ -650,7 +654,7 @@ def ensure_installed(*, log_failures: bool = True):
         return found
 
     hermes_bin = os.path.join(_hermes_bin_dir(), "tirith")
-    if os.path.isfile(hermes_bin) and os.access(hermes_bin, os.X_OK):
+    if pathlib.Path(hermes_bin).is_file() and os.access(hermes_bin, os.X_OK):
         _resolved_path = hermes_bin
         _install_failure_reason = ""
         _clear_install_failed()
@@ -703,6 +707,7 @@ def check_command_security(command: str) -> dict:
 
     Returns:
         {"action": "allow"|"warn"|"block", "findings": [...], "summary": str}
+
     """
     cfg = _load_security_config()
 

@@ -1,6 +1,6 @@
-from pathlib import Path
 import re
 import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -67,7 +67,7 @@ def test_every_on_disk_subpackage_is_covered_by_packages_find():
         find_packages(
             where=str(REPO_ROOT),
             include=[pattern for name in top_level for pattern in (name, f"{name}.*")],
-        )
+        ),
     )
 
     missing = sorted(expected - selected)
@@ -134,7 +134,7 @@ def test_bundled_plugin_manifests_ship_in_both_wheel_and_sdist():
     """
     # There must actually be manifests on disk for the globs to match.
     on_disk = list((REPO_ROOT / "plugins").rglob("plugin.yaml")) + list(
-        (REPO_ROOT / "plugins").rglob("plugin.yml")
+        (REPO_ROOT / "plugins").rglob("plugin.yml"),
     )
     assert on_disk, "expected bundled plugin manifests under plugins/"
 
@@ -264,4 +264,3 @@ def test_locale_catalogs_ship_in_both_wheel_and_sdist():
     # Every on-disk catalog has the .yaml extension the globs above match.
     on_disk = list((REPO_ROOT / "locales").glob("*.yaml"))
     assert on_disk, "expected locales/*.yaml catalogs on disk"
-

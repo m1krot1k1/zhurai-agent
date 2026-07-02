@@ -7,11 +7,11 @@ from gateway.config import Platform
 from gateway.run import GatewayRunner
 from gateway.session import SessionContext, SessionSource
 from gateway.session_context import (
+    _UNSET,
+    _VAR_MAP,
+    clear_session_vars,
     get_session_env,
     set_session_vars,
-    clear_session_vars,
-    _VAR_MAP,
-    _UNSET,
 )
 
 
@@ -313,7 +313,7 @@ async def test_run_in_executor_with_context_preserves_session_env(monkeypatch):
                 "chat_id": get_session_env("HERMES_SESSION_CHAT_ID"),
                 "user_id": get_session_env("HERMES_SESSION_USER_ID"),
                 "session_key": get_session_env("HERMES_SESSION_KEY"),
-            }
+            },
         )
     finally:
         runner._clear_session_env(tokens)

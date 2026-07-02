@@ -13,9 +13,9 @@ import asyncio
 
 import pytest
 
-import agent.account_usage as account_usage
+from agent import account_usage
 from agent.account_usage import CreditsView, build_credits_view
-from hermes_cli.nous_account import NousPortalAccountInfo, NousPaidServiceAccessInfo
+from hermes_cli.nous_account import NousPaidServiceAccessInfo, NousPortalAccountInfo
 
 
 def _account(**kwargs) -> NousPortalAccountInfo:
@@ -64,7 +64,7 @@ def test_view_built_with_org_pinned_url_and_identity(_logged_in_account):
                 total_usable_credits=30.0,
             ),
             subscription=None,
-        )
+        ),
     )
 
     view = build_credits_view()
@@ -90,7 +90,7 @@ def test_view_depleted_flag(_logged_in_account):
                 total_usable_credits=0.0,
             ),
             subscription=None,
-        )
+        ),
     )
 
     view = build_credits_view()
@@ -108,7 +108,7 @@ def test_view_falls_back_to_legacy_url_when_slug_null(_logged_in_account):
                 total_usable_credits=5.0,
             ),
             subscription=None,
-        )
+        ),
     )
 
     view = build_credits_view()
@@ -173,7 +173,7 @@ def test_gateway_credits_renders_block_and_url(monkeypatch):
 
 def test_gateway_credits_not_logged_in(monkeypatch):
     monkeypatch.setattr(
-        account_usage, "build_credits_view", lambda *a, **kw: CreditsView(logged_in=False)
+        account_usage, "build_credits_view", lambda *a, **kw: CreditsView(logged_in=False),
     )
     stub = _make_gateway_stub()
     out = asyncio.run(stub._handle_credits_command(_FakeEvent()))
@@ -194,7 +194,7 @@ def test_gateway_credits_fetch_exception_is_not_logged_in(monkeypatch):
 
 
 def test_credits_command_registered():
-    from hermes_cli.commands import resolve_command, COMMAND_REGISTRY
+    from hermes_cli.commands import COMMAND_REGISTRY, resolve_command
 
     cmd = resolve_command("credits")
     assert cmd is not None and cmd.name == "credits"
@@ -213,7 +213,7 @@ def test_cli_show_credits_non_interactive_renders_text_not_modal(monkeypatch, ca
     worker's JSON-RPC stdin and crash the command (only the depleted banner
     would survive). Regression for that exact failure.
     """
-    import agent.account_usage as account_usage
+    from agent import account_usage
     from cli import HermesCLI
 
     monkeypatch.setattr(
@@ -248,11 +248,11 @@ def test_cli_show_credits_non_interactive_renders_text_not_modal(monkeypatch, ca
 
 
 def test_cli_show_credits_logged_out(monkeypatch, capsys):
-    import agent.account_usage as account_usage
+    from agent import account_usage
     from cli import HermesCLI
 
     monkeypatch.setattr(
-        account_usage, "build_credits_view", lambda *a, **k: CreditsView(logged_in=False)
+        account_usage, "build_credits_view", lambda *a, **k: CreditsView(logged_in=False),
     )
     cli = HermesCLI.__new__(HermesCLI)
     cli._app = None

@@ -14,7 +14,7 @@ from unittest.mock import Mock
 
 import pytest
 
-import tools.browser_tool as browser_tool
+from tools import browser_tool
 
 
 @pytest.fixture(autouse=True)
@@ -194,7 +194,7 @@ class TestCleanupHybridSessions:
             },
         )
         monkeypatch.setattr(
-            browser_tool, "_last_active_session_key", {"default": "default::local"}
+            browser_tool, "_last_active_session_key", {"default": "default::local"},
         )
 
         browser_tool.cleanup_browser("default")
@@ -238,7 +238,7 @@ class TestCleanupHybridSessions:
             },
         )
         monkeypatch.setattr(
-            browser_tool, "_last_active_session_key", {"default": "default::local"}
+            browser_tool, "_last_active_session_key", {"default": "default::local"},
         )
 
         browser_tool.cleanup_browser("default::local")

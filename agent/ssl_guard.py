@@ -65,6 +65,7 @@ def verify_ca_bundle() -> None:
         SSLConfigurationError: If an explicit CA-bundle environment variable
             points at a bad path, or if certifi's bundled ``cacert.pem`` is
             missing/corrupt.
+
     """
     if _skip_ssl_guard_enabled():
         logger.debug("SSL CA bundle guard skipped via HERMES_SKIP_SSL_GUARD")

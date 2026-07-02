@@ -121,9 +121,11 @@ def _ensure_discord_mock() -> None:
             self.color = color
             self.fields = []
             self.footer = None
+
         def add_field(self, *, name=None, value=None, inline=False, **_):
             self.fields.append({"name": name, "value": value, "inline": inline})
             return self
+
         def set_footer(self, *, text=None, icon_url=None, **_):
             self.footer = {"text": text, "icon_url": icon_url}
             return self
@@ -136,8 +138,10 @@ def _ensure_discord_mock() -> None:
         def __init__(self, timeout=None):
             self.timeout = timeout
             self.children = []
+
         def add_item(self, item):
             self.children.append(item)
+
         def clear_items(self):
             self.children.clear()
 
@@ -288,7 +292,7 @@ def _scan_for_plugin_adapter_antipattern(source: str) -> list[str]:
                 ):
                     offenses.append(
                         f"line {node.lineno}: {target_name}(...) points into "
-                        f"plugins/platforms/"
+                        f"plugins/platforms/",
                     )
 
     # Bare `import adapter` / `from adapter import ...` anywhere (module level
@@ -300,14 +304,14 @@ def _scan_for_plugin_adapter_antipattern(source: str) -> list[str]:
                     offenses.append(
                         f"line {node.lineno}: ``import adapter`` "
                         f"(bare — resolves to whichever plugin's adapter.py "
-                        f"is first on sys.path)"
+                        f"is first on sys.path)",
                     )
         elif isinstance(node, ast.ImportFrom):
             if node.module == "adapter" and node.level == 0:
                 offenses.append(
                     f"line {node.lineno}: ``from adapter import ...`` "
                     f"(bare — resolves to whichever plugin's adapter.py "
-                    f"is first on sys.path)"
+                    f"is first on sys.path)",
                 )
 
     return offenses
@@ -360,7 +364,7 @@ def _run_adapter_antipattern_scan() -> list[str]:
         if offenses:
             violations.append(
                 f"  {path.relative_to(_GATEWAY_DIR.parent.parent)}:\n    "
-                + "\n    ".join(offenses)
+                + "\n    ".join(offenses),
             )
     return violations
 
@@ -423,6 +427,7 @@ def pytest_configure(config):
         class _NoLock:
             def __enter__(self):
                 return self
+
             def __exit__(self, *a):
                 pass
         lock = _NoLock()
@@ -446,6 +451,4 @@ def pytest_configure(config):
             )
             cache_file.write_text(msg, encoding="utf-8")
             raise pytest.UsageError(msg)
-        else:
-            cache_file.write_text("clean", encoding="utf-8")
-
+        cache_file.write_text("clean", encoding="utf-8")

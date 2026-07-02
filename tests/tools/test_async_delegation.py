@@ -12,7 +12,7 @@ import time
 import pytest
 
 from tools import async_delegation as ad
-from tools.process_registry import process_registry, format_process_notification
+from tools.process_registry import format_process_notification, process_registry
 
 
 @pytest.fixture(autouse=True)
@@ -228,8 +228,10 @@ def test_completed_records_pruned_to_cap():
 def test_delegate_task_background_routes_async_and_does_not_block(monkeypatch):
     """delegate_task(background=True) returns a handle without running the
     child synchronously, and the child completes on the background thread.
-    A single task is dispatched as a one-item background batch unit."""
-    from unittest.mock import MagicMock, patch
+    A single task is dispatched as a one-item background batch unit.
+    """
+    from unittest.mock import MagicMock
+
     import tools.delegate_tool as dt
 
     parent = MagicMock()
@@ -293,9 +295,11 @@ def test_delegate_task_background_batch_runs_as_one_unit(monkeypatch):
     """A multi-item batch with background=True dispatches the WHOLE fan-out as
     ONE background unit (one handle, one async slot). The children run in
     parallel and join; the consolidated results come back as a single
-    completion event when ALL of them finish."""
+    completion event when ALL of them finish.
+    """
     import json
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import MagicMock
+
     import tools.delegate_tool as dt
 
     parent = MagicMock()
@@ -368,9 +372,11 @@ def test_model_dispatch_forces_background():
     """The MODEL-facing dispatch path forces background=True for any top-level
     delegation (single task OR batch), and keeps it off for an orchestrator
     subagent (depth > 0). Direct delegate_task() callers are unaffected (they
-    keep the synchronous default)."""
-    import tools.delegate_tool as dt
+    keep the synchronous default).
+    """
     from unittest.mock import MagicMock
+
+    import tools.delegate_tool as dt
 
     top = MagicMock()
     top._delegate_depth = 0
@@ -381,20 +387,22 @@ def test_model_dispatch_forces_background():
     # single vs batch; subagent never.
     assert dt._model_background_value({"goal": "x"}, top) is True
     assert dt._model_background_value(
-        {"tasks": [{"goal": "a"}, {"goal": "b"}]}, top
+        {"tasks": [{"goal": "a"}, {"goal": "b"}]}, top,
     ) is True
     assert dt._model_background_value({"tasks": [{"goal": "a"}]}, top) is True
     assert dt._model_background_value({"goal": "x"}, sub) is False
     assert dt._model_background_value(
-        {"tasks": [{"goal": "a"}, {"goal": "b"}]}, sub
+        {"tasks": [{"goal": "a"}, {"goal": "b"}]}, sub,
     ) is False
 
 
 def test_run_agent_dispatch_forces_background():
     """run_agent._dispatch_delegate_task — the live model path — forces
     background on for any top-level delegation (single OR batch) and off for a
-    subagent."""
+    subagent.
+    """
     from unittest.mock import patch
+
     import run_agent
 
     class _FakeAgent:
@@ -412,7 +420,7 @@ def test_run_agent_dispatch_forces_background():
         assert captured["background"] is True
 
         run_agent.AIAgent._dispatch_delegate_task(
-            agent, {"tasks": [{"goal": "a"}, {"goal": "b"}]}
+            agent, {"tasks": [{"goal": "a"}, {"goal": "b"}]},
         )
         assert captured["background"] is True
 
@@ -425,8 +433,10 @@ def test_run_agent_dispatch_forces_background():
 def test_delegate_task_background_detaches_child_from_parent(monkeypatch):
     """A background child must NOT remain in parent._active_children —
     otherwise parent-turn interrupts / cache evicts / session close would
-    kill the detached subagent mid-run."""
+    kill the detached subagent mid-run.
+    """
     from unittest.mock import MagicMock, patch
+
     import tools.delegate_tool as dt
 
     parent = MagicMock()
@@ -469,7 +479,8 @@ def test_delegate_task_background_detaches_child_from_parent(monkeypatch):
 
 def test_concurrent_dispatch_respects_capacity():
     """Two threads racing dispatch with cap=1 must yield exactly one accept
-    (capacity check and record insert are atomic under the records lock)."""
+    (capacity check and record insert are atomic under the records lock).
+    """
     gate = threading.Event()
 
     def blocker():
@@ -486,7 +497,7 @@ def test_concurrent_dispatch_respects_capacity():
                 goal="race", context=None, toolsets=None, role="leaf",
                 model="m", session_key="", runner=blocker,
                 max_async_children=1,
-            )
+            ),
         )
 
     threads = [threading.Thread(target=racer) for _ in range(2)]
@@ -587,5 +598,3 @@ def test_gateway_cli_origin_event_left_unrouted():
     evt = _make_async_evt(session_key="")
     runner._enrich_async_delegation_routing(evt)
     assert "platform" not in evt
-
-

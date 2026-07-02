@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Optional
 
 from hermes_cli.auth import (
     ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
@@ -24,10 +23,10 @@ NOUS_AUTH_KEEPALIVE_INITIAL_DELAY_SECONDS = 60
 
 _keepalive_lock = threading.Lock()
 _keepalive_stop = threading.Event()
-_keepalive_thread: Optional[threading.Thread] = None
+_keepalive_thread: threading.Thread | None = None
 
 
-def _timeout_seconds(value: Optional[float]) -> float:
+def _timeout_seconds(value: float | None) -> float:
     if value is not None:
         return float(value)
     try:
@@ -47,7 +46,7 @@ def _entry_state(entry: object) -> dict:
 def _refresh_selected_pool_entry(
     *,
     min_key_ttl_seconds: int,
-) -> Optional[bool]:
+) -> bool | None:
     """Refresh the current Nous credential pool entry when it is stale.
 
     Returns True when a pool entry exists and is usable/refreshed, False when a
@@ -91,7 +90,7 @@ def _refresh_selected_pool_entry(
 def refresh_nous_auth_keepalive_once(
     *,
     min_key_ttl_seconds: int = NOUS_INVOKE_JWT_MIN_TTL_SECONDS,
-    timeout_seconds: Optional[float] = None,
+    timeout_seconds: float | None = None,
 ) -> bool:
     """Refresh Nous auth once if credentials are configured."""
     min_key_ttl_seconds = max(60, int(min_key_ttl_seconds))
@@ -129,7 +128,7 @@ def _keepalive_loop(
     interval_seconds: int,
     initial_delay_seconds: int,
     min_key_ttl_seconds: int,
-    timeout_seconds: Optional[float],
+    timeout_seconds: float | None,
 ) -> None:
     if initial_delay_seconds > 0 and stop_event.wait(initial_delay_seconds):
         return
@@ -147,8 +146,8 @@ def start_nous_auth_keepalive(
     interval_seconds: int = NOUS_AUTH_KEEPALIVE_INTERVAL_SECONDS,
     initial_delay_seconds: int = NOUS_AUTH_KEEPALIVE_INITIAL_DELAY_SECONDS,
     min_key_ttl_seconds: int = NOUS_INVOKE_JWT_MIN_TTL_SECONDS,
-    timeout_seconds: Optional[float] = None,
-) -> Optional[threading.Thread]:
+    timeout_seconds: float | None = None,
+) -> threading.Thread | None:
     """Start the process-wide Nous auth keepalive thread."""
     if interval_seconds <= 0:
         return None

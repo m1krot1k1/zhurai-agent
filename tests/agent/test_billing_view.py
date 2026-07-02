@@ -19,9 +19,9 @@ from decimal import Decimal
 import pytest
 
 import agent.billing_view as bv
+import hermes_cli.nous_billing as nb
 from agent.billing_view import (
     AutoReload,
-    BillingState,
     CardInfo,
     MonthlyCap,
     billing_state_from_payload,
@@ -31,7 +31,6 @@ from agent.billing_view import (
     parse_money,
     validate_charge_amount,
 )
-import hermes_cli.nous_billing as nb
 from hermes_cli.nous_billing import (
     BillingAuthError,
     BillingError,
@@ -40,7 +39,6 @@ from hermes_cli.nous_billing import (
     _raise_for_error,
     resolve_portal_base_url,
 )
-
 
 # ---------------------------------------------------------------------------
 # Decimal money
@@ -51,11 +49,11 @@ from hermes_cli.nous_billing import (
     "raw,expected",
     [
         ("142.5", Decimal("142.5")),   # decimal string, NOT 2dp — the headline case
-        ("100", Decimal("100")),
-        ("10000", Decimal("10000")),
+        ("100", Decimal(100)),
+        ("10000", Decimal(10000)),
         ("0.01", Decimal("0.01")),
-        (250, Decimal("250")),
-        ("  50  ", Decimal("50")),
+        (250, Decimal(250)),
+        ("  50  ", Decimal(50)),
     ],
 )
 def test_parse_money_valid(raw, expected):
@@ -76,9 +74,9 @@ def test_parse_money_never_uses_binary_float():
     "value,expected",
     [
         (Decimal("142.5"), "$142.50"),
-        (Decimal("100"), "$100"),
+        (Decimal(100), "$100"),
         (Decimal("0.01"), "$0.01"),
-        (Decimal("1000"), "$1000"),
+        (Decimal(1000), "$1000"),
         (None, "—"),
     ],
 )
@@ -123,8 +121,8 @@ def test_state_member_tier_parse():
     assert s.role == "MEMBER"
     assert s.balance_usd == Decimal("142.5")
     assert s.cli_billing_enabled is True
-    assert s.charge_presets == (Decimal("100"), Decimal("250"), Decimal("500"))
-    assert s.min_usd == Decimal("10") and s.max_usd == Decimal("10000")
+    assert s.charge_presets == (Decimal(100), Decimal(250), Decimal(500))
+    assert s.min_usd == Decimal(10) and s.max_usd == Decimal(10000)
     assert s.card is None and s.monthly_cap is None and s.auto_reload is None
     assert s.is_admin is False
     assert s.can_charge is False  # not admin
@@ -137,12 +135,12 @@ def test_state_owner_tier_parse():
     assert s.card == CardInfo(brand="visa", last4="4242")
     assert s.card is not None and s.card.masked == "visa ····4242"
     assert s.monthly_cap == MonthlyCap(
-        limit_usd=Decimal("1000"),
-        spent_this_month_usd=Decimal("180"),
+        limit_usd=Decimal(1000),
+        spent_this_month_usd=Decimal(180),
         is_default_ceiling=True,
     )
     assert s.auto_reload == AutoReload(
-        enabled=True, threshold_usd=Decimal("20"), reload_to_usd=Decimal("100")
+        enabled=True, threshold_usd=Decimal(20), reload_to_usd=Decimal(100),
     )
 
 
@@ -161,7 +159,7 @@ def test_state_handles_garbage_substructs():
     p["chargePresets"] = ["100", "bad", "250"]  # bad preset dropped, not crash
     s = billing_state_from_payload(p)
     assert s.card is None and s.monthly_cap is None
-    assert s.charge_presets == (Decimal("100"), Decimal("250"))
+    assert s.charge_presets == (Decimal(100), Decimal(250))
 
 
 # ---------------------------------------------------------------------------
@@ -351,13 +349,13 @@ def test_new_idempotency_key_unique_and_uuid_shaped():
 
 
 def test_validate_amount_ok():
-    v = validate_charge_amount("100", min_usd=Decimal("10"), max_usd=Decimal("10000"))
-    assert v.ok and v.amount == Decimal("100")
+    v = validate_charge_amount("100", min_usd=Decimal(10), max_usd=Decimal(10000))
+    assert v.ok and v.amount == Decimal(100)
 
 
 def test_validate_amount_strips_dollar_sign():
-    v = validate_charge_amount("$250", min_usd=Decimal("10"), max_usd=Decimal("10000"))
-    assert v.ok and v.amount == Decimal("250")
+    v = validate_charge_amount("$250", min_usd=Decimal(10), max_usd=Decimal(10000))
+    assert v.ok and v.amount == Decimal(250)
 
 
 @pytest.mark.parametrize(
@@ -372,6 +370,6 @@ def test_validate_amount_strips_dollar_sign():
     ],
 )
 def test_validate_amount_rejections(raw, err_substr):
-    v = validate_charge_amount(raw, min_usd=Decimal("10"), max_usd=Decimal("10000"))
+    v = validate_charge_amount(raw, min_usd=Decimal(10), max_usd=Decimal(10000))
     assert not v.ok
     assert err_substr.lower() in (v.error or "").lower()

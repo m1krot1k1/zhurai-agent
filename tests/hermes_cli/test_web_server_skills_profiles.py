@@ -23,8 +23,8 @@ def _write_skill(skills_dir, name, description="test skill"):
 @pytest.fixture
 def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
     """Isolated default home + one named profile, each with its own skills."""
-    from hermes_constants import get_hermes_home
     from hermes_cli import profiles
+    from hermes_constants import get_hermes_home
 
     default_home = get_hermes_home()
     profiles_root = default_home / "profiles"
@@ -49,8 +49,8 @@ def client(monkeypatch, isolated_profiles):
         pytest.skip("fastapi/starlette not installed")
 
     import hermes_state
+    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
     from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
     c = TestClient(app)
@@ -71,7 +71,7 @@ class TestProfileScopedSkills:
         assert "dashboard-skill" not in names
 
     def test_skills_list_without_profile_uses_dashboard_home(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         resp = client.get("/api/skills")
         assert resp.status_code == 200
@@ -116,12 +116,13 @@ class TestProfileScopedSkills:
 
     def test_scope_restores_module_globals(self, client, isolated_profiles):
         """The SKILLS_DIR swap is per-request; the module global must be
-        restored even after a scoped call (cron-style locked swap)."""
-        import tools.skills_tool as skills_tool
+        restored even after a scoped call (cron-style locked swap).
+        """
+        from tools import skills_tool
 
         before = skills_tool.SKILLS_DIR
         client.get("/api/skills", params={"profile": "worker_alpha"})
-        assert skills_tool.SKILLS_DIR == before
+        assert before == skills_tool.SKILLS_DIR
 
 
 class TestProfileScopedToolsets:
@@ -138,7 +139,7 @@ class TestProfileScopedToolsets:
         assert "x_search" not in default_cfg.get("platform_toolsets", {}).get("cli", [])
 
         listing = client.get(
-            "/api/tools/toolsets", params={"profile": "worker_alpha"}
+            "/api/tools/toolsets", params={"profile": "worker_alpha"},
         ).json()
         assert {t["name"]: t for t in listing}["x_search"]["enabled"] is True
         # Unscoped listing reflects the dashboard's own (untouched) config.
@@ -155,12 +156,13 @@ class TestProfileScopedToolsets:
 
 class TestProfileScopedHubActions:
     def test_hub_install_spawns_with_profile_flag(
-        self, client, isolated_profiles, monkeypatch
+        self, client, isolated_profiles, monkeypatch,
     ):
         """Hub installs must go through a fresh ``hermes -p <profile>``
         subprocess — the in-process scope can't reach skills_hub's
-        import-time SKILLS_DIR binding."""
-        import hermes_cli.web_server as web_server
+        import-time SKILLS_DIR binding.
+        """
+        from hermes_cli import web_server
 
         calls = []
 
@@ -181,13 +183,13 @@ class TestProfileScopedHubActions:
             (
                 ["-p", "worker_alpha", "skills", "install", "official/demo", "--yes"],
                 "skills-install",
-            )
+            ),
         ]
 
     def test_hub_install_without_profile_keeps_legacy_argv(
-        self, client, isolated_profiles, monkeypatch
+        self, client, isolated_profiles, monkeypatch,
     ):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         calls = []
 
@@ -200,7 +202,7 @@ class TestProfileScopedHubActions:
             lambda subcommand, name: calls.append(list(subcommand)) or _FakeProc(),
         )
         resp = client.post(
-            "/api/skills/hub/install", json={"identifier": "official/demo"}
+            "/api/skills/hub/install", json={"identifier": "official/demo"},
         )
         assert resp.status_code == 200
         assert calls == [["skills", "install", "official/demo", "--yes"]]

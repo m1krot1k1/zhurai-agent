@@ -35,7 +35,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fix A: prelude error surfacing via wire `error` events
 #
@@ -80,7 +79,8 @@ def _make_codex_agent():
 )
 def test_codex_stream_wire_error_event_surfaces_stream_error_event(provider_message):
     """A wire ``type=error`` SSE frame raises ``_StreamErrorEvent`` with the
-    provider's real message in the body."""
+    provider's real message in the body.
+    """
     from run_agent import _StreamErrorEvent
 
     agent = _make_codex_agent()
@@ -117,7 +117,7 @@ def test_codex_stream_retries_remote_protocol_error_once():
     def create_side_effect(**kwargs):
         call_count["n"] += 1
         raise httpx.RemoteProtocolError(
-            "peer closed connection without sending complete message body"
+            "peer closed connection without sending complete message body",
         )
 
     mock_client = MagicMock()
@@ -177,7 +177,7 @@ def test_codex_stream_truncated_no_terminal_event_raises():
 
 
 def test_summarize_api_error_decorates_xai_entitlement_403():
-    """xAI's OAuth 403 must surface the X Premium+ gotcha + neutral causes.
+    """XAI's OAuth 403 must surface the X Premium+ gotcha + neutral causes.
 
     Wording deliberately leads with the X Premium+ gotcha because that's
     the #1 confusing case: people see Grok in their X app, assume it
@@ -191,7 +191,7 @@ def test_summarize_api_error_decorates_xai_entitlement_403():
         "HTTP 403: Error code: 403 - {'code': 'The caller does not have permission "
         "to execute the specified operation', 'error': 'You have either run out of "
         "available resources or do not have an active Grok subscription. Manage "
-        "subscriptions at https://grok.com'}"
+        "subscriptions at https://grok.com'}",
     )
     summary = AIAgent._summarize_api_error(error)
     # The original xAI text must survive — it's still useful diagnostic info.
@@ -221,7 +221,7 @@ def test_summarize_api_error_does_not_accuse_subscribers():
     from run_agent import AIAgent
 
     error = RuntimeError(
-        "HTTP 403: do not have an active Grok subscription"
+        "HTTP 403: do not have an active Grok subscription",
     )
     summary = AIAgent._summarize_api_error(error)
     # MUST NOT contain language that flatly assumes the user is unsubscribed.
@@ -243,8 +243,8 @@ def test_summarize_api_error_decorates_xai_body_message():
                     "You have either run out of available resources or do "
                     "not have an active Grok subscription. Manage at "
                     "https://grok.com"
-                )
-            }
+                ),
+            },
         }
 
     summary = AIAgent._summarize_api_error(_XaiErr("403"))
@@ -272,7 +272,7 @@ def test_summarize_api_error_handles_nested_provider_message():
                 "type": "invalid_request_error",
                 "param": None,
                 "code": None,
-            }
+            },
         }
 
     summary = AIAgent._summarize_api_error(_NestedProviderErr("400"))
@@ -323,8 +323,8 @@ def test_classify_api_error_stream_event_grok_subscription_is_auth():
     skipped.  The explicit pattern added at step 1 must fire first and
     return auth/non-retryable so _is_entitlement_failure can stop the loop.
     """
+    from agent.error_classifier import FailoverReason, classify_api_error
     from run_agent import _StreamErrorEvent
-    from agent.error_classifier import classify_api_error, FailoverReason
 
     err = _StreamErrorEvent(
         "You have either run out of available resources or do not have an "
@@ -339,8 +339,8 @@ def test_classify_api_error_stream_event_grok_subscription_is_auth():
 
 def test_classify_api_error_stream_event_resources_exhausted_grok_is_auth():
     """'out of available resources' + 'grok' variant also classifies as auth."""
+    from agent.error_classifier import FailoverReason, classify_api_error
     from run_agent import _StreamErrorEvent
-    from agent.error_classifier import classify_api_error, FailoverReason
 
     err = _StreamErrorEvent(
         "You have run out of available resources for Grok.",
@@ -352,8 +352,8 @@ def test_classify_api_error_stream_event_resources_exhausted_grok_is_auth():
 
 def test_classify_api_error_stream_event_unrelated_not_reclassified():
     """An unrelated _StreamErrorEvent must not be caught by the xAI guard."""
+    from agent.error_classifier import FailoverReason, classify_api_error
     from run_agent import _StreamErrorEvent
-    from agent.error_classifier import classify_api_error, FailoverReason
 
     err = _StreamErrorEvent("Internal server error — try again later")
     result = classify_api_error(err, provider="xai-oauth", model="grok-4.3")
@@ -375,7 +375,7 @@ def _assistant_msg_with_encrypted_reasoning(text="hi from grok", encrypted="enc_
                 "id": "rs_xai_001",
                 "encrypted_content": encrypted,
                 "summary": [],
-            }
+            },
         ],
     }
 
@@ -397,7 +397,7 @@ def test_codex_reasoning_replay_default_includes_encrypted_content():
 
 
 def test_codex_reasoning_replay_includes_encrypted_content_for_xai():
-    """xAI must receive replayed encrypted reasoning items (May 2026 reversal).
+    """XAI must receive replayed encrypted reasoning items (May 2026 reversal).
 
     Earlier we stripped these on the theory that the OAuth/SuperGrok
     surface rejected them.  xAI subsequently confirmed they explicitly
@@ -430,7 +430,7 @@ def test_codex_reasoning_replay_includes_encrypted_content_for_xai():
 
 
 def test_codex_transport_xai_request_includes_encrypted_content():
-    """xAI ``include`` array must request ``reasoning.encrypted_content``.
+    """XAI ``include`` array must request ``reasoning.encrypted_content``.
 
     This is the request-side half of the May 2026 reversal: we ask xAI
     to echo back encrypted reasoning so the next turn can replay it.
@@ -612,8 +612,8 @@ def test_recover_with_credential_pool_skips_refresh_on_bare_403_for_xai_oauth():
     subscription", etc.). Before the defense-in-depth guard, the recovery
     path would happily mint a fresh token, get a fresh 403, and spin.
     """
-    from run_agent import AIAgent
     from agent.error_classifier import FailoverReason
+    from run_agent import AIAgent
 
     agent = _make_codex_agent()
     assert agent.provider == "xai-oauth"
@@ -778,7 +778,8 @@ def test_is_entitlement_failure_false_via_oauth2_validation_phrase_alone():
     validated" phrase by itself (no WKE suffix) must also route to
     refresh.  This is a belt-and-braces guard against xAI dropping or
     reformatting the WKE suffix in a future API revision without
-    changing the human-readable error text."""
+    changing the human-readable error text.
+    """
     from run_agent import AIAgent
 
     assert not AIAgent._is_entitlement_failure(
@@ -795,7 +796,8 @@ def test_is_entitlement_failure_wke_signal_overrides_entitlement_keywords():
     suffix AND entitlement language, the WKE signal wins.  Auth is
     recoverable; entitlement isn't.  If the refreshed token still
     can't access the resource, the next 403 (without WKE) lands on
-    the entitlement path correctly."""
+    the entitlement path correctly.
+    """
     from run_agent import AIAgent
 
     assert not AIAgent._is_entitlement_failure(
@@ -813,7 +815,8 @@ def test_is_entitlement_failure_wke_signal_overrides_entitlement_keywords():
 def test_is_entitlement_failure_case_insensitive_wke_match():
     """Substring match is case-insensitive — the classifier lowercases
     everything before matching, so a future xAI build that uppercases
-    the prefix wouldn't reintroduce the misclassification."""
+    the prefix wouldn't reintroduce the misclassification.
+    """
     from run_agent import AIAgent
 
     assert not AIAgent._is_entitlement_failure(
@@ -891,7 +894,8 @@ def test_recover_with_credential_pool_still_blocks_real_entitlement():
     #26847 protection — entitlement 403 must NOT refresh — must
     survive the new disambiguator.  A real unsubscribed-account body
     has no WKE suffix and no OAuth2-validation phrase, so the
-    classifier still classifies it as entitlement and short-circuits."""
+    classifier still classifies it as entitlement and short-circuits.
+    """
     from agent.error_classifier import FailoverReason
 
     agent = _make_codex_agent()
@@ -1025,7 +1029,7 @@ def _stamped_assistant_msg(issuer_kind, *, text="hi", encrypted="enc_blob", rs_i
                 "encrypted_content": encrypted,
                 "summary": [],
                 "_issuer_kind": issuer_kind,
-            }
+            },
         ],
     }
 
@@ -1046,7 +1050,7 @@ def test_cross_issuer_reasoning_is_dropped_on_replay():
 
     # Calling against codex_backend — the grok-issued blob must be dropped.
     items = _chat_messages_to_responses_input(
-        msgs, current_issuer_kind="codex_backend"
+        msgs, current_issuer_kind="codex_backend",
     )
     reasoning = [it for it in items if it.get("type") == "reasoning"]
     assert reasoning == [], (
@@ -1068,7 +1072,7 @@ def test_same_issuer_reasoning_is_still_replayed():
     ]
 
     items = _chat_messages_to_responses_input(
-        msgs, current_issuer_kind="xai_responses"
+        msgs, current_issuer_kind="xai_responses",
     )
     reasoning = [it for it in items if it.get("type") == "reasoning"]
     assert len(reasoning) == 1
@@ -1094,14 +1098,14 @@ def test_unstamped_reasoning_is_replayed_for_backwards_compat():
                     "id": "rs_legacy",
                     "encrypted_content": "legacy_blob",
                     "summary": [],
-                }
+                },
             ],
         },
         {"role": "user", "content": "next"},
     ]
 
     items = _chat_messages_to_responses_input(
-        msgs, current_issuer_kind="codex_backend"
+        msgs, current_issuer_kind="codex_backend",
     )
     reasoning = [it for it in items if it.get("type") == "reasoning"]
     assert len(reasoning) == 1

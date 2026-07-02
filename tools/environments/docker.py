@@ -14,7 +14,6 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
 
 from tools.environments.base import BaseEnvironment, _popen_bash
 from tools.environments.local import _HERMES_PROVIDER_ENV_BLOCKLIST
@@ -31,7 +30,7 @@ _DOCKER_SEARCH_PATHS = [
     "/Applications/Docker.app/Contents/Resources/bin/docker",
 ]
 
-_docker_executable: Optional[str] = None  # resolved once, cached
+_docker_executable: str | None = None  # resolved once, cached
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -197,7 +196,7 @@ def reap_orphan_containers(
     # long enough ago.  Doing this per-container (rather than bulk inspect)
     # keeps the failure blast radius to one container at a time.
     import datetime
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     removed = 0
     for cid in candidate_ids:
         finished_at = _container_finished_at(docker, cid)
@@ -264,7 +263,7 @@ def _container_finished_at(docker_exe: str, container_id: str):
         return None
 
 
-def find_docker() -> Optional[str]:
+def find_docker() -> str | None:
     """Locate the docker (or podman) CLI binary.
 
     Resolution order:
@@ -281,7 +280,7 @@ def find_docker() -> Optional[str]:
 
     # 1. Explicit override via env var (e.g. for Podman on immutable distros)
     override = os.getenv("HERMES_DOCKER_BINARY")
-    if override and os.path.isfile(override) and os.access(override, os.X_OK):
+    if override and Path(override).is_file() and os.access(override, os.X_OK):
         _docker_executable = override
         logger.info("Using HERMES_DOCKER_BINARY override: %s", override)
         return override
@@ -301,7 +300,7 @@ def find_docker() -> Optional[str]:
 
     # 4. Well-known macOS Docker Desktop locations
     for path in _DOCKER_SEARCH_PATHS:
-        if os.path.isfile(path) and os.access(path, os.X_OK):
+        if Path(path).is_file() and os.access(path, os.X_OK):
             _docker_executable = path
             logger.info("Found docker at non-PATH location: %s", path)
             return path
@@ -412,7 +411,7 @@ def _image_uses_init_entrypoint(docker_exe: str, image: str) -> bool:
     return first in ("/init", "/package/admin/s6-overlay/command/init")
 
 
-def _resolve_host_user_spec() -> Optional[str]:
+def _resolve_host_user_spec() -> str | None:
     """Return ``<uid>:<gid>`` for the current host user, or ``None`` on platforms
     where this is not meaningful (e.g. Windows without posix ids).
 
@@ -430,7 +429,7 @@ def _resolve_host_user_spec() -> Optional[str]:
         return None
 
 
-_storage_opt_ok: Optional[bool] = None  # cached result across instances
+_storage_opt_ok: bool | None = None  # cached result across instances
 
 
 def _ensure_docker_available() -> None:
@@ -444,11 +443,11 @@ def _ensure_docker_available() -> None:
         logger.error(
             "Docker backend selected but no docker executable was found in PATH "
             "or known install locations. Install Docker Desktop and ensure the "
-            "CLI is available."
+            "CLI is available.",
         )
         raise RuntimeError(
             "Docker executable not found in PATH or known install locations. "
-            "Install Docker and ensure the 'docker' command is available."
+            "Install Docker and ensure the 'docker' command is available.",
         )
 
     try:
@@ -467,7 +466,7 @@ def _ensure_docker_available() -> None:
             exc_info=True,
         )
         raise RuntimeError(
-            "Docker executable could not be executed. Check your Docker installation."
+            "Docker executable could not be executed. Check your Docker installation.",
         )
     except subprocess.TimeoutExpired:
         logger.error(
@@ -477,7 +476,7 @@ def _ensure_docker_available() -> None:
             exc_info=True,
         )
         raise RuntimeError(
-            "Docker daemon is not responding. Ensure Docker is running and try again."
+            "Docker daemon is not responding. Ensure Docker is running and try again.",
         )
     except Exception:
         logger.error(
@@ -496,7 +495,7 @@ def _ensure_docker_available() -> None:
             )
             raise RuntimeError(
                 "Docker command is available but 'docker version' failed. "
-                "Check your Docker installation."
+                "Check your Docker installation.",
             )
 
 
@@ -540,13 +539,13 @@ class DockerEnvironment(BaseEnvironment):
         self._task_id = task_id
         self._forward_env = _normalize_forward_env_names(forward_env)
         self._env = _normalize_env_dict(env)
-        self._container_id: Optional[str] = None
+        self._container_id: str | None = None
         self._labels: dict[str, str] = {}
         self._image: str = ""
         self._container_name: str = ""
         self._image_uses_s6_init: bool = False
         self._all_run_args: list[str] = []
-        logger.info(f"DockerEnvironment volumes: {volumes}")
+        logger.info("DockerEnvironment volumes: %s", volumes)
         # Ensure volumes is a list (config.yaml could be malformed)
         if volumes is not None and not isinstance(volumes, list):
             logger.warning(f"docker_volumes config is not a list: {volumes!r}")
@@ -567,7 +566,7 @@ class DockerEnvironment(BaseEnvironment):
             else:
                 logger.warning(
                     "Docker storage driver does not support per-container disk limits "
-                    "(requires overlay2 on XFS with pquota). Container will run without disk quota."
+                    "(requires overlay2 on XFS with pquota). Container will run without disk quota.",
                 )
         if not network:
             resource_args.append("--network=none")
@@ -592,31 +591,31 @@ class DockerEnvironment(BaseEnvironment):
                 if ":/workspace" in vol:
                     workspace_explicitly_mounted = True
             else:
-                logger.warning(f"Docker volume '{vol}' missing colon, skipping")
+                logger.warning("Docker volume '%s' missing colon, skipping", vol)
 
         host_cwd_abs = os.path.abspath(os.path.expanduser(host_cwd)) if host_cwd else ""
         bind_host_cwd = (
             auto_mount_cwd
             and bool(host_cwd_abs)
-            and os.path.isdir(host_cwd_abs)
+            and Path(host_cwd_abs).is_dir()
             and not workspace_explicitly_mounted
         )
-        if auto_mount_cwd and host_cwd and not os.path.isdir(host_cwd_abs):
-            logger.debug(f"Skipping docker cwd mount: host_cwd is not a valid directory: {host_cwd}")
+        if auto_mount_cwd and host_cwd and not Path(host_cwd_abs).is_dir():
+            logger.debug("Skipping docker cwd mount: host_cwd is not a valid directory: %s", host_cwd)
 
-        self._workspace_dir: Optional[str] = None
-        self._home_dir: Optional[str] = None
+        self._workspace_dir: str | None = None
+        self._home_dir: str | None = None
         writable_args = []
         if self._persistent:
             sandbox = get_sandbox_dir() / "docker" / task_id
             self._home_dir = str(sandbox / "home")
-            os.makedirs(self._home_dir, exist_ok=True)
+            Path(self._home_dir).mkdir(exist_ok=True, parents=True)
             writable_args.extend([
                 "-v", f"{self._home_dir}:/root",
             ])
             if not bind_host_cwd and not workspace_explicitly_mounted:
                 self._workspace_dir = str(sandbox / "workspace")
-                os.makedirs(self._workspace_dir, exist_ok=True)
+                Path(self._workspace_dir).mkdir(exist_ok=True, parents=True)
                 writable_args.extend([
                     "-v", f"{self._workspace_dir}:/workspace",
                 ])
@@ -631,7 +630,7 @@ class DockerEnvironment(BaseEnvironment):
             ])
 
         if bind_host_cwd:
-            logger.info(f"Mounting configured host cwd to /workspace: {host_cwd_abs}")
+            logger.info("Mounting configured host cwd to /workspace: %s", host_cwd_abs)
             volume_args = ["-v", f"{host_cwd_abs}:/workspace", *volume_args]
         elif workspace_explicitly_mounted:
             logger.debug("Skipping docker cwd mount: /workspace already mounted by user config")
@@ -640,9 +639,9 @@ class DockerEnvironment(BaseEnvironment):
         # Read-only so the container can authenticate but not modify host creds.
         try:
             from tools.credential_files import (
+                get_cache_directory_mounts,
                 get_credential_file_mounts,
                 get_skills_directory_mount,
-                get_cache_directory_mounts,
             )
 
             for mount_entry in get_credential_file_mounts():
@@ -736,7 +735,7 @@ class DockerEnvironment(BaseEnvironment):
                 logger.warning(
                     "docker_run_as_host_user is enabled but this platform does "
                     "not expose POSIX uid/gid; container will start as its "
-                    "image default user."
+                    "image default user.",
                 )
                 # Fall back to the full cap set — without --user, an image's
                 # init may still need s6-setuidgid/gosu/su to drop privileges.
@@ -763,7 +762,7 @@ class DockerEnvironment(BaseEnvironment):
             run_exec=image_uses_s6_init,
         )
 
-        logger.info(f"Docker volume_args: {volume_args}")
+        logger.info("Docker volume_args: %s", volume_args)
         # User-supplied extra docker run flags (docker_extra_args in config.yaml).
         # Appended last so they can override defaults if needed.
         validated_extra = []
@@ -782,7 +781,7 @@ class DockerEnvironment(BaseEnvironment):
             + env_args
             + validated_extra
         )
-        logger.info(f"Docker run_args: {all_run_args}")
+        logger.info("Docker run_args: %s", all_run_args)
 
         # Start the container directly via `docker run -d`.
         container_name = f"hermes-{uuid.uuid4().hex[:8]}"
@@ -1071,9 +1070,8 @@ class DockerEnvironment(BaseEnvironment):
             result.get("returncode", 0) != 0
             and self._is_container_gone(result.get("output", ""))
             and self._persist_across_processes
-        ):
-            if self._recreate_container():
-                result = super().execute(command, cwd, **kwargs)
+        ) and self._recreate_container():
+            result = super().execute(command, cwd, **kwargs)
         return result
 
     @staticmethod
@@ -1119,7 +1117,7 @@ class DockerEnvironment(BaseEnvironment):
         logger.debug("Docker --storage-opt support: %s", _storage_opt_ok)
         return _storage_opt_ok
 
-    def _find_reusable_container(self, task_label: str, profile_label: str) -> Optional[tuple[str, str]]:
+    def _find_reusable_container(self, task_label: str, profile_label: str) -> tuple[str, str] | None:
         """Look for an existing container labeled for this (task, profile).
 
         Returns ``(container_id, state)`` on hit, ``None`` on miss / on any

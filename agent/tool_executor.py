@@ -19,32 +19,38 @@ import os
 import random
 import threading
 import time
-from typing import Any, Optional
+from typing import Any
 
 from agent.display import (
     KawaiiSpinner,
-    build_tool_preview as _build_tool_preview,
-    get_cute_tool_message as _get_cute_tool_message_impl,
-    get_tool_emoji as _get_tool_emoji,
     _detect_tool_failure,
 )
-from agent.tool_guardrails import ToolGuardrailDecision
+from agent.display import (
+    build_tool_preview as _build_tool_preview,
+)
+from agent.display import (
+    get_cute_tool_message as _get_cute_tool_message_impl,
+)
+from agent.display import (
+    get_tool_emoji as _get_tool_emoji,
+)
 from agent.tool_dispatch_helpers import (
+    _append_subdir_hint_to_multimodal,
     _is_destructive_command,
     _is_multimodal_tool_result,
     _multimodal_text_summary,
-    _append_subdir_hint_to_multimodal,
     make_tool_result_message,
 )
+from agent.tool_guardrails import ToolGuardrailDecision
+from tools.budget_config import DEFAULT_BUDGET, BudgetConfig, budget_for_context_window
 from tools.terminal_tool import (
     get_active_env,
 )
 from tools.thread_context import propagate_context_to_thread
 from tools.tool_result_storage import (
-    maybe_persist_tool_result,
     enforce_turn_budget,
+    maybe_persist_tool_result,
 )
-from tools.budget_config import BudgetConfig, DEFAULT_BUDGET, budget_for_context_window
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,7 @@ def _budget_for_agent(agent) -> BudgetConfig:
         return budget_for_context_window(int(ctx)) if ctx else DEFAULT_BUDGET
     except Exception:
         return DEFAULT_BUDGET
+
 
 # Maximum number of concurrent worker threads for parallel tool execution.
 # Mirrors the constant in ``run_agent`` for tests/imports that look here.
@@ -87,7 +94,7 @@ def _emit_terminal_post_tool_call(
     status: str | None = None,
     error_type: str | None = None,
     error_message: str | None = None,
-    middleware_trace: Optional[list[dict[str, Any]]] = None,
+    middleware_trace: list[dict[str, Any]] | None = None,
 ) -> None:
     try:
         from model_tools import _emit_post_tool_call_hook
@@ -130,7 +137,7 @@ def _emit_cancelled_terminal_post_tool_call(
     start_time: float,
     reason: str = "user interrupt",
     error_type: str = "keyboard_interrupt",
-    middleware_trace: Optional[list[dict[str, Any]]] = None,
+    middleware_trace: list[dict[str, Any]] | None = None,
 ) -> str:
     result = _cancelled_tool_result(reason)
     _emit_terminal_post_tool_call(
@@ -429,7 +436,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
                     if _is_destructive_command(cmd):
                         cwd = function_args.get("workdir") or os.getenv("TERMINAL_CWD", os.getcwd())
                         agent._checkpoint_mgr.ensure_checkpoint(
-                            cwd, f"before terminal: {cmd[:60]}"
+                            cwd, f"before terminal: {cmd[:60]}",
                         )
                 except Exception:
                     pass
@@ -457,7 +464,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
                 preview = _build_tool_preview(name, args)
                 agent.tool_progress_callback("tool.started", name, preview, args)
             except Exception as cb_err:
-                logging.debug(f"Tool progress callback error: {cb_err}")
+                logging.debug("Tool progress callback error: %s", cb_err)
 
     for tc, name, args, middleware_trace, block_result, blocked_by_guardrail in parsed_calls:
         if block_result is not None:
@@ -466,7 +473,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
             try:
                 agent.tool_start_callback(tc.id, name, args)
             except Exception as cb_err:
-                logging.debug(f"Tool start callback error: {cb_err}")
+                logging.debug("Tool start callback error: %s", cb_err)
 
     # ── Concurrent execution ─────────────────────────────────────────
     # Each slot holds (function_name, function_args, function_result, duration, error_flag, blocked_flag, middleware_trace)
@@ -568,7 +575,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
     spinner = None
     if agent._should_emit_quiet_tool_messages() and agent._should_start_quiet_spinner():
         face = random.choice(KawaiiSpinner.get_waiting_faces())
-        spinner = KawaiiSpinner(f"{face} ⚡ running {num_tools} tools concurrently", spinner_type='dots', print_fn=agent._print_fn)
+        spinner = KawaiiSpinner(f"{face} ⚡ running {num_tools} tools concurrently", spinner_type="dots", print_fn=agent._print_fn)
         spinner.start()
 
     try:
@@ -586,7 +593,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
                     # _approval_session_key) AND thread-local approval/sudo
                     # callbacks into the worker thread; clears callbacks on exit.
                     f = executor.submit(
-                        propagate_context_to_thread(_run_tool), i, tc, name, args, parsed_calls[i][3]
+                        propagate_context_to_thread(_run_tool), i, tc, name, args, parsed_calls[i][3],
                     )
                     futures.append(f)
 
@@ -634,7 +641,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
                         ]
                         agent._touch_activity(
                             f"concurrent tools running ({_conc_elapsed}s, "
-                            f"{len(not_done)} remaining: {', '.join(_still_running[:3])})"
+                            f"{len(not_done)} remaining: {', '.join(_still_running[:3])})",
                         )
     finally:
         if spinner:
@@ -713,7 +720,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
                         result=function_result,
                     )
                 except Exception as cb_err:
-                    logging.debug(f"Tool progress callback error: {cb_err}")
+                    logging.debug("Tool progress callback error: %s", cb_err)
 
             if agent.verbose_logging:
                 logging.debug(f"Tool {function_name} completed in {tool_duration:.2f}s")
@@ -726,11 +733,11 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
         elif not agent.quiet_mode and getattr(agent, "tool_progress_mode", "all") != "off":
             _preview_str = _multimodal_text_summary(function_result)
             if agent.verbose_logging:
-                print(f"  ✅ Tool {i+1} completed in {tool_duration:.2f}s")
+                print(f"  ✅ Tool {i + 1} completed in {tool_duration:.2f}s")
                 print(agent._wrap_verbose("Result: ", _preview_str))
             else:
                 response_preview = _preview_str[:agent.log_prefix_chars] + "..." if len(_preview_str) > agent.log_prefix_chars else _preview_str
-                print(f"  ✅ Tool {i+1} completed in {tool_duration:.2f}s - {response_preview}")
+                print(f"  ✅ Tool {i + 1} completed in {tool_duration:.2f}s - {response_preview}")
 
         agent._current_tool = None
         agent._touch_activity(f"tool completed: {name} ({tool_duration:.1f}s)")
@@ -739,7 +746,7 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
             try:
                 agent.tool_complete_callback(tc.id, name, args, function_result)
             except Exception as cb_err:
-                logging.debug(f"Tool complete callback error: {cb_err}")
+                logging.debug("Tool complete callback error: %s", cb_err)
 
         function_result = maybe_persist_tool_result(
             content=function_result,
@@ -788,7 +795,6 @@ def execute_tool_calls_concurrent(agent, assistant_message, messages: list, effe
         agent._apply_pending_steer_to_tool_results(messages, num_tools)
 
 
-
 def execute_tool_calls_sequential(agent, assistant_message, messages: list, effective_task_id: str, api_call_count: int = 0) -> None:
     """Execute tool calls sequentially (original behavior). Used for single calls or interactive tools."""
     # Resolve the context-scaled tool-output budget once per turn.
@@ -798,7 +804,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
         # If the user sent "stop" during a previous tool's execution,
         # do NOT start any more tools -- skip them all immediately.
         if agent._interrupt_requested:
-            remaining_calls = assistant_message.tool_calls[i-1:]
+            remaining_calls = assistant_message.tool_calls[i - 1:]
             if remaining_calls:
                 agent._vprint(f"{agent.log_prefix}⚡ Interrupt: skipping {len(remaining_calls)} tool call(s)", force=True)
             for skipped_tc in remaining_calls:
@@ -817,7 +823,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
         try:
             function_args = json.loads(tool_call.function.arguments)
         except json.JSONDecodeError as e:
-            logger.warning(f"Unexpected JSON error after validation: {e}")
+            logger.warning("Unexpected JSON error after validation: %s", e)
             function_args = {}
         if not isinstance(function_args, dict):
             function_args = {}
@@ -825,7 +831,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
         # Tool Search unwrap — see execute_tool_calls_concurrent for full
         # rationale, including the scope gate (the unwrap dispatches the
         # underlying tool directly, so session toolset scope is enforced here).
-        _ts_scope_block: Optional[str] = None
+        _ts_scope_block: str | None = None
         try:
             from tools import tool_search as _ts
             if function_name == _ts.TOOL_CALL_NAME:
@@ -851,7 +857,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
         )
 
         # Check plugin hooks for a block directive before executing.
-        _block_msg: Optional[str] = None
+        _block_msg: str | None = None
         _block_error_type = "plugin_block"
         if _ts_scope_block is not None:
             _block_msg = _ts_scope_block
@@ -918,13 +924,13 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 preview = _build_tool_preview(function_name, function_args)
                 agent.tool_progress_callback("tool.started", function_name, preview, function_args)
             except Exception as cb_err:
-                logging.debug(f"Tool progress callback error: {cb_err}")
+                logging.debug("Tool progress callback error: %s", cb_err)
 
         if not _execution_blocked and agent.tool_start_callback:
             try:
                 agent.tool_start_callback(tool_call.id, function_name, function_args)
             except Exception as cb_err:
-                logging.debug(f"Tool start callback error: {cb_err}")
+                logging.debug("Tool start callback error: %s", cb_err)
 
         # Checkpoint: snapshot working dir before file-mutating tools
         if not _execution_blocked and function_name in {"write_file", "patch"} and agent._checkpoint_mgr.enabled:
@@ -933,7 +939,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 if file_path:
                     work_dir = agent._checkpoint_mgr.get_working_dir_for_path(file_path)
                     agent._checkpoint_mgr.ensure_checkpoint(
-                        work_dir, f"before {function_name}"
+                        work_dir, f"before {function_name}",
                     )
             except Exception:
                 pass  # never block tool execution
@@ -945,7 +951,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 if _is_destructive_command(cmd):
                     cwd = function_args.get("workdir") or os.getenv("TERMINAL_CWD", os.getcwd())
                     agent._checkpoint_mgr.ensure_checkpoint(
-                        cwd, f"before terminal: {cmd[:60]}"
+                        cwd, f"before terminal: {cmd[:60]}",
                     )
             except Exception:
                 pass  # never block tool execution
@@ -1091,7 +1097,9 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 agent._vprint(f"  {_get_cute_tool_message_impl('clarify', function_args, tool_duration, result=function_result)}")
         elif function_name == "read_terminal":
             def _execute(next_args: dict) -> Any:
-                from tools.read_terminal_tool import read_terminal_tool as _read_terminal_tool
+                from tools.read_terminal_tool import (
+                    read_terminal_tool as _read_terminal_tool,
+                )
                 return _read_terminal_tool(
                     start_line=next_args.get("start_line"),
                     count=next_args.get("count"),
@@ -1122,7 +1130,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
             spinner = None
             if agent._should_emit_quiet_tool_messages() and agent._should_start_quiet_spinner():
                 face = random.choice(KawaiiSpinner.get_waiting_faces())
-                spinner = KawaiiSpinner(f"{face} {spinner_label}", spinner_type='dots', print_fn=agent._print_fn)
+                spinner = KawaiiSpinner(f"{face} {spinner_label}", spinner_type="dots", print_fn=agent._print_fn)
                 spinner.start()
             agent._delegate_spinner = spinner
             _delegate_result = None
@@ -1141,7 +1149,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
             finally:
                 agent._delegate_spinner = None
                 tool_duration = time.time() - tool_start_time
-                cute_msg = _get_cute_tool_message_impl('delegate_task', function_args, tool_duration, result=_delegate_result)
+                cute_msg = _get_cute_tool_message_impl("delegate_task", function_args, tool_duration, result=_delegate_result)
                 if spinner:
                     spinner.stop(cute_msg)
                 elif agent._should_emit_quiet_tool_messages():
@@ -1153,7 +1161,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 face = random.choice(KawaiiSpinner.get_waiting_faces())
                 emoji = _get_tool_emoji(function_name)
                 preview = _build_tool_preview(function_name, function_args) or function_name
-                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type='dots', print_fn=agent._print_fn)
+                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type="dots", print_fn=agent._print_fn)
                 spinner.start()
             _ce_result = None
             try:
@@ -1186,7 +1194,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 face = random.choice(KawaiiSpinner.get_waiting_faces())
                 emoji = _get_tool_emoji(function_name)
                 preview = _build_tool_preview(function_name, function_args) or function_name
-                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type='dots', print_fn=agent._print_fn)
+                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type="dots", print_fn=agent._print_fn)
                 spinner.start()
             _mem_result = None
             try:
@@ -1217,7 +1225,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                 face = random.choice(KawaiiSpinner.get_waiting_faces())
                 emoji = _get_tool_emoji(function_name)
                 preview = _build_tool_preview(function_name, function_args) or function_name
-                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type='dots', print_fn=agent._print_fn)
+                spinner = KawaiiSpinner(f"{face} {emoji} {preview}", spinner_type="dots", print_fn=agent._print_fn)
                 spinner.start()
             _spinner_result = None
             try:
@@ -1366,7 +1374,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
                     result=function_result,
                 )
             except Exception as cb_err:
-                logging.debug(f"Tool progress callback error: {cb_err}")
+                logging.debug("Tool progress callback error: %s", cb_err)
 
         agent._current_tool = None
         agent._touch_activity(f"tool completed: {function_name} ({tool_duration:.1f}s)")
@@ -1380,7 +1388,7 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
             try:
                 agent.tool_complete_callback(tool_call.id, function_name, function_args, function_result)
             except Exception as cb_err:
-                logging.debug(f"Tool complete callback error: {cb_err}")
+                logging.debug("Tool complete callback error: %s", cb_err)
 
         function_result = maybe_persist_tool_result(
             content=function_result,
@@ -1443,8 +1451,6 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
     # applied to sequential execution as well.
     if num_tools_seq > 0:
         agent._apply_pending_steer_to_tool_results(messages, num_tools_seq)
-
-
 
 
 __all__ = [

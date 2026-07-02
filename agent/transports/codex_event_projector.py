@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 def _deterministic_call_id(item_type: str, item_id: str) -> str:
@@ -40,7 +40,8 @@ def _deterministic_call_id(item_type: str, item_id: str) -> str:
     Uses the codex item id directly when present (already a uuid); falls back
     to a content hash so replay produces the same id across sessions and
     prefix caches stay valid. See AGENTS.md Pitfall #16 (deterministic IDs in
-    tool call history)."""
+    tool call history).
+    """
     if item_id:
         return f"codex_{item_type}_{item_id}"
     digest = hashlib.sha256(f"{item_type}".encode()).hexdigest()[:16]
@@ -59,25 +60,28 @@ class ProjectionResult:
     `messages` is a list because some Codex items produce two messages
     (assistant tool_call + tool result). Empty list = item ignored (e.g. a
     streaming `outputDelta` that doesn't materialize into messages until the
-    `item/completed` event)."""
+    `item/completed` event).
+    """
 
     messages: list[dict] = field(default_factory=list)
     is_tool_iteration: bool = False
-    final_text: Optional[str] = None  # Set when an agentMessage completes
+    final_text: str | None = None  # Set when an agentMessage completes
 
 
 class CodexEventProjector:
     """Stateful projector consuming Codex notifications in arrival order.
 
     Owns the in-progress reasoning content (codex emits reasoning as separate
-    items but Hermes stashes it on the next assistant message)."""
+    items but Hermes stashes it on the next assistant message).
+    """
 
     def __init__(self) -> None:
         self._pending_reasoning: list[str] = []
 
     def project(self, notification: dict) -> ProjectionResult:
         """Project a single notification. Idempotent for non-completion events;
-        only `item/completed` and `turn/completed` materialize messages."""
+        only `item/completed` and `turn/completed` materialize messages.
+        """
         method = notification.get("method", "")
         params = notification.get("params", {}) or {}
 
@@ -136,7 +140,7 @@ class CodexEventProjector:
                 elif "text" in fragment:
                     text_parts.append(str(fragment["text"]))
         return ProjectionResult(
-            messages=[{"role": "user", "content": "\n".join(text_parts)}]
+            messages=[{"role": "user", "content": "\n".join(text_parts)}],
         )
 
     def _project_command(self, item: dict, item_id: str) -> ProjectionResult:
@@ -156,7 +160,7 @@ class CodexEventProjector:
                         "name": "exec_command",
                         "arguments": _format_tool_args(args),
                     },
-                }
+                },
             ],
         }
         if self._pending_reasoning:
@@ -172,7 +176,7 @@ class CodexEventProjector:
             "content": output,
         }
         return ProjectionResult(
-            messages=[assistant_msg, tool_msg], is_tool_iteration=True
+            messages=[assistant_msg, tool_msg], is_tool_iteration=True,
         )
 
     def _project_file_change(self, item: dict, item_id: str) -> ProjectionResult:
@@ -197,7 +201,7 @@ class CodexEventProjector:
                         "name": "apply_patch",
                         "arguments": _format_tool_args(args),
                     },
-                }
+                },
             ],
         }
         if self._pending_reasoning:
@@ -211,7 +215,7 @@ class CodexEventProjector:
             "content": f"apply_patch status={status}, {n} change(s)",
         }
         return ProjectionResult(
-            messages=[assistant_msg, tool_msg], is_tool_iteration=True
+            messages=[assistant_msg, tool_msg], is_tool_iteration=True,
         )
 
     def _project_mcp_tool_call(self, item: dict, item_id: str) -> ProjectionResult:
@@ -232,7 +236,7 @@ class CodexEventProjector:
                         "name": f"mcp.{server}.{tool}",
                         "arguments": _format_tool_args(args),
                     },
-                }
+                },
             ],
         }
         if self._pending_reasoning:
@@ -252,11 +256,11 @@ class CodexEventProjector:
             "content": content,
         }
         return ProjectionResult(
-            messages=[assistant_msg, tool_msg], is_tool_iteration=True
+            messages=[assistant_msg, tool_msg], is_tool_iteration=True,
         )
 
     def _project_dynamic_tool_call(
-        self, item: dict, item_id: str
+        self, item: dict, item_id: str,
     ) -> ProjectionResult:
         tool = item.get("tool") or "unknown"
         call_id = _deterministic_call_id(f"dyn_{tool}", item_id)
@@ -274,7 +278,7 @@ class CodexEventProjector:
                         "name": tool,
                         "arguments": _format_tool_args(args),
                     },
-                }
+                },
             ],
         }
         if self._pending_reasoning:
@@ -292,7 +296,7 @@ class CodexEventProjector:
             "content": content,
         }
         return ProjectionResult(
-            messages=[assistant_msg, tool_msg], is_tool_iteration=True
+            messages=[assistant_msg, tool_msg], is_tool_iteration=True,
         )
 
     def _project_opaque(self, item: dict, item_type: str) -> ProjectionResult:
@@ -307,6 +311,6 @@ class CodexEventProjector:
                 {
                     "role": "assistant",
                     "content": f"[codex {item_type}] {payload}",
-                }
-            ]
+                },
+            ],
         )

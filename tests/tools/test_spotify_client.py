@@ -198,7 +198,7 @@ def test_library_contains_uses_generic_library_endpoint(monkeypatch: pytest.Monk
             "GET",
             "https://api.spotify.com/v1/me/library/contains",
             {"uris": "spotify:album:abc,spotify:track:def"},
-        )
+        ),
     ]
 
 
@@ -241,9 +241,8 @@ def test_library_remove_uses_generic_library_endpoint(
             "DELETE",
             "https://api.spotify.com/v1/me/library",
             {"uris": ",".join(expected_uris)},
-        )
+        ),
     ]
-
 
 
 def test_spotify_library_tracks_list_routes_to_saved_tracks(monkeypatch: pytest.MonkeyPatch) -> None:

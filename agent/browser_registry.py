@@ -1,5 +1,4 @@
-"""
-Browser Provider Registry
+"""Browser Provider Registry
 =========================
 
 Central map of registered cloud browser providers. Populated by plugins at
@@ -38,14 +37,13 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Dict, List, Optional
 
 from agent.browser_provider import BrowserProvider
 
 logger = logging.getLogger(__name__)
 
 
-_providers: Dict[str, BrowserProvider] = {}
+_providers: dict[str, BrowserProvider] = {}
 _lock = threading.Lock()
 
 
@@ -59,7 +57,7 @@ def register_provider(provider: BrowserProvider) -> None:
     if not isinstance(provider, BrowserProvider):
         raise TypeError(
             f"register_provider() expects a BrowserProvider instance, "
-            f"got {type(provider).__name__}"
+            f"got {type(provider).__name__}",
         )
     name = provider.name
     if not isinstance(name, str) or not name.strip():
@@ -79,14 +77,14 @@ def register_provider(provider: BrowserProvider) -> None:
         )
 
 
-def list_providers() -> List[BrowserProvider]:
+def list_providers() -> list[BrowserProvider]:
     """Return all registered providers, sorted by name."""
     with _lock:
         items = list(_providers.values())
     return sorted(items, key=lambda p: p.name)
 
 
-def get_provider(name: str) -> Optional[BrowserProvider]:
+def get_provider(name: str) -> BrowserProvider | None:
     """Return the provider registered under *name*, or None."""
     if not isinstance(name, str):
         return None
@@ -110,7 +108,7 @@ _LEGACY_PREFERENCE = (
 )
 
 
-def _resolve(configured: Optional[str]) -> Optional[BrowserProvider]:
+def _resolve(configured: str | None) -> BrowserProvider | None:
     """Resolve the active browser provider.
 
     Resolution rules (in order):
@@ -150,7 +148,7 @@ def _resolve(configured: Optional[str]) -> Optional[BrowserProvider]:
         """Wrap ``is_available()`` so a buggy provider doesn't kill resolution."""
         try:
             return bool(p.is_available())
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 "Browser provider %s.is_available() raised %s — treating as unavailable",
                 p.name, exc, exc_info=True,

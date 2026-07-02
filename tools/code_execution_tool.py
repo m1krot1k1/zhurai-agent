@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Code Execution Tool -- Programmatic Tool Calling (PTC)
+"""Code Execution Tool -- Programmatic Tool Calling (PTC)
 
 Lets the LLM write a Python script that calls Hermes tools via RPC,
 collapsing multi-step tool chains into a single inference turn.
@@ -44,7 +43,8 @@ import time
 import uuid
 
 _IS_WINDOWS = platform.system() == "Windows"
-from typing import Any, Dict, List, Optional
+import pathlib
+from typing import Any
 
 from tools.thread_context import propagate_context_to_thread
 
@@ -256,10 +256,9 @@ _TOOL_STUBS = {
 }
 
 
-def generate_hermes_tools_module(enabled_tools: List[str],
+def generate_hermes_tools_module(enabled_tools: list[str],
                                  transport: str = "uds") -> str:
-    """
-    Build the source code for the hermes_tools.py stub module.
+    """Build the source code for the hermes_tools.py stub module.
 
     Only tools in both SANDBOX_ALLOWED_TOOLS and enabled_tools get stubs.
 
@@ -267,6 +266,7 @@ def generate_hermes_tools_module(enabled_tools: List[str],
         enabled_tools: Tool names enabled in the current session.
         transport: ``"uds"`` for Unix domain socket (local backend) or
                    ``"file"`` for file-based RPC (remote backends).
+
     """
     tools_to_generate = sorted(SANDBOX_ALLOWED_TOOLS & set(enabled_tools))
 
@@ -279,7 +279,7 @@ def generate_hermes_tools_module(enabled_tools: List[str],
         stub_functions.append(
             f"def {func_name}({sig}):\n"
             f"    {doc}\n"
-            f"    return _call({func_name!r}, {args_expr})\n"
+            f"    return _call({func_name!r}, {args_expr})\n",
         )
         export_names.append(func_name)
 
@@ -474,8 +474,7 @@ def _rpc_server_loop(
     allowed_tools: frozenset,
     stop_event: threading.Event,
 ):
-    """
-    Accept one client connection and dispatch tool-call requests until
+    """Accept one client connection and dispatch tool-call requests until
     the client disconnects or the call limit is reached.
     """
     from model_tools import handle_function_call
@@ -487,7 +486,7 @@ def _rpc_server_loop(
             try:
                 conn, _ = server_sock.accept()
                 break
-            except socket.timeout:
+            except TimeoutError:
                 continue
         if conn is None:
             return
@@ -497,7 +496,7 @@ def _rpc_server_loop(
         while True:
             try:
                 chunk = conn.recv(65536)
-            except socket.timeout:
+            except TimeoutError:
                 break
             if not chunk:
                 break
@@ -528,7 +527,7 @@ def _rpc_server_loop(
                         "error": (
                             f"Tool '{tool_name}' is not available in execute_code. "
                             f"Available: {available}"
-                        )
+                        ),
                     })
                     conn.sendall((resp + "\n").encode())
                     continue
@@ -539,7 +538,7 @@ def _rpc_server_loop(
                         "error": (
                             f"Tool call limit reached ({max_tool_calls}). "
                             "No more tool calls allowed in this execution."
-                        )
+                        ),
                     })
                     conn.sendall((resp + "\n").encode())
                     continue
@@ -554,12 +553,12 @@ def _rpc_server_loop(
                 # their status prints don't leak into the CLI spinner.
                 try:
                     _real_stdout, _real_stderr = sys.stdout, sys.stderr
-                    devnull = open(os.devnull, "w", encoding="utf-8")
+                    devnull = pathlib.Path(os.devnull).open("w", encoding="utf-8")
                     try:
                         sys.stdout = devnull
                         sys.stderr = devnull
                         result = handle_function_call(
-                            tool_name, tool_args, task_id=task_id
+                            tool_name, tool_args, task_id=task_id,
                         )
                     finally:
                         sys.stdout, sys.stderr = _real_stdout, _real_stderr
@@ -581,7 +580,7 @@ def _rpc_server_loop(
 
                 conn.sendall((result + "\n").encode())
 
-    except socket.timeout:
+    except TimeoutError:
         logger.debug("RPC listener socket timeout")
     except OSError as e:
         logger.debug("RPC listener socket error: %s", e, exc_info=True)
@@ -605,10 +604,16 @@ def _get_or_create_env(task_id: str):
     Returns ``(env, env_type)`` tuple.
     """
     from tools.terminal_tool import (
-        _active_environments, _env_lock, _create_environment,
-        _get_env_config, _last_activity, _start_cleanup_thread,
-        _creation_locks, _creation_locks_lock, _task_env_overrides,
+        _active_environments,
+        _create_environment,
+        _creation_locks,
+        _creation_locks_lock,
+        _env_lock,
+        _get_env_config,
+        _last_activity,
         _resolve_container_task_id,
+        _start_cleanup_thread,
+        _task_env_overrides,
     )
 
     effective_task_id = _resolve_container_task_id(task_id)
@@ -808,7 +813,7 @@ def _rpc_poll_loop(
                         "error": (
                             f"Tool '{tool_name}' is not available in execute_code. "
                             f"Available: {available}"
-                        )
+                        ),
                     })
                 # Enforce tool call limit
                 elif tool_call_counter[0] >= max_tool_calls:
@@ -816,7 +821,7 @@ def _rpc_poll_loop(
                         "error": (
                             f"Tool call limit reached ({max_tool_calls}). "
                             "No more tool calls allowed in this execution."
-                        )
+                        ),
                     })
                 else:
                     # Strip forbidden terminal parameters
@@ -827,12 +832,12 @@ def _rpc_poll_loop(
                     # Dispatch through the standard tool handler
                     try:
                         _real_stdout, _real_stderr = sys.stdout, sys.stderr
-                        devnull = open(os.devnull, "w", encoding="utf-8")
+                        devnull = pathlib.Path(os.devnull).open("w", encoding="utf-8")
                         try:
                             sys.stdout = devnull
                             sys.stderr = devnull
                             tool_result = handle_function_call(
-                                tool_name, tool_args, task_id=task_id
+                                tool_name, tool_args, task_id=task_id,
                             )
                         finally:
                             sys.stdout, sys.stderr = _real_stdout, _real_stderr
@@ -854,7 +859,7 @@ def _rpc_poll_loop(
                 # Use echo piping (not stdin_data) because Modal doesn't
                 # reliably deliver stdin to chained commands.
                 encoded_result = base64.b64encode(
-                    tool_result.encode("utf-8")
+                    tool_result.encode("utf-8"),
                 ).decode("ascii")
                 env.execute(
                     f"echo '{encoded_result}' | base64 -d > {quoted_res_file}.tmp"
@@ -876,8 +881,8 @@ def _rpc_poll_loop(
 
 def _execute_remote(
     code: str,
-    task_id: Optional[str],
-    enabled_tools: Optional[List[str]],
+    task_id: str | None,
+    enabled_tools: list[str] | None,
 ) -> str:
     """Run a script on the remote terminal backend via file-based RPC.
 
@@ -885,7 +890,6 @@ def _execute_remote(
     the remote environment, and tool calls are proxied through a polling
     thread that communicates via request/response files.
     """
-
     _cfg = _load_config()
     timeout = _cfg.get("timeout", DEFAULT_TIMEOUT)
     max_tool_calls = _cfg.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)
@@ -1036,7 +1040,7 @@ def _execute_remote(
     stdout_text = redact_sensitive_text(stdout_text)
 
     # Build response
-    result: Dict[str, Any] = {
+    result: dict[str, Any] = {
         "status": status,
         "output": stdout_text,
         "tool_calls_made": tool_call_counter[0],
@@ -1073,11 +1077,10 @@ def _execute_remote(
 
 def execute_code(
     code: str,
-    task_id: Optional[str] = None,
-    enabled_tools: Optional[List[str]] = None,
+    task_id: str | None = None,
+    enabled_tools: list[str] | None = None,
 ) -> str:
-    """
-    Run a Python script in a sandboxed child process with RPC access
+    """Run a Python script in a sandboxed child process with RPC access
     to a subset of Hermes tools.
 
     Dispatches to the local (UDS) or remote (file-based RPC) path
@@ -1091,11 +1094,12 @@ def execute_code(
 
     Returns:
         JSON string with execution results.
+
     """
     if not SANDBOX_AVAILABLE:
         return json.dumps({
             "error": "execute_code sandbox is unavailable in this environment. "
-                     "Use normal tool calls (terminal, read_file, write_file, ...) instead."
+                     "Use normal tool calls (terminal, read_file, write_file, ...) instead.",
         })
 
     if not code or not code.strip():
@@ -1179,12 +1183,10 @@ def execute_code(
         # sandbox_tools is already the correct set (intersection with session
         # tools, or SANDBOX_ALLOWED_TOOLS as fallback — see lines above).
         tools_src = generate_hermes_tools_module(list(sandbox_tools))
-        with open(os.path.join(tmpdir, "hermes_tools.py"), "w", encoding="utf-8") as f:
-            f.write(tools_src)
+        pathlib.Path(os.path.join(tmpdir, "hermes_tools.py")).write_text(tools_src, encoding="utf-8")
 
         # Write the user's script
-        with open(os.path.join(tmpdir, "script.py"), "w", encoding="utf-8") as f:
-            f.write(code)
+        pathlib.Path(os.path.join(tmpdir, "script.py")).write_text(code, encoding="utf-8")
 
         # --- Start RPC server ---
         # Two transports:
@@ -1203,7 +1205,7 @@ def execute_code(
         else:
             server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             server_sock.bind(sock_path)
-            os.chmod(sock_path, 0o600)
+            pathlib.Path(sock_path).chmod(0o600)
         server_sock.listen(1)
 
         # Wrapped so the thread inherits the turn's approval context + callbacks
@@ -1361,10 +1363,10 @@ def execute_code(
             target=_drain_head_tail,
             args=(proc.stdout, stdout_head_chunks, stdout_tail_chunks,
                   _STDOUT_HEAD_BYTES, _STDOUT_TAIL_BYTES, stdout_total_bytes),
-            daemon=True
+            daemon=True,
         )
         stderr_reader = threading.Thread(
-            target=_drain, args=(proc.stderr, stderr_chunks, MAX_STDERR_BYTES), daemon=True
+            target=_drain, args=(proc.stderr, stderr_chunks, MAX_STDERR_BYTES), daemon=True,
         )
         stdout_reader.start()
         stderr_reader.start()
@@ -1446,7 +1448,7 @@ def execute_code(
         stderr_text = redact_sensitive_text(stderr_text)
 
         # Build response
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": status,
             "output": stdout_text,
             "tool_calls_made": tool_call_counter[0],
@@ -1509,7 +1511,7 @@ def execute_code(
             # Only UDS has a filesystem socket to unlink; TCP sockets are
             # freed by server_sock.close() above.
             if sock_path:
-                os.unlink(sock_path)
+                pathlib.Path(sock_path).unlink()
         except OSError:
             pass  # already cleaned up or never created
 
@@ -1669,7 +1671,7 @@ def _resolve_child_python(mode: str) -> str:
         for subdir in subdirs:
             for exe in exe_names:
                 candidate = os.path.join(root, subdir, exe)
-                if not (os.path.isfile(candidate) and os.access(candidate, os.X_OK)):
+                if not (pathlib.Path(candidate).is_file() and os.access(candidate, os.X_OK)):
                     continue
                 if _is_usable_python(candidate):
                     return candidate
@@ -1698,10 +1700,10 @@ def _resolve_child_cwd(mode: str, staging_dir: str) -> str:
     raw = os.environ.get("TERMINAL_CWD", "").strip()
     if raw:
         expanded = os.path.expanduser(raw)
-        if os.path.isdir(expanded):
+        if pathlib.Path(expanded).is_dir():
             return expanded
     here = os.getcwd()
-    if os.path.isdir(here):
+    if pathlib.Path(here).is_dir():
         return here
     return staging_dir
 
@@ -1715,25 +1717,25 @@ def _resolve_child_cwd(mode: str, staging_dir: str) -> str:
 _TOOL_DOC_LINES = [
     ("web_search",
      "  web_search(query: str, limit: int = 5) -> dict\n"
-     "    Returns {\"data\": {\"web\": [{\"url\", \"title\", \"description\"}, ...]}}"),
+     '    Returns {"data": {"web": [{"url", "title", "description"}, ...]}}'),
     ("web_extract",
      "  web_extract(urls: list[str]) -> dict\n"
-     "    Returns {\"results\": [{\"url\", \"title\", \"content\", \"error\"}, ...]} where content is markdown"),
+     '    Returns {"results": [{"url", "title", "content", "error"}, ...]} where content is markdown'),
     ("read_file",
      "  read_file(path: str, offset: int = 1, limit: int = 500) -> dict\n"
-     "    Lines are 1-indexed. Returns {\"content\": \"...\", \"total_lines\": N}"),
+     '    Lines are 1-indexed. Returns {"content": "...", "total_lines": N}'),
     ("write_file",
      "  write_file(path: str, content: str) -> dict\n"
      "    Always overwrites the entire file."),
     ("search_files",
-     "  search_files(pattern: str, target=\"content\", path=\".\", file_glob=None, limit=50) -> dict\n"
-     "    target: \"content\" (search inside files) or \"files\" (find files by name). Returns {\"matches\": [...]}"),
+     '  search_files(pattern: str, target="content", path=".", file_glob=None, limit=50) -> dict\n'
+     '    target: "content" (search inside files) or "files" (find files by name). Returns {"matches": [...]}'),
     ("patch",
      "  patch(path: str, old_string: str, new_string: str, replace_all: bool = False) -> dict\n"
      "    Replaces old_string with new_string in the file."),
     ("terminal",
      "  terminal(command: str, timeout=None, workdir=None) -> dict\n"
-     "    Foreground only (no background/pty). Returns {\"output\": \"...\", \"exit_code\": N}"),
+     '    Foreground only (no background/pty). Returns {"output": "...", "exit_code": N}'),
 ]
 
 

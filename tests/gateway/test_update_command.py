@@ -6,7 +6,7 @@ the _send_update_notification startup hook (sends results after restart).
 
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -76,7 +76,6 @@ class TestHandleUpdateCommand:
             MockPath.return_value = MagicMock()
             MockPath.__truediv__ = Path.__truediv__
             # Easier: just patch the __file__ resolution in the method
-            pass
 
         # Simpler approach — mock at method level using a wrapper
         runner = _make_runner()
@@ -173,6 +172,7 @@ class TestHandleUpdateCommand:
     async def test_resolve_hermes_bin_fallback(self):
         """_resolve_hermes_bin falls back to sys.executable argv when which fails."""
         import sys
+
         from gateway.run import _resolve_hermes_bin
 
         fake_spec = MagicMock()
@@ -391,7 +391,8 @@ class TestUpdateCommandPlatformGate:
     @pytest.mark.asyncio
     async def test_blocks_programmatic_interface(self, monkeypatch):
         """``Platform.WEBHOOK`` is not a messaging platform and must be
-        blocked by the allowlist gate before any side effects fire."""
+        blocked by the allowlist gate before any side effects fire.
+        """
         runner = _make_runner()
         event = _make_event(platform=Platform.WEBHOOK)
         monkeypatch.setenv("HERMES_MANAGED", "")
@@ -608,7 +609,7 @@ class TestSendUpdateNotification:
         }
         (hermes_home / ".update_pending.json").write_text(json.dumps(pending))
         (hermes_home / ".update_output.txt").write_text(
-            "→ Found 3 new commit(s)\n✓ Code updated!\n✓ Update complete!"
+            "→ Found 3 new commit(s)\n✓ Code updated!\n✓ Update complete!",
         )
         (hermes_home / ".update_exit_code").write_text("0")
 
@@ -667,7 +668,7 @@ class TestSendUpdateNotification:
         pending = {"platform": "telegram", "chat_id": "111", "user_id": "222"}
         (hermes_home / ".update_pending.json").write_text(json.dumps(pending))
         (hermes_home / ".update_output.txt").write_text(
-            "\x1b[32m✓ Code updated!\x1b[0m\n\x1b[1mDone\x1b[0m"
+            "\x1b[32m✓ Code updated!\x1b[0m\n\x1b[1mDone\x1b[0m",
         )
         (hermes_home / ".update_exit_code").write_text("0")
 
@@ -925,7 +926,8 @@ class TestUpdateInHelp:
         """The /update command is in the help text (proxy for _known_commands)."""
         # _known_commands is local to _handle_message, so we verify by
         # checking the help output includes it.
-        from gateway.run import GatewayRunner
         import inspect
+
+        from gateway.run import GatewayRunner
         source = inspect.getsource(GatewayRunner._handle_message)
         assert '"update"' in source

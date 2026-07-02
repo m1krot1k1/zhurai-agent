@@ -33,7 +33,6 @@ def _clean_browser_env(monkeypatch):
     """Each test controls DISPLAY / WAYLAND_DISPLAY / BROWSER explicitly."""
     for var in ("DISPLAY", "WAYLAND_DISPLAY", "BROWSER"):
         monkeypatch.delenv(var, raising=False)
-    yield
 
 
 def _force_platform_linux(monkeypatch):
@@ -90,7 +89,7 @@ def test_webbrowser_get_raises_refuses(monkeypatch):
 
 
 def test_non_linux_with_gui_allows(monkeypatch):
-    """macOS / Windows always have a usable default GUI browser."""
+    """MacOS / Windows always have a usable default GUI browser."""
     monkeypatch.setattr("hermes_cli.auth.sys.platform", "darwin")
     _force_resolved_browser(monkeypatch, "MacOSX")
     assert _can_open_graphical_browser() is True

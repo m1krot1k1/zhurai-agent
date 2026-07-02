@@ -5,37 +5,38 @@ import logging
 import os
 import subprocess
 import time
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from tools.checkpoint_manager import (
     CheckpointManager,
-    _shadow_repo_path,
+    _dir_file_count,
+    _git_env,
     _init_shadow_repo,
     _init_store,
-    _run_git,
-    _git_env,
-    _dir_file_count,
     _project_hash,
-    _store_path,
-    _ref_name,
     _project_meta_path,
+    _ref_name,
+    _run_git,
+    _shadow_repo_path,
+    _store_path,
     _touch_project,
-    format_checkpoint_list,
-    prune_checkpoints,
-    maybe_auto_prune_checkpoints,
-    store_status,
     clear_all,
     clear_legacy,
+    format_checkpoint_list,
+    maybe_auto_prune_checkpoints,
+    prune_checkpoints,
+    store_status,
 )
-
 
 # =========================================================================
 # Fixtures
 # =========================================================================
 
-@pytest.fixture()
+
+@pytest.fixture
 def work_dir(tmp_path):
     d = tmp_path / "project"
     d.mkdir()
@@ -44,13 +45,13 @@ def work_dir(tmp_path):
     return d
 
 
-@pytest.fixture()
+@pytest.fixture
 def checkpoint_base(tmp_path):
     """Isolated checkpoint base — never writes to ~/.hermes/."""
     return tmp_path / "checkpoints"
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_home(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
@@ -62,13 +63,13 @@ def fake_home(tmp_path, monkeypatch):
     return home
 
 
-@pytest.fixture()
+@pytest.fixture
 def mgr(work_dir, checkpoint_base, monkeypatch):
     monkeypatch.setattr("tools.checkpoint_manager.CHECKPOINT_BASE", checkpoint_base)
     return CheckpointManager(enabled=True, max_snapshots=50)
 
 
-@pytest.fixture()
+@pytest.fixture
 def disabled_mgr(checkpoint_base, monkeypatch):
     monkeypatch.setattr("tools.checkpoint_manager.CHECKPOINT_BASE", checkpoint_base)
     return CheckpointManager(enabled=False)
@@ -461,7 +462,7 @@ class TestWorkingDirResolution:
         filepath.write_text("x\n")
 
         assert m.get_working_dir_for_path(
-            f"~/{project.name}/src/main.py"
+            f"~/{project.name}/src/main.py",
         ) == str(project)
 
 
@@ -743,7 +744,7 @@ class TestGpgAndGlobalConfigIsolation:
             "[user]\n    email = real@user.com\n    name = Real User\n"
             "[commit]\n    gpgsign = true\n"
             "[tag]\n    gpgSign = true\n"
-            "[gpg]\n    program = /nonexistent/fake-gpg-binary\n"
+            "[gpg]\n    program = /nonexistent/fake-gpg-binary\n",
         )
         monkeypatch.setenv("HOME", str(fake_home))
         monkeypatch.delenv("GPG_TTY", raising=False)

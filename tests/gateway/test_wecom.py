@@ -111,7 +111,7 @@ class TestWeComConnect:
         )
 
         adapter = WeComAdapter(
-            PlatformConfig(enabled=True, extra={"bot_id": "bot-1", "secret": "secret-1"})
+            PlatformConfig(enabled=True, extra={"bot_id": "bot-1", "secret": "secret-1"}),
         )
         adapter._open_connection = AsyncMock(side_effect=RuntimeError("invalid secret (errcode=40013)"))
 
@@ -173,7 +173,7 @@ class TestWeComReplyMode:
         adapter = WeComAdapter(PlatformConfig(enabled=True))
         adapter._reply_req_ids["msg-1"] = "req-1"
         adapter._send_reply_request = AsyncMock(
-            return_value={"headers": {"req_id": "req-1"}, "errcode": 0}
+            return_value={"headers": {"req_id": "req-1"}, "errcode": 0},
         )
 
         result = await adapter.send("chat-123", "hello from reply", reply_to="msg-1")
@@ -204,11 +204,11 @@ class TestWeComReplyMode:
                 "reject_reason": None,
                 "downgraded": False,
                 "downgrade_note": None,
-            }
+            },
         )
         adapter._upload_media_bytes = AsyncMock(return_value={"media_id": "media-1", "type": "image"})
         adapter._send_reply_request = AsyncMock(
-            return_value={"headers": {"req_id": "req-1"}, "errcode": 0}
+            return_value={"headers": {"req_id": "req-1"}, "errcode": 0},
         )
 
         result = await adapter.send_image_file("chat-123", "/tmp/demo.png", reply_to="msg-1")
@@ -242,7 +242,7 @@ class TestExtractText:
                     {"msgtype": "text", "text": {"content": "part1"}},
                     {"msgtype": "image", "image": {"url": "https://example.com/x.png"}},
                     {"msgtype": "text", "text": {"content": "part2"}},
-                ]
+                ],
             },
         }
         text, _reply_text = WeComAdapter._extract_text(body)
@@ -280,7 +280,7 @@ class TestPolicyHelpers:
         from plugins.platforms.wecom.adapter import WeComAdapter
 
         adapter = WeComAdapter(
-            PlatformConfig(enabled=True, extra={"dm_policy": "allowlist", "allow_from": ["user-1"]})
+            PlatformConfig(enabled=True, extra={"dm_policy": "allowlist", "allow_from": ["user-1"]}),
         )
         assert adapter._is_dm_allowed("user-1") is True
         assert adapter._is_dm_allowed("user-2") is False
@@ -289,7 +289,8 @@ class TestPolicyHelpers:
         """Env-only setup (WECOM_DM_POLICY + WECOM_ALLOWED_USERS, no config
         ``extra``) must populate the DM allowlist. Otherwise ``dm_policy:
         allowlist`` runs with an empty allowlist and drops every listed user
-        at intake — the documented env vars become no-ops."""
+        at intake — the documented env vars become no-ops.
+        """
         from plugins.platforms.wecom.adapter import WeComAdapter
 
         monkeypatch.setenv("WECOM_DM_POLICY", "allowlist")
@@ -305,13 +306,14 @@ class TestPolicyHelpers:
 
     def test_dm_allowlist_extra_takes_precedence_over_env(self, monkeypatch):
         """Config ``extra`` wins over the env fallback, so an explicit
-        allowlist is never silently widened by a stray WECOM_ALLOWED_USERS."""
+        allowlist is never silently widened by a stray WECOM_ALLOWED_USERS.
+        """
         from plugins.platforms.wecom.adapter import WeComAdapter
 
         monkeypatch.setenv("WECOM_ALLOWED_USERS", "env-user")
 
         adapter = WeComAdapter(
-            PlatformConfig(enabled=True, extra={"dm_policy": "allowlist", "allow_from": ["cfg-user"]})
+            PlatformConfig(enabled=True, extra={"dm_policy": "allowlist", "allow_from": ["cfg-user"]}),
         )
 
         assert adapter._allow_from == ["cfg-user"]
@@ -329,7 +331,7 @@ class TestPolicyHelpers:
                     "group_allow_from": ["group-1"],
                     "groups": {"group-1": {"allow_from": ["user-1"]}},
                 },
-            )
+            ),
         )
 
         assert adapter._is_group_allowed("group-1", "user-1") is True
@@ -365,6 +367,7 @@ class TestMediaHelpers:
 
     def test_decrypt_file_bytes_round_trip(self):
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
         from plugins.platforms.wecom.adapter import WeComAdapter
 
         plaintext = b"wecom-secret"
@@ -487,7 +490,7 @@ class TestMediaUpload:
                     "content-type": "application/octet-stream",
                     "content-disposition": 'attachment; filename="secret.bin"',
                 },
-            )
+            ),
         )
 
         cached = await adapter._cache_media(
@@ -565,7 +568,7 @@ class TestSend:
                 "reject_reason": None,
                 "downgraded": True,
                 "downgrade_note": "语音格式 audio/mpeg 不支持，企微仅支持 AMR 格式，已转为文件格式发送",
-            }
+            },
         )
         adapter._upload_media_bytes = AsyncMock(return_value={"media_id": "media-1", "type": "file"})
         adapter._send_media_message = AsyncMock(return_value={"headers": {"req_id": "req-media"}, "errcode": 0})
@@ -654,7 +657,7 @@ class TestInboundMessages:
             PlatformConfig(
                 enabled=True,
                 extra={"group_policy": "allowlist", "group_allow_from": ["group-allowed"]},
-            )
+            ),
         )
         adapter.handle_message = AsyncMock()
         adapter._extract_media = AsyncMock(return_value=([], []))
@@ -779,7 +782,7 @@ class TestWeComZombieSessionFix:
             PlatformConfig(
                 enabled=True,
                 extra={"group_policy": "allowlist", "group_allow_from": ["group-ok"]},
-            )
+            ),
         )
         adapter.handle_message = AsyncMock()
         adapter._extract_media = AsyncMock(return_value=([], []))
@@ -825,16 +828,17 @@ class TestWeComZombieSessionFix:
     async def test_proactive_group_send_falls_back_to_cached_req_id(self):
         """Sending into a group without reply_to should use the last cached
         req_id via APP_CMD_RESPONSE — WeCom AI Bots cannot initiate APP_CMD_SEND
-        in group chats (errcode 600039)."""
+        in group chats (errcode 600039).
+        """
         from plugins.platforms.wecom.adapter import WeComAdapter
 
         adapter = WeComAdapter(PlatformConfig(enabled=True))
         adapter._last_chat_req_ids["group-1"] = "inbound-req-42"
         adapter._send_reply_request = AsyncMock(
-            return_value={"headers": {"req_id": "inbound-req-42"}, "errcode": 0}
+            return_value={"headers": {"req_id": "inbound-req-42"}, "errcode": 0},
         )
         adapter._send_request = AsyncMock(
-            return_value={"headers": {"req_id": "new"}, "errcode": 0}
+            return_value={"headers": {"req_id": "new"}, "errcode": 0},
         )
 
         result = await adapter.send("group-1", "ping", reply_to=None)
@@ -855,7 +859,7 @@ class TestWeComZombieSessionFix:
 
         adapter = WeComAdapter(PlatformConfig(enabled=True))
         adapter._send_request = AsyncMock(
-            return_value={"headers": {"req_id": "new"}, "errcode": 0}
+            return_value={"headers": {"req_id": "new"}, "errcode": 0},
         )
 
         result = await adapter.send("fresh-dm-chat", "ping", reply_to=None)
@@ -864,7 +868,6 @@ class TestWeComZombieSessionFix:
         adapter._send_request.assert_awaited_once()
         cmd = adapter._send_request.await_args.args[0]
         assert cmd == APP_CMD_SEND
-
 
 
 class TestTextBatchFlushRace:
@@ -882,7 +885,8 @@ class TestTextBatchFlushRace:
     @pytest.mark.asyncio
     async def test_superseded_task_does_not_pop_or_process_event(self):
         """A flush task that has been superseded must leave the event in the
-        batch dict for the new task to handle."""
+        batch dict for the new task to handle.
+        """
         from gateway.platforms.base import MessageEvent, MessageType
         from plugins.platforms.wecom.adapter import WeComAdapter
 

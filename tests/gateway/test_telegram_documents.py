@@ -1,5 +1,4 @@
-"""
-Tests for Telegram document handling in gateway/platforms/telegram.py.
+"""Tests for Telegram document handling in gateway/platforms/telegram.py.
 
 Covers: document type detection, download/cache flow, size limits,
         text injection, error handling.
@@ -9,7 +8,6 @@ We mock the telegram module at import time to avoid collection errors.
 """
 
 import asyncio
-import os
 import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,16 +16,16 @@ import pytest
 
 from gateway.config import PlatformConfig
 from gateway.platforms.base import (
+    SUPPORTED_VIDEO_TYPES,
     MessageEvent,
     MessageType,
     SendResult,
-    SUPPORTED_VIDEO_TYPES,
 )
-
 
 # ---------------------------------------------------------------------------
 # Mock the telegram package if it's not installed
 # ---------------------------------------------------------------------------
+
 
 def _ensure_telegram_mock():
     """Install mock telegram modules so TelegramAdapter can be imported."""
@@ -51,12 +49,14 @@ def _ensure_telegram_mock():
 _ensure_telegram_mock()
 
 # Now we can safely import
-from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402
+import pathlib
 
+from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers to build mock Telegram objects
 # ---------------------------------------------------------------------------
+
 
 def _make_file_obj(data: bytes = b"hello"):
     """Create a mock Telegram File with download_as_bytearray."""
@@ -126,7 +126,7 @@ def _make_video(file_obj=None):
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
+@pytest.fixture
 def adapter():
     config = PlatformConfig(enabled=True, token="fake-token")
     a = TelegramAdapter(config)
@@ -144,10 +144,10 @@ def adapter():
 def _redirect_cache(tmp_path, monkeypatch):
     """Point document/video cache to tmp_path so tests don't touch ~/.hermes."""
     monkeypatch.setattr(
-        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache"
+        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache",
     )
     monkeypatch.setattr(
-        "gateway.platforms.base.VIDEO_CACHE_DIR", tmp_path / "video_cache"
+        "gateway.platforms.base.VIDEO_CACHE_DIR", tmp_path / "video_cache",
     )
 
 
@@ -198,7 +198,7 @@ class TestDocumentDownloadBlock:
         await adapter._handle_media_message(update, MagicMock())
         event = adapter.handle_message.call_args[0][0]
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert event.media_types == ["application/pdf"]
 
     @pytest.mark.asyncio
@@ -269,7 +269,7 @@ class TestDocumentDownloadBlock:
         update = _make_update(msg)
 
         with patch.object(adapter, "_photo_batch_key", return_value="batch-1"), patch.object(
-            adapter, "_enqueue_photo_event"
+            adapter, "_enqueue_photo_event",
         ) as enqueue_mock:
             await adapter._handle_media_message(update, MagicMock())
 
@@ -289,7 +289,7 @@ class TestDocumentDownloadBlock:
         update = _make_update(msg)
 
         with patch.object(adapter, "_photo_batch_key", return_value="batch-2"), patch.object(
-            adapter, "_enqueue_photo_event"
+            adapter, "_enqueue_photo_event",
         ) as enqueue_mock:
             await adapter._handle_media_message(update, MagicMock())
 
@@ -372,7 +372,7 @@ class TestDocumentDownloadBlock:
         event = adapter.handle_message.call_args[0][0]
         # File should still be cached
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         # Content NOT injected — text should be empty (no caption set)
         assert "[Content of" not in (event.text or "")
 
@@ -422,7 +422,7 @@ class TestVideoDownloadBlock:
         event = adapter.handle_message.call_args[0][0]
         assert event.message_type == MessageType.VIDEO
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert event.media_types == [SUPPORTED_VIDEO_TYPES[".mp4"]]
 
     @pytest.mark.asyncio
@@ -436,7 +436,7 @@ class TestVideoDownloadBlock:
         event = adapter.handle_message.call_args[0][0]
         assert event.message_type == MessageType.VIDEO
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert event.media_types == [SUPPORTED_VIDEO_TYPES[".mp4"]]
 
 
@@ -511,7 +511,7 @@ class TestMediaGroups:
 class TestSendVoice:
     """Tests for TelegramAdapter.send_voice() routing across audio formats."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def connected_adapter(self, adapter):
         """Adapter with a mock bot attached."""
         bot = AsyncMock()
@@ -592,7 +592,7 @@ class TestSendVoice:
 class TestSendDocument:
     """Tests for TelegramAdapter.send_document() — sending files to users."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def connected_adapter(self, adapter):
         """Adapter with a mock bot attached."""
         bot = AsyncMock()
@@ -720,13 +720,13 @@ class TestSendDocument:
         test_file.write_bytes(b"data")
 
         connected_adapter._bot.send_document = AsyncMock(
-            side_effect=RuntimeError("Telegram API error")
+            side_effect=RuntimeError("Telegram API error"),
         )
 
         # The base fallback calls self.send() which is also on _bot, so mock it
         # to avoid cascading errors.
         connected_adapter.send = AsyncMock(
-            return_value=SendResult(success=True, message_id="fallback")
+            return_value=SendResult(success=True, message_id="fallback"),
         )
 
         result = await connected_adapter.send_document(
@@ -759,7 +759,7 @@ class TestSendDocument:
 
     @pytest.mark.asyncio
     async def test_send_document_thread_id(self, connected_adapter, tmp_path):
-        """metadata thread_id is forwarded as message_thread_id (required for Telegram forum groups)."""
+        """Metadata thread_id is forwarded as message_thread_id (required for Telegram forum groups)."""
         test_file = tmp_path / "report.pdf"
         test_file.write_bytes(b"%PDF-1.4 data")
 
@@ -829,7 +829,7 @@ class TestTelegramPhotoBatching:
 class TestSendVideo:
     """Tests for TelegramAdapter.send_video() — sending videos to users."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def connected_adapter(self, adapter):
         bot = AsyncMock()
         adapter._bot = bot
@@ -887,7 +887,7 @@ class TestSendVideo:
 
     @pytest.mark.asyncio
     async def test_send_video_thread_id(self, connected_adapter, tmp_path):
-        """metadata thread_id is forwarded as message_thread_id (required for Telegram forum groups)."""
+        """Metadata thread_id is forwarded as message_thread_id (required for Telegram forum groups)."""
         test_file = tmp_path / "clip.mp4"
         test_file.write_bytes(b"\x00\x00\x00\x1c" + b"ftyp" + b"\x00" * 100)
 

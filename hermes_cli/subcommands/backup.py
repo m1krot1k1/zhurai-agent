@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_backup_parser(subparsers, *, cmd_backup: Callable) -> None:
@@ -33,6 +33,6 @@ def build_backup_parser(subparsers, *, cmd_backup: Callable) -> None:
         help="Quick snapshot: only critical state files (config, state.db, .env, auth, cron)",
     )
     backup_parser.add_argument(
-        "-l", "--label", help="Label for the snapshot (only used with --quick)"
+        "-l", "--label", help="Label for the snapshot (only used with --quick)",
     )
     backup_parser.set_defaults(func=cmd_backup)

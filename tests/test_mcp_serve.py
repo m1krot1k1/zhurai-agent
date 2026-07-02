@@ -1,5 +1,4 @@
-"""
-Tests for mcp_serve — Hermes MCP server.
+"""Tests for mcp_serve — Hermes MCP server.
 
 Three layers of tests:
 1. Unit tests — helpers, content extraction, attachment parsing
@@ -13,16 +12,16 @@ import inspect
 import json
 import os
 import sqlite3
-import time
 import threading
+import time
 from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _isolate_hermes_home(tmp_path, monkeypatch):
@@ -246,7 +245,7 @@ def fake_mcp_server(populated_sessions_dir, mock_session_db, monkeypatch):
 
     monkeypatch.setattr(mcp_serve, "_get_sessions_dir", lambda: populated_sessions_dir)
     monkeypatch.setattr(mcp_serve, "_get_session_db", lambda: mock_session_db)
-    monkeypatch.setattr(mcp_serve, "_load_channel_directory", lambda: {})
+    monkeypatch.setattr(mcp_serve, "_load_channel_directory", dict)
     monkeypatch.setattr(mcp_serve, "_MCP_SERVER_AVAILABLE", True)
     monkeypatch.setattr(mcp_serve, "FastMCP", _FakeFastMCP)
 
@@ -444,7 +443,7 @@ class TestEventBridge:
         assert result[0]["session_key"] == "wake"
 
     def test_queue_limit(self):
-        from mcp_serve import EventBridge, QueueEvent, QUEUE_LIMIT
+        from mcp_serve import QUEUE_LIMIT, EventBridge, QueueEvent
         b = EventBridge()
         for i in range(QUEUE_LIMIT + 50):
             b._enqueue(QueueEvent(cursor=0, type="message", session_key=f"s{i}"))
@@ -502,7 +501,7 @@ def mcp_server_e2e(populated_sessions_dir, mock_session_db, monkeypatch):
     import mcp_serve
     monkeypatch.setattr(mcp_serve, "_get_sessions_dir", lambda: populated_sessions_dir)
     monkeypatch.setattr(mcp_serve, "_get_session_db", lambda: mock_session_db)
-    monkeypatch.setattr(mcp_serve, "_load_channel_directory", lambda: {})
+    monkeypatch.setattr(mcp_serve, "_load_channel_directory", dict)
 
     bridge = mcp_serve.EventBridge()
     server = mcp_serve.create_mcp_server(event_bridge=bridge)
@@ -512,7 +511,7 @@ def mcp_server_e2e(populated_sessions_dir, mock_session_db, monkeypatch):
 def _run_tool(server, name, args=None):
     """Call an MCP tool through FastMCP's tool manager and return parsed JSON."""
     result = asyncio.get_event_loop().run_until_complete(
-        server._tool_manager.call_tool(name, args or {})
+        server._tool_manager.call_tool(name, args or {}),
     )
     return json.loads(result) if isinstance(result, str) else result
 
@@ -746,6 +745,7 @@ class TestE2EEventsWait:
         result = _run_tool(server, "events_wait", {"timeout_ms": 999999})
         assert result["event"] is not None
 
+
 class TestMCPToolParameterCoercion:
     def test_conversations_list_coerces_string_limit(self, fake_mcp_server, _event_loop):
         server, _ = fake_mcp_server
@@ -782,7 +782,7 @@ class TestMCPToolParameterCoercion:
                 type="message",
                 session_key="test",
                 data={"content": "waiting for this"},
-            )
+            ),
         )
 
         result = _run_tool(server, "events_wait", {"after_cursor": "0", "timeout_ms": "bad"})
@@ -1078,7 +1078,7 @@ class TestEventBridgePollE2E:
                 "display_name": "PollTest",
                 "updated_at": "2026-03-29T15:00:05",
                 "origin": {"platform": "telegram", "chat_id": "poll_test"},
-            }
+            },
         }
         (sessions_dir / "sessions.json").write_text(json.dumps(sessions_data))
 
@@ -1133,7 +1133,7 @@ class TestEventBridgePollE2E:
                 "platform": "telegram",
                 "updated_at": "2026-03-29T15:00:05",
                 "origin": {"platform": "telegram", "chat_id": "skip"},
-            }
+            },
         }
         (sessions_dir / "sessions.json").write_text(json.dumps(sessions_data))
         _create_test_db(db_path, session_id, [
@@ -1185,7 +1185,7 @@ class TestEventBridgePollE2E:
                 "platform": "telegram",
                 "updated_at": "2026-03-29T15:00:05",
                 "origin": {"platform": "telegram", "chat_id": "new"},
-            }
+            },
         }
         (sessions_dir / "sessions.json").write_text(json.dumps(sessions_data))
         _create_test_db(db_path, session_id, [

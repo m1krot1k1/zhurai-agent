@@ -4,16 +4,14 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 from tools.vision_tools import (
-    _detect_video_mime_type,
-    _video_to_base64_data_url,
-    _handle_video_analyze,
     _MAX_VIDEO_BASE64_BYTES,
-    video_analyze_tool,
     VIDEO_ANALYZE_SCHEMA,
+    _detect_video_mime_type,
+    _handle_video_analyze,
+    _video_to_base64_data_url,
+    video_analyze_tool,
 )
-
 
 # ---------------------------------------------------------------------------
 # _detect_video_mime_type
@@ -147,7 +145,7 @@ class TestHandleVideoAnalyze:
         with patch("tools.vision_tools.video_analyze_tool", new_callable=AsyncMock) as mock_tool:
             mock_tool.return_value = json.dumps({"success": True, "analysis": "ok"})
             asyncio.get_event_loop().run_until_complete(
-                _handle_video_analyze({"video_url": "/tmp/test.mp4", "question": "test"})
+                _handle_video_analyze({"video_url": "/tmp/test.mp4", "question": "test"}),
             )
             args = mock_tool.call_args[0]
             assert args[2] == "google/gemini-2.5-flash"
@@ -159,7 +157,7 @@ class TestHandleVideoAnalyze:
         with patch("tools.vision_tools.video_analyze_tool", new_callable=AsyncMock) as mock_tool:
             mock_tool.return_value = json.dumps({"success": True, "analysis": "ok"})
             asyncio.get_event_loop().run_until_complete(
-                _handle_video_analyze({"video_url": "/tmp/test.mp4", "question": "test"})
+                _handle_video_analyze({"video_url": "/tmp/test.mp4", "question": "test"}),
             )
             args = mock_tool.call_args[0]
             assert args[2] == "google/gemini-flash"

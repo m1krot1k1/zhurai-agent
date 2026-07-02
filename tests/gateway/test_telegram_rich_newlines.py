@@ -18,7 +18,7 @@ import pytest
 from plugins.platforms.telegram.adapter import TelegramAdapter
 
 
-@pytest.fixture()
+@pytest.fixture
 def adapter():
     """Bare adapter instance — _rich_message_payload doesn't use self."""
     return object.__new__(TelegramAdapter)
@@ -38,7 +38,7 @@ class TestRichMessageNewlineNormalization:
         md = payload["markdown"]
         # Each single \n should now be "  \n" (two spaces + newline)
         assert "  \n" in md, f"Expected hard break '  \\n' in {md!r}"
-        assert "Line 1  \nLine 2  \nLine 3" == md
+        assert md == "Line 1  \nLine 2  \nLine 3"
 
     def test_paragraph_breaks_preserved(self, adapter):
         """Double newlines (paragraph breaks) must NOT gain extra spaces."""
@@ -46,7 +46,7 @@ class TestRichMessageNewlineNormalization:
         payload = adapter._rich_message_payload(content)
         md = payload["markdown"]
         # \n\n should remain as-is — no trailing spaces injected
-        assert "Paragraph 1\n\nParagraph 2" == md
+        assert md == "Paragraph 1\n\nParagraph 2"
 
     def test_mixed_single_and_double_newlines(self, adapter):
         """Content with both list items and paragraph breaks must be handled correctly."""

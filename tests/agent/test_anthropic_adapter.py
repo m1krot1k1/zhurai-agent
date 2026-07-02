@@ -4,19 +4,18 @@ import json
 import sys
 import time
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent.prompt_caching import apply_anthropic_cache_control
 from agent.anthropic_adapter import (
     _is_azure_anthropic_endpoint,
     _is_oauth_token,
     _refresh_oauth_token,
     _to_plain_data,
     _write_claude_code_credentials,
-    build_anthropic_client,
     build_anthropic_bedrock_client,
+    build_anthropic_client,
     build_anthropic_kwargs,
     convert_messages_to_anthropic,
     convert_tools_to_anthropic,
@@ -26,8 +25,8 @@ from agent.anthropic_adapter import (
     resolve_anthropic_token,
     run_oauth_setup_token,
 )
+from agent.prompt_caching import apply_anthropic_cache_control
 from agent.transports import get_transport
-
 
 # ---------------------------------------------------------------------------
 # Auth helpers
@@ -76,7 +75,8 @@ class TestBuildAnthropicClient:
 
     def test_oauth_drop_context_1m_beta_strips_only_1m(self):
         """drop_context_1m_beta=True strips context-1m-2025-08-07 while
-        preserving every other OAuth-relevant beta."""
+        preserving every other OAuth-relevant beta.
+        """
         with patch("agent.anthropic_adapter._anthropic_sdk") as mock_sdk:
             build_anthropic_client(
                 "sk-ant-oat01-" + "x" * 60,
@@ -110,7 +110,7 @@ class TestBuildAnthropicClient:
             kwargs = mock_sdk.Anthropic.call_args[1]
             assert kwargs["base_url"] == "https://custom.api.com"
             assert kwargs["default_headers"] == {
-                "anthropic-beta": "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14"
+                "anthropic-beta": "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14",
             }
 
     def test_custom_base_url_strips_trailing_v1(self):
@@ -134,16 +134,16 @@ class TestBuildAnthropicClient:
 
     def test_azure_anthropic_endpoint_detection_is_host_and_path_scoped(self):
         assert _is_azure_anthropic_endpoint(
-            "https://example.services.ai.azure.com/models/anthropic"
+            "https://example.services.ai.azure.com/models/anthropic",
         ) is True
         assert _is_azure_anthropic_endpoint(
-            "https://example.services.ai.azure.us/anthropic"
+            "https://example.services.ai.azure.us/anthropic",
         ) is True
         assert _is_azure_anthropic_endpoint(
-            "https://example.openai.azure.com/openai/v1"
+            "https://example.openai.azure.com/openai/v1",
         ) is False
         assert _is_azure_anthropic_endpoint(
-            "https://management.azure.com/anthropic"
+            "https://management.azure.com/anthropic",
         ) is False
 
     def test_bedrock_client_keeps_context_1m_beta(self):
@@ -164,7 +164,7 @@ class TestBuildAnthropicClient:
             assert kwargs["auth_token"] == "minimax-secret-123"
             assert "api_key" not in kwargs
             assert kwargs["default_headers"] == {
-                "anthropic-beta": "interleaved-thinking-2025-05-14"
+                "anthropic-beta": "interleaved-thinking-2025-05-14",
             }
 
     def test_minimax_cn_anthropic_endpoint_omits_tool_streaming_beta(self):
@@ -177,7 +177,7 @@ class TestBuildAnthropicClient:
             assert kwargs["auth_token"] == "minimax-cn-secret-123"
             assert "api_key" not in kwargs
             assert kwargs["default_headers"] == {
-                "anthropic-beta": "interleaved-thinking-2025-05-14"
+                "anthropic-beta": "interleaved-thinking-2025-05-14",
             }
 
     def test_azure_foundry_anthropic_endpoint_uses_bearer_auth(self):
@@ -218,7 +218,7 @@ class TestReadClaudeCodeCredentials:
                 "accessToken": "sk-ant-oat01-token",
                 "refreshToken": "sk-ant-oat01-refresh",
                 "expiresAt": int(time.time() * 1000) + 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
         creds = read_claude_code_credentials()
@@ -250,7 +250,7 @@ class TestReadClaudeCodeCredentials:
         cred_file = tmp_path / ".claude" / ".credentials.json"
         cred_file.parent.mkdir(parents=True)
         cred_file.write_text(json.dumps({
-            "claudeAiOauth": {"accessToken": "", "refreshToken": "x"}
+            "claudeAiOauth": {"accessToken": "", "refreshToken": "x"},
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
         assert read_claude_code_credentials() is None
@@ -326,7 +326,7 @@ class TestResolveAnthropicToken:
                 "accessToken": "cc-auto-token",
                 "refreshToken": "refresh",
                 "expiresAt": int(time.time() * 1000) + 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
         assert resolve_anthropic_token() == "cc-auto-token"
@@ -377,7 +377,8 @@ class TestResolveAnthropicToken:
         """A persisted OAuth entry with access_token=None must not crash the
         resolver (None.strip() would escape the helper's try/excepts and take
         down the whole resolver incl. the ANTHROPIC_API_KEY fallback). It should
-        be skipped and the api-key fallback (source #5) should win."""
+        be skipped and the api-key fallback (source #5) should win.
+        """
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant...ykey")
         monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
@@ -397,7 +398,8 @@ class TestResolveAnthropicToken:
         """resolve_anthropic_token() returns an OAuth bearer token; a pool entry
         whose auth_type is api_key (not oauth) must NOT be returned from the pool
         path — those are consumed via the aux client's _pool_runtime_api_key
-        lane, a different resolution concern."""
+        lane, a different resolution concern.
+        """
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
@@ -415,7 +417,8 @@ class TestResolveAnthropicToken:
 
     def test_pool_is_not_consulted_when_env_token_present(self, monkeypatch, tmp_path):
         """Source #1 (ANTHROPIC_TOKEN) must short-circuit before the pool: when
-        it is set, load_pool must never be called (ordering contract #1 → #4)."""
+        it is set, load_pool must never be called (ordering contract #1 → #4).
+        """
         monkeypatch.setenv("ANTHROPIC_TOKEN", "env-token")
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
@@ -436,7 +439,8 @@ class TestResolveAnthropicToken:
     def test_pool_resolution_is_read_only(self, monkeypatch, tmp_path):
         """The resolver must enumerate the pool read-only — clear_expired and
         refresh must both be False so a bare resolve never writes auth.json or
-        triggers a network refresh from diagnostic call sites (#50108 MED)."""
+        triggers a network refresh from diagnostic call sites (#50108 MED).
+        """
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
         monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
@@ -467,7 +471,7 @@ class TestResolveAnthropicToken:
                 "accessToken": "cc-auto-token",
                 "refreshToken": "refresh-token",
                 "expiresAt": int(time.time() * 1000) + 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
 
@@ -507,7 +511,7 @@ class TestRefreshOauthToken:
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_ctx = MagicMock()
             mock_ctx.__enter__ = MagicMock(return_value=MagicMock(
-                read=MagicMock(return_value=mock_response)
+                read=MagicMock(return_value=mock_response),
             ))
             mock_ctx.__exit__ = MagicMock(return_value=False)
             mock_urlopen.return_value = mock_ctx
@@ -589,7 +593,7 @@ class TestResolveWithRefresh:
                 "accessToken": "expired-tok",
                 "refreshToken": "valid-refresh",
                 "expiresAt": int(time.time() * 1000) - 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
 
@@ -611,7 +615,7 @@ class TestResolveWithRefresh:
                 "accessToken": "expired-claude-creds-token",
                 "refreshToken": "valid-refresh",
                 "expiresAt": int(time.time() * 1000) - 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
 
@@ -641,7 +645,7 @@ class TestRunOauthSetupToken:
                 "accessToken": "from-cred-file",
                 "refreshToken": "refresh",
                 "expiresAt": int(time.time() * 1000) + 3600_000,
-            }
+            },
         }))
         monkeypatch.setattr("agent.anthropic_adapter.Path.home", lambda: tmp_path)
 
@@ -741,7 +745,7 @@ class TestConvertTools:
                         "required": ["query"],
                     },
                 },
-            }
+            },
         ]
         result = convert_tools_to_anthropic(tools)
         assert len(result) == 1
@@ -772,7 +776,7 @@ class TestConvertTools:
                         "required": ["command"],
                     },
                 },
-            }
+            },
         ]
 
         result = convert_tools_to_anthropic(tools)
@@ -808,7 +812,7 @@ class TestConvertMessages:
                     {"type": "text", "text": "Can you see this?"},
                     {"type": "image_url", "image_url": {"url": "https://example.com/cat.png"}},
                 ],
-            }
+            },
         ]
 
         _, result = convert_messages_to_anthropic(messages)
@@ -820,7 +824,7 @@ class TestConvertMessages:
                     {"type": "text", "text": "Can you see this?"},
                     {"type": "image", "source": {"type": "url", "url": "https://example.com/cat.png"}},
                 ],
-            }
+            },
         ]
 
     def test_converts_data_url_image_blocks_to_base64_anthropic_image_blocks(self):
@@ -831,7 +835,7 @@ class TestConvertMessages:
                     {"type": "input_text", "text": "What is in this screenshot?"},
                     {"type": "input_image", "image_url": "data:image/png;base64,AAAA"},
                 ],
-            }
+            },
         ]
 
         _, result = convert_messages_to_anthropic(messages)
@@ -850,7 +854,7 @@ class TestConvertMessages:
                         },
                     },
                 ],
-            }
+            },
         ]
 
     def test_converts_tool_calls(self):
@@ -865,7 +869,7 @@ class TestConvertMessages:
                             "name": "search",
                             "arguments": '{"query": "test"}',
                         },
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "tc_1", "content": "search results"},
@@ -919,7 +923,7 @@ class TestConvertMessages:
                 "role": "assistant",
                 "content": "",
                 "tool_calls": [
-                    {"id": "tc_orphan", "function": {"name": "x", "arguments": "{}"}}
+                    {"id": "tc_orphan", "function": {"name": "x", "arguments": "{}"}},
                 ],
             },
             {"role": "user", "content": "never mind"},
@@ -1037,7 +1041,7 @@ class TestConvertMessages:
                         "type": "thinking",
                         "thinking": "Need to inspect the tool result first.",
                         "signature": "sig_123",
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "tc_1", "content": "tool output"},
@@ -1062,7 +1066,7 @@ class TestConvertMessages:
                         "image_url": {"url": "data:image/png;base64,ZmFrZQ=="},
                     },
                 ],
-            }
+            },
         ]
 
         _, result = convert_messages_to_anthropic(messages)
@@ -1088,7 +1092,7 @@ class TestConvertMessages:
                         "image_url": {"url": "https://example.com/cat.png"},
                     },
                 ],
-            }
+            },
         ]
 
         _, result = convert_messages_to_anthropic(messages)
@@ -1217,7 +1221,8 @@ class TestBuildAnthropicKwargs:
 
     def test_fast_mode_oauth_drop_context_1m_beta_strips_only_1m(self):
         """drop_context_1m_beta=True strips context-1m from fast-mode
-        extra_headers while preserving every other OAuth + fast-mode beta."""
+        extra_headers while preserving every other OAuth + fast-mode beta.
+        """
         kwargs = build_anthropic_kwargs(
             model="claude-opus-4-6",
             messages=[{"role": "user", "content": "Hi"}],
@@ -1355,10 +1360,10 @@ class TestBuildAnthropicKwargs:
         legacy list stays on the manual path.
         """
         from agent.anthropic_adapter import (
-            _supports_adaptive_thinking,
-            _supports_xhigh_effort,
             _forbids_sampling_params,
             _get_anthropic_max_output,
+            _supports_adaptive_thinking,
+            _supports_xhigh_effort,
         )
         # New / unknown Claude models → modern contract by default.
         for m in (
@@ -1376,8 +1381,8 @@ class TestBuildAnthropicKwargs:
     def test_legacy_claude_stays_on_manual_thinking(self):
         """Older Claude families keep the legacy manual-thinking contract."""
         from agent.anthropic_adapter import (
-            _supports_adaptive_thinking,
             _forbids_sampling_params,
+            _supports_adaptive_thinking,
         )
         for m in (
             "claude-3-5-sonnet",
@@ -1392,9 +1397,9 @@ class TestBuildAnthropicKwargs:
     def test_claude_46_is_adaptive_but_not_xhigh_or_no_sampling(self):
         """4.6 is adaptive, but predates xhigh and still accepts sampling."""
         from agent.anthropic_adapter import (
+            _forbids_sampling_params,
             _supports_adaptive_thinking,
             _supports_xhigh_effort,
-            _forbids_sampling_params,
         )
         for m in ("claude-opus-4.6", "claude-sonnet-4-6"):
             assert _supports_adaptive_thinking(m) is True, m
@@ -1403,11 +1408,12 @@ class TestBuildAnthropicKwargs:
 
     def test_non_claude_anthropic_models_use_manual_path(self):
         """Non-Claude Anthropic-Messages models (minimax, qwen3, kimi) must not
-        be misclassified as adaptive by the default-to-modern rule."""
+        be misclassified as adaptive by the default-to-modern rule.
+        """
         from agent.anthropic_adapter import (
+            _forbids_sampling_params,
             _supports_adaptive_thinking,
             _supports_xhigh_effort,
-            _forbids_sampling_params,
         )
         for m in ("minimax-m2", "qwen3-max", "moonshotai/kimi-k2.5", "glm-4.6"):
             assert _supports_adaptive_thinking(m) is False, m
@@ -1677,7 +1683,7 @@ class TestNormalizeResponse:
             ),
         ]
         nr = get_transport("anthropic_messages").normalize_response(
-            self._make_response(blocks, "tool_use")
+            self._make_response(blocks, "tool_use"),
         )
         assert nr.content == "Searching..."
         assert nr.finish_reason == "tool_calls"
@@ -1711,13 +1717,13 @@ class TestNormalizeResponse:
     def test_stop_reason_mapping(self):
         block = SimpleNamespace(type="text", text="x")
         nr1 = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "end_turn")
+            self._make_response([block], "end_turn"),
         )
         nr2 = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "tool_use")
+            self._make_response([block], "tool_use"),
         )
         nr3 = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "max_tokens")
+            self._make_response([block], "max_tokens"),
         )
         assert nr1.finish_reason == "stop"
         assert nr2.finish_reason == "tool_calls"
@@ -1730,20 +1736,20 @@ class TestNormalizeResponse:
         # "stop" (old behavior).
         block = SimpleNamespace(type="text", text="")
         nr_refusal = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "refusal")
+            self._make_response([block], "refusal"),
         )
         nr_overflow = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "model_context_window_exceeded")
+            self._make_response([block], "model_context_window_exceeded"),
         )
         assert nr_refusal.finish_reason == "content_filter"
         assert nr_overflow.finish_reason == "length"
 
     def test_no_text_content(self):
         block = SimpleNamespace(
-            type="tool_use", id="tc_1", name="search", input={"q": "hi"}
+            type="tool_use", id="tc_1", name="search", input={"q": "hi"},
         )
         nr = get_transport("anthropic_messages").normalize_response(
-            self._make_response([block], "tool_use")
+            self._make_response([block], "tool_use"),
         )
         assert nr.content is None
         assert len(nr.tool_calls) == 1
@@ -1784,7 +1790,8 @@ class TestRoleAlternation:
 
 class TestThinkingBlockSignatureManagement:
     """Tests for the thinking block handling strategy:
-    strip from old turns, preserve latest signed, downgrade unsigned."""
+    strip from old turns, preserve latest signed, downgrade unsigned.
+    """
 
     def test_thinking_stripped_from_non_last_assistant(self):
         """Thinking blocks are removed from all assistant messages except the last."""
@@ -2116,7 +2123,7 @@ class TestToolChoice:
                 "description": "x",
                 "parameters": {"type": "object", "properties": {}},
             },
-        }
+        },
     ]
 
     def test_auto_tool_choice(self):
@@ -2153,14 +2160,13 @@ class TestToolChoice:
         assert kwargs["tool_choice"] == {"type": "tool", "name": "search"}
 
 
-
 # ---------------------------------------------------------------------------
 # max_tokens resolver — openclaw/openclaw#66664 port
 # ---------------------------------------------------------------------------
 
 from agent.anthropic_adapter import (
-    _resolve_positive_anthropic_max_tokens,
     _resolve_anthropic_messages_max_tokens,
+    _resolve_positive_anthropic_max_tokens,
 )
 
 
@@ -2212,7 +2218,7 @@ class TestResolveMessagesMaxTokens:
 
     def test_positive_requested_wins(self):
         assert _resolve_anthropic_messages_max_tokens(
-            8192, "claude-opus-4-6"
+            8192, "claude-opus-4-6",
         ) == 8192
 
     def test_zero_falls_back_to_model_default(self):
@@ -2231,7 +2237,7 @@ class TestResolveMessagesMaxTokens:
 
     def test_fractional_positive_floored(self):
         assert _resolve_anthropic_messages_max_tokens(
-            8192.5, "claude-opus-4-6"
+            8192.5, "claude-opus-4-6",
         ) == 8192
 
     def test_sub_one_float_falls_back(self):

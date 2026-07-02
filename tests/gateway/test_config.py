@@ -104,7 +104,8 @@ class TestGetConnectedPlatforms:
     def test_dingtalk_recognised_via_env_vars(self, monkeypatch):
         """DingTalk configured via env vars (no extras) should still be
         recognised as connected — covers the case where _apply_env_overrides
-        hasn't populated extras yet."""
+        hasn't populated extras yet.
+        """
         monkeypatch.setenv("DINGTALK_CLIENT_ID", "env_cid")
         monkeypatch.setenv("DINGTALK_CLIENT_SECRET", "env_sec")
         config = GatewayConfig(
@@ -153,7 +154,7 @@ class TestSessionResetPolicy:
 
     def test_from_dict_treats_null_values_as_defaults(self):
         restored = SessionResetPolicy.from_dict(
-            {"mode": None, "at_hour": None, "idle_minutes": None}
+            {"mode": None, "at_hour": None, "idle_minutes": None},
         )
         assert restored.mode == "both"
         assert restored.at_hour == 4
@@ -182,7 +183,7 @@ class TestStreamingConfig:
                 "edit_interval": "oops",
                 "buffer_threshold": "oops",
                 "fresh_final_after_seconds": "oops",
-            }
+            },
         )
         assert restored.edit_interval == 0.8
         assert restored.buffer_threshold == 24
@@ -246,7 +247,7 @@ class TestGatewayConfigRoundtrip:
             {
                 "gateway": {"max_concurrent_sessions": 4},
                 "max_concurrent_sessions": 2,
-            }
+            },
         )
 
         assert config.max_concurrent_sessions == 2
@@ -292,7 +293,7 @@ class TestGatewayConfigRoundtrip:
 
     def test_get_notice_delivery_defaults_to_public(self):
         config = GatewayConfig(
-            platforms={Platform.SLACK: PlatformConfig(enabled=True, token="***")}
+            platforms={Platform.SLACK: PlatformConfig(enabled=True, token="***")},
         )
 
         assert config.get_notice_delivery(Platform.SLACK) == "public"
@@ -305,7 +306,7 @@ class TestGatewayConfigRoundtrip:
                     token="***",
                     extra={"notice_delivery": "private"},
                 ),
-            }
+            },
         )
 
         assert config.get_notice_delivery(Platform.SLACK) == "private"
@@ -335,7 +336,8 @@ class TestLoadGatewayConfig:
         start_gateway()'s connect loop actually dials the connector. Registering
         the adapter in the platform_registry is NOT enough — the connect loop
         iterates config.platforms, so an un-enabled RELAY never connects (the
-        'relay registered but no inbound' bug)."""
+        'relay registered but no inbound' bug).
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -352,7 +354,8 @@ class TestLoadGatewayConfig:
 
     def test_relay_platform_absent_when_url_unset(self, tmp_path, monkeypatch):
         """No relay URL -> no RELAY platform, so direct/single-tenant gateways
-        are unaffected."""
+        are unaffected.
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -505,8 +508,8 @@ class TestLoadGatewayConfig:
         config_path.write_text(
             "discord:\n"
             "  allow_from:\n"
-            "    - \"123456789012345678\"\n"
-            "    - \"999888777666555444\"\n",
+            '    - "123456789012345678"\n'
+            '    - "999888777666555444"\n',
             encoding="utf-8",
         )
 
@@ -533,7 +536,7 @@ class TestLoadGatewayConfig:
             "  discord:\n"
             "    extra:\n"
             "      allow_from:\n"
-            "        - \"123456789012345678\"\n",
+            '        - "123456789012345678"\n',
             encoding="utf-8",
         )
 
@@ -554,7 +557,7 @@ class TestLoadGatewayConfig:
         config_path.write_text(
             "platforms:\n"
             "  api_server:\n"
-            "    enabled: \"false\"\n",
+            '    enabled: "false"\n',
             encoding="utf-8",
         )
 
@@ -577,7 +580,7 @@ class TestLoadGatewayConfig:
             "      token: nested-token\n"
             "      home_channel:\n"
             "        platform: telegram\n"
-            "        chat_id: \"123\"\n"
+            '        chat_id: "123"\n'
             "        name: Nested Home\n"
             "      extra:\n"
             "        reply_prefix: nested\n",
@@ -645,8 +648,8 @@ class TestLoadGatewayConfig:
             "platforms:\n"
             "  telegram:\n"
             "    allow_from:\n"
-            "      - \"111222333\"\n"
-            "      - \"444555666\"\n"
+            '      - "111222333"\n'
+            '      - "444555666"\n'
             "    require_mention: true\n",
             encoding="utf-8",
         )
@@ -675,7 +678,7 @@ class TestLoadGatewayConfig:
             "  platforms:\n"
             "    telegram:\n"
             "      allow_from:\n"
-            "        - \"777888999\"\n"
+            '        - "777888999"\n'
             "      require_mention: false\n",
             encoding="utf-8",
         )
@@ -697,7 +700,7 @@ class TestLoadGatewayConfig:
         config_path = hermes_home / "config.yaml"
         config_path.write_text(
             "session_reset:\n"
-            "  notify: \"false\"\n",
+            '  notify: "false"\n',
             encoding="utf-8",
         )
 
@@ -712,7 +715,7 @@ class TestLoadGatewayConfig:
         hermes_home.mkdir()
         config_path = hermes_home / "config.yaml"
         config_path.write_text(
-            "always_log_local: \"false\"\n",
+            'always_log_local: "false"\n',
             encoding="utf-8",
         )
 
@@ -729,7 +732,7 @@ class TestLoadGatewayConfig:
         config_path.write_text(
             "discord:\n"
             "  channel_prompts:\n"
-            "    \"123\": Research mode\n"
+            '    "123": Research mode\n'
             "    456: Therapist mode\n",
             encoding="utf-8",
         )
@@ -987,7 +990,8 @@ class TestLoadGatewayConfig:
 
 class TestHomeChannelEnvOverrides:
     """Home channel env vars should apply even when the platform was already
-    configured via config.yaml (not just when credential env vars create it)."""
+    configured via config.yaml (not just when credential env vars create it).
+    """
 
     def test_existing_platform_configs_accept_home_channel_env_overrides(self):
         cases = [

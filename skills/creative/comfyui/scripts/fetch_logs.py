@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-fetch_logs.py — Retrieve workflow execution diagnostics from a ComfyUI server.
+"""fetch_logs.py — Retrieve workflow execution diagnostics from a ComfyUI server.
 
 When a workflow errors, the server's /history (local) or /jobs (cloud) entry
 contains the full Python traceback. This script makes it easy to fetch by
@@ -19,9 +18,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DEFAULT_LOCAL_HOST, ENV_API_KEY, emit_json, http_get, is_cloud_host,
-    resolve_api_key, resolve_url,
+from _common import (
+    DEFAULT_LOCAL_HOST,
+    ENV_API_KEY,
+    emit_json,
+    http_get,
+    is_cloud_host,
+    resolve_api_key,
+    resolve_url,
 )
 
 
@@ -150,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     diag["source"] = res.get("source")
     diag["prompt_id"] = args.prompt_id
     emit_json(diag)
-    return 0 if diag.get("status_str") not in {"error",} else 1
+    return 0 if diag.get("status_str") not in {"error"} else 1
 
 
 if __name__ == "__main__":

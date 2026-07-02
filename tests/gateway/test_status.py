@@ -2,6 +2,7 @@
 
 import json
 import os
+from datetime import UTC
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -235,7 +236,6 @@ class TestGatewayPidState:
         def fake_kill(pid, sig):
             if pid == 99999:
                 raise ProcessLookupError
-            return None
 
         monkeypatch.setattr(status.os, "kill", fake_kill)
 
@@ -264,7 +264,7 @@ class TestGatewayRuntimeStatus:
                 target,
                 payload,
                 {"indent": None, "separators": (",", ":")},
-            )
+            ),
         ]
 
     def test_write_runtime_status_overwrites_stale_pid_on_restart(self, tmp_path, monkeypatch):
@@ -420,7 +420,7 @@ class TestTerminatePid:
         status.terminate_pid(123, force=True)
 
         assert calls == [
-            (["taskkill", "/PID", "123", "/T", "/F"], True, True, 10)
+            (["taskkill", "/PID", "123", "/T", "/F"], True, True, 10),
         ]
 
     def test_force_falls_back_to_sigterm_when_taskkill_missing(self, monkeypatch):
@@ -444,7 +444,7 @@ class TestTerminatePid:
 class TestScopedLocks:
     def test_windows_file_lock_uses_high_offset(self, tmp_path, monkeypatch):
         lock_path = tmp_path / "gateway.lock"
-        handle = open(lock_path, "a+", encoding="utf-8")
+        handle = Path(lock_path).open("a+", encoding="utf-8")
         fd = handle.fileno()
         calls = []
 
@@ -492,7 +492,7 @@ class TestScopedLocks:
         assert existing["pid"] == 99999
 
     def test_acquire_scoped_lock_replaces_pid_reused_by_unrelated_process(self, tmp_path, monkeypatch):
-        """macOS regression: PID reused by an unrelated process with start_time=None.
+        """MacOS regression: PID reused by an unrelated process with start_time=None.
 
         On macOS /proc is unavailable, so both the lock record and the live
         process report start_time=None.  The live PID is alive (os.kill
@@ -785,7 +785,7 @@ class TestTakeoverMarker:
         assert result is False
 
     def test_consume_returns_true_on_windows_when_start_time_unavailable(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Takeover consume must also recognise a self-marker on platforms
         without ``/proc`` (macOS / native Windows).
@@ -820,12 +820,12 @@ class TestTakeoverMarker:
 
     def test_consume_returns_false_for_stale_marker(self, tmp_path, monkeypatch):
         """A marker older than 60s must be ignored."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         marker_path = tmp_path / ".gateway-takeover.json"
         # Hand-craft a marker written 2 minutes ago
-        stale_time = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+        stale_time = (datetime.now(UTC) - timedelta(minutes=2)).isoformat()
         marker_path.write_text(json.dumps({
             "target_pid": os.getpid(),
             "target_start_time": 123,
@@ -892,7 +892,7 @@ class TestTakeoverMarker:
         assert ok is False
 
     def test_consume_ignores_marker_for_different_process_and_prevents_stale_grief(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Regression: a stale marker from a dead replacer naming a dead
         target must not accidentally cause an unrelated future gateway to
@@ -904,12 +904,12 @@ class TestTakeoverMarker:
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         marker_path = tmp_path / ".gateway-takeover.json"
         # Fresh marker (timestamp is recent) but names a totally different PID
-        from datetime import datetime, timezone
+        from datetime import datetime
         marker_path.write_text(json.dumps({
             "target_pid": os.getpid() + 10000,
             "target_start_time": 42,
             "replacer_pid": 99999,
-            "written_at": datetime.now(timezone.utc).isoformat(),
+            "written_at": datetime.now(UTC).isoformat(),
         }))
         monkeypatch.setattr(status, "_get_process_start_time", lambda pid: 42)
 
@@ -960,11 +960,11 @@ class TestPlannedStopMarker:
         assert not (tmp_path / ".gateway-planned-stop.json").exists()
 
     def test_consume_returns_false_for_stale_marker(self, tmp_path, monkeypatch):
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         marker_path = tmp_path / ".gateway-planned-stop.json"
-        stale_time = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+        stale_time = (datetime.now(UTC) - timedelta(minutes=2)).isoformat()
         marker_path.write_text(json.dumps({
             "target_pid": os.getpid(),
             "target_start_time": 123,
@@ -1004,7 +1004,7 @@ class TestPlannedStopMarker:
         assert ok is False
 
     def test_consume_returns_true_on_windows_when_start_time_unavailable(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Regression for #34597: a legitimate stop must be recognised on
         platforms without ``/proc``.
@@ -1034,7 +1034,7 @@ class TestPlannedStopMarker:
         assert not (tmp_path / ".gateway-planned-stop.json").exists()
 
     def test_consume_still_rejects_foreign_pid_when_start_time_unavailable(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """The PID-only fallback must NOT match a marker naming another PID.
 
@@ -1052,7 +1052,7 @@ class TestPlannedStopMarker:
         assert result is False
 
     def test_consume_still_rejects_start_time_mismatch_when_both_known(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """PID-reuse defence is preserved when BOTH start_times are present.
 
@@ -1117,7 +1117,8 @@ class TestReadProcessCmdlinePsFallback:
 
 class TestCorruptStatusFiles:
     """A status / pid file holding non-UTF-8 (binary) bytes must read as
-    None, not crash the gateway status path with UnicodeDecodeError."""
+    None, not crash the gateway status path with UnicodeDecodeError.
+    """
 
     def test_read_json_file_returns_none_on_binary_garbage(self, tmp_path):
         p = tmp_path / "runtime.json"
@@ -1143,7 +1144,8 @@ class TestCorruptStatusFiles:
 class TestParseActiveAgents:
     """The shared read-side coercion used by BOTH HTTP surfaces (/api/status
     and /health/detailed) so the exposed active_agents field is consistent and
-    never negative regardless of what the status file holds."""
+    never negative regardless of what the status file holds.
+    """
 
     def test_valid_int_passthrough(self):
         assert status.parse_active_agents(3) == 3
@@ -1173,7 +1175,8 @@ class TestActiveAgentsTurnBoundaryWrite:
     turn boundary must PRESERVE the lifecycle gateway_state. The whole readout
     depends on active_agents being refreshed per-turn while gateway_state is
     only touched by lifecycle transitions — so an active_agents-only write must
-    not clobber it."""
+    not clobber it.
+    """
 
     def test_active_agents_only_write_preserves_gateway_state(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
@@ -1193,7 +1196,8 @@ class TestActiveAgentsTurnBoundaryWrite:
 
     def test_active_agents_only_write_preserves_draining_state(self, tmp_path, monkeypatch):
         """Same invariant while draining — a turn finishing mid-drain (count
-        falling) must not flip the state back to running."""
+        falling) must not flip the state back to running.
+        """
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
         status.write_runtime_status(gateway_state="draining", active_agents=3)
@@ -1207,50 +1211,53 @@ class TestActiveAgentsTurnBoundaryWrite:
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         status.write_runtime_status(gateway_state="running", active_agents=-5)
         assert status.read_runtime_status()["active_agents"] == 0
+
+
 class TestGatewayBusyDerivation:
     """Pure contract for derive_gateway_busy / derive_gateway_drainable — the
-    single shared definition both /api/status and /health/detailed consume."""
+    single shared definition both /api/status and /health/detailed consume.
+    """
 
     def test_busy_requires_running_state_and_positive_count(self):
         assert status.derive_gateway_busy(
-            gateway_running=True, gateway_state="running", active_agents=1
+            gateway_running=True, gateway_state="running", active_agents=1,
         ) is True
         assert status.derive_gateway_busy(
-            gateway_running=True, gateway_state="running", active_agents=0
+            gateway_running=True, gateway_state="running", active_agents=0,
         ) is False
 
     def test_busy_false_when_not_live_even_if_file_says_active(self):
         # Liveness wins: gateway_running False ⇒ never busy, regardless of count.
         assert status.derive_gateway_busy(
-            gateway_running=False, gateway_state="running", active_agents=9
+            gateway_running=False, gateway_state="running", active_agents=9,
         ) is False
 
     def test_busy_false_for_non_running_states(self):
         for state in ("draining", "stopping", "stopped", "startup_failed", None):
             assert status.derive_gateway_busy(
-                gateway_running=True, gateway_state=state, active_agents=5
+                gateway_running=True, gateway_state=state, active_agents=5,
             ) is False, state
 
     def test_busy_degrades_on_unparseable_count(self):
         for bad in (None, "garbage", object()):
             assert status.derive_gateway_busy(
-                gateway_running=True, gateway_state="running", active_agents=bad
+                gateway_running=True, gateway_state="running", active_agents=bad,
             ) is False
 
     def test_drainable_is_running_and_live_independent_of_count(self):
         # Idle running gateway is drainable but NOT busy.
         assert status.derive_gateway_drainable(
-            gateway_running=True, gateway_state="running"
+            gateway_running=True, gateway_state="running",
         ) is True
         assert status.derive_gateway_busy(
-            gateway_running=True, gateway_state="running", active_agents=0
+            gateway_running=True, gateway_state="running", active_agents=0,
         ) is False
 
     def test_drainable_false_when_down_or_not_running(self):
         assert status.derive_gateway_drainable(
-            gateway_running=False, gateway_state="running"
+            gateway_running=False, gateway_state="running",
         ) is False
         for state in ("draining", "stopped", None):
             assert status.derive_gateway_drainable(
-                gateway_running=True, gateway_state=state
+                gateway_running=True, gateway_state=state,
             ) is False, state

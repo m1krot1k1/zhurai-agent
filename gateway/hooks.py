@@ -1,5 +1,4 @@
-"""
-Event Hook System
+"""Event Hook System
 
 A lightweight event-driven system that fires handlers at key lifecycle points.
 Hooks are discovered from ~/.hermes/hooks/ directories, each containing:
@@ -39,19 +38,18 @@ and ``thread_id`` is non-empty.
 import asyncio
 import importlib.util
 import sys
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import yaml
 
 from hermes_cli.config import get_hermes_home
 
-
 HOOKS_DIR = get_hermes_home() / "hooks"
 
 
 class HookRegistry:
-    """
-    Discovers, loads, and fires event hooks.
+    """Discovers, loads, and fires event hooks.
 
     Usage:
         registry = HookRegistry()
@@ -61,11 +59,11 @@ class HookRegistry:
 
     def __init__(self):
         # event_type -> [handler_fn, ...]
-        self._handlers: Dict[str, List[Callable]] = {}
-        self._loaded_hooks: List[dict] = []  # metadata for listing
+        self._handlers: dict[str, list[Callable]] = {}
+        self._loaded_hooks: list[dict] = []  # metadata for listing
 
     @property
-    def loaded_hooks(self) -> List[dict]:
+    def loaded_hooks(self) -> list[dict]:
         """Return metadata about all loaded hooks."""
         return list(self._loaded_hooks)
 
@@ -79,8 +77,7 @@ class HookRegistry:
         return
 
     def discover_and_load(self) -> None:
-        """
-        Scan the hooks directory for hook directories and load their handlers.
+        """Scan the hooks directory for hook directories and load their handlers.
 
         Also registers built-in hooks that are always active.
 
@@ -124,7 +121,7 @@ class HookRegistry:
                 # dispatch with "TypeAdapter ... is not fully defined".
                 module_name = f"hermes_hook_{hook_name}"
                 spec = importlib.util.spec_from_file_location(
-                    module_name, handler_path
+                    module_name, handler_path,
                 )
                 if spec is None or spec.loader is None:
                     print(f"[hooks] Skipping {hook_name}: could not load handler.py", flush=True)
@@ -159,7 +156,7 @@ class HookRegistry:
             except Exception as e:
                 print(f"[hooks] Error loading hook {hook_dir.name}: {e}", flush=True)
 
-    def _resolve_handlers(self, event_type: str) -> List[Callable]:
+    def _resolve_handlers(self, event_type: str) -> list[Callable]:
         """Return all handlers that should fire for ``event_type``.
 
         Exact matches fire first, followed by wildcard matches (e.g.
@@ -167,14 +164,13 @@ class HookRegistry:
         """
         handlers = list(self._handlers.get(event_type, []))
         if ":" in event_type:
-            base = event_type.split(":")[0]
+            base = event_type.split(":", maxsplit=1)[0]
             wildcard_key = f"{base}:*"
             handlers.extend(self._handlers.get(wildcard_key, []))
         return handlers
 
-    async def emit(self, event_type: str, context: Optional[Dict[str, Any]] = None) -> None:
-        """
-        Fire all handlers registered for an event, discarding return values.
+    async def emit(self, event_type: str, context: dict[str, Any] | None = None) -> None:
+        """Fire all handlers registered for an event, discarding return values.
 
         Supports wildcard matching: handlers registered for "command:*" will
         fire for any "command:..." event. Handlers registered for a base type
@@ -184,6 +180,7 @@ class HookRegistry:
         Args:
             event_type: The event identifier (e.g. "agent:start").
             context:    Optional dict with event-specific data.
+
         """
         if context is None:
             context = {}
@@ -200,8 +197,8 @@ class HookRegistry:
     async def emit_collect(
         self,
         event_type: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[Any]:
+        context: dict[str, Any] | None = None,
+    ) -> list[Any]:
         """Fire handlers and return their non-None return values in order.
 
         Like :meth:`emit` but captures each handler's return value. Used for
@@ -214,7 +211,7 @@ class HookRegistry:
         if context is None:
             context = {}
 
-        results: List[Any] = []
+        results: list[Any] = []
         for fn in self._resolve_handlers(event_type):
             try:
                 result = fn(event_type, context)

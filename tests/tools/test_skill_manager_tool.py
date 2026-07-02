@@ -8,25 +8,26 @@ from unittest.mock import patch
 import pytest
 
 from tools.skill_manager_tool import (
-    _validate_name,
-    _validate_category,
-    _validate_frontmatter,
-    _validate_file_path,
+    MAX_NAME_LENGTH,
     _create_skill,
+    _delete_skill,
     _edit_skill,
     _patch_skill,
-    _delete_skill,
-    _write_file,
     _remove_file,
+    _validate_category,
+    _validate_file_path,
+    _validate_frontmatter,
+    _validate_name,
+    _write_file,
     skill_manage,
-    MAX_NAME_LENGTH,
 )
 
 
 @contextmanager
 def _skill_dir(tmp_path):
     """Patch both SKILLS_DIR and get_all_skills_dirs so _find_skill searches
-    only the temp directory — not the real ~/.hermes/skills/."""
+    only the temp directory — not the real ~/.hermes/skills/.
+    """
     with patch("tools.skill_manager_tool.SKILLS_DIR", tmp_path), \
          patch("agent.skill_utils.get_all_skills_dirs", return_value=[tmp_path]):
         yield
@@ -565,12 +566,12 @@ class TestSkillManageDispatcher:
 
     def test_create_from_background_review_marks_agent_created(self, tmp_path):
         """Background-review fork creates ARE marked as agent-created."""
-        from tools.skill_provenance import set_current_write_origin, BACKGROUND_REVIEW
+        from tools.skill_provenance import BACKGROUND_REVIEW, set_current_write_origin
         token = set_current_write_origin(BACKGROUND_REVIEW)
         try:
             with _skill_dir(tmp_path):
                 raw = skill_manage(
-                    action="create", name="review-sediment", content=VALID_SKILL_CONTENT
+                    action="create", name="review-sediment", content=VALID_SKILL_CONTENT,
                 )
                 from tools.skill_usage import load_usage
                 usage = load_usage()
@@ -639,7 +640,7 @@ class TestSecurityScanGate:
     def test_scan_blocks_dangerous_when_flag_on(self, tmp_path):
         """Dangerous verdict + flag on → returns an error string for the agent."""
         from tools.skill_manager_tool import _security_scan_skill
-        from tools.skills_guard import ScanResult, Finding
+        from tools.skills_guard import Finding, ScanResult
 
         finding = Finding(
             pattern_id="test", severity="critical", category="exfiltration",
@@ -711,7 +712,8 @@ class TestSecurityScanGate:
 @contextmanager
 def _two_roots(local_dir: Path, external_dir: Path):
     """Patch the skill manager so local SKILLS_DIR = local_dir and
-    get_all_skills_dirs() returns [local_dir, external_dir] in order."""
+    get_all_skills_dirs() returns [local_dir, external_dir] in order.
+    """
     with patch("tools.skill_manager_tool.SKILLS_DIR", local_dir), \
          patch("agent.skill_utils.get_all_skills_dirs",
                return_value=[local_dir, external_dir]):
@@ -723,7 +725,7 @@ def _write_external_skill(external_dir: Path, name: str = "ext-skill") -> Path:
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
         f"---\nname: {name}\ndescription: An external skill.\n---\n\n"
-        "# External\n\nBody with OLD_MARKER here.\n"
+        "# External\n\nBody with OLD_MARKER here.\n",
     )
     return skill_dir
 
@@ -813,7 +815,8 @@ class TestExternalSkillMutations:
     def test_delete_external_skill_cleans_empty_category(self, tmp_path):
         """When a skill lives under external/<category>/<name>, deleting the
         last skill in the category should rmdir the empty category dir but
-        stop at the external root."""
+        stop at the external root.
+        """
         local = tmp_path / "local"
         external = tmp_path / "vault"
         local.mkdir(); external.mkdir()
@@ -823,7 +826,7 @@ class TestExternalSkillMutations:
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
             "---\nname: ext-skill\ndescription: An external skill.\n---\n\n"
-            "# External\n\nBody.\n"
+            "# External\n\nBody.\n",
         )
 
         with _two_roots(local, external):
@@ -836,7 +839,8 @@ class TestExternalSkillMutations:
 
     def test_create_still_writes_to_local_root(self, tmp_path):
         """Creating a new skill always lands in local SKILLS_DIR, never
-        external_dirs — create is unchanged by this PR."""
+        external_dirs — create is unchanged by this PR.
+        """
         local = tmp_path / "local"
         external = tmp_path / "vault"
         local.mkdir(); external.mkdir()
@@ -848,7 +852,6 @@ class TestExternalSkillMutations:
         assert result["success"] is True, result
         assert (local / "fresh-skill" / "SKILL.md").exists()
         assert not (external / "fresh-skill").exists()
-
 
 
 # ---------------------------------------------------------------------------
@@ -980,7 +983,8 @@ class TestDeleteSkillRmtreeGuard:
 
     def test_symlinked_skill_dir_refused(self, tmp_path):
         """A skill dir that is a symlink must not be rmtree'd — rmtree would
-        otherwise follow it and delete the link target's contents."""
+        otherwise follow it and delete the link target's contents.
+        """
         victim = tmp_path.parent / "precious_victim"
         victim.mkdir()
         (victim / "important.txt").write_text("DO NOT DELETE")
@@ -1003,7 +1007,8 @@ class TestDeleteSkillRmtreeGuard:
 
     def test_skills_root_itself_refused(self, tmp_path):
         """If discovery ever hands back the skills root, refuse — rmtree would
-        wipe every installed skill."""
+        wipe every installed skill.
+        """
         with patch("tools.skill_manager_tool.SKILLS_DIR", tmp_path), \
              patch("agent.skill_utils.get_all_skills_dirs", return_value=[tmp_path]), \
              patch("tools.skill_manager_tool._find_skill",

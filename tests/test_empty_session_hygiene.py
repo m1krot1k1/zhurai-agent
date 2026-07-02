@@ -12,7 +12,7 @@ import pytest
 from hermes_state import SessionDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def db(tmp_path):
     session_db = SessionDB(db_path=tmp_path / "state.db")
     yield session_db
@@ -151,7 +151,8 @@ class TestCLIDiscardSessionIfEmpty:
     def test_in_memory_history_blocks_prune(self, db):
         """The live transcript is authoritative: even if the DB row has no
         flushed messages yet, a CLI holding conversation history must not
-        prune the session (covers flush-failed / not-yet-flushed turns)."""
+        prune the session (covers flush-failed / not-yet-flushed turns).
+        """
         db.create_session(session_id="unflushed", source="cli", model="test")
         db.end_session("unflushed", "new_session")
 

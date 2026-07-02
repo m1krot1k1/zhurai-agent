@@ -9,9 +9,6 @@ the agent uses the Raft CLI according to the Raft manual.
 
 from __future__ import annotations
 
-import asyncio
-from collections import deque
-from datetime import datetime, timezone
 import hmac
 import json
 import logging
@@ -24,7 +21,9 @@ import threading
 import time
 import uuid
 import weakref
-from typing import Any, Deque, Dict, List, Optional
+from collections import deque
+from datetime import UTC, datetime
+from typing import Any
 
 try:
     from aiohttp import web
@@ -36,6 +35,7 @@ except ImportError:
 
 import sys
 from pathlib import Path as _Path
+
 sys.path.insert(0, str(_Path(__file__).resolve().parents[3]))
 
 from gateway.config import Platform, PlatformConfig
@@ -89,7 +89,7 @@ _ACTIVITY_ALLOWED_FIELDS = {
     "errorClass",
     "durationMs",
 }
-_ACTIVE_ADAPTERS: "weakref.WeakSet[RaftAdapter]" = weakref.WeakSet()
+_ACTIVE_ADAPTERS: weakref.WeakSet[RaftAdapter] = weakref.WeakSet()
 _ACTIVE_ADAPTERS_LOCK = threading.Lock()
 _RAFT_CONTEXT_LOCK = threading.Lock()
 _RAFT_SESSION_IDS: set[str] = set()
@@ -139,7 +139,7 @@ def _platform_value(value: Any) -> str:
     return str(getattr(value, "value", value) or "")
 
 
-def _safe_scalar(value: Any, default: Optional[str] = None) -> Optional[str]:
+def _safe_scalar(value: Any, default: str | None = None) -> str | None:
     if not isinstance(value, str):
         return default
     if not value or len(value) > _MAX_SCALAR_LENGTH:
@@ -150,10 +150,10 @@ def _safe_scalar(value: Any, default: Optional[str] = None) -> Optional[str]:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _content_string(value: Any) -> Optional[tuple[str, bool]]:
+def _content_string(value: Any) -> tuple[str, bool] | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -170,7 +170,7 @@ def _content_string(value: Any) -> Optional[tuple[str, bool]]:
     return text, False
 
 
-def _duration_ms(value: Any) -> Optional[int]:
+def _duration_ms(value: Any) -> int | None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return None
     duration = int(value)
@@ -189,8 +189,8 @@ def _make_activity_event(
     tool_output: Any = None,
     error_class: Any = None,
     duration_ms: Any = None,
-) -> Dict[str, Any]:
-    event: Dict[str, Any] = {
+) -> dict[str, Any]:
+    event: dict[str, Any] = {
         "schema": ACTIVITY_EVENT_SCHEMA,
         "eventId": f"hermes-{uuid.uuid4()}",
         "sessionId": _safe_scalar(session_id, "unknown") or "unknown",
@@ -226,7 +226,7 @@ def _make_activity_event(
     return event
 
 
-def _validate_activity_event(value: Any) -> Dict[str, Any]:
+def _validate_activity_event(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("activity event must be an object")
     if value.get("schema") != ACTIVITY_EVENT_SCHEMA:
@@ -270,11 +270,11 @@ class ActivityQueue:
 
     def __init__(self, cap: int = DEFAULT_ACTIVITY_QUEUE_CAP):
         self._cap = max(1, int(cap or DEFAULT_ACTIVITY_QUEUE_CAP))
-        self._events: Deque[Dict[str, Any]] = deque()
+        self._events: deque[dict[str, Any]] = deque()
         self._dropped_since_drain = 0
         self._lock = threading.Lock()
 
-    def push(self, event: Dict[str, Any]) -> None:
+    def push(self, event: dict[str, Any]) -> None:
         validated = _validate_activity_event(event)
         with self._lock:
             self._events.append(validated)
@@ -282,10 +282,10 @@ class ActivityQueue:
                 self._events.popleft()
                 self._dropped_since_drain += 1
 
-    def drain(self, max_events: int = 200) -> Dict[str, Any]:
+    def drain(self, max_events: int = 200) -> dict[str, Any]:
         limit = max(1, int(max_events or 200))
         with self._lock:
-            events: List[Dict[str, Any]] = []
+            events: list[dict[str, Any]] = []
             while self._events and len(events) < limit:
                 events.append(self._events.popleft())
             dropped = self._dropped_since_drain
@@ -328,11 +328,11 @@ def _is_raft_context(**kwargs: Any) -> bool:
     with _RAFT_CONTEXT_LOCK:
         return bool(
             (safe_turn_id and safe_turn_id in _RAFT_TURN_IDS)
-            or (safe_session_id and safe_session_id in _RAFT_SESSION_IDS)
+            or (safe_session_id and safe_session_id in _RAFT_SESSION_IDS),
         )
 
 
-def _report_activity(event: Dict[str, Any]) -> None:
+def _report_activity(event: dict[str, Any]) -> None:
     with _ACTIVE_ADAPTERS_LOCK:
         adapters = list(_ACTIVE_ADAPTERS)
     for adapter in adapters:
@@ -352,7 +352,7 @@ def _on_session_start(**kwargs: Any) -> None:
         _make_activity_event(
             hook_event_name="SessionStart",
             session_id=kwargs.get("session_id"),
-        )
+        ),
     )
 
 
@@ -369,7 +369,7 @@ def _on_pre_llm_call(**kwargs: Any) -> None:
         _make_activity_event(
             hook_event_name="UserPromptSubmit",
             session_id=kwargs.get("session_id"),
-        )
+        ),
     )
 
 
@@ -382,7 +382,7 @@ def _on_pre_tool_call(**kwargs: Any) -> None:
             session_id=kwargs.get("session_id"),
             tool_name=kwargs.get("tool_name"),
             tool_input=kwargs.get("args"),
-        )
+        ),
     )
 
 
@@ -401,7 +401,7 @@ def _on_post_tool_call(**kwargs: Any) -> None:
             tool_output=kwargs.get("error_message") or kwargs.get("result"),
             error_class=kwargs.get("error_type") or ("tool_failure" if status == "error" else None),
             duration_ms=kwargs.get("duration_ms"),
-        )
+        ),
     )
 
 
@@ -412,7 +412,7 @@ def _on_post_llm_call(**kwargs: Any) -> None:
         _make_activity_event(
             hook_event_name="Stop",
             session_id=kwargs.get("session_id"),
-        )
+        ),
     )
 
 
@@ -426,7 +426,7 @@ def _on_session_end(**kwargs: Any) -> None:
                 session_id=kwargs.get("session_id"),
                 status="error",
                 error_class="interrupted" if kwargs.get("interrupted") else "incomplete",
-            )
+            ),
         )
     _forget_raft_context(kwargs.get("session_id"), kwargs.get("turn_id"))
 
@@ -438,7 +438,7 @@ def _on_session_finalize(**kwargs: Any) -> None:
         _make_activity_event(
             hook_event_name="SessionEnd",
             session_id=kwargs.get("session_id"),
-        )
+        ),
     )
     _forget_raft_context(kwargs.get("session_id"), kwargs.get("turn_id"), forget_session=True)
 
@@ -455,13 +455,13 @@ class RaftAdapter(BasePlatformAdapter):
         self._bridge_token: str = str(extra.get("bridge_token", ""))
         self._runtime_session: str = str(
             extra.get("runtime_session", DEFAULT_RUNTIME_SESSION)
-            or DEFAULT_RUNTIME_SESSION
+            or DEFAULT_RUNTIME_SESSION,
         )
         self._max_body_bytes: int = int(
-            extra.get("max_body_bytes", DEFAULT_MAX_BODY_BYTES)
+            extra.get("max_body_bytes", DEFAULT_MAX_BODY_BYTES),
         )
         self._runner = None
-        self._bridge_process: Optional[subprocess.Popen] = None
+        self._bridge_process: subprocess.Popen | None = None
         self._activity_queue = ActivityQueue()
 
     @property
@@ -533,7 +533,7 @@ class RaftAdapter(BasePlatformAdapter):
             return
 
         endpoint = f"http://{self._host}:{port}{self._path}"
-        cmd: List[str] = [
+        cmd: list[str] = [
             raft_bin, "--profile", profile,
             "agent", "bridge",
             "--wake-adapter", "wake-channel",
@@ -542,7 +542,7 @@ class RaftAdapter(BasePlatformAdapter):
         env = {**os.environ, "RAFT_CHANNEL_TOKEN": self._bridge_token}
         try:
             self._bridge_process = subprocess.Popen(
-                cmd, env=env, stdin=subprocess.DEVNULL
+                cmd, env=env, stdin=subprocess.DEVNULL,
             )
             logger.info("[raft] Spawned bridge pid=%d profile=%s endpoint=%s", self._bridge_process.pid, profile, endpoint)
         except Exception:
@@ -567,16 +567,16 @@ class RaftAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         logger.debug("[raft] adapter send is a no-op; agent delivers via raft CLI")
         return SendResult(success=True)
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         return {"name": f"raft/{chat_id}", "type": "raft"}
 
-    async def _handle_health(self, request: "web.Request") -> "web.Response":
+    async def _handle_health(self, request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
@@ -587,10 +587,10 @@ class RaftAdapter(BasePlatformAdapter):
                     "endpoint": "/activity",
                     "drainEndpoint": "/activity/drain",
                 },
-            }
+            },
         )
 
-    async def _handle_wake(self, request: "web.Request") -> "web.Response":
+    async def _handle_wake(self, request: web.Request) -> web.Response:
         if not self._validate_bridge_token(request.headers.get(BRIDGE_TOKEN_HEADER, "")):
             return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
 
@@ -603,7 +603,7 @@ class RaftAdapter(BasePlatformAdapter):
         except Exception:
             return web.json_response({"ok": False, "error": "bad_request"}, status=400)
 
-        payload: Dict[str, Any] = {}
+        payload: dict[str, Any] = {}
         if raw_body.strip():
             try:
                 parsed = json.loads(raw_body)
@@ -637,7 +637,7 @@ class RaftAdapter(BasePlatformAdapter):
             status=202,
         )
 
-    async def _handle_activity(self, request: "web.Request") -> "web.Response":
+    async def _handle_activity(self, request: web.Request) -> web.Response:
         if not self._validate_bridge_token(request.headers.get(BRIDGE_TOKEN_HEADER, "")):
             return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
 
@@ -655,7 +655,7 @@ class RaftAdapter(BasePlatformAdapter):
 
         return web.json_response({"ok": True}, status=202)
 
-    async def _handle_activity_drain(self, request: "web.Request") -> "web.Response":
+    async def _handle_activity_drain(self, request: web.Request) -> web.Response:
         if not self._validate_bridge_token(request.headers.get(BRIDGE_TOKEN_HEADER, "")):
             return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
         try:
@@ -669,7 +669,7 @@ class RaftAdapter(BasePlatformAdapter):
             return False
         return hmac.compare_digest(token, self._bridge_token)
 
-    async def _accept_wake(self, payload: Dict[str, Any]) -> bool:
+    async def _accept_wake(self, payload: dict[str, Any]) -> bool:
         if not self._message_handler:
             logger.warning("[raft] Wake received before gateway message handler was attached")
             return False
@@ -681,7 +681,7 @@ class RaftAdapter(BasePlatformAdapter):
             or payload.get("delivery_id")
             or payload.get("wake_id")
             or payload.get("id")
-            or f"raft-wake-{int(time.time() * 1000)}"
+            or f"raft-wake-{int(time.time() * 1000)}",
         )
         source = self.build_source(
             chat_id=self._runtime_session,
@@ -731,7 +731,7 @@ class RaftAdapter(BasePlatformAdapter):
             "`raft manual get raft-cli-overview` before using Raft commands."
         )
 
-    def report_activity(self, event: Dict[str, Any]) -> None:
+    def report_activity(self, event: dict[str, Any]) -> None:
         try:
             self._activity_queue.push(event)
         except Exception:
@@ -743,7 +743,7 @@ def _is_connected(config: PlatformConfig) -> bool:
     return bool(extra.get("enabled") or extra.get("bridge_token"))
 
 
-def _env_enablement() -> Optional[dict]:
+def _env_enablement() -> dict | None:
     """Seed PlatformConfig.extra from env vars during gateway config load.
 
     Auto-enables when RAFT_PROFILE is set (the adapter needs it anyway).

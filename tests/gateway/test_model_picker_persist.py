@@ -20,8 +20,8 @@ closure the PR changed, against a real temp ``HERMES_HOME``.
 
 import types
 
-import yaml
 import pytest
+import yaml
 
 from gateway.config import Platform
 from gateway.platforms.base import MessageEvent, MessageType
@@ -93,7 +93,7 @@ def _setup_isolated_home(tmp_path, monkeypatch, model_yaml_value):
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
-    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", dict)
     # The picker-setup path calls list_picker_providers, which otherwise hits
     # the network (OpenRouter model catalog). Stub it to a minimal list — these
     # tests capture and fire the on_model_selected callback and don't assert on
@@ -157,7 +157,8 @@ async def _drive_picker(runner, event):
 async def test_picker_tap_persists_by_default(tmp_path, monkeypatch, seed_model):
     """Tapping a model in the picker (bare /model) persists to config.yaml,
     matching the typed ``/model`` default — this is the #49176 fix. The written
-    ``model:`` must always end up a nested dict regardless of the seed shape."""
+    ``model:`` must always end up a nested dict regardless of the seed shape.
+    """
     adapter = _FakePickerAdapter()
     cfg_path = _setup_isolated_home(tmp_path, monkeypatch, seed_model)
 
@@ -180,10 +181,11 @@ async def test_picker_tap_persists_by_default(tmp_path, monkeypatch, seed_model)
 async def test_picker_tap_session_flag_does_not_persist(tmp_path, monkeypatch):
     """``/model --session`` then a picker tap stays in-memory only — config
     untouched, but the in-memory session override must still be applied (the
-    switch worked, it just wasn't persisted)."""
+    switch worked, it just wasn't persisted).
+    """
     adapter = _FakePickerAdapter()
     cfg_path = _setup_isolated_home(
-        tmp_path, monkeypatch, {"default": "old-model", "provider": "openai-codex"}
+        tmp_path, monkeypatch, {"default": "old-model", "provider": "openai-codex"},
     )
     runner = _make_runner(adapter)
 

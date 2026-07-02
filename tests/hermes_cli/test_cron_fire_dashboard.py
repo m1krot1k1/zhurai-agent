@@ -13,7 +13,6 @@ hosted agents don't expose). It must:
     background, returning 202.
 """
 
-import pytest
 from starlette.testclient import TestClient
 
 from hermes_cli import web_server
@@ -32,33 +31,36 @@ def _client(auth_required: bool):
 def _restore(prev_auth, prev_host):
     if prev_auth is None:
         if hasattr(web_server.app.state, "auth_required"):
-            delattr(web_server.app.state, "auth_required")
+            del web_server.app.state.auth_required
     else:
         web_server.app.state.auth_required = prev_auth
     if prev_host is None:
         if hasattr(web_server.app.state, "bound_host"):
-            delattr(web_server.app.state, "bound_host")
+            del web_server.app.state.bound_host
     else:
         web_server.app.state.bound_host = prev_host
 
 
 def test_route_registered_on_dashboard_app():
     """The fire webhook is served by the dashboard app (the hosted-agent public
-    surface), not only the aiohttp adapter."""
+    surface), not only the aiohttp adapter.
+    """
     paths = {r.path for r in web_server.app.routes if hasattr(r, "path")}
     assert "/api/cron/fire" in paths
 
 
 def test_fire_path_is_public():
     """Must bypass the dashboard cookie gate so the NAS bearer-JWT callback
-    reaches the verifier (the JWT is the real auth)."""
+    reaches the verifier (the JWT is the real auth).
+    """
     assert "/api/cron/fire" in PUBLIC_API_PATHS
 
 
 def test_bad_token_401(monkeypatch):
     """Invalid NAS-JWT -> 401, even with the dashboard auth gate ENGAGED
     (proves the route is reachable past the cookie gate and the verifier is the
-    gate). fire_due must NOT run."""
+    gate). fire_due must NOT run.
+    """
     fired = []
     monkeypatch.setattr(
         "plugins.cron.chronos.verify.get_fire_verifier",
@@ -98,7 +100,8 @@ def test_missing_job_id_400(monkeypatch):
 
 def test_unknown_job_200_gone(monkeypatch):
     """Valid token but the job isn't found in any profile -> 200 'gone'
-    (NAS shouldn't retry a fire for a cancelled/completed job)."""
+    (NAS shouldn't retry a fire for a cancelled/completed job).
+    """
     monkeypatch.setattr(
         "plugins.cron.chronos.verify.get_fire_verifier",
         lambda: (lambda **kw: {"purpose": "cron_fire"}),
@@ -118,7 +121,8 @@ def test_unknown_job_200_gone(monkeypatch):
 
 def test_valid_token_accepts_and_fires(monkeypatch):
     """Valid token + known job -> 202 and fire_due invoked for the resolved
-    profile."""
+    profile.
+    """
     fired = []
     monkeypatch.setattr(
         "plugins.cron.chronos.verify.get_fire_verifier",

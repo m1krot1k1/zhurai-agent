@@ -21,7 +21,7 @@ def _make_conn():
         "CREATE TABLE sessions ("
         " id TEXT PRIMARY KEY,"
         " parent_session_id TEXT,"
-        " model_config TEXT)"
+        " model_config TEXT)",
     )
     conn.execute("CREATE TABLE messages (session_id TEXT)")
     return conn

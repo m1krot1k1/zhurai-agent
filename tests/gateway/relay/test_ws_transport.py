@@ -17,7 +17,7 @@ import json
 import pytest
 import pytest_asyncio
 
-from gateway.relay.ws_transport import WebSocketRelayTransport, WEBSOCKETS_AVAILABLE
+from gateway.relay.ws_transport import WEBSOCKETS_AVAILABLE, WebSocketRelayTransport
 
 pytestmark = pytest.mark.skipif(not WEBSOCKETS_AVAILABLE, reason="websockets not installed")
 
@@ -81,7 +81,7 @@ class _StubConnectorServer:
             result = {"success": True, "message_id": f"srv-{action.get('op')}"}
             await ws.send(
                 json.dumps({"type": "outbound_result", "requestId": frame["requestId"], "result": result})
-                + "\n"
+                + "\n",
             )
 
 
@@ -120,7 +120,7 @@ async def test_inbound_frame_reaches_handler(server):
                 "source": {"platform": "discord", "chat_id": "chan1", "chat_type": "group", "guild_id": "guildA"},
             },
             "bufferId": "buf-1",
-        }
+        },
     ]
     received = []
     t = WebSocketRelayTransport(server.url, "discord", "appShared")
@@ -157,7 +157,7 @@ async def test_follow_up_round_trips(server):
     try:
         await t.handshake()
         result = await t.send_follow_up(
-            {"op": "follow_up", "session_key": "s1", "kind": "discord.interaction_token", "content": "fu"}
+            {"op": "follow_up", "session_key": "s1", "kind": "discord.interaction_token", "content": "fu"},
         )
         assert result["success"] is True
         assert result["message_id"] == "srv-follow_up"
@@ -184,7 +184,8 @@ def test_https_url_normalized_to_wss():
     POST), but websockets.connect needs ws(s):// and the connector mounts its WS
     server at /relay. The transport must convert scheme AND ensure the /relay
     path. Regression for the live staging failures 'scheme isn't ws or wss' then
-    'server rejected WebSocket connection: HTTP 400' (wrong path)."""
+    'server rejected WebSocket connection: HTTP 400' (wrong path).
+    """
     t = WebSocketRelayTransport("https://connector.example", "discord", "b")
     assert t._url == "wss://connector.example/relay"
     t2 = WebSocketRelayTransport("http://connector.local:8080", "discord", "b")

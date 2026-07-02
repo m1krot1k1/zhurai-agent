@@ -60,8 +60,8 @@ def _make_runner(*, platform_extra: dict | None = None,
                 enabled=True,
                 token="***",
                 extra=platform_extra or {},
-            )
-        }
+            ),
+        },
     )
     adapter = MagicMock()
     adapter.send = AsyncMock()
@@ -138,7 +138,7 @@ async def test_whoami_non_admin_lists_runnable_commands():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": ["status", "model"],
-        }
+        },
     )
     result = await runner._handle_message(_make_event("/whoami", _make_source(user_id="999")))
     assert "Tier: user" in result
@@ -159,7 +159,7 @@ async def test_non_admin_denied_for_unlisted_command():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": ["status"],
-        }
+        },
     )
     # /stop is NOT in user_allowed_commands and not in the always-allowed floor.
     result = await runner._handle_message(_make_event("/stop", _make_source(user_id="999")))
@@ -175,7 +175,7 @@ async def test_non_admin_with_empty_user_commands_gets_floor_only():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],  # explicitly empty
-        }
+        },
     )
     # /stop denied
     result = await runner._handle_message(_make_event("/stop", _make_source(user_id="999")))
@@ -197,7 +197,7 @@ async def test_admin_runs_unlisted_command():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],  # users can run nothing
-        }
+        },
     )
     # Admin runs /whoami (proxy for "any command works"); the gate must NOT
     # return the ⛔ denial. The /whoami handler is deterministic and doesn't
@@ -213,7 +213,7 @@ async def test_user_runs_listed_command():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": ["whoami"],  # explicit
-        }
+        },
     )
     result = await runner._handle_message(_make_event("/whoami", _make_source(user_id="999")))
     assert "⛔" not in result
@@ -247,12 +247,12 @@ async def test_dm_admin_is_not_group_admin():
             "allow_admin_from": ["111"],
             "group_allow_admin_from": ["222"],
             "group_user_allowed_commands": [],
-        }
+        },
     )
     # User 111 is DM admin. In group context they're a non-admin with no
     # listed commands → /stop denied.
     result = await runner._handle_message(
-        _make_event("/stop", _make_source(user_id="111", chat_type="group"))
+        _make_event("/stop", _make_source(user_id="111", chat_type="group")),
     )
     assert "⛔" in result
 
@@ -263,7 +263,7 @@ async def test_group_only_gating_leaves_dm_unrestricted():
         platform_extra={
             # Only group has an admin list → DM scope stays in backward-compat mode
             "group_allow_admin_from": ["222"],
-        }
+        },
     )
     result = await runner._handle_message(_make_event("/whoami", _make_source(user_id="anyone", chat_type="dm")))
     assert "Tier: unrestricted" in result
@@ -285,7 +285,7 @@ async def test_plugin_registered_command_is_gated(monkeypatch):
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],
-        }
+        },
     )
 
     from hermes_cli import commands as cmd_mod
@@ -309,7 +309,7 @@ async def test_plugin_registered_command_is_gated(monkeypatch):
 
     # Non-admin tries to run the plugin command → must be denied by the gate.
     result = await runner._handle_message(
-        _make_event("/myplugin foo bar", _make_source(user_id="999"))
+        _make_event("/myplugin foo bar", _make_source(user_id="999")),
     )
     assert "⛔" in result
     assert "/myplugin is admin-only here" in result
@@ -333,7 +333,7 @@ async def test_running_agent_fastpath_blocks_non_admin_command():
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],
-        }
+        },
     )
     src = _make_source(user_id="999")
     # Mark the session as having an in-flight agent so the fast-path runs.
@@ -352,12 +352,13 @@ async def test_running_agent_fastpath_allows_admin_command():
     """Admins must still be able to run privileged commands like /restart
     through the running-agent fast-path. We check that we don't get the
     denial message; the actual /restart handler is mocked out via the
-    runner's MagicMock."""
+    runner's MagicMock.
+    """
     runner = _make_runner(
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],
-        }
+        },
     )
     src = _make_source(user_id="111")  # admin
     sk = build_session_key(src)
@@ -374,12 +375,13 @@ async def test_running_agent_fastpath_allows_admin_command():
 @pytest.mark.asyncio
 async def test_running_agent_fastpath_status_always_works():
     """/status is intentionally pre-gate on the fast-path so users can
-    always see session state, even non-admins."""
+    always see session state, even non-admins.
+    """
     runner = _make_runner(
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],
-        }
+        },
     )
     src = _make_source(user_id="999")  # non-admin
     sk = build_session_key(src)
@@ -401,12 +403,13 @@ async def test_running_agent_fastpath_status_always_works():
 @pytest.mark.asyncio
 async def test_gate_uses_canonical_name_not_alias():
     """If /hist resolves to canonical 'history' and history is in
-    user_allowed_commands, the alias must be allowed too."""
+    user_allowed_commands, the alias must be allowed too.
+    """
     runner = _make_runner(
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": ["history"],
-        }
+        },
     )
     # Find a real alias in the registry to use.
     from hermes_cli.commands import COMMAND_REGISTRY
@@ -429,12 +432,13 @@ async def test_gate_uses_canonical_name_not_alias():
 async def test_gate_does_not_intercept_unknown_command():
     """Random non-command text like /xyzzy is not in the registry. The gate
     must not produce a denial message — the existing unknown-command path
-    will handle it (or the agent will see it as plain text)."""
+    will handle it (or the agent will see it as plain text).
+    """
     runner = _make_runner(
         platform_extra={
             "allow_admin_from": ["111"],
             "user_allowed_commands": [],
-        }
+        },
     )
     # /xyzzy is not in COMMAND_REGISTRY and not a plugin command.
     # The gate should pass through (no ⛔) since canonical resolution
@@ -465,7 +469,7 @@ async def test_dm_admin_blocked_in_group_with_separate_admin_list():
             "allow_admin_from": ["111"],          # DM admin
             "group_allow_admin_from": ["222"],    # group admin
             "group_user_allowed_commands": ["status"],
-        }
+        },
     )
     # User 111 is DM admin. In a group, they're a non-admin and can only
     # run group_user_allowed_commands. /restart is not in that list → denied.
@@ -483,9 +487,10 @@ async def test_dm_admin_blocked_in_group_with_separate_admin_list():
 @pytest.mark.asyncio
 async def test_gating_isolated_per_platform():
     """When Discord is gated and Telegram isn't, the same user_id on
-    Telegram must be unrestricted."""
-    from gateway.run import GatewayRunner
+    Telegram must be unrestricted.
+    """
     from gateway.config import GatewayConfig, Platform, PlatformConfig
+    from gateway.run import GatewayRunner
 
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
@@ -499,9 +504,9 @@ async def test_gating_isolated_per_platform():
                 },
             ),
             Platform.TELEGRAM: PlatformConfig(
-                enabled=True, token="***", extra={}
+                enabled=True, token="***", extra={},
             ),
-        }
+        },
     )
     runner.adapters = {
         Platform.DISCORD: MagicMock(send=AsyncMock()),

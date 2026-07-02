@@ -13,12 +13,13 @@ Covers:
 """
 
 import os
+import pathlib
 import unittest
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
 from email import encoders
-from unittest.mock import patch, MagicMock, AsyncMock, ANY
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 from gateway.platforms.base import SendResult
 
@@ -61,6 +62,7 @@ class TestConfigEnvOverrides(unittest.TestCase):
         config = GatewayConfig()
         _apply_env_overrides(config)
         self.assertNotIn(Platform.EMAIL, config.platforms)
+
 
 class TestCheckRequirements(unittest.TestCase):
     """Verify check_email_requirements function."""
@@ -106,21 +108,21 @@ class TestHelperFunctions(unittest.TestCase):
         from plugins.platforms.email.adapter import _extract_email_address
         self.assertEqual(
             _extract_email_address("John Doe <john@example.com>"),
-            "john@example.com"
+            "john@example.com",
         )
 
     def test_extract_email_address_bare(self):
         from plugins.platforms.email.adapter import _extract_email_address
         self.assertEqual(
             _extract_email_address("john@example.com"),
-            "john@example.com"
+            "john@example.com",
         )
 
     def test_extract_email_address_uppercase(self):
         from plugins.platforms.email.adapter import _extract_email_address
         self.assertEqual(
             _extract_email_address("John@Example.COM"),
-            "john@example.com"
+            "john@example.com",
         )
 
     def test_strip_html_basic(self):
@@ -281,7 +283,6 @@ class TestDispatchMessage(unittest.TestCase):
 
         async def mock_handler(event):
             captured_events.append(event)
-            return None
 
         adapter._message_handler = mock_handler
         # Override handle_message to capture the event directly
@@ -367,6 +368,7 @@ class TestDispatchMessage(unittest.TestCase):
     def test_image_attachment_sets_photo_type(self):
         """Email with image attachment should set message type to PHOTO."""
         import asyncio
+
         from gateway.platforms.base import MessageType
         adapter = self._make_adapter()
         captured_events = []
@@ -396,6 +398,7 @@ class TestDispatchMessage(unittest.TestCase):
     def test_document_attachment_sets_document_type(self):
         """Email with a document attachment must set DOCUMENT so run.py injects file context."""
         import asyncio
+
         from gateway.platforms.base import MessageType
         adapter = self._make_adapter()
         captured_events = []
@@ -424,8 +427,10 @@ class TestDispatchMessage(unittest.TestCase):
 
     def test_mixed_image_and_document_prefers_document(self):
         """DOCUMENT wins for mixed attachments — image handling keys off per-path
-        mime types, but document injection gates strictly on MessageType.DOCUMENT."""
+        mime types, but document injection gates strictly on MessageType.DOCUMENT.
+        """
         import asyncio
+
         from gateway.platforms.base import MessageType
         adapter = self._make_adapter()
         captured_events = []
@@ -523,7 +528,6 @@ class TestDispatchMessage(unittest.TestCase):
 
             async def mock_handler(event):
                 captured_events.append(event)
-                return None
 
             adapter._message_handler = mock_handler
 
@@ -693,7 +697,7 @@ class TestSendMethods(unittest.TestCase):
             mock_smtp.return_value = mock_server
 
             result = asyncio.run(
-                adapter.send("user@test.com", "Hello from Hermes!")
+                adapter.send("user@test.com", "Hello from Hermes!"),
             )
 
             self.assertTrue(result.success)
@@ -711,7 +715,7 @@ class TestSendMethods(unittest.TestCase):
             mock_smtp.side_effect = Exception("Connection refused")
 
             result = asyncio.run(
-                adapter.send("user@test.com", "Hello")
+                adapter.send("user@test.com", "Hello"),
             )
 
             self.assertFalse(result.success)
@@ -725,7 +729,7 @@ class TestSendMethods(unittest.TestCase):
         adapter.send = AsyncMock(return_value=SendResult(success=True))
 
         asyncio.run(
-            adapter.send_image("user@test.com", "https://img.com/photo.jpg", "My photo")
+            adapter.send_image("user@test.com", "https://img.com/photo.jpg", "My photo"),
         )
 
         call_args = adapter.send.call_args
@@ -749,7 +753,7 @@ class TestSendMethods(unittest.TestCase):
                 mock_smtp.return_value = mock_server
 
                 result = asyncio.run(
-                    adapter.send_document("user@test.com", tmp_path, "Here is the file")
+                    adapter.send_document("user@test.com", tmp_path, "Here is the file"),
                 )
 
                 self.assertTrue(result.success)
@@ -763,7 +767,7 @@ class TestSendMethods(unittest.TestCase):
                 )
                 self.assertTrue(has_attachment)
         finally:
-            os.unlink(tmp_path)
+            pathlib.Path(tmp_path).unlink()
 
     def test_send_typing_is_noop(self):
         """send_typing should do nothing for email."""
@@ -779,7 +783,7 @@ class TestSendMethods(unittest.TestCase):
         adapter._thread_context["user@test.com"] = {"subject": "Test", "message_id": "<m@t>"}
 
         info = asyncio.run(
-            adapter.get_chat_info("user@test.com")
+            adapter.get_chat_info("user@test.com"),
         )
 
         self.assertEqual(info["name"], "user@test.com")
@@ -1021,8 +1025,10 @@ class TestSendEmailStandalone(unittest.TestCase):
         """_send_email should use verified STARTTLS when sending."""
         import asyncio
         import ssl
-        from plugins.platforms.email.adapter import _standalone_send as _email_send
         from types import SimpleNamespace
+
+        from plugins.platforms.email.adapter import _standalone_send as _email_send
+
         async def _send_email(extra, chat_id, message):
             return await _email_send(SimpleNamespace(token=None, api_key=None, extra=extra or {}), chat_id, message)
 
@@ -1031,7 +1037,7 @@ class TestSendEmailStandalone(unittest.TestCase):
             mock_smtp.return_value = mock_server
 
             result = asyncio.run(
-                _send_email({"address": "hermes@test.com", "smtp_host": "smtp.test.com"}, "user@test.com", "Hello")
+                _send_email({"address": "hermes@test.com", "smtp_host": "smtp.test.com"}, "user@test.com", "Hello"),
             )
 
             self.assertTrue(result["success"])
@@ -1052,14 +1058,16 @@ class TestSendEmailStandalone(unittest.TestCase):
     def test_send_email_tool_failure(self):
         """SMTP failure should return error dict."""
         import asyncio
-        from plugins.platforms.email.adapter import _standalone_send as _email_send
         from types import SimpleNamespace
+
+        from plugins.platforms.email.adapter import _standalone_send as _email_send
+
         async def _send_email(extra, chat_id, message):
             return await _email_send(SimpleNamespace(token=None, api_key=None, extra=extra or {}), chat_id, message)
 
         with patch("smtplib.SMTP", side_effect=Exception("SMTP error")):
             result = asyncio.run(
-                _send_email({"address": "hermes@test.com", "smtp_host": "smtp.test.com"}, "user@test.com", "Hello")
+                _send_email({"address": "hermes@test.com", "smtp_host": "smtp.test.com"}, "user@test.com", "Hello"),
             )
 
             self.assertIn("error", result)
@@ -1069,13 +1077,15 @@ class TestSendEmailStandalone(unittest.TestCase):
     def test_send_email_tool_not_configured(self):
         """Missing config should return error."""
         import asyncio
-        from plugins.platforms.email.adapter import _standalone_send as _email_send
         from types import SimpleNamespace
+
+        from plugins.platforms.email.adapter import _standalone_send as _email_send
+
         async def _send_email(extra, chat_id, message):
             return await _email_send(SimpleNamespace(token=None, api_key=None, extra=extra or {}), chat_id, message)
 
         result = asyncio.run(
-            _send_email({}, "user@test.com", "Hello")
+            _send_email({}, "user@test.com", "Hello"),
         )
 
         self.assertIn("error", result)
@@ -1322,12 +1332,11 @@ class TestConnectSmtp(unittest.TestCase):
 
     def test_ipv6_timeout_falls_back_to_ipv4(self):
         """When default connection times out, retry with an IPv4-only SMTP path."""
-        import socket as _socket
         import plugins.platforms.email.adapter as email_mod
 
         adapter = self._make_adapter("587")
 
-        with patch("smtplib.SMTP", side_effect=_socket.timeout("timed out")), \
+        with patch("smtplib.SMTP", side_effect=TimeoutError("timed out")), \
              patch.object(email_mod, "_IPv4SMTP") as mock_ipv4_smtp:
             mock_server = MagicMock()
             mock_ipv4_smtp.return_value = mock_server
@@ -1340,12 +1349,11 @@ class TestConnectSmtp(unittest.TestCase):
 
     def test_port_465_ipv6_fallback(self):
         """Port 465 IPv6 timeout falls back to IPv4 with SMTP_SSL."""
-        import socket as _socket
         import plugins.platforms.email.adapter as email_mod
 
         adapter = self._make_adapter("465")
 
-        with patch("smtplib.SMTP_SSL", side_effect=_socket.timeout("timed out")), \
+        with patch("smtplib.SMTP_SSL", side_effect=TimeoutError("timed out")), \
              patch.object(email_mod, "_IPv4SMTP_SSL") as mock_ipv4_smtp_ssl:
             mock_server = MagicMock()
             mock_ipv4_smtp_ssl.return_value = mock_server
@@ -1360,6 +1368,7 @@ class TestConnectSmtp(unittest.TestCase):
     def test_tls_verification_error_does_not_retry_ipv4(self):
         """Certificate failures are security errors, not IPv6 reachability failures."""
         import ssl as _ssl
+
         import plugins.platforms.email.adapter as email_mod
 
         adapter = self._make_adapter("465")
@@ -1374,6 +1383,7 @@ class TestConnectSmtp(unittest.TestCase):
     def test_ipv4_connection_does_not_mutate_global_resolver(self):
         """IPv4 fallback must not monkeypatch process-global socket state."""
         import socket as _socket
+
         from plugins.platforms.email.adapter import _create_ipv4_connection
 
         original_getaddrinfo = _socket.getaddrinfo
@@ -1417,7 +1427,8 @@ class TestConnectionConfigResolution(unittest.TestCase):
 
     def test_falls_back_to_platform_config_extra(self):
         """When env vars are absent, settings come from PlatformConfig.extra —
-        the same dict gateway.config populates and `hermes config show` reads."""
+        the same dict gateway.config populates and `hermes config show` reads.
+        """
         from gateway.config import PlatformConfig
         from plugins.platforms.email.adapter import EmailAdapter
         cfg = PlatformConfig(enabled=True)
@@ -1437,8 +1448,10 @@ class TestConnectionConfigResolution(unittest.TestCase):
 
     def test_connect_aborts_without_attempting_imap_when_host_missing(self):
         """A missing host returns False without the cryptic DNS error, and marks
-        the failure non-retryable so the gateway stops reconnecting (#40715)."""
+        the failure non-retryable so the gateway stops reconnecting (#40715).
+        """
         import asyncio
+
         from gateway.config import PlatformConfig
         from plugins.platforms.email.adapter import EmailAdapter
         with patch.dict(os.environ, {
@@ -1463,7 +1476,8 @@ class TestConnectionConfigResolution(unittest.TestCase):
 
     def test_blank_present_env_vars_are_not_required(self):
         """Blank/whitespace EMAIL_* values must read as missing (#40715) — an
-        abandoned setup with empty keys must not enable the platform."""
+        abandoned setup with empty keys must not enable the platform.
+        """
         from plugins.platforms.email.adapter import check_email_requirements
         for blank in ("", "   ", "\n"):
             with patch.dict(os.environ, {

@@ -40,7 +40,7 @@ def parse_date(raw: str) -> dt.date | None:
 
 
 def _read(path: str) -> list[dict[str, str]]:
-    with open(path, newline="", encoding="utf-8") as fh:
+    with Path(path).open(newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
 
 
@@ -127,7 +127,7 @@ def analyze(
             amt = 0.0
         if not (donor and recip and d):
             continue
-        grouped[(donor, recip)].append((d, amt))
+        grouped[donor, recip].append((d, amt))
 
     results = []
     skipped = 0
@@ -179,7 +179,7 @@ def analyze(
                 "effect_size_sd": round(effect_size, 2),
                 "significant": p_value < p_threshold,
                 "total_donation_amount": round(sum(a for (_, a) in records), 2),
-            }
+            },
         )
 
     results.sort(key=lambda r: r["p_value"])
@@ -243,7 +243,7 @@ def main() -> int:
     print(
         f"Tested {meta['n_pairs_tested']} pairs ({meta['n_pairs_skipped']} skipped). "
         f"Significant (p<{meta['p_threshold']}): {meta['n_significant']}. "
-        f"Wrote {a.out}"
+        f"Wrote {a.out}",
     )
     return 0
 

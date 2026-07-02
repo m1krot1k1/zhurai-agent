@@ -1,5 +1,4 @@
-"""
-Tests for document cache utilities in gateway/platforms/base.py.
+"""Tests for document cache utilities in gateway/platforms/base.py.
 
 Covers: get_document_cache_dir, cache_document_from_bytes,
         cleanup_document_cache, SUPPORTED_DOCUMENT_TYPES.
@@ -22,11 +21,12 @@ from gateway.platforms.base import (
 # Fixture: redirect DOCUMENT_CACHE_DIR to a temp directory for every test
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def _redirect_cache(tmp_path, monkeypatch):
     """Point the module-level DOCUMENT_CACHE_DIR to a fresh tmp_path."""
     monkeypatch.setattr(
-        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache"
+        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache",
     )
 
 
@@ -55,7 +55,7 @@ class TestCacheDocumentFromBytes:
     def test_basic_caching(self):
         data = b"hello world"
         path = cache_document_from_bytes(data, "test.txt")
-        assert os.path.exists(path)
+        assert Path(path).exists()
         assert Path(path).read_bytes() == data
 
     def test_filename_preserved_in_path(self):
@@ -175,7 +175,7 @@ class TestSupportedDocumentTypes:
 # 1x1 transparent PNG (passes cache_image_from_bytes validation)
 _PNG_1PX = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-    "890000000d49444154789c6360000002000154a24f5f0000000049454e44ae426082"
+    "890000000d49444154789c6360000002000154a24f5f0000000049454e44ae426082",
 )
 
 
@@ -187,7 +187,7 @@ class TestCacheMediaBytes:
         assert result.kind == "document"
         assert result.media_type == "application/pdf"
         assert "report.pdf" in result.display_name
-        assert os.path.exists(result.path)
+        assert Path(result.path).exists()
         assert "report.pdf" in result.context_note()
 
     def test_png_routes_to_image(self):
@@ -196,7 +196,7 @@ class TestCacheMediaBytes:
         assert result is not None
         assert result.kind == "image"
         assert result.media_type == "image/png"
-        assert os.path.exists(result.path)
+        assert Path(result.path).exists()
 
     def test_native_photo_without_filename_uses_default_kind(self):
         from gateway.platforms.base import cache_media_bytes
@@ -229,7 +229,7 @@ class TestCacheMediaBytes:
         assert result.kind == "document"
         # Caller-supplied MIME is preserved when present.
         assert result.media_type == "application/x-msdownload"
-        assert os.path.exists(result.path)
+        assert Path(result.path).exists()
 
     def test_unknown_document_no_mime_falls_back_to_octet_stream(self):
         from gateway.platforms.base import cache_media_bytes

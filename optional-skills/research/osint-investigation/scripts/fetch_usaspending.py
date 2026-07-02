@@ -127,7 +127,7 @@ def fetch(
                     "psc_code": str(r.get("PSC Code", "") or ""),
                     "competition_extent": set_aside,
                     "description": r.get("Description", "") or "",
-                }
+                },
             )
         meta = payload.get("page_metadata", {})
         if not meta.get("hasNext"):
@@ -136,7 +136,7 @@ def fetch(
         time.sleep(0.5)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)

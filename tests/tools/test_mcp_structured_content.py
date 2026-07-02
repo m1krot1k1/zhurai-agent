@@ -71,7 +71,7 @@ class TestStructuredContentPreservation:
         session.call_tool = AsyncMock(
             return_value=_FakeCallToolResult(
                 content=[_FakeContentBlock("hello")],
-            )
+            ),
         )
         handler = mcp_tool._make_tool_handler("test-server", "my-tool", 30.0)
         raw = handler({})
@@ -86,7 +86,7 @@ class TestStructuredContentPreservation:
             return_value=_FakeCallToolResult(
                 content=[_FakeContentBlock("OK")],
                 structuredContent=payload,
-            )
+            ),
         )
         handler = mcp_tool._make_tool_handler("test-server", "my-tool", 30.0)
         raw = handler({})
@@ -97,7 +97,8 @@ class TestStructuredContentPreservation:
 
     def test_both_content_and_structured_desktop_commander(self, _patch_mcp_server):
         """Real-world case: Desktop Commander returns file text in content,
-        metadata in structuredContent.  Agent must see file contents."""
+        metadata in structuredContent.  Agent must see file contents.
+        """
         session = _patch_mcp_server
         file_text = "import os\nprint('hello')\n"
         metadata = {"fileName": "main.py", "filePath": "/tmp/main.py", "fileType": "python"}
@@ -105,7 +106,7 @@ class TestStructuredContentPreservation:
             return_value=_FakeCallToolResult(
                 content=[_FakeContentBlock(file_text)],
                 structuredContent=metadata,
-            )
+            ),
         )
         handler = mcp_tool._make_tool_handler("test-server", "my-tool", 30.0)
         raw = handler({})
@@ -120,7 +121,7 @@ class TestStructuredContentPreservation:
             return_value=_FakeCallToolResult(
                 content=[_FakeContentBlock("done")],
                 structuredContent=None,
-            )
+            ),
         )
         handler = mcp_tool._make_tool_handler("test-server", "my-tool", 30.0)
         raw = handler({})
@@ -135,7 +136,7 @@ class TestStructuredContentPreservation:
             return_value=_FakeCallToolResult(
                 content=[],
                 structuredContent=payload,
-            )
+            ),
         )
         handler = mcp_tool._make_tool_handler("test-server", "my-tool", 30.0)
         raw = handler({})

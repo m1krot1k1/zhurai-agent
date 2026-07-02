@@ -13,7 +13,6 @@ from gateway.config import PlatformConfig
 from gateway.platforms.api_server import APIServerAdapter
 from gateway.platforms.base import is_network_accessible
 
-
 # ---------------------------------------------------------------------------
 # Unit tests: is_network_accessible()
 # ---------------------------------------------------------------------------
@@ -74,7 +73,8 @@ class TestIsNetworkAccessible:
 
     def test_hostname_mixed_resolution(self):
         """If a hostname resolves to both loopback and non-loopback, it's
-        network-accessible (any non-loopback address is enough)."""
+        network-accessible (any non-loopback address is enough).
+        """
         mixed_result = [
             (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", 0)),
             (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("10.0.0.1", 0)),
@@ -124,7 +124,7 @@ class TestConnectBindGuard:
     async def test_allows_wildcard_with_key(self):
         """Non-loopback with a key should pass the guard."""
         adapter = APIServerAdapter(
-            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "sk-test"})
+            PlatformConfig(enabled=True, extra={"host": "0.0.0.0", "key": "sk-test"}),
         )
         # The guard checks: is_network_accessible(host) AND NOT api_key
         # With a key set, the guard should not block.

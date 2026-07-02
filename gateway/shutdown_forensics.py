@@ -24,10 +24,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-
-_SIGNAL_NAME_BY_NUM: Dict[int, str] = {}
+_SIGNAL_NAME_BY_NUM: dict[int, str] = {}
 for _name in ("SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT", "SIGUSR1", "SIGUSR2"):
     _val = getattr(signal, _name, None)
     if _val is not None:
@@ -45,10 +44,10 @@ def _signal_name(sig: Any) -> str:
     return _SIGNAL_NAME_BY_NUM.get(sig_int, f"signal#{sig_int}")
 
 
-def _read_proc_field(pid: int, key: str) -> Optional[str]:
+def _read_proc_field(pid: int, key: str) -> str | None:
     """Read a single field from /proc/<pid>/status.  Linux only; None elsewhere."""
     try:
-        with open(f"/proc/{pid}/status", encoding="utf-8") as fh:
+        with Path(f"/proc/{pid}/status").open(encoding="utf-8") as fh:
             for line in fh:
                 if line.startswith(key + ":"):
                     return line.split(":", 1)[1].strip()
@@ -57,11 +56,10 @@ def _read_proc_field(pid: int, key: str) -> Optional[str]:
     return None
 
 
-def _read_proc_cmdline(pid: int) -> Optional[str]:
+def _read_proc_cmdline(pid: int) -> str | None:
     """Read /proc/<pid>/cmdline as a printable string.  Linux only; None elsewhere."""
     try:
-        with open(f"/proc/{pid}/cmdline", "rb") as fh:
-            data = fh.read()
+        data = Path(f"/proc/{pid}/cmdline").read_bytes()
     except (FileNotFoundError, PermissionError, OSError):
         return None
     if not data:
@@ -70,12 +68,12 @@ def _read_proc_cmdline(pid: int) -> Optional[str]:
     return data.replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
 
 
-def _proc_summary(pid: int) -> Dict[str, Any]:
+def _proc_summary(pid: int) -> dict[str, Any]:
     """Compact /proc/<pid> snapshot: pid, ppid, state, uid, cmdline.
 
     Best-effort.  Missing fields are simply omitted rather than raising.
     """
-    summary: Dict[str, Any] = {"pid": pid}
+    summary: dict[str, Any] = {"pid": pid}
     if pid <= 0:
         return summary
     name = _read_proc_field(pid, "Name")
@@ -101,7 +99,7 @@ def _proc_summary(pid: int) -> Dict[str, Any]:
     return summary
 
 
-def snapshot_shutdown_context(received_signal: Any = None) -> Dict[str, Any]:
+def snapshot_shutdown_context(received_signal: Any = None) -> dict[str, Any]:
     """Fast (<10ms) snapshot of who/what is asking us to shut down.
 
     Captures:
@@ -120,7 +118,7 @@ def snapshot_shutdown_context(received_signal: Any = None) -> Dict[str, Any]:
     pid = os.getpid()
     ppid = os.getppid()
 
-    ctx: Dict[str, Any] = {
+    ctx: dict[str, Any] = {
         "ts": now,
         "ts_monotonic": monotonic,
         "signal": _signal_name(received_signal),
@@ -199,7 +197,7 @@ def spawn_async_diagnostic(
     signal_name: str,
     *,
     timeout_seconds: float = 5.0,
-) -> Optional[int]:
+) -> int | None:
     """Fire-and-forget ``ps``-style snapshot written to ``log_path``.
 
     Runs as a detached subprocess so it can't block the asyncio event loop
@@ -278,7 +276,7 @@ def spawn_async_diagnostic(
     return proc.pid
 
 
-def format_context_for_log(ctx: Dict[str, Any]) -> str:
+def format_context_for_log(ctx: dict[str, Any]) -> str:
     """Render a shutdown context dict as a single, scannable log line."""
     sig = ctx.get("signal", "?")
     parent = ctx.get("parent") or {}
@@ -288,11 +286,11 @@ def format_context_for_log(ctx: Dict[str, Any]) -> str:
     under_systemd = "yes" if ctx.get("under_systemd") else "no"
     load = ctx.get("loadavg_1m")
     load_str = f"{load:.2f}" if isinstance(load, (int, float)) else "?"
-    extras: List[str] = []
+    extras: list[str] = []
     if ctx.get("takeover_marker") is not None:
         for_self = ctx.get("takeover_marker_for_self")
         extras.append(
-            f"takeover_marker_present={'self' if for_self else 'other'}"
+            f"takeover_marker_present={'self' if for_self else 'other'}",
         )
     if ctx.get("planned_stop_marker") is not None:
         extras.append("planned_stop_marker_present=yes")
@@ -311,7 +309,7 @@ def format_context_for_log(ctx: Dict[str, Any]) -> str:
     )
 
 
-def context_as_json(ctx: Dict[str, Any]) -> str:
+def context_as_json(ctx: dict[str, Any]) -> str:
     """JSON-serialise a context dict for structured ingestion.  Never raises."""
     try:
         return json.dumps(ctx, default=str, sort_keys=True)
@@ -319,7 +317,7 @@ def context_as_json(ctx: Dict[str, Any]) -> str:
         return "{}"
 
 
-def check_systemd_timing_alignment(drain_timeout: float) -> Optional[Dict[str, Any]]:
+def check_systemd_timing_alignment(drain_timeout: float) -> dict[str, Any] | None:
     """At startup, sanity-check that systemd's TimeoutStopSec >= drain_timeout.
 
     When the gateway is run under a stale systemd unit file (e.g. the user
@@ -341,10 +339,10 @@ def check_systemd_timing_alignment(drain_timeout: float) -> Optional[Dict[str, A
         return None  # Not running under systemd (or at least not directly)
 
     # Try to identify our unit name and ask systemctl for its config.
-    unit_name: Optional[str] = None
+    unit_name: str | None = None
     try:
         # /proc/self/cgroup gives us "0::/user.slice/.../hermes-gateway.service"
-        with open("/proc/self/cgroup", encoding="utf-8") as fh:
+        with Path("/proc/self/cgroup").open(encoding="utf-8") as fh:
             for line in fh:
                 # systemd cgroup line ends with the unit name
                 if ".service" in line:
@@ -363,7 +361,7 @@ def check_systemd_timing_alignment(drain_timeout: float) -> Optional[Dict[str, A
     # Query systemctl for TimeoutStopUSec.  Use --user OR system depending
     # on which manager actually owns the unit.  Try user first since
     # that's the common case for hermes.
-    timeout_us: Optional[int] = None
+    timeout_us: int | None = None
     for flag in (["--user"], []):
         try:
             result = subprocess.run(
@@ -406,7 +404,7 @@ def check_systemd_timing_alignment(drain_timeout: float) -> Optional[Dict[str, A
     }
 
 
-def _parse_systemd_duration_to_us(raw: str) -> Optional[int]:
+def _parse_systemd_duration_to_us(raw: str) -> int | None:
     """Parse 'TimeoutStopUSec=1min 30s' / '90s' style values to microseconds.
 
     systemd accepts a wide grammar; we cover the common cases (s, ms, min,

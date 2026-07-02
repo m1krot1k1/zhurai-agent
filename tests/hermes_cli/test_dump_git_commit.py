@@ -60,7 +60,7 @@ def test_get_git_commit_falls_back_when_git_returns_empty_stdout(tmp_path):
 
 
 def test_get_git_commit_falls_back_when_git_raises(tmp_path):
-    """git binary missing (e.g. minimal container w/o git) → baked SHA path."""
+    """Git binary missing (e.g. minimal container w/o git) → baked SHA path."""
     from hermes_cli import dump
 
     repo_dir = tmp_path / "repo"
@@ -147,7 +147,7 @@ def test_get_git_commit_date_empty_when_git_fails(tmp_path):
 
 
 def test_get_git_commit_date_empty_when_git_raises(tmp_path):
-    """git binary missing → '' (no crash, suffix simply omitted)."""
+    """Git binary missing → '' (no crash, suffix simply omitted)."""
     from hermes_cli import dump
 
     repo_dir = tmp_path / "repo"

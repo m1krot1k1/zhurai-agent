@@ -40,7 +40,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from typing import Tuple
 
 # Dedicated logger name so the documented grep recipe survives a
 # ``logging.getLogger(__name__)`` rename of any internal module.
@@ -79,7 +78,7 @@ def _emit(server_id: str, level: int, message: str) -> None:
     event_log.log(level, "lsp[%s] %s", server_id, message)
 
 
-def _announce_once(bucket: set, key: Tuple) -> bool:
+def _announce_once(bucket: set, key: tuple) -> bool:
     """Return True if *key* has not been announced for *bucket* yet.
 
     Atomically marks the key as announced so concurrent callers
@@ -104,7 +103,8 @@ def log_clean(server_id: str, file_path: str) -> None:
 
 def log_disabled(server_id: str, file_path: str, reason: str) -> None:
     """LSP intentionally skipped for this file (feature off, ext unmapped,
-    backend not local, etc.).  DEBUG."""
+    backend not local, etc.).  DEBUG.
+    """
     _emit(server_id, logging.DEBUG, f"skipped: {reason} ({_short_path(file_path)})")
 
 
@@ -124,13 +124,15 @@ def log_active(server_id: str, workspace_root: str) -> None:
 def log_diagnostics(server_id: str, file_path: str, count: int) -> None:
     """Diagnostics arrived for a file.  INFO every time — these are the
     failure signals users actually want to grep for, and they are
-    inherently rare per edit."""
+    inherently rare per edit.
+    """
     _emit(server_id, logging.INFO, f"{count} diags ({_short_path(file_path)})")
 
 
 def log_no_project_root(server_id: str, file_path: str) -> None:
     """File had no recognised project marker.  INFO once per file,
-    DEBUG thereafter."""
+    DEBUG thereafter.
+    """
     key = (server_id, file_path)
     if _announce_once(_announced_no_root, key):
         _emit(server_id, logging.INFO, f"no project root for {_short_path(file_path)}")
@@ -141,7 +143,8 @@ def log_no_project_root(server_id: str, file_path: str) -> None:
 def log_server_unavailable(server_id: str, binary_or_pkg: str) -> None:
     """The server binary couldn't be resolved.  WARNING once per
     (server_id, binary), DEBUG thereafter so a hundred subsequent
-    .py edits don't spam the log."""
+    .py edits don't spam the log.
+    """
     key = (server_id, binary_or_pkg)
     if _announce_once(_announced_unavailable, key):
         _emit(
@@ -162,7 +165,8 @@ def log_no_server_configured(server_id: str) -> None:
 
 def log_timeout(server_id: str, file_path: str, kind: str = "diagnostics") -> None:
     """A request to the server timed out.  WARNING every time — these are
-    inherently novel events worth surfacing on each occurrence."""
+    inherently novel events worth surfacing on each occurrence.
+    """
     _emit(
         server_id,
         logging.WARNING,
@@ -199,15 +203,15 @@ def reset_announce_caches() -> None:
 
 __all__ = [
     "event_log",
-    "log_clean",
-    "log_disabled",
     "log_active",
+    "log_clean",
     "log_diagnostics",
+    "log_disabled",
     "log_no_project_root",
-    "log_server_unavailable",
     "log_no_server_configured",
-    "log_timeout",
     "log_server_error",
+    "log_server_unavailable",
     "log_spawn_failed",
+    "log_timeout",
     "reset_announce_caches",
 ]

@@ -26,7 +26,6 @@ from unittest.mock import patch
 from hermes_cli.model_normalize import normalize_model_for_provider
 from hermes_cli.model_switch import switch_model
 
-
 # Live catalog opencode-go currently returns from /v1/models (snapshot).
 _OPENCODE_GO_LIVE = [
     "minimax-m2.7", "minimax-m2.5",
@@ -45,13 +44,13 @@ _OPENCODE_GO_LIVE = [
 
 def test_opencode_go_strips_deepseek_prefix():
     assert normalize_model_for_provider(
-        "deepseek/deepseek-v4-flash", "opencode-go"
+        "deepseek/deepseek-v4-flash", "opencode-go",
     ) == "deepseek-v4-flash"
 
 
 def test_opencode_go_strips_minimax_prefix():
     assert normalize_model_for_provider(
-        "minimax/minimax-m2.7", "opencode-go"
+        "minimax/minimax-m2.7", "opencode-go",
     ) == "minimax-m2.7"
 
 
@@ -59,46 +58,46 @@ def test_opencode_go_strips_moonshotai_prefix():
     # Moonshot's aggregator vendor is `moonshotai/...` — a common copy-paste
     # from OpenRouter slugs.  opencode-go serves it bare as `kimi-k2.6`.
     assert normalize_model_for_provider(
-        "moonshotai/kimi-k2.6", "opencode-go"
+        "moonshotai/kimi-k2.6", "opencode-go",
     ) == "kimi-k2.6"
 
 
 def test_opencode_go_bare_name_unchanged():
     assert normalize_model_for_provider(
-        "kimi-k2.6", "opencode-go"
+        "kimi-k2.6", "opencode-go",
     ) == "kimi-k2.6"
 
 
 def test_opencode_go_preserves_dot_versioning():
     # opencode-go uses dot-versioned IDs (`mimo-v2.5-pro`, not hyphen).
     assert normalize_model_for_provider(
-        "xiaomi/mimo-v2.5-pro", "opencode-go"
+        "xiaomi/mimo-v2.5-pro", "opencode-go",
     ) == "mimo-v2.5-pro"
 
 
 def test_opencode_zen_still_hyphenates_claude():
     # Regression: opencode-zen's Claude hyphen conversion must still work.
     assert normalize_model_for_provider(
-        "anthropic/claude-sonnet-4.6", "opencode-zen"
+        "anthropic/claude-sonnet-4.6", "opencode-zen",
     ) == "claude-sonnet-4-6"
 
 
 def test_opencode_zen_bare_claude_hyphenated():
     assert normalize_model_for_provider(
-        "claude-sonnet-4.6", "opencode-zen"
+        "claude-sonnet-4.6", "opencode-zen",
     ) == "claude-sonnet-4-6"
 
 
 def test_opencode_zen_strips_arbitrary_vendor_prefix():
     assert normalize_model_for_provider(
-        "minimax/minimax-m2.5-free", "opencode-zen"
+        "minimax/minimax-m2.5-free", "opencode-zen",
     ) == "minimax-m2.5-free"
 
 
 def test_openrouter_still_prepends_vendor():
     # Regression: real aggregators must still get vendor/model format.
     assert normalize_model_for_provider(
-        "claude-sonnet-4.6", "openrouter"
+        "claude-sonnet-4.6", "openrouter",
     ) == "anthropic/claude-sonnet-4.6"
 
 
@@ -110,7 +109,8 @@ def test_openrouter_still_prepends_vendor():
 
 def _run_switch(raw_input: str, **extra):
     """Call switch_model with opencode-go as current provider, mocking the
-    live catalog so the test doesn't hit the network."""
+    live catalog so the test doesn't hit the network.
+    """
     defaults = dict(
         current_provider="opencode-go",
         current_model="kimi-k2.6",
@@ -136,7 +136,8 @@ def _run_switch(raw_input: str, **extra):
 def test_deepseek_v4_flash_stays_on_opencode_go():
     """Regression: ``/model deepseek-v4-flash`` while on opencode-go must
     NOT switch to native deepseek just because deepseek's static catalog
-    also contains that name."""
+    also contains that name.
+    """
     result = _run_switch("deepseek-v4-flash")
     assert result.target_provider == "opencode-go", (
         f"Expected to stay on opencode-go, got {result.target_provider}. "

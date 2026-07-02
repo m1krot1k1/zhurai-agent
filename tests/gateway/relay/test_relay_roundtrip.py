@@ -16,10 +16,9 @@ import pytest
 
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import MessageEvent, MessageType
-from gateway.session import SessionSource, build_session_key
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
-
+from gateway.session import SessionSource, build_session_key
 from tests.gateway.relay.stub_connector import StubConnector
 
 
@@ -119,4 +118,3 @@ async def test_get_chat_info_proxied_to_connector(wired):
 
 async def _async_capture(sink, event):
     sink.append(event)
-    return None

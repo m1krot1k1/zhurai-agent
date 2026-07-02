@@ -8,7 +8,6 @@ mcp_config.py, and memory_setup.py.
 from hermes_cli.colors import Colors, color
 from hermes_cli.secret_prompt import masked_secret_prompt
 
-
 # ─── Print Helpers ────────────────────────────────────────────────────────────
 
 
@@ -62,7 +61,7 @@ def prompt(
         else:
             value = input(display)
         value = value.strip()
-        return value if value else (default or "")
+        return value or (default or "")
     except (KeyboardInterrupt, EOFError):
         print()
         return ""

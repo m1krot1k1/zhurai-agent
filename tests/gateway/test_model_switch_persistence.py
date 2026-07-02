@@ -15,10 +15,8 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-
 from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.session import SessionEntry, SessionSource, build_session_key
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,7 +39,7 @@ def _make_runner():
 
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="tok")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="tok")},
     )
     adapter = MagicMock()
     adapter.send = AsyncMock()

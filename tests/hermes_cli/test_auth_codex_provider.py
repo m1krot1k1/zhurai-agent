@@ -1,21 +1,21 @@
 """Tests for Codex auth — tokens stored in Hermes auth store (~/.hermes/auth.json)."""
 
+import base64
 import json
 import time
-import base64
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from hermes_cli.auth import (
-    AuthError,
     DEFAULT_CODEX_BASE_URL,
     PROVIDER_REGISTRY,
-    _read_codex_tokens,
-    _save_codex_tokens,
+    AuthError,
     _import_codex_cli_tokens,
     _login_openai_codex,
+    _read_codex_tokens,
+    _save_codex_tokens,
     refresh_codex_oauth_pure,
     resolve_codex_runtime_credentials,
     resolve_provider,
@@ -830,7 +830,7 @@ def test_refresh_parses_openai_nested_error_shape_refresh_token_reused(monkeypat
                 "type": "invalid_request_error",
                 "param": None,
                 "code": "refresh_token_reused",
-            }
+            },
         },
     )
     _patch_httpx(monkeypatch, response)
@@ -854,7 +854,7 @@ def test_refresh_parses_openai_nested_error_shape_generic_code(monkeypatch):
                 "message": "Invalid client credentials.",
                 "type": "invalid_request_error",
                 "code": "invalid_client",
-            }
+            },
         },
     )
     _patch_httpx(monkeypatch, response)
@@ -960,7 +960,7 @@ def test_is_rate_limited_auth_error_distinguishes_credential_errors():
     from hermes_cli.auth import CODEX_RATE_LIMITED_CODE, is_rate_limited_auth_error
 
     rate_limited = AuthError(
-        "quota", provider="openai-codex", code=CODEX_RATE_LIMITED_CODE, relogin_required=False
+        "quota", provider="openai-codex", code=CODEX_RATE_LIMITED_CODE, relogin_required=False,
     )
     missing_creds = AuthError(
         "No Codex credentials stored.",

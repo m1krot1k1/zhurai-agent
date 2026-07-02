@@ -3,18 +3,16 @@
 import json
 import sys
 import types
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from plugins.memory.mem0._setup import (
-    parse_flags,
-    build_oss_config,
-    _write_env,
-    post_setup,
-    _check_qdrant_path,
     _check_ollama,
     _check_pgvector,
+    _check_qdrant_path,
+    _write_env,
+    build_oss_config,
+    parse_flags,
+    post_setup,
 )
 
 

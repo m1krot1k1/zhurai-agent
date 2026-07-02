@@ -1,8 +1,7 @@
 """Tests for hermes-api-server toolset and API server tool availability."""
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-
-from toolsets import resolve_toolset, get_toolset, validate_toolset
+from toolsets import get_toolset, resolve_toolset, validate_toolset
 
 
 class TestHermesApiServerToolset:
@@ -68,8 +67,8 @@ class TestApiServerAdapterToolset:
     @patch("gateway.platforms.api_server.AIOHTTP_AVAILABLE", True)
     def test_create_agent_reads_config_toolsets(self):
         """API server resolves toolsets from config like all other platforms."""
-        from gateway.platforms.api_server import APIServerAdapter
         from gateway.config import PlatformConfig
+        from gateway.platforms.api_server import APIServerAdapter
 
         adapter = APIServerAdapter(PlatformConfig())
 
@@ -98,8 +97,8 @@ class TestApiServerAdapterToolset:
     @patch("gateway.platforms.api_server.AIOHTTP_AVAILABLE", True)
     def test_create_agent_respects_config_override(self):
         """User can override API server toolsets via platform_toolsets in config.yaml."""
-        from gateway.platforms.api_server import APIServerAdapter
         from gateway.config import PlatformConfig
+        from gateway.platforms.api_server import APIServerAdapter
 
         adapter = APIServerAdapter(PlatformConfig())
 
@@ -114,7 +113,7 @@ class TestApiServerAdapterToolset:
             mock_model.return_value = "test/model"
             # User overrides with just web and terminal
             mock_config.return_value = {
-                "platform_toolsets": {"api_server": ["web", "terminal"]}
+                "platform_toolsets": {"api_server": ["web", "terminal"]},
             }
             mock_agent_cls.return_value = MagicMock()
 

@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_profiles(tmp_path, monkeypatch):
     """Give profile discovery an isolated default home with one named profile."""
     from hermes_cli import profiles
@@ -45,9 +45,9 @@ def test_call_cron_for_profile_routes_storage_and_restores_globals(isolated_prof
     assert (isolated_profiles["worker_alpha"] / "cron" / "jobs.json").exists()
     assert not (isolated_profiles["default"] / "cron" / "jobs.json").exists()
 
-    assert cron_jobs.CRON_DIR == old_cron_dir
-    assert cron_jobs.JOBS_FILE == old_jobs_file
-    assert cron_jobs.OUTPUT_DIR == old_output_dir
+    assert old_cron_dir == cron_jobs.CRON_DIR
+    assert old_jobs_file == cron_jobs.JOBS_FILE
+    assert old_output_dir == cron_jobs.OUTPUT_DIR
 
 
 @pytest.mark.asyncio
@@ -134,7 +134,8 @@ async def test_cron_mutation_without_profile_finds_named_profile_job(isolated_pr
 @pytest.mark.asyncio
 async def test_update_cron_job_rejects_id_mutation(isolated_profiles):
     """Dashboard surfaces a 400 (not a 500 or silent rename) when an
-    id-mutation attempt is rejected by cron/jobs.update_job."""
+    id-mutation attempt is rejected by cron/jobs.update_job.
+    """
     from hermes_cli import web_server
 
     worker_job = web_server._call_cron_for_profile(

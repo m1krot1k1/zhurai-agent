@@ -12,7 +12,7 @@ No LLM, no real platform connections.
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -20,9 +20,11 @@ import pytest
 
 from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.platforms.base import MessageEvent, SendResult
+from gateway.run import GatewayRunner
 from gateway.session import SessionEntry, SessionSource, build_session_key
 
 E2E_MESSAGE_SETTLE_DELAY = 0.3
+
 
 # Platform library mocks
 
@@ -30,7 +32,7 @@ E2E_MESSAGE_SETTLE_DELAY = 0.3
 def _ensure_telegram_mock():
     """Install mock telegram modules so TelegramAdapter can be imported."""
     if "telegram" in sys.modules and hasattr(sys.modules["telegram"], "__file__"):
-        return # Real library installed
+        return  # Real library installed
 
     telegram_mod = MagicMock()
     telegram_mod.Update = MagicMock()
@@ -59,7 +61,7 @@ def _ensure_telegram_mock():
 def _ensure_discord_mock():
     """Install mock discord modules so DiscordAdapter can be imported."""
     if "discord" in sys.modules and hasattr(sys.modules["discord"], "__file__"):
-        return # Real library installed
+        return  # Real library installed
 
     discord_mod = MagicMock()
     discord_mod.Intents.default.return_value = MagicMock()
@@ -118,15 +120,16 @@ _ensure_discord_mock()
 _ensure_slack_mock()
 
 import discord  # noqa: E402 — mocked above
-from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402
-from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
 
 import plugins.platforms.slack.adapter as _slack_mod  # noqa: E402
+from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
+from plugins.platforms.telegram.adapter import TelegramAdapter  # noqa: E402
+
 _slack_mod.SLACK_AVAILABLE = True
 from plugins.platforms.slack.adapter import SlackAdapter  # noqa: E402
 
-
 # Platform-generic factories
+
 
 def make_source(platform: Platform, chat_id: str = "e2e-chat-1", user_id: str = "e2e-user-1", chat_type: str = "dm") -> SessionSource:
     return SessionSource(
@@ -176,7 +179,7 @@ def make_runner(platform: Platform, session_entry: SessionEntry = None) -> "Gate
 
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={platform: PlatformConfig(enabled=True, token="e2e-test-token")}
+        platforms={platform: PlatformConfig(enabled=True, token="e2e-test-token")},
     )
     runner.adapters = {}
     runner._voice_mode = {}
@@ -278,22 +281,22 @@ def platform(request):
     return request.param
 
 
-@pytest.fixture()
+@pytest.fixture
 def source(platform):
     return make_source(platform)
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_entry(platform, source):
     return make_session_entry(platform, source)
 
 
-@pytest.fixture()
+@pytest.fixture
 def runner(platform, session_entry):
     return make_runner(platform, session_entry)
 
 
-@pytest.fixture()
+@pytest.fixture
 def adapter(platform, runner):
     return make_adapter(platform, runner)
 
@@ -379,7 +382,7 @@ def make_discord_message(
         guild=getattr(channel, "guild", None),
         mentions=mentions, attachments=attachments,
         type=getattr(discord, "MessageType", SimpleNamespace()).default,
-        reference=None, created_at=datetime.now(timezone.utc),
+        reference=None, created_at=datetime.now(UTC),
         create_thread=AsyncMock(),
     )
 
@@ -416,21 +419,21 @@ def _make_discord_adapter_wired(runner=None):
     return adapter, runner
 
 
-@pytest.fixture()
+@pytest.fixture
 def discord_setup():
     return _make_discord_adapter_wired()
 
 
-@pytest.fixture()
+@pytest.fixture
 def discord_adapter(discord_setup):
     return discord_setup[0]
 
 
-@pytest.fixture()
+@pytest.fixture
 def discord_runner(discord_setup):
     return discord_setup[1]
 
 
-@pytest.fixture()
+@pytest.fixture
 def bot_user():
     return make_fake_bot_user()

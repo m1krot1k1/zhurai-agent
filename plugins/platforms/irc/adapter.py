@@ -1,5 +1,4 @@
-"""
-IRC Platform Adapter for Hermes Agent.
+"""IRC Platform Adapter for Hermes Agent.
 
 A plugin-based gateway adapter that connects to an IRC server and relays
 messages to/from the Hermes agent.  Zero external dependencies — uses
@@ -33,7 +32,7 @@ import os
 import re
 import ssl
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +42,18 @@ logger = logging.getLogger(__name__)
 # is discovered but the gateway hasn't been fully initialised yet.
 # ---------------------------------------------------------------------------
 
+from gateway.config import Platform
 from gateway.platforms.base import (
     BasePlatformAdapter,
-    SendResult,
     MessageEvent,
     MessageType,
+    SendResult,
 )
-from gateway.config import Platform
-
 
 # ---------------------------------------------------------------------------
 # IRC protocol helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_irc_message(raw: str) -> dict:
     """Parse a raw IRC protocol line into components.
@@ -85,7 +84,7 @@ def _parse_irc_message(raw: str) -> dict:
 
 def _extract_nick(prefix: str) -> str:
     """Extract nickname from IRC prefix (nick!user@host)."""
-    return prefix.split("!")[0] if "!" in prefix else prefix
+    return prefix.split("!", maxsplit=1)[0] if "!" in prefix else prefix
 
 
 # ---------------------------------------------------------------------------
@@ -139,9 +138,9 @@ class IRCAdapter(BasePlatformAdapter):
         self.max_message_length = int(max_msg or 450)
 
         # Runtime state
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
-        self._recv_task: Optional[asyncio.Task] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
+        self._recv_task: asyncio.Task | None = None
         self._current_nick = self.nickname
         self._registered = False  # IRC registration complete
         self._registration_event = asyncio.Event()
@@ -201,7 +200,7 @@ class IRCAdapter(BasePlatformAdapter):
         # Wait for registration (001 RPL_WELCOME) with timeout
         try:
             await asyncio.wait_for(self._registration_event.wait(), timeout=30.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("IRC: registration timed out")
             await self.disconnect()
             self._set_fatal_error("registration_timeout", "IRC server did not send RPL_WELCOME", retryable=True)
@@ -259,8 +258,8 @@ class IRCAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         if not self._writer or self._writer.is_closing():
             return SendResult(success=False, error="Not connected")
@@ -280,9 +279,8 @@ class IRCAdapter(BasePlatformAdapter):
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         """IRC has no typing indicator — no-op."""
-        pass
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         is_channel = chat_id.startswith("#") or chat_id.startswith("&")
         return {
             "name": chat_id,
@@ -291,7 +289,7 @@ class IRCAdapter(BasePlatformAdapter):
 
     # ── Message splitting ─────────────────────────────────────────────────
 
-    def _split_message(self, content: str, target: str) -> List[str]:
+    def _split_message(self, content: str, target: str) -> list[str]:
         """Split a long message into IRC-safe chunks.
 
         IRC has a ~512 byte line limit.  After accounting for protocol
@@ -300,11 +298,11 @@ class IRCAdapter(BasePlatformAdapter):
         # Strip markdown formatting that doesn't render in IRC
         content = self._strip_markdown(content)
 
-        overhead = len(f"PRIVMSG {target} :".encode("utf-8")) + 2  # +2 for \r\n
+        overhead = len(f"PRIVMSG {target} :".encode()) + 2  # +2 for \r\n
         max_bytes = 510 - overhead
         user_limit = self.max_message_length
 
-        lines: List[str] = []
+        lines: list[str] = []
         for paragraph in content.split("\n"):
             if not paragraph.strip():
                 continue
@@ -333,7 +331,7 @@ class IRCAdapter(BasePlatformAdapter):
                 lines.append(paragraph[:split_at].rstrip())
                 paragraph = paragraph[split_at:].lstrip()
 
-        return lines if lines else [""]
+        return lines or [""]
 
     @staticmethod
     def _strip_markdown(text: str) -> str:
@@ -542,14 +540,14 @@ def interactive_setup() -> None:
     in non-CLI contexts (gateway runtime, tests).
     """
     from hermes_cli.setup import (
-        prompt,
-        prompt_yes_no,
-        save_env_value,
         get_env_value,
         print_header,
         print_info,
-        print_warning,
         print_success,
+        print_warning,
+        prompt,
+        prompt_yes_no,
+        save_env_value,
     )
 
     print_header("IRC")
@@ -721,10 +719,10 @@ async def _standalone_send(
     chat_id: str,
     message: str,
     *,
-    thread_id: Optional[str] = None,
-    media_files: Optional[List[str]] = None,
+    thread_id: str | None = None,
+    media_files: list[str] | None = None,
     force_document: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Open an ephemeral IRC connection, send a PRIVMSG, and quit.
 
     Used by ``tools/send_message_tool._send_via_adapter`` when the gateway
@@ -811,7 +809,7 @@ async def _standalone_send(
                 return {"error": "IRC standalone send: registration timeout (no RPL_WELCOME)"}
             try:
                 raw_line = await asyncio.wait_for(reader.readuntil(b"\r\n"), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return {"error": "IRC standalone send: registration timeout (no RPL_WELCOME)"}
             except asyncio.IncompleteReadError:
                 return {"error": "IRC standalone send: server closed connection during registration"}
@@ -854,7 +852,7 @@ async def _standalone_send(
                     break
                 try:
                     raw_line = await asyncio.wait_for(reader.readuntil(b"\r\n"), timeout=remaining)
-                except (asyncio.TimeoutError, asyncio.IncompleteReadError):
+                except (TimeoutError, asyncio.IncompleteReadError):
                     break
                 decoded = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
                 jmsg = _parse_irc_message(decoded)
@@ -871,7 +869,7 @@ async def _standalone_send(
         # exceeds the IRC 510-byte protocol limit.  Reuses the same
         # algorithm as IRCAdapter._split_message, with control-character
         # stripping per line to block CRLF injection from message content.
-        overhead = len(f"PRIVMSG {target} :".encode("utf-8")) + 2
+        overhead = len(f"PRIVMSG {target} :".encode()) + 2
         max_bytes = 510 - overhead
         sent_any = False
         for paragraph in plain.split("\n"):
@@ -909,7 +907,7 @@ async def _standalone_send(
         await _raw("QUIT :delivered")
         try:
             await asyncio.wait_for(reader.read(1024), timeout=2.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
         return {"success": True, "message_id": str(int(time.time() * 1000))}
@@ -922,7 +920,7 @@ async def _standalone_send(
         try:
             writer.close()
             await asyncio.wait_for(writer.wait_closed(), timeout=5.0)
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             pass
 
 

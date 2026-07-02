@@ -113,7 +113,7 @@ def test_gateway_enroll_dispatch():
             "wss://connector.example.com/relay",
             "--gateway-id",
             "gw-1",
-        ]
+        ],
     )
     assert ns.command == "gateway"
     assert ns.gateway_command == "enroll"

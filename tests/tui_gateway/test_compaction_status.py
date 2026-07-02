@@ -9,19 +9,18 @@ silently reset mid-turn.
 from __future__ import annotations
 
 import importlib
-
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def server():
     with patch.dict(
         "sys.modules",
         {
             "hermes_constants": MagicMock(
-                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_compaction")
+                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_compaction"),
             ),
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
@@ -34,7 +33,7 @@ def server():
 def _capture(server, monkeypatch):
     events: list[dict] = []
     monkeypatch.setattr(
-        server, "_emit", lambda event, sid, payload=None: events.append(payload or {})
+        server, "_emit", lambda event, sid, payload=None: events.append(payload or {}),
     )
     return events
 

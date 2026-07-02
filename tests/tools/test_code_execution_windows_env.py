@@ -21,6 +21,7 @@ bytes.  The child then fails to import with a SyntaxError:
 """
 
 import os
+import pathlib
 import subprocess
 import sys
 import textwrap
@@ -75,7 +76,8 @@ class TestWindowsEssentialAllowlist:
 class TestScrubChildEnvWindows:
     """Verify _scrub_child_env passes Windows essentials through when
     is_windows=True and blocks them when is_windows=False (so POSIX hosts
-    don't inherit pointless Windows vars)."""
+    don't inherit pointless Windows vars).
+    """
 
     def _sample_windows_env(self):
         """A realistic subset of what os.environ looks like on Windows."""
@@ -145,7 +147,8 @@ class TestScrubChildEnvWindows:
 
     def test_essentials_blocked_when_is_windows_false(self):
         """On POSIX hosts, Windows-specific vars should not pass — they
-        have no meaning and could confuse child tooling."""
+        have no meaning and could confuse child tooling.
+        """
         env = self._sample_windows_env()
         scrubbed = _scrub_child_env(env,
                                     is_passthrough=_no_passthrough,
@@ -163,7 +166,8 @@ class TestScrubChildEnvWindows:
     def test_case_insensitive_essential_match(self):
         """Windows env var names are case-insensitive at the OS level but
         Python preserves whatever case os.environ reported.  The scrubber
-        must normalize to uppercase for the membership check."""
+        must normalize to uppercase for the membership check.
+        """
         env = {
             "SystemRoot": r"C:\Windows",       # mixed case
             "comspec": r"C:\Windows\System32\cmd.exe",  # lowercase
@@ -180,7 +184,8 @@ class TestScrubChildEnvWindows:
 class TestScrubChildEnvPassthroughInteraction:
     """The passthrough hook runs *before* the secret block, so a skill
     can legitimately forward a third-party API key.  The Windows
-    essentials addition must not interfere with that."""
+    essentials addition must not interfere with that.
+    """
 
     def test_passthrough_wins_over_secret_block(self):
         env = {"TENOR_API_KEY": "x", "PATH": "/bin"}
@@ -214,7 +219,8 @@ class TestWindowsSocketSmokeTest:
     """Integration-ish smoke test: spawn a child Python with a scrubbed
     env and confirm it can create an AF_INET socket.  This is the
     regression that motivated the fix — without SYSTEMROOT the child
-    hits WinError 10106 before any RPC is attempted."""
+    hits WinError 10106 before any RPC is attempted.
+    """
 
     def test_child_can_create_socket_with_scrubbed_env(self):
         scrubbed = _scrub_child_env(os.environ, is_passthrough=_no_passthrough)
@@ -373,7 +379,8 @@ class TestPosixEquivalence:
         We parametrize over three passthrough rules to cover the full
         surface: no passthrough, single-var passthrough (the common
         skill-registered case), and everything-passes (edge case that
-        could expose precedence bugs)."""
+        could expose precedence bugs).
+        """
         expected = _legacy_posix_scrubber(env, pt)
         actual = _scrub_child_env(env, is_passthrough=pt, is_windows=False)
         assert actual == expected, (
@@ -386,7 +393,8 @@ class TestPosixEquivalence:
     def test_posix_behavior_unchanged_on_real_os_environ(self):
         """Bonus check against the actual os.environ of the host running
         the test.  This covers vars we might not have thought to put in
-        the synthetic fixtures."""
+        the synthetic fixtures.
+        """
         expected = _legacy_posix_scrubber(os.environ, lambda _: False)
         actual = _scrub_child_env(os.environ,
                                   is_passthrough=lambda _: False,
@@ -400,7 +408,8 @@ class TestPosixEquivalence:
         """Correctness check on the NEW behavior: is_windows=True must
         keep everything POSIX mode keeps, and *may* add Windows
         essentials.  It must never drop a var that POSIX mode would keep
-        — if it did, we'd have broken same-host reuse of the scrubber."""
+        — if it did, we'd have broken same-host reuse of the scrubber.
+        """
         env = {**self._POSIX_SYNTHETIC_ENV, **self._WINDOWS_SYNTHETIC_ENV}
         posix_result = _scrub_child_env(env,
                                         is_passthrough=lambda _: False,
@@ -447,13 +456,15 @@ class TestSandboxWritesUtf8:
     """Verify the file-write call sites use UTF-8 explicitly, not the
     platform default.  We check the source of ``execute_code`` rather
     than spawning a real sandbox because the latter needs a full agent
-    context — but the code inspection is deterministic and fast."""
+    context — but the code inspection is deterministic and fast.
+    """
 
     def test_stub_and_script_writes_specify_utf8(self):
         """Both ``hermes_tools.py`` and ``script.py`` writes in
-        ``_execute_local`` must pass ``encoding="utf-8"``."""
+        ``_execute_local`` must pass ``encoding="utf-8"``.
+        """
         import tools.code_execution_tool as cet
-        src = open(cet.__file__, encoding="utf-8").read()
+        src = pathlib.Path(cet.__file__).open(encoding="utf-8").read()
 
         # There should be no ``open(path, "w")`` without encoding= for
         # the two staging files.  Grep-style check: find every write of
@@ -461,23 +472,24 @@ class TestSandboxWritesUtf8:
         # ``encoding="utf-8"`` within a short window.
         import re
         pattern = re.compile(
-            r'open\(\s*os\.path\.join\(\s*tmpdir\s*,\s*"[^"]+\.py"\s*\)\s*,\s*"w"[^)]*\)'
+            r'open\(\s*os\.path\.join\(\s*tmpdir\s*,\s*"[^"]+\.py"\s*\)\s*,\s*"w"[^)]*\)',
         )
         for match in pattern.finditer(src):
             line = match.group(0)
             assert 'encoding="utf-8"' in line or "encoding='utf-8'" in line, (
-                f"Sandbox file write missing encoding=\"utf-8\" on Windows: {line!r}"
+                f'Sandbox file write missing encoding="utf-8" on Windows: {line!r}'
             )
 
     def test_file_rpc_stub_uses_utf8(self):
         """The file-based RPC transport stub (used by remote backends)
         reads/writes JSON response files.  Those must also specify UTF-8
-        so non-ASCII tool results survive the round-trip intact."""
+        so non-ASCII tool results survive the round-trip intact.
+        """
         from tools.code_execution_tool import generate_hermes_tools_module
         stub = generate_hermes_tools_module(["terminal"], transport="file")
         # The generated stub should open response + request files as UTF-8.
         assert 'encoding="utf-8"' in stub, (
-            "File-based RPC stub does not specify encoding=\"utf-8\" — "
+            'File-based RPC stub does not specify encoding="utf-8" — '
             "will corrupt non-ASCII tool results on non-UTF-8 locales."
         )
 
@@ -487,10 +499,12 @@ class TestSandboxWritesUtf8:
         sandbox does, and it must succeed even when the stub contains
         em-dashes (which it does — check the transport-header docstring).
         """
+        import ast
+        import tempfile
+
         from tools.code_execution_tool import generate_hermes_tools_module
-        import tempfile, ast
         stub = generate_hermes_tools_module(
-            ["terminal", "read_file", "write_file"], transport="uds"
+            ["terminal", "read_file", "write_file"], transport="uds",
         )
         # Sanity: stub actually contains a non-ASCII character, otherwise
         # this test wouldn't prove anything meaningful.
@@ -503,19 +517,18 @@ class TestSandboxWritesUtf8:
         )
 
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
+            mode="w", suffix=".py", delete=False, encoding="utf-8",
         ) as f:
             f.write(stub)
             tmp_path = f.name
 
         try:
             # Re-read and parse exactly like the child Python would.
-            with open(tmp_path, encoding="utf-8") as fh:
-                round_tripped = fh.read()
+            round_tripped = pathlib.Path(tmp_path).read_text(encoding="utf-8")
             assert round_tripped == stub, "UTF-8 round-trip corrupted the stub"
             ast.parse(round_tripped)  # must not raise SyntaxError
         finally:
-            os.unlink(tmp_path)
+            pathlib.Path(tmp_path).unlink()
 
     @pytest.mark.skipif(
         sys.platform != "win32",
@@ -526,9 +539,11 @@ class TestSandboxWritesUtf8:
         *without* ``encoding="utf-8"`` would corrupt the file.  If this
         test ever starts failing (i.e. default write succeeds), it means
         Python's default encoding has changed and the explicit UTF-8
-        requirement may be obsolete — reconsider the fix."""
-        from tools.code_execution_tool import generate_hermes_tools_module
+        requirement may be obsolete — reconsider the fix.
+        """
         import tempfile
+
+        from tools.code_execution_tool import generate_hermes_tools_module
 
         stub = generate_hermes_tools_module(["terminal"], transport="uds")
         # Find a non-ASCII character we can use to prove the corruption.
@@ -538,7 +553,7 @@ class TestSandboxWritesUtf8:
 
         # Write with default encoding (simulating the old buggy code).
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
+            mode="w", suffix=".py", delete=False,
         ) as f:
             try:
                 f.write(stub)
@@ -556,7 +571,7 @@ class TestSandboxWritesUtf8:
                 return
 
             # Read back as UTF-8 (what Python does on import).
-            with open(tmp_path, encoding="utf-8") as fh:
+            with pathlib.Path(tmp_path).open(encoding="utf-8") as fh:
                 try:
                     fh.read()
                     # If this succeeds on Windows, the platform default is
@@ -567,13 +582,13 @@ class TestSandboxWritesUtf8:
                         "Default text-file encoding is UTF-8-compatible on "
                         "this Windows build — explicit encoding= is no "
                         "longer load-bearing, but keep it for belt-and-"
-                        "suspenders."
+                        "suspenders.",
                     )
                 except UnicodeDecodeError:
                     # Exactly the failure mode that motivated the fix.
                     pass
         finally:
-            os.unlink(tmp_path)
+            pathlib.Path(tmp_path).unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -599,13 +614,15 @@ class TestSandboxWritesUtf8:
 
 class TestChildStdioIsUtf8:
     """Verify the sandbox child is spawned with UTF-8 stdio encoding,
-    so LLM scripts can print non-ASCII without crashing on Windows."""
+    so LLM scripts can print non-ASCII without crashing on Windows.
+    """
 
     def test_popen_env_sets_pythonioencoding_utf8(self):
         """Source-level check: the Popen call site must set
-        PYTHONIOENCODING=utf-8 in child_env."""
+        PYTHONIOENCODING=utf-8 in child_env.
+        """
         import tools.code_execution_tool as cet
-        src = open(cet.__file__, encoding="utf-8").read()
+        src = pathlib.Path(cet.__file__).open(encoding="utf-8").read()
         assert 'child_env["PYTHONIOENCODING"] = "utf-8"' in src, (
             "PYTHONIOENCODING=utf-8 missing from child env — Windows "
             "scripts that print non-ASCII will crash with "
@@ -614,9 +631,10 @@ class TestChildStdioIsUtf8:
 
     def test_popen_env_sets_pythonutf8_mode(self):
         """Source-level check: PYTHONUTF8=1 must be set too — it makes
-        open()'s default encoding UTF-8 in user-written file I/O."""
+        open()'s default encoding UTF-8 in user-written file I/O.
+        """
         import tools.code_execution_tool as cet
-        src = open(cet.__file__, encoding="utf-8").read()
+        src = pathlib.Path(cet.__file__).open(encoding="utf-8").read()
         assert 'child_env["PYTHONUTF8"] = "1"' in src, (
             "PYTHONUTF8=1 missing from child env — user scripts that "
             "call open(path, 'w') without encoding= will produce "
@@ -673,7 +691,8 @@ class TestChildStdioIsUtf8:
         overrides and prove that on Windows, printing non-ASCII fails.
         If this ever starts passing, Python has changed its default
         stdio encoding on Windows and the fix may be obsolete — but
-        keep the env vars anyway for belt-and-suspenders."""
+        keep the env vars anyway for belt-and-suspenders.
+        """
         script = textwrap.dedent("""
             import sys
             print("em-dash \\u2014 arrow \\u2192")
@@ -703,7 +722,7 @@ class TestChildStdioIsUtf8:
                 "This Python/Windows build handles non-ASCII stdout even "
                 "without PYTHONIOENCODING/PYTHONUTF8 — fix is defensive "
                 "but no longer strictly load-bearing.  Keep the env vars "
-                "for older Python builds and C.ASCII-locale containers."
+                "for older Python builds and C.ASCII-locale containers.",
             )
         # Otherwise: crash OR garbled output — both count as proving the
         # bug is real on this system.

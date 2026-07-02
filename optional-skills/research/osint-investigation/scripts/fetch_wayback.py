@@ -14,7 +14,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get_json  # noqa: E402
+from _http import get_json
 
 BASE = "https://web.archive.org/cdx/search/cdx"
 
@@ -82,11 +82,11 @@ def fetch(
                     "status": entry[idx["statuscode"]] if "statuscode" in idx else "",
                     "digest": entry[idx["digest"]] if "digest" in idx else "",
                     "length": entry[idx["length"]] if "length" in idx else "",
-                }
+                },
             )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)

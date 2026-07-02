@@ -1,10 +1,10 @@
 """Tests for CLI browser CDP auto-launch helpers."""
 
+import os
+import subprocess
 from contextlib import redirect_stdout
 from io import StringIO
-import os
 from queue import Queue
-import subprocess
 from unittest.mock import patch
 
 from cli import HermesCLI
@@ -73,7 +73,7 @@ class TestChromeDebugLaunch:
         assert "start_new_session" not in captured["kwargs"]
         flags = captured["kwargs"].get("creationflags", 0)
         expected = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0,
         )
         assert flags == expected
 

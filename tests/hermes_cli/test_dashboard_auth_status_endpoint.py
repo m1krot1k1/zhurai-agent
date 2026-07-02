@@ -84,7 +84,8 @@ def test_status_reports_auth_disabled_in_loopback_mode(loopback_client):
 def test_status_preserves_existing_fields(loopback_client):
     """Defence-in-depth: adding auth_required/auth_providers must not
     have dropped any previous field (the dashboard's React StatusPage
-    relies on the full payload shape)."""
+    relies on the full payload shape).
+    """
     r = loopback_client.get("/api/status")
     body = r.json()
     expected_keys = {
@@ -112,7 +113,8 @@ def test_status_withholds_host_detail_in_gated_mode(gated_client):
     """On a gated (non-loopback) bind, the public ``/api/status`` probe must
     expose only the liveness + auth-gate shape — never absolute host paths,
     the gateway PID, or the internal gateway health URL. The endpoint
-    bypasses dashboard auth, so anyone who can reach the host hits it cold."""
+    bypasses dashboard auth, so anyone who can reach the host hits it cold.
+    """
     r = gated_client.get("/api/status")
     assert r.status_code == 200
     body = r.json()
@@ -127,7 +129,8 @@ def test_status_withholds_host_detail_in_gated_mode(gated_client):
 def test_status_includes_host_detail_in_loopback_mode(loopback_client):
     """Counterpart to the gated case: a loopback bind is local-only, so the
     full payload (including host paths and PID) is still served — preserving
-    the StatusPage / ``hermes status`` experience for local operators."""
+    the StatusPage / ``hermes status`` experience for local operators.
+    """
     r = loopback_client.get("/api/status")
     assert r.status_code == 200
     body = r.json()

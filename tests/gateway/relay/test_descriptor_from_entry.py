@@ -38,14 +38,16 @@ def test_projection_carries_platform_entry_fields():
 
 def test_zero_max_length_maps_to_4096_default():
     """PlatformEntry.max_message_length == 0 means 'no limit'; the descriptor
-    carries a concrete bound matching the stream_consumer default."""
+    carries a concrete bound matching the stream_consumer default.
+    """
     d = CapabilityDescriptor.from_platform_entry(_entry(max_message_length=0))
     assert d.max_message_length == 4096
 
 
 def test_runtime_capabilities_supplied_by_caller():
     """PlatformEntry doesn't encode draft/edit/thread/markdown behavior — those
-    come from the caller (the connector, reading the live adapter)."""
+    come from the caller (the connector, reading the live adapter).
+    """
     d = CapabilityDescriptor.from_platform_entry(
         _entry(),
         supports_draft_streaming=True,

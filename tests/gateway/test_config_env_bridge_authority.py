@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -51,7 +50,7 @@ def _run_gateway_import(hermes_home: Path, initial_env: dict[str, str]) -> dict[
             v = os.environ.get(k)
             if v is not None:
                 print(f"{{k}}={{v}}")
-        """
+        """,
     )
     env = dict(initial_env)
     env["HERMES_HOME"] = str(hermes_home)
@@ -70,7 +69,7 @@ def _run_gateway_import(hermes_home: Path, initial_env: dict[str, str]) -> dict[
     if result.returncode != 0:
         pytest.fail(
             f"gateway.run import failed (rc={result.returncode})\n"
-            f"stderr:\n{result.stderr}\nstdout:\n{result.stdout}"
+            f"stderr:\n{result.stderr}\nstdout:\n{result.stdout}",
         )
     out: dict[str, str] = {}
     for line in result.stdout.splitlines():

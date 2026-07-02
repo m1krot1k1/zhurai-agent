@@ -10,7 +10,6 @@ import pytest
 
 import plugins.image_gen.openai as openai_plugin
 
-
 # 1×1 transparent PNG — valid bytes for save_b64_image()
 _PNG_HEX = (
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
@@ -32,7 +31,7 @@ def _fake_response(*, b64=None, url=None, revised_prompt=None):
 @pytest.fixture(autouse=True)
 def _tmp_hermes_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    yield tmp_path
+    return tmp_path
 
 
 @pytest.fixture
@@ -104,7 +103,7 @@ class TestModelResolution:
     def test_config_openai_model(self, tmp_path):
         import yaml
         (tmp_path / "config.yaml").write_text(
-            yaml.safe_dump({"image_gen": {"openai": {"model": "gpt-image-2-low"}}})
+            yaml.safe_dump({"image_gen": {"openai": {"model": "gpt-image-2-low"}}}),
         )
         model_id, meta = openai_plugin._resolve_model()
         assert model_id == "gpt-image-2-low"
@@ -114,7 +113,7 @@ class TestModelResolution:
         """``image_gen.model: gpt-image-2-high`` also works (top-level)."""
         import yaml
         (tmp_path / "config.yaml").write_text(
-            yaml.safe_dump({"image_gen": {"model": "gpt-image-2-high"}})
+            yaml.safe_dump({"image_gen": {"model": "gpt-image-2-high"}}),
         )
         model_id, meta = openai_plugin._resolve_model()
         assert model_id == "gpt-image-2-high"

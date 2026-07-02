@@ -4,10 +4,12 @@ Before the fix in PR #441, _handle_retry_command() called
 _handle_message(retry_event) but discarded its return value with `return None`,
 so users never received the final response.
 """
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from gateway.run import GatewayRunner
+
+import pytest
+
 from gateway.platforms.base import MessageEvent, MessageType
+from gateway.run import GatewayRunner
 
 
 @pytest.fixture
@@ -25,7 +27,7 @@ def gateway(tmp_path):
 async def test_retry_returns_response_not_none(gateway):
     """_handle_retry_command must return the inner handler response, not None."""
     gateway.session_store.get_or_create_session.return_value = MagicMock(
-        session_id="test-session"
+        session_id="test-session",
     )
     gateway.session_store.load_transcript.return_value = [
         {"role": "user", "content": "Hello Hermes"},
@@ -48,7 +50,7 @@ async def test_retry_returns_response_not_none(gateway):
 async def test_retry_no_previous_message(gateway):
     """If there is no previous user message, return early with a message."""
     gateway.session_store.get_or_create_session.return_value = MagicMock(
-        session_id="test-session"
+        session_id="test-session",
     )
     gateway.session_store.load_transcript.return_value = []
     event = MessageEvent(

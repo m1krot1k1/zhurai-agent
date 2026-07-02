@@ -9,10 +9,10 @@ import pytest
 
 from hermes_cli import azure_detect
 
-
 # ----------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------
+
 
 class _FakeHTTPResponse:
     """Minimal stand-in for urllib.request.urlopen's context manager."""
@@ -103,7 +103,7 @@ def test_detect_anthropic_path_wins_without_http():
 def test_detect_openai_models_probe_success():
     """/models probe returning a model list → chat_completions."""
     def _fake_get(url, api_key, timeout=6.0, **kwargs):
-        assert "key-abc" == api_key
+        assert api_key == "key-abc"
         return 200, json.loads(_openai_models_body("gpt-5.4", "claude-opus-4-6"))
 
     with patch.object(azure_detect, "_http_get_json", side_effect=_fake_get):

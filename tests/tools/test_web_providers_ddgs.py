@@ -29,8 +29,10 @@ def _install_fake_ddgs(monkeypatch, *, text_results=None, text_raises=None):
     class _FakeDDGS:
         def __enter__(self):
             return self
+
         def __exit__(self, *_a):
             return False
+
         def text(self, query, max_results=5):
             if text_raises is not None:
                 raise text_raises
@@ -181,7 +183,7 @@ class TestDDGSBackendWiring:
     def test_ddgs_trails_paid_providers_in_auto_detect(self, monkeypatch):
         """Exa (priority) should win over ddgs in auto-detect."""
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         for key in ("FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "PARALLEL_API_KEY",
                     "TAVILY_API_KEY", "SEARXNG_URL", "BRAVE_SEARCH_API_KEY"):
             monkeypatch.delenv(key, raising=False)
@@ -192,7 +194,7 @@ class TestDDGSBackendWiring:
 
     def test_auto_detect_picks_ddgs_as_last_resort(self, monkeypatch):
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         for key in ("FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "PARALLEL_API_KEY",
                     "TAVILY_API_KEY", "EXA_API_KEY", "SEARXNG_URL", "BRAVE_SEARCH_API_KEY"):
             monkeypatch.delenv(key, raising=False)
@@ -224,11 +226,13 @@ class TestDDGSSearchOnlyErrors:
 
     def test_web_extract_returns_search_only_error(self, monkeypatch):
         import asyncio
+
         from tools import web_tools
 
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {"backend": "ddgs"})
         monkeypatch.setattr(web_tools, "_ddgs_package_importable", lambda: True)
         monkeypatch.setattr(web_tools, "_is_tool_gateway_ready", lambda: False)
+
         async def _allow_ssrf(_url: str) -> bool:
             return True
 
@@ -236,7 +240,7 @@ class TestDDGSSearchOnlyErrors:
         monkeypatch.setattr("tools.interrupt.is_interrupted", lambda: False, raising=False)
 
         result_str = asyncio.get_event_loop().run_until_complete(
-            web_tools.web_extract_tool(["https://example.com"])
+            web_tools.web_extract_tool(["https://example.com"]),
         )
         result = json.loads(result_str)
         assert result["success"] is False

@@ -20,7 +20,6 @@ from hermes_cli.plugins import (
     get_plugin_auxiliary_tasks,
 )
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 
@@ -54,7 +53,7 @@ def patched_manager(monkeypatch):
 
     monkeypatch.setattr(plugins_mod, "get_plugin_manager", _stub_get_manager)
     monkeypatch.setattr(plugins_mod, "_ensure_plugins_discovered", _stub_get_manager)
-    yield fresh
+    return fresh
 
 
 # ── PluginContext.register_auxiliary_task ────────────────────────────────────
@@ -129,10 +128,10 @@ def test_register_auxiliary_task_allows_same_plugin_re_registration():
     """Re-registration by the same plugin updates the entry (idempotent)."""
     ctx, manager = _make_ctx("plug_a")
     ctx.register_auxiliary_task(
-        key="t1", display_name="First", description="first"
+        key="t1", display_name="First", description="first",
     )
     ctx.register_auxiliary_task(
-        key="t1", display_name="Second", description="second"
+        key="t1", display_name="Second", description="second",
     )
     assert manager._aux_tasks["t1"]["display_name"] == "Second"
 
@@ -148,11 +147,11 @@ def test_register_auxiliary_task_rejects_cross_plugin_collision():
     ctx_b = PluginContext(manifest_b, manager)
 
     ctx_a.register_auxiliary_task(
-        key="shared", display_name="A", description="a"
+        key="shared", display_name="A", description="a",
     )
     with pytest.raises(ValueError, match="already registered by plugin 'plug_a'"):
         ctx_b.register_auxiliary_task(
-            key="shared", display_name="B", description="b"
+            key="shared", display_name="B", description="b",
         )
 
 
@@ -181,13 +180,13 @@ def test_get_plugin_auxiliary_tasks_returns_sorted_list(patched_manager):
     manifest = PluginManifest(name="plug")
     ctx = PluginContext(manifest, patched_manager)
     ctx.register_auxiliary_task(
-        key="zeta_task", display_name="Zeta", description="z"
+        key="zeta_task", display_name="Zeta", description="z",
     )
     ctx.register_auxiliary_task(
-        key="alpha_task", display_name="Alpha", description="a"
+        key="alpha_task", display_name="Alpha", description="a",
     )
     ctx.register_auxiliary_task(
-        key="mike_task", display_name="Mike", description="m"
+        key="mike_task", display_name="Mike", description="m",
     )
 
     tasks = get_plugin_auxiliary_tasks()
@@ -235,7 +234,7 @@ def test_all_aux_tasks_swallows_plugin_discovery_failure(monkeypatch):
         raise RuntimeError("plugin scan exploded")
 
     monkeypatch.setattr(
-        "hermes_cli.plugins.get_plugin_auxiliary_tasks", _broken
+        "hermes_cli.plugins.get_plugin_auxiliary_tasks", _broken,
     )
 
     merged = main_mod._all_aux_tasks()
@@ -249,6 +248,7 @@ def test_all_aux_tasks_swallows_plugin_discovery_failure(monkeypatch):
 def test_reset_aux_to_auto_resets_plugin_tasks(tmp_path, monkeypatch, patched_manager):
     """Plugin task with non-auto config gets reset alongside built-ins."""
     from pathlib import Path
+
     from hermes_cli.config import load_config, save_config
     from hermes_cli.main import _reset_aux_to_auto
 
@@ -282,10 +282,11 @@ def test_reset_aux_to_auto_resets_plugin_tasks(tmp_path, monkeypatch, patched_ma
 
 
 def test_get_auxiliary_task_config_layers_plugin_defaults(
-    tmp_path, monkeypatch, patched_manager
+    tmp_path, monkeypatch, patched_manager,
 ):
     """Plugin-declared defaults appear when user has no config entry."""
     from pathlib import Path
+
     from agent.auxiliary_client import _get_auxiliary_task_config
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
@@ -309,12 +310,13 @@ def test_get_auxiliary_task_config_layers_plugin_defaults(
 
 
 def test_get_auxiliary_task_config_user_config_wins_over_plugin_defaults(
-    tmp_path, monkeypatch, patched_manager
+    tmp_path, monkeypatch, patched_manager,
 ):
     """User's config.yaml entry overrides plugin-declared defaults."""
     from pathlib import Path
-    from hermes_cli.config import load_config, save_config
+
     from agent.auxiliary_client import _get_auxiliary_task_config
+    from hermes_cli.config import load_config, save_config
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -341,9 +343,10 @@ def test_get_auxiliary_task_config_user_config_wins_over_plugin_defaults(
 
 
 def test_get_auxiliary_task_config_unknown_task_returns_empty(
-    tmp_path, monkeypatch, patched_manager
+    tmp_path, monkeypatch, patched_manager,
 ):
     from pathlib import Path
+
     from agent.auxiliary_client import _get_auxiliary_task_config
 
     monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))

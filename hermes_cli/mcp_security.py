@@ -65,7 +65,7 @@ _PERSISTENCE_PATTERN = re.compile(
     r"authorized_keys"               # SSH key persistence (the campaign's payload)
     r"|\.ssh/"                       # any write under ~/.ssh
     r"|/etc/ssh\b"                   # sshd_config / AuthorizedKeysCommand backdoor
-    r"|/etc/pam\.d\b|pam_[\w-]+\.so" # PAM credential logger
+    r"|/etc/pam\.d\b|pam_[\w-]+\.so"  # PAM credential logger
     r"|/etc/sudoers"                 # sudoers escalation
     r"|/etc/cron|crontab\b"          # cron persistence
     r"|/etc/rc\.local|/etc/systemd"  # init / unit persistence
@@ -141,7 +141,7 @@ def validate_mcp_server_entry(name: str, entry: dict[str, Any]) -> list[str]:
         if ioc in flat:
             issues.append(
                 f"MCP server '{name}' contains a known hermes-0day "
-                f"indicator-of-compromise ('{ioc}')"
+                f"indicator-of-compromise ('{ioc}')",
             )
             # One IOC is enough to refuse; don't leak the full match list.
             return issues
@@ -171,7 +171,7 @@ def validate_mcp_server_entry(name: str, entry: dict[str, Any]) -> list[str]:
             f"MCP server '{name}' uses shell interpreter '{command}' to write "
             f"to an OS persistence surface (SSH keys / PAM / sudoers / cron / "
             f"shell rc) — this is the hermes-0day backdoor shape, not a real "
-            f"MCP server"
+            f"MCP server",
         )
 
     return issues

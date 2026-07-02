@@ -19,7 +19,8 @@ from unittest.mock import patch
 
 def _make_cli_stub():
     """Build a minimal HermesCLI-shaped object that can run ``process_command``
-    for the destructive-slash branches without spinning up a real TUI."""
+    for the destructive-slash branches without spinning up a real TUI.
+    """
     from cli import HermesCLI
 
     new_session_calls = []
@@ -30,7 +31,7 @@ def _make_cli_stub():
     self_ = SimpleNamespace(
         _app=None,
         _prompt_text_input_modal=lambda **_kw: (_ for _ in ()).throw(
-            AssertionError("modal must not be invoked when inline-skip token present")
+            AssertionError("modal must not be invoked when inline-skip token present"),
         ),
         new_session=lambda **kw: _capture_new_session(self_, **kw),
         # Stub out side-effects the destructive-slash branches reach for.
@@ -45,7 +46,7 @@ def _make_cli_stub():
     # Bind the methods we need under test.
     self_._split_destructive_skip = HermesCLI._split_destructive_skip
     self_._confirm_destructive_slash = HermesCLI._confirm_destructive_slash.__get__(
-        self_, type(self_)
+        self_, type(self_),
     )
     self_.process_command = HermesCLI.process_command.__get__(self_, type(self_))
     return self_, new_session_calls
@@ -112,10 +113,10 @@ def test_new_without_skip_token_still_consults_modal():
     )
     self_._split_destructive_skip = HermesCLI._split_destructive_skip
     self_._normalize_slash_confirm_choice = HermesCLI._normalize_slash_confirm_choice.__get__(
-        self_, type(self_)
+        self_, type(self_),
     )
     self_._confirm_destructive_slash = HermesCLI._confirm_destructive_slash.__get__(
-        self_, type(self_)
+        self_, type(self_),
     )
     self_.process_command = HermesCLI.process_command.__get__(self_, type(self_))
 

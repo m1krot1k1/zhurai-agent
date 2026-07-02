@@ -10,7 +10,6 @@ Only Sonnet is affected — Opus 1M is general access.
 
 from types import SimpleNamespace
 
-
 # ---------------------------------------------------------------------------
 # Detection logic
 # ---------------------------------------------------------------------------
@@ -85,10 +84,10 @@ class TestLongContextTierDetection:
     def test_rejects_partial_match(self):
         """Both 'extra usage' AND 'long context' must be present."""
         assert not self._is_long_context_tier_error(
-            429, "extra usage required"
+            429, "extra usage required",
         )
         assert not self._is_long_context_tier_error(
-            429, "long context requests not supported"
+            429, "long context requests not supported",
         )
 
 
@@ -99,7 +98,8 @@ class TestLongContextTierDetection:
 
 class TestContextReduction:
     """When the long-context tier error fires, context_length should
-    drop to 200k and the reduced flag should be set correctly."""
+    drop to 200k and the reduced flag should be set correctly.
+    """
 
     def _make_compressor(self, context_length=1_000_000, threshold_percent=0.5):
         c = SimpleNamespace(
@@ -132,8 +132,7 @@ class TestContextReduction:
         reduced_ctx = 200_000
 
         original = comp.context_length
-        if comp.context_length > reduced_ctx:
-            comp.context_length = reduced_ctx
+        comp.context_length = min(comp.context_length, reduced_ctx)
 
         assert comp.context_length == original  # unchanged
 
@@ -142,8 +141,7 @@ class TestContextReduction:
         reduced_ctx = 200_000
 
         original = comp.context_length
-        if comp.context_length > reduced_ctx:
-            comp.context_length = reduced_ctx
+        comp.context_length = min(comp.context_length, reduced_ctx)
 
         assert comp.context_length == original  # unchanged
 
@@ -155,11 +153,13 @@ class TestContextReduction:
 
 class TestAgentErrorPath:
     """Verify the long-context 429 doesn't hit the generic rate-limit
-    or client-error handlers."""
+    or client-error handlers.
+    """
 
     def test_long_context_429_not_treated_as_rate_limit(self):
         """The error should be intercepted before the generic
-        is_rate_limited check fires a fallback switch."""
+        is_rate_limited check fires a fallback switch.
+        """
         error_msg = "extra usage is required for long context requests."
         status_code = 429
         model = "claude-sonnet-4.6"

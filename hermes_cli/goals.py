@@ -33,9 +33,9 @@ import json
 import logging
 import re
 import time
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +144,7 @@ JUDGE_SYSTEM_PROMPT = (
     '{"verdict": "wait", "wait_on_session": "<id>", "reason": "<one sentence>"}\n'
     '{"verdict": "wait", "wait_on_pid": <int>, "reason": "<one sentence>"}\n'
     '{"verdict": "wait", "wait_for_seconds": <int>, "reason": "<one sentence>"}\n'
-    "The legacy shape {\"done\": <true|false>, \"reason\": \"...\"} is still "
+    'The legacy shape {"done": <true|false>, "reason": "..."} is still '
     "accepted (true=done, false=continue)."
 )
 
@@ -311,18 +311,19 @@ class GoalContract:
     def is_empty(self) -> bool:
         return not any(getattr(self, f).strip() for f in _CONTRACT_FIELDS)
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {f: getattr(self, f) for f in _CONTRACT_FIELDS}
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict[str, Any]]) -> "GoalContract":
+    def from_dict(cls, data: dict[str, Any] | None) -> GoalContract:
         if not isinstance(data, dict):
             return cls()
         return cls(**{f: str(data.get(f) or "").strip() for f in _CONTRACT_FIELDS})
 
     def render_block(self) -> str:
         """Render non-empty contract fields as a labelled block. Empty
-        contract → empty string (callers skip the section entirely)."""
+        contract → empty string (callers skip the section entirely).
+        """
         lines = []
         for f in _CONTRACT_FIELDS:
             val = getattr(self, f).strip()
@@ -331,7 +332,7 @@ class GoalContract:
         return "\n".join(lines)
 
 
-def parse_contract(text: str) -> Tuple[str, GoalContract]:
+def parse_contract(text: str) -> tuple[str, GoalContract]:
     """Split user-typed goal text into a headline + structured contract.
 
     Supports inline ``field: value`` lines so power users can type a full
@@ -353,8 +354,8 @@ def parse_contract(text: str) -> Tuple[str, GoalContract]:
     if not text:
         return "", GoalContract()
 
-    headline_parts: List[str] = []
-    fields: Dict[str, List[str]] = {f: [] for f in _CONTRACT_FIELDS}
+    headline_parts: list[str] = []
+    fields: dict[str, list[str]] = {f: [] for f in _CONTRACT_FIELDS}
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -372,7 +373,7 @@ def parse_contract(text: str) -> Tuple[str, GoalContract]:
 
     headline = " ".join(headline_parts).strip()
     contract = GoalContract(
-        **{f: " ".join(v).strip() for f, v in fields.items()}
+        **{f: " ".join(v).strip() for f, v in fields.items()},
     )
     # If a headline was given but no explicit `outcome:` field, the headline
     # IS the outcome — don't duplicate it into the contract block (the goal
@@ -395,16 +396,16 @@ class GoalState:
     max_turns: int = DEFAULT_MAX_TURNS
     created_at: float = 0.0
     last_turn_at: float = 0.0
-    last_verdict: Optional[str] = None        # "done" | "continue" | "skipped"
-    last_reason: Optional[str] = None
-    paused_reason: Optional[str] = None       # why we auto-paused (budget, etc.)
+    last_verdict: str | None = None        # "done" | "continue" | "skipped"
+    last_reason: str | None = None
+    paused_reason: str | None = None       # why we auto-paused (budget, etc.)
     consecutive_parse_failures: int = 0       # judge-output parse failures in a row
     # User-added criteria appended mid-loop via the /subgoal command.
     # When non-empty the judge prompt and continuation prompt both
     # include them so the agent works toward them and the judge factors
     # them into the verdict. Backwards-compatible: defaults to empty so
     # old state_meta rows load unchanged.
-    subgoals: List[str] = field(default_factory=list)
+    subgoals: list[str] = field(default_factory=list)
     # Wait barrier: when the agent is blocked on long-running async work
     # (CI poller, build, test run, deploy, rate-limit cooldown) the goal loop
     # PARKS instead of being re-poked every turn into busy-work. Two barrier
@@ -424,10 +425,10 @@ class GoalState:
     # passes, then the next turn resumes normal judging. Cleared by that,
     # ``/goal unwait``, pause, resume, or clear. Backwards-compatible: old
     # state_meta rows load with no barrier.
-    waiting_on_pid: Optional[int] = None
-    waiting_on_session: Optional[str] = None
+    waiting_on_pid: int | None = None
+    waiting_on_session: str | None = None
     waiting_until: float = 0.0
-    waiting_reason: Optional[str] = None
+    waiting_reason: str | None = None
     waiting_since: float = 0.0
     # Optional structured completion contract (outcome / verification /
     # constraints / boundaries / stop_when). Empty by default; a goal with
@@ -440,10 +441,10 @@ class GoalState:
         return json.dumps(data, ensure_ascii=False)
 
     @classmethod
-    def from_json(cls, raw: str) -> "GoalState":
+    def from_json(cls, raw: str) -> GoalState:
         data = json.loads(raw)
         raw_subgoals = data.get("subgoals") or []
-        subgoals: List[str] = []
+        subgoals: list[str] = []
         if isinstance(raw_subgoals, list):
             subgoals = [str(s).strip() for s in raw_subgoals if str(s).strip()]
         return cls(
@@ -475,7 +476,8 @@ class GoalState:
 
     def render_subgoals_block(self) -> str:
         """Render the subgoals as a numbered ``- N. text`` block. Empty
-        when no subgoals exist."""
+        when no subgoals exist.
+        """
         if not self.subgoals:
             return ""
         return "\n".join(f"- {i}. {text}" for i, text in enumerate(self.subgoals, start=1))
@@ -490,10 +492,10 @@ def _meta_key(session_id: str) -> str:
     return f"goal:{session_id}"
 
 
-_DB_CACHE: Dict[str, Any] = {}
+_DB_CACHE: dict[str, Any] = {}
 
 
-def _get_session_db() -> Optional[Any]:
+def _get_session_db() -> Any | None:
     """Return a SessionDB instance for the current HERMES_HOME.
 
     SessionDB has no built-in singleton, but opening a new connection per
@@ -523,7 +525,7 @@ def _get_session_db() -> Optional[Any]:
     return db
 
 
-def load_goal(session_id: str) -> Optional[GoalState]:
+def load_goal(session_id: str) -> GoalState | None:
     """Load the goal for a session, or None if none exists."""
     if not session_id:
         return None
@@ -690,7 +692,7 @@ def _goal_judge_max_tokens() -> int:
     return DEFAULT_JUDGE_MAX_TOKENS
 
 
-def _parse_judge_response(raw: str) -> Tuple[str, str, bool, Optional[Dict[str, Any]]]:
+def _parse_judge_response(raw: str) -> tuple[str, str, bool, dict[str, Any] | None]:
     """Parse the judge's reply. Fail-open on unusable output.
 
     Returns ``(verdict, reason, parse_failed, wait_directive)`` where:
@@ -721,7 +723,7 @@ def _parse_judge_response(raw: str) -> Tuple[str, str, bool, Optional[Dict[str, 
             text = text[nl + 1:]
 
     # First try: parse the whole blob.
-    data: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
     try:
         data = json.loads(text)
     except Exception:
@@ -759,7 +761,7 @@ def _parse_judge_response(raw: str) -> Tuple[str, str, bool, Optional[Dict[str, 
 
     # Wait verdict: extract a concrete directive (pid or seconds). Accept a
     # few key spellings the model might emit.
-    def _first_int(*keys: str) -> Optional[int]:
+    def _first_int(*keys: str) -> int | None:
         for k in keys:
             v = data.get(k)
             if v is None:
@@ -787,7 +789,7 @@ def _parse_judge_response(raw: str) -> Tuple[str, str, bool, Optional[Dict[str, 
     return "continue", f"{reason} (wait verdict had no target — continuing)", False, None
 
 
-def _render_background_block(background_processes: Optional[List[Dict[str, Any]]]) -> str:
+def _render_background_block(background_processes: list[dict[str, Any]] | None) -> str:
     """Render the live background-process list for the judge prompt.
 
     Each entry is a ``process_registry.list_sessions()`` dict. Only RUNNING
@@ -798,7 +800,7 @@ def _render_background_block(background_processes: Optional[List[Dict[str, Any]]
     """
     if not background_processes:
         return ""
-    lines: List[str] = []
+    lines: list[str] = []
     for p in background_processes:
         if not isinstance(p, dict):
             continue
@@ -838,10 +840,10 @@ def judge_goal(
     last_response: str,
     *,
     timeout: float = DEFAULT_JUDGE_TIMEOUT,
-    subgoals: Optional[List[str]] = None,
-    background_processes: Optional[List[Dict[str, Any]]] = None,
-    contract: Optional[GoalContract] = None,
-) -> Tuple[str, str, bool, Optional[Dict[str, Any]]]:
+    subgoals: list[str] | None = None,
+    background_processes: list[dict[str, Any]] | None = None,
+    contract: GoalContract | None = None,
+) -> tuple[str, str, bool, dict[str, Any] | None]:
     """Ask the auxiliary model whether the goal is satisfied.
 
     Returns ``(verdict, reason, parse_failed, wait_directive)`` where verdict
@@ -878,7 +880,10 @@ def judge_goal(
         return "continue", "empty response (nothing to evaluate)", False, None
 
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:
         logger.debug("goal judge: auxiliary client import failed: %s", exc)
         return "continue", "auxiliary client unavailable", False, None
@@ -898,7 +903,7 @@ def judge_goal(
     # truth.
     clean_subgoals = [s.strip() for s in (subgoals or []) if s and s.strip()]
     background_block = _render_background_block(background_processes)
-    current_time = datetime.now(tz=timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    current_time = datetime.now(tz=UTC).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
     if contract is not None and not contract.is_empty():
         contract_block = contract.render_block()
@@ -964,7 +969,7 @@ def judge_goal(
     return verdict, reason, parse_failed, wait_directive
 
 
-def gather_background_processes(task_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def gather_background_processes(task_id: str | None = None) -> list[dict[str, Any]]:
     """Return the live background-process snapshot for the goal judge.
 
     Thin, fail-safe wrapper over ``process_registry.list_sessions(task_id)``.
@@ -984,7 +989,7 @@ def gather_background_processes(task_id: Optional[str] = None) -> List[Dict[str,
     return [s for s in sessions if isinstance(s, dict) and s.get("status") != "exited"]
 
 
-def draft_contract(objective: str, *, timeout: float = DEFAULT_JUDGE_TIMEOUT) -> Optional[GoalContract]:
+def draft_contract(objective: str, *, timeout: float = DEFAULT_JUDGE_TIMEOUT) -> GoalContract | None:
     """Expand a plain-language objective into a structured completion contract.
 
     Uses the ``goal_judge`` auxiliary task (main-model-first, cache-safe — it
@@ -999,7 +1004,10 @@ def draft_contract(objective: str, *, timeout: float = DEFAULT_JUDGE_TIMEOUT) ->
         return None
 
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:
         logger.debug("goal draft: auxiliary client import failed: %s", exc)
         return None
@@ -1042,7 +1050,7 @@ def draft_contract(objective: str, *, timeout: float = DEFAULT_JUDGE_TIMEOUT) ->
     return None if contract.is_empty() else contract
 
 
-def _extract_json_object(raw: str) -> Optional[Dict[str, Any]]:
+def _extract_json_object(raw: str) -> dict[str, Any] | None:
     """Best-effort: pull the first JSON object out of a model reply.
 
     Shares the fence-stripping + first-object fallback logic used by the
@@ -1080,7 +1088,6 @@ class GoalManager:
     The CLI and gateway each hold one ``GoalManager`` per live session.
 
     Methods:
-
     - ``set(goal)`` — start a new standing goal.
     - ``clear()`` — remove the active goal.
     - ``pause()`` / ``resume()`` — explicit user controls.
@@ -1089,17 +1096,18 @@ class GoalManager:
       and return a decision dict the caller uses to drive the next turn.
     - ``next_continuation_prompt()`` — the canonical user-role message to
       feed back into ``run_conversation``.
+
     """
 
     def __init__(self, session_id: str, *, default_max_turns: int = DEFAULT_MAX_TURNS):
         self.session_id = session_id
         self.default_max_turns = int(default_max_turns or DEFAULT_MAX_TURNS)
-        self._state: Optional[GoalState] = load_goal(session_id)
+        self._state: GoalState | None = load_goal(session_id)
 
     # --- introspection ------------------------------------------------
 
     @property
-    def state(self) -> Optional[GoalState]:
+    def state(self) -> GoalState | None:
         return self._state
 
     def is_active(self) -> bool:
@@ -1113,7 +1121,7 @@ class GoalManager:
 
     def status_line(self) -> str:
         s = self._state
-        if s is None or s.status in {"cleared",}:
+        if s is None or s.status in {"cleared"}:
             return "No active goal. Set one with /goal <text>."
         turns = f"{s.turns_used}/{s.max_turns} turns"
         sub = f", {len(s.subgoals)} subgoal{'s' if len(s.subgoals) != 1 else ''}" if s.subgoals else ""
@@ -1140,7 +1148,7 @@ class GoalManager:
 
     # --- mutation -----------------------------------------------------
 
-    def set(self, goal: str, *, max_turns: Optional[int] = None, contract: Optional[GoalContract] = None) -> GoalState:
+    def set(self, goal: str, *, max_turns: int | None = None, contract: GoalContract | None = None) -> GoalState:
         goal = (goal or "").strip()
         if not goal:
             raise ValueError("goal text is empty")
@@ -1157,7 +1165,7 @@ class GoalManager:
         save_goal(self.session_id, state)
         return state
 
-    def set_contract(self, contract: GoalContract) -> Optional[GoalState]:
+    def set_contract(self, contract: GoalContract) -> GoalState | None:
         """Attach or replace the completion contract on the active goal.
 
         Returns the updated state, or None when there is no goal to attach to.
@@ -1168,7 +1176,7 @@ class GoalManager:
         save_goal(self.session_id, self._state)
         return self._state
 
-    def pause(self, reason: str = "user-paused") -> Optional[GoalState]:
+    def pause(self, reason: str = "user-paused") -> GoalState | None:
         if not self._state:
             return None
         self._state.status = "paused"
@@ -1182,7 +1190,7 @@ class GoalManager:
         save_goal(self.session_id, self._state)
         return self._state
 
-    def resume(self, *, reset_budget: bool = True) -> Optional[GoalState]:
+    def resume(self, *, reset_budget: bool = True) -> GoalState | None:
         if not self._state:
             return None
         self._state.status = "active"
@@ -1237,7 +1245,7 @@ class GoalManager:
         idx = int(index_1based) - 1
         if idx < 0 or idx >= len(self._state.subgoals):
             raise IndexError(
-                f"index out of range (1..{len(self._state.subgoals)})"
+                f"index out of range (1..{len(self._state.subgoals)})",
             )
         removed = self._state.subgoals.pop(idx)
         save_goal(self.session_id, self._state)
@@ -1331,7 +1339,8 @@ class GoalManager:
 
     def stop_waiting(self) -> bool:
         """Clear any active wait barrier (pid / session / time). Returns True
-        if one was cleared."""
+        if one was cleared.
+        """
         if self._state is None:
             return False
         if (
@@ -1384,8 +1393,8 @@ class GoalManager:
         last_response: str,
         *,
         user_initiated: bool = True,
-        background_processes: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        background_processes: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Run the judge and update state. Return a decision dict.
 
         ``user_initiated`` distinguishes a real user prompt (True) from a
@@ -1554,7 +1563,7 @@ class GoalManager:
             ),
         }
 
-    def next_continuation_prompt(self) -> Optional[str]:
+    def next_continuation_prompt(self) -> str | None:
         if not self._state or self._state.status != "active":
             return None
         # Contract takes priority: it carries the verification surface and
@@ -1627,7 +1636,7 @@ def run_kanban_goal_loop(
     max_turns: int = DEFAULT_MAX_TURNS,
     first_response: str = "",
     log=None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Drive a kanban worker through a Ralph-style goal loop.
 
     The dispatcher spawns a goal-mode worker exactly like a normal worker
@@ -1708,7 +1717,7 @@ def run_kanban_goal_loop(
                 try:
                     block_fn(
                         f"Goal-mode worker's output looked complete but it never "
-                        f"called kanban_complete after a finalize nudge ({reason})."
+                        f"called kanban_complete after a finalize nudge ({reason}).",
                     )
                 except Exception as exc:
                     _log(f"kanban goal loop: block_fn failed ({exc})")
@@ -1725,7 +1734,7 @@ def run_kanban_goal_loop(
                 block_fn(
                     f"Goal-mode worker exhausted its turn budget "
                     f"({turns_used}/{max_turns}) without completing the task. "
-                    f"Last judge verdict: {_truncate(reason, 300)}"
+                    f"Last judge verdict: {_truncate(reason, 300)}",
                 )
             except Exception as exc:
                 _log(f"kanban goal loop: block_fn failed ({exc})")
@@ -1741,25 +1750,25 @@ def run_kanban_goal_loop(
 
 
 __all__ = [
-    "GoalState",
-    "GoalContract",
-    "GoalManager",
-    "parse_contract",
-    "draft_contract",
     "CONTINUATION_PROMPT_TEMPLATE",
-    "CONTINUATION_PROMPT_WITH_SUBGOALS_TEMPLATE",
     "CONTINUATION_PROMPT_WITH_CONTRACT_TEMPLATE",
-    "JUDGE_USER_PROMPT_TEMPLATE",
-    "JUDGE_USER_PROMPT_WITH_SUBGOALS_TEMPLATE",
-    "JUDGE_USER_PROMPT_WITH_CONTRACT_TEMPLATE",
+    "CONTINUATION_PROMPT_WITH_SUBGOALS_TEMPLATE",
+    "DEFAULT_MAX_TURNS",
     "DRAFT_CONTRACT_SYSTEM_PROMPT",
+    "JUDGE_USER_PROMPT_TEMPLATE",
+    "JUDGE_USER_PROMPT_WITH_CONTRACT_TEMPLATE",
+    "JUDGE_USER_PROMPT_WITH_SUBGOALS_TEMPLATE",
     "KANBAN_GOAL_CONTINUATION_TEMPLATE",
     "KANBAN_GOAL_FINALIZE_TEMPLATE",
-    "DEFAULT_MAX_TURNS",
-    "load_goal",
-    "save_goal",
+    "GoalContract",
+    "GoalManager",
+    "GoalState",
     "clear_goal",
-    "migrate_goal_to_session",
+    "draft_contract",
     "judge_goal",
+    "load_goal",
+    "migrate_goal_to_session",
+    "parse_contract",
     "run_kanban_goal_loop",
+    "save_goal",
 ]

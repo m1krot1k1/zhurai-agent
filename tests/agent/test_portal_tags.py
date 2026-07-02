@@ -5,8 +5,8 @@ from __future__ import annotations
 
 def test_hermes_client_tag_includes_current_version():
     """The client tag must reflect hermes_cli.__version__ verbatim."""
-    from hermes_cli import __version__
     from agent.portal_tags import hermes_client_tag
+    from hermes_cli import __version__
 
     assert hermes_client_tag() == f"client=hermes-client-v{__version__}"
 
@@ -47,7 +47,7 @@ def test_auxiliary_client_nous_extra_body_uses_helper():
     from agent.auxiliary_client import NOUS_EXTRA_BODY
     from agent.portal_tags import nous_portal_tags
 
-    assert NOUS_EXTRA_BODY == {"tags": nous_portal_tags()}
+    assert {"tags": nous_portal_tags()} == NOUS_EXTRA_BODY
 
 
 def test_nous_provider_profile_uses_helper():

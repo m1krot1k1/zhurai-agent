@@ -13,10 +13,10 @@ report: latin-1 locale → UnicodeEncodeError before the wizard could start.
 
 import io
 import os
+import pathlib
 import sys
 
 import hermes_cli
-
 
 # The exact glyphs the setup wizard / banners print (setup.py ~line 2962+).
 _BANNER = "┌─────┐\n│ ⚕ Hermes │\n└─────┘"
@@ -81,7 +81,7 @@ def test_latin1_stdout_is_repaired_to_utf8(monkeypatch):
     assert sys.stderr.encoding.lower().replace("-", "") == "utf8"
     # The banner now encodes without raising.
     sys.stdout.write(_BANNER)
-    assert "⚕".encode("utf-8") in sys.stdout.getvalue()
+    assert "⚕".encode() in sys.stdout.getvalue()
 
 
 def test_ascii_posix_locale_is_repaired(monkeypatch):
@@ -96,7 +96,8 @@ def test_ascii_posix_locale_is_repaired(monkeypatch):
 def test_utf8_stream_left_untouched(monkeypatch):
     """Already-UTF-8 streams are a no-op: object identity preserved AND the
     process environment is left untouched (no PYTHONUTF8/PYTHONIOENCODING
-    burned in on a healthy UTF-8 host)."""
+    burned in on a healthy UTF-8 host).
+    """
     out = _FakeStream("utf-8")
     err = _FakeStream("utf-8")
     sentinel_out, sentinel_err = out, err
@@ -130,7 +131,7 @@ def test_repair_does_not_override_explicit_env(monkeypatch):
 def test_fallback_when_reconfigure_unavailable(monkeypatch, tmp_path):
     """Streams without reconfigure() fall back to reopening the fd as UTF-8."""
     real_path = tmp_path / "out.txt"
-    fh = open(real_path, "w", encoding="latin-1")
+    fh = pathlib.Path(real_path).open("w", encoding="latin-1")
 
     class _NoReconfigure:
         """latin-1 stream exposing a real fileno() but no reconfigure()."""
@@ -151,7 +152,7 @@ def test_fallback_when_reconfigure_unavailable(monkeypatch, tmp_path):
     sys.stdout.write(_BANNER)
     sys.stdout.flush()
     fh.close()
-    assert "⚕".encode("utf-8") in real_path.read_bytes()
+    assert "⚕".encode() in real_path.read_bytes()
 
 
 def test_broken_stream_does_not_raise(monkeypatch):
@@ -173,7 +174,7 @@ def test_broken_stream_does_not_raise(monkeypatch):
 
 
 def test_none_streams_do_not_raise(monkeypatch):
-    """pythonw / detached streams (sys.stdout is None) must be tolerated."""
+    """Pythonw / detached streams (sys.stdout is None) must be tolerated."""
     monkeypatch.setattr(sys, "stdout", None, raising=False)
     monkeypatch.setattr(sys, "stderr", None, raising=False)
     hermes_cli._ensure_utf8()

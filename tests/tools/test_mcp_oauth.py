@@ -1,28 +1,27 @@
 """Tests for tools/mcp_oauth.py — OAuth 2.1 PKCE support for MCP servers."""
 
+import asyncio
 import json
 import os
 import stat
 import sys
 from io import BytesIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
-import asyncio
 
 from tools.mcp_oauth import (
     HermesTokenStorage,
     OAuthNonInteractiveError,
+    _can_open_browser,
+    _find_free_port,
+    _is_interactive,
+    _make_callback_handler,
+    _paste_callback_reader,
+    _redirect_handler,
+    _wait_for_callback,
     build_oauth_auth,
     remove_oauth_tokens,
-    _find_free_port,
-    _can_open_browser,
-    _is_interactive,
-    _wait_for_callback,
-    _make_callback_handler,
-    _redirect_handler,
-    _paste_callback_reader,
 )
 
 
@@ -472,8 +471,9 @@ class TestWaitForCallbackNoBlocking:
 
     def test_raises_on_timeout_instead_of_input(self):
         """When no auth code arrives, raises OAuthNonInteractiveError."""
-        import tools.mcp_oauth as mod
         import asyncio
+
+        import tools.mcp_oauth as mod
 
         mod._oauth_port = _find_free_port()
 
@@ -620,7 +620,6 @@ def test_build_oauth_auth_preserves_server_url_path():
     assert captured["server_url"] == "https://mcp.notion.com/mcp"
 
 
-
 class TestPasteCallbackReader:
     """_paste_callback_reader parses redirect URLs / query strings from stdin."""
 
@@ -687,7 +686,7 @@ class TestPasteCallbackReader:
     def test_garbage_input_noop(self, monkeypatch, capsys):
         result = self._empty_result()
         monkeypatch.setattr(
-            "sys.stdin", MagicMock(readline=lambda: "not a url at all\n")
+            "sys.stdin", MagicMock(readline=lambda: "not a url at all\n"),
         )
         _paste_callback_reader(result)
         assert result["auth_code"] is None
@@ -709,6 +708,7 @@ class TestPasteCallbackReader:
     def test_swallows_stdin_errors(self, monkeypatch):
         """OSError / interrupt on readline must not propagate."""
         result = self._empty_result()
+
         def raise_oserror():
             raise OSError("stdin closed")
         monkeypatch.setattr("sys.stdin", MagicMock(readline=raise_oserror))
@@ -725,6 +725,7 @@ class TestWaitForCallbackPasteIntegration:
         monkeypatch.setattr(mod, "_is_interactive", lambda: True)
         # Make stdin readline block forever so HTTP listener path drives the test;
         # we just want to verify the prompt was printed and the thread spawned.
+
         def block_forever():
             import threading
             threading.Event().wait()

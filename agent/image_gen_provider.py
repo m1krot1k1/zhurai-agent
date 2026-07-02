@@ -1,5 +1,4 @@
-"""
-Image Generation Provider ABC
+"""Image Generation Provider ABC
 =============================
 
 Defines the pluggable-backend interface for image generation. Providers register
@@ -47,12 +46,12 @@ import datetime
 import logging
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-VALID_ASPECT_RATIOS: Tuple[str, ...] = ("landscape", "square", "portrait")
+VALID_ASPECT_RATIOS: tuple[str, ...] = ("landscape", "square", "portrait")
 DEFAULT_ASPECT_RATIO = "landscape"
 
 
@@ -89,7 +88,7 @@ class ImageGenProvider(abc.ABC):
         """
         return True
 
-    def list_models(self) -> List[Dict[str, Any]]:
+    def list_models(self) -> list[dict[str, Any]]:
         """Return catalog entries for ``hermes tools`` model picker.
 
         Each entry::
@@ -106,7 +105,7 @@ class ImageGenProvider(abc.ABC):
         """
         return []
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         """Return provider metadata for the ``hermes tools`` picker.
 
         Used by ``tools_config.py`` to inject this provider as a row in
@@ -133,14 +132,14 @@ class ImageGenProvider(abc.ABC):
             "env_vars": [],
         }
 
-    def default_model(self) -> Optional[str]:
+    def default_model(self) -> str | None:
         """Return the default model id, or None if not applicable."""
         models = self.list_models()
         if models:
             return models[0].get("id")
         return None
 
-    def capabilities(self) -> Dict[str, Any]:
+    def capabilities(self) -> dict[str, Any]:
         """Return what this provider supports.
 
         Returned dict (all keys optional)::
@@ -168,10 +167,10 @@ class ImageGenProvider(abc.ABC):
         prompt: str,
         aspect_ratio: str = DEFAULT_ASPECT_RATIO,
         *,
-        image_url: Optional[str] = None,
-        reference_image_urls: Optional[List[str]] = None,
+        image_url: str | None = None,
+        reference_image_urls: list[str] | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate an image from a text prompt, or edit/transform a source image.
 
         Routing: if ``image_url`` (or any ``reference_image_urls``) is
@@ -193,7 +192,7 @@ class ImageGenProvider(abc.ABC):
 # ---------------------------------------------------------------------------
 
 
-def resolve_aspect_ratio(value: Optional[str]) -> str:
+def resolve_aspect_ratio(value: str | None) -> str:
     """Clamp an aspect_ratio value to the valid set, defaulting to landscape.
 
     Invalid values are coerced rather than rejected so the tool surface is
@@ -207,7 +206,7 @@ def resolve_aspect_ratio(value: Optional[str]) -> str:
     return DEFAULT_ASPECT_RATIO
 
 
-def normalize_reference_images(value: Any) -> Optional[List[str]]:
+def normalize_reference_images(value: Any) -> list[str] | None:
     """Coerce a reference-image argument into a clean list of URL/path strings.
 
     Accepts a single string or a list; strips blanks and whitespace. Returns
@@ -220,7 +219,7 @@ def normalize_reference_images(value: Any) -> Optional[List[str]]:
         value = [value]
     if not isinstance(value, (list, tuple)):
         return None
-    out: List[str] = []
+    out: list[str] = []
     for item in value:
         if isinstance(item, str) and item.strip():
             out.append(item.strip())
@@ -324,7 +323,7 @@ def save_url_image(
                 except OSError:
                     pass
                 raise ValueError(
-                    f"Image at {url} exceeds {max_bytes // (1024 * 1024)}MB cap; refusing to cache."
+                    f"Image at {url} exceeds {max_bytes // (1024 * 1024)}MB cap; refusing to cache.",
                 )
             fh.write(chunk)
 
@@ -346,8 +345,8 @@ def success_response(
     aspect_ratio: str,
     provider: str,
     modality: str = "text",
-    extra: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a uniform success response dict.
 
     ``image`` may be an HTTP URL or an absolute filesystem path (for b64
@@ -356,7 +355,7 @@ def success_response(
     actually hit, useful for diagnostics. Callers that need to pass through
     additional backend-specific fields can supply ``extra``.
     """
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "success": True,
         "image": image,
         "model": model,
@@ -379,7 +378,7 @@ def error_response(
     model: str = "",
     prompt: str = "",
     aspect_ratio: str = DEFAULT_ASPECT_RATIO,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a uniform error response dict."""
     return {
         "success": False,

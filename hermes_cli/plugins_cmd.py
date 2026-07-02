@@ -17,17 +17,17 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from hermes_constants import get_hermes_home
 from hermes_cli.config import cfg_get
 from hermes_cli.secret_prompt import masked_secret_prompt
+from hermes_constants import get_hermes_home
 
 logger = logging.getLogger(__name__)
 
 
 @functools.lru_cache(maxsize=1)
-def _resolve_git_executable() -> Optional[str]:
+def _resolve_git_executable() -> str | None:
     """Resolve a git binary for subprocess use when ``PATH`` may be minimal.
 
     Matches other Hermes subprocess resolution: :func:`shutil.which` first,
@@ -51,12 +51,12 @@ def _resolve_git_executable() -> Optional[str]:
                 (
                     os.path.join(local, "Programs", "Git", "cmd", "git.exe"),
                     os.path.join(local, "Programs", "Git", "bin", "git.exe"),
-                )
+                ),
             )
     else:
         candidates = ["/usr/bin/git", "/usr/local/bin/git", "/bin/git"]
     for c in candidates:
-        if c and os.path.isfile(c):
+        if c and Path(c).is_file():
             return c
     return None
 
@@ -108,7 +108,7 @@ def _sanitize_plugin_name(
 
     if name in {".", ".."}:
         raise ValueError(
-            f"Invalid plugin name '{name}': must not reference the plugins directory itself."
+            f"Invalid plugin name '{name}': must not reference the plugins directory itself.",
         )
 
     # Reject obvious traversal characters
@@ -122,14 +122,14 @@ def _sanitize_plugin_name(
 
     if target == plugins_resolved:
         raise ValueError(
-            f"Invalid plugin name '{name}': resolves to the plugins directory itself."
+            f"Invalid plugin name '{name}': resolves to the plugins directory itself.",
         )
 
     try:
         target.relative_to(plugins_resolved)
     except ValueError:
         raise ValueError(
-            f"Invalid plugin name '{name}': resolves outside the plugins directory."
+            f"Invalid plugin name '{name}': resolves outside the plugins directory.",
         )
 
     return target
@@ -149,7 +149,7 @@ _GITHUB_BROWSER_SEGMENTS = {
 }
 
 
-def _resolve_git_url(identifier: str) -> tuple[str, Optional[str]]:
+def _resolve_git_url(identifier: str) -> tuple[str, str | None]:
     """Turn an identifier into a cloneable Git URL and optional subdirectory.
 
     Returns ``(git_url, subdir)`` where ``subdir`` is the path within the
@@ -212,7 +212,7 @@ def _resolve_git_url(identifier: str) -> tuple[str, Optional[str]]:
     raise ValueError(
         f"Invalid plugin identifier: '{identifier}'. "
         "Use a Git URL or 'owner/repo' shorthand (optionally with a subdirectory: "
-        "'owner/repo/path/to/plugin')."
+        "'owner/repo/path/to/plugin').",
     )
 
 
@@ -249,8 +249,7 @@ def _repo_name_from_url(url: str) -> str:
     """Extract the repo name from a Git URL for the plugin directory name."""
     # Strip trailing .git and slashes
     name = url.rstrip("/")
-    if name.endswith(".git"):
-        name = name[:-4]
+    name = name.removesuffix(".git")
     # Get last path component
     name = name.rsplit("/", 1)[-1]
     # Handle ssh-style urls: git@github.com:owner/repo
@@ -267,7 +266,7 @@ def _read_manifest(plugin_dir: Path) -> dict:
     try:
         import yaml
 
-        with open(manifest_file, encoding="utf-8") as f:
+        with Path(manifest_file).open(encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except Exception as e:
         logger.warning("Failed to read plugin.yaml in %s: %s", plugin_dir, e)
@@ -287,11 +286,11 @@ def _copy_example_files(plugin_dir: Path, console) -> None:
             try:
                 shutil.copy2(example_file, real_path)
                 console.print(
-                    f"[dim]  Created {real_name} from {example_file.name}[/dim]"
+                    f"[dim]  Created {real_name} from {example_file.name}[/dim]",
                 )
             except OSError as e:
                 console.print(
-                    f"[yellow]Warning:[/yellow] Failed to copy {example_file.name}: {e}"
+                    f"[yellow]Warning:[/yellow] Failed to copy {example_file.name}: {e}",
                 )
 
 
@@ -337,7 +336,7 @@ def _prompt_plugin_env_vars(manifest: dict, console) -> None:
     if not requires_env:
         return
 
-    from hermes_cli.config import get_env_value, save_env_value  # noqa: F811
+    from hermes_cli.config import get_env_value, save_env_value
     from hermes_constants import display_hermes_home
 
     # Normalise to list-of-dicts
@@ -412,7 +411,7 @@ def _display_after_install(plugin_dir: Path, identifier: str) -> None:
                 border_style="green",
                 title="✓ Installed",
                 expand=False,
-            )
+            ),
         )
         console.print()
 
@@ -434,7 +433,7 @@ def _require_installed_plugin(name: str, plugins_dir: Path, console) -> Path:
         installed = ", ".join(d.name for d in plugins_dir.iterdir() if d.is_dir()) or "(none)"
         console.print(
             f"[red]Error:[/red] Plugin '{name}' not found in {plugins_dir}.\n"
-            f"Installed plugins: {installed}"
+            f"Installed plugins: {installed}",
         )
         sys.exit(1)
     return target
@@ -549,7 +548,7 @@ def _install_plugin_core(identifier: str, *, force: bool) -> tuple[Path, dict, s
 def cmd_install(
     identifier: str,
     force: bool = False,
-    enable: Optional[bool] = None,
+    enable: bool | None = None,
 ) -> None:
     """Install a plugin from a Git URL or owner/repo shorthand.
 
@@ -648,7 +647,7 @@ def cmd_update(name: str) -> None:
     if not (target / ".git").exists():
         console.print(
             f"[red]Error:[/red] Plugin '{name}' was not installed from git "
-            f"(no .git directory). Cannot update."
+            f"(no .git directory). Cannot update.",
         )
         sys.exit(1)
 
@@ -665,7 +664,7 @@ def cmd_update(name: str) -> None:
     out = output.strip()
     if "Already up to date" in out:
         console.print(
-            f"[green]✓[/green] Plugin [bold]{name}[/bold] is already up to date."
+            f"[green]✓[/green] Plugin [bold]{name}[/bold] is already up to date.",
         )
     else:
         console.print(f"[green]✓[/green] Plugin [bold]{name}[/bold] updated.")
@@ -742,7 +741,7 @@ def _save_enabled_set(enabled: set) -> None:
     save_config(config)
 
 
-def _resolve_plugin_key(name: str) -> Optional[str]:
+def _resolve_plugin_key(name: str) -> str | None:
     """Resolve a user-supplied plugin identifier to its canonical registry key.
 
     Accepts either the bare manifest name (``nemo_relay``), the directory
@@ -798,7 +797,7 @@ def cmd_enable(name: str) -> None:
     _save_disabled_set(disabled)
     console.print(
         f"[green]✓[/green] Plugin [bold]{key}[/bold] enabled. "
-        "Takes effect on next session."
+        "Takes effect on next session.",
     )
 
 
@@ -830,7 +829,7 @@ def cmd_disable(name: str) -> None:
     _save_disabled_set(disabled)
     console.print(
         f"[yellow]\u2298[/yellow] Plugin [bold]{key}[/bold] disabled. "
-        "Takes effect on next session."
+        "Takes effect on next session.",
     )
 
 
@@ -858,7 +857,7 @@ def _read_manifest_info(d: Path, prefix: str):
     description = ""
     if yaml:
         try:
-            with open(manifest_file, encoding="utf-8") as f:
+            with Path(manifest_file).open(encoding="utf-8") as f:
                 manifest = yaml.safe_load(f) or {}
             name = manifest.get("name", d.name)
             version = manifest.get("version", "")
@@ -980,7 +979,7 @@ def cmd_list(args: Any | None = None) -> None:
     if getattr(args, "plain", False):
         for name, version, _description, source, _dir, key in entries:
             status = _plugin_status(name, enabled, disabled, key=key)
-            print(f"{status:12} {source:8} {str(version):8} {name}")
+            print(f"{status:12} {source:8} {version!s:8} {name}")
         return
 
     if not entries:
@@ -1300,7 +1299,6 @@ def _run_composite_ui(curses, plugin_names, plugin_labels, plugin_selected,
             # We need to map logical cursor positions to screen rows
             # accounting for non-navigable separator/headers
 
-
             # --- General Plugins section ---
             if n_plugins > 0:
                 # Section header
@@ -1422,33 +1420,32 @@ def _run_composite_ui(curses, plugin_names, plugin_labels, plugin_selected,
                     # ENTER on a plugin checkbox — confirm and exit
                     result_holder["plugins_changed"] = True
                     return
-                else:
-                    # ENTER on a category — same as SPACE, launch sub-screen
-                    ci = cursor - n_plugins
-                    if 0 <= ci < n_categories:
-                        curses.endwin()
-                        _cat_name, _cat_cur, cat_fn = categories[ci]
-                        changed = cat_fn()
-                        if changed:
-                            result_holder["providers_changed"] = True
-                            categories[ci] = (
-                                _cat_name,
-                                _get_current_memory_provider() or "built-in" if ci == 0
-                                else _get_current_context_engine(),
-                                cat_fn,
-                            )
-                        stdscr = curses.initscr()
-                        curses.noecho()
-                        curses.cbreak()
-                        stdscr.keypad(True)
-                        if curses.has_colors():
-                            curses.start_color()
-                            curses.use_default_colors()
-                            curses.init_pair(1, curses.COLOR_GREEN, -1)
-                            curses.init_pair(2, curses.COLOR_YELLOW, -1)
-                            curses.init_pair(3, curses.COLOR_CYAN, -1)
-                            curses.init_pair(4, 8 if curses.COLORS > 8 else curses.COLOR_WHITE, -1)
-                        curses.curs_set(0)
+                # ENTER on a category — same as SPACE, launch sub-screen
+                ci = cursor - n_plugins
+                if 0 <= ci < n_categories:
+                    curses.endwin()
+                    _cat_name, _cat_cur, cat_fn = categories[ci]
+                    changed = cat_fn()
+                    if changed:
+                        result_holder["providers_changed"] = True
+                        categories[ci] = (
+                            _cat_name,
+                            _get_current_memory_provider() or "built-in" if ci == 0
+                            else _get_current_context_engine(),
+                            cat_fn,
+                        )
+                    stdscr = curses.initscr()
+                    curses.noecho()
+                    curses.cbreak()
+                    stdscr.keypad(True)
+                    if curses.has_colors():
+                        curses.start_color()
+                        curses.use_default_colors()
+                        curses.init_pair(1, curses.COLOR_GREEN, -1)
+                        curses.init_pair(2, curses.COLOR_YELLOW, -1)
+                        curses.init_pair(3, curses.COLOR_CYAN, -1)
+                        curses.init_pair(4, 8 if curses.COLORS > 8 else curses.COLOR_WHITE, -1)
+                    curses.curs_set(0)
             elif key in {27, ord("q")}:
                 # Save plugin changes on exit
                 result_holder["plugins_changed"] = True
@@ -1479,7 +1476,7 @@ def _run_composite_ui(curses, plugin_names, plugin_labels, plugin_selected,
         _save_disabled_set(new_disabled)
         console.print(
             f"\n[green]\u2713[/green] General plugins: {len(new_enabled)} enabled, "
-            f"{len(plugin_names) - len(new_enabled)} disabled."
+            f"{len(plugin_names) - len(new_enabled)} disabled.",
         )
     elif n_plugins > 0:
         console.print("\n[dim]General plugins unchanged.[/dim]")
@@ -1489,7 +1486,7 @@ def _run_composite_ui(curses, plugin_names, plugin_labels, plugin_selected,
         new_context = _get_current_context_engine()
         console.print(
             f"[green]\u2713[/green] Memory provider: [bold]{new_memory}[/bold]  "
-            f"Context engine: [bold]{new_context}[/bold]"
+            f"Context engine: [bold]{new_context}[/bold]",
         )
 
     if n_plugins > 0 or result_holder["providers_changed"]:
@@ -1606,7 +1603,7 @@ def dashboard_install_plugin(
     }
 
 
-def _get_plugin_toolset_key(name: str) -> Optional[str]:
+def _get_plugin_toolset_key(name: str) -> str | None:
     """Return the toolset key a plugin registers its tools under, or None.
 
     Queries the live tool registry — the plugin must already be loaded.
@@ -1723,7 +1720,7 @@ def dashboard_set_agent_plugin_enabled(name: str, *, enabled: bool) -> dict[str,
     return {"ok": True, "name": name, "unchanged": False}
 
 
-def _user_installed_plugin_dir(name: str) -> Optional[Path]:
+def _user_installed_plugin_dir(name: str) -> Path | None:
     """Resolved path under ``~/.hermes/plugins/<name>`` if it exists."""
     plugins_dir = _plugins_dir()
     try:

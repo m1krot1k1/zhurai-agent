@@ -7,19 +7,20 @@ import subprocess
 import sys
 import threading
 import time
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from tools.environments.local import _HERMES_PROVIDER_ENV_FORCE_PREFIX
 from tools.process_registry import (
-    ProcessRegistry,
-    ProcessSession,
     FINISHED_TTL_SECONDS,
     MAX_PROCESSES,
+    ProcessRegistry,
+    ProcessSession,
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry():
     """Create a fresh ProcessRegistry."""
     return ProcessRegistry()
@@ -65,7 +66,7 @@ def _wait_until(predicate, timeout: float = 5.0, interval: float = 0.05) -> bool
 
 
 def test_write_stdin_uses_str_for_windows_pty(monkeypatch, registry):
-    """pywinpty expects str input; bytes raises a PyString conversion error."""
+    """Pywinpty expects str input; bytes raises a PyString conversion error."""
     written = []
 
     class _FakePty:
@@ -952,8 +953,10 @@ class TestKillProcess:
         class FakeProcess:
             def __init__(self, pid):
                 self.pid = pid
+
             def children(self, recursive=False):
                 return []
+
             def terminate(self):
                 terminate_calls.append(("terminate", self.pid))
 
@@ -1013,7 +1016,7 @@ from tools.process_registry import (
 
 def test_is_async_delegation_notification_text():
     assert is_async_delegation_notification_text(
-        "[ASYNC DELEGATION BATCH COMPLETE — deleg_abc]\nDetails"
+        "[ASYNC DELEGATION BATCH COMPLETE — deleg_abc]\nDetails",
     )
     assert not is_async_delegation_notification_text("[IMPORTANT: Background process x]")
 
@@ -1044,17 +1047,6 @@ def test_async_delegation_skips_parent_turn_for_orchestrator_handoff():
             "ORCHESTRATOR_MUST: decompose into parallel branches"
         ),
         "goal": "Coordinate user request",
-    }
-    assert async_delegation_skips_parent_turn(evt) is True
-
-
-def test_async_delegation_skips_parent_turn_for_batch_fanout():
-    evt = {
-        "type": "async_delegation",
-        "context": "ORIGINAL_REQUEST: analyze repo",
-        "goal": "Parallel specialists",
-        "is_batch": True,
-        "results": [{"task_index": 0, "status": "completed", "summary": "done"}],
     }
     assert async_delegation_skips_parent_turn(evt) is True
 
@@ -1278,7 +1270,8 @@ class TestTerminateHostPidWindows:
 
     def test_windows_falls_back_to_os_kill_when_taskkill_missing(self, monkeypatch):
         """If ``taskkill.exe`` is somehow unavailable, fall back to a bare
-        ``os.kill(pid, SIGTERM)`` so we at least try to kill the parent."""
+        ``os.kill(pid, SIGTERM)`` so we at least try to kill the parent.
+        """
         from tools import process_registry as pr
 
         kill_calls = []
@@ -1299,9 +1292,11 @@ class TestTerminateHostPidWindows:
 
     def test_windows_does_not_call_psutil(self, monkeypatch):
         """The Windows branch must NOT exercise the psutil tree-walk
-        (it's unreliable on Windows — see the function docstring)."""
-        from tools import process_registry as pr
+        (it's unreliable on Windows — see the function docstring).
+        """
         import psutil
+
+        from tools import process_registry as pr
 
         psutil_calls = []
 
@@ -1334,8 +1329,9 @@ class TestTerminateHostPidPosix:
     """POSIX branch walks the tree via psutil and SIGTERMs children first."""
 
     def test_posix_walks_tree_and_terminates_children_then_parent(self, monkeypatch):
-        from tools import process_registry as pr
         import psutil
+
+        from tools import process_registry as pr
 
         terminate_order = []
 
@@ -1372,8 +1368,9 @@ class TestTerminateHostPidPosix:
         )
 
     def test_posix_no_such_process_swallowed(self, monkeypatch):
-        from tools import process_registry as pr
         import psutil
+
+        from tools import process_registry as pr
 
         def boom(pid):
             raise psutil.NoSuchProcess(pid)
@@ -1385,8 +1382,9 @@ class TestTerminateHostPidPosix:
         pr.ProcessRegistry._terminate_host_pid(999999999)
 
     def test_posix_oserror_falls_back_to_os_kill(self, monkeypatch):
-        from tools import process_registry as pr
         import psutil
+
+        from tools import process_registry as pr
 
         def boom(pid):
             raise PermissionError("can't read /proc")

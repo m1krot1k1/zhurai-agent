@@ -29,7 +29,7 @@ def test_headroom_bootstrap_reports_missing_binary_when_auto_install_off(monkeyp
                 "enabled": True,
                 "dashboard_url": "http://127.0.0.1:8787",
                 "auto_install": False,
-            }
+            },
         },
     )
     monkeypatch.setattr(hb, "_is_healthy", lambda *_args, **_kwargs: False)
@@ -153,7 +153,7 @@ def test_routed_headroom_base_url_routes_chat_modes(monkeypatch):
                 "enabled": True,
                 "route_model_requests": True,
                 "dashboard_url": "http://127.0.0.1:8787",
-            }
+            },
         },
     )
     routed = hb.routed_headroom_base_url(
@@ -173,7 +173,7 @@ def test_routed_headroom_base_url_routes_anthropic_mode(monkeypatch):
                 "enabled": True,
                 "route_model_requests": True,
                 "dashboard_url": "http://127.0.0.1:8787",
-            }
+            },
         },
     )
     routed = hb.routed_headroom_base_url(
@@ -193,7 +193,7 @@ def test_routed_headroom_base_url_routes_custom_provider(monkeypatch):
                 "enabled": True,
                 "route_model_requests": True,
                 "dashboard_url": "http://127.0.0.1:8787",
-            }
+            },
         },
     )
     original = "http://localhost:11434/v1"
@@ -214,7 +214,7 @@ def test_routed_headroom_base_url_skips_bedrock_runtime(monkeypatch):
                 "enabled": True,
                 "route_model_requests": True,
                 "dashboard_url": "http://127.0.0.1:8787",
-            }
+            },
         },
     )
     original = "https://bedrock-runtime.us-east-1.amazonaws.com"
@@ -235,7 +235,7 @@ def test_routed_headroom_base_url_skips_codex_app_server(monkeypatch):
                 "enabled": True,
                 "route_model_requests": True,
                 "dashboard_url": "http://127.0.0.1:8787",
-            }
+            },
         },
     )
     original = "acp://copilot"

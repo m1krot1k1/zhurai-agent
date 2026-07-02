@@ -94,7 +94,7 @@ def _sanitize_single_tool(tool: dict) -> dict:
     # endpoint at chatgpt.com/backend-api/codex) reject outright. Nested
     # combinators inside properties are preserved.
     fn["parameters"] = _strip_top_level_combinators(
-        fn["parameters"], path=fn.get("name", "<tool>")
+        fn["parameters"], path=fn.get("name", "<tool>"),
     )
     fn["parameters"] = _strip_ref_siblings(fn["parameters"])
     return out
@@ -193,6 +193,7 @@ def strip_nullable_unions(
     Returns:
         The schema with nullable unions collapsed. Non-union nodes are
         returned unchanged.
+
     """
     if isinstance(schema, list):
         return [strip_nullable_unions(item, keep_nullable_hint=keep_nullable_hint) for item in schema]
@@ -368,6 +369,7 @@ def strip_pattern_and_format(tools: list[dict]) -> tuple[list[dict], int]:
     Returns:
         ``(tools, stripped_count)`` — the same list reference plus a count of
         how many ``pattern``/``format`` keywords were removed across all tools.
+
     """
     if not tools:
         return tools, 0
@@ -395,7 +397,7 @@ def strip_pattern_and_format(tools: list[dict]) -> tuple[list[dict], int]:
     for tool in tools:
         if not isinstance(tool, dict):
             continue
-        
+
         # OpenAI-format: {"function": {"parameters": {...}}}
         fn = tool.get("function")
         if isinstance(fn, dict):
@@ -403,7 +405,7 @@ def strip_pattern_and_format(tools: list[dict]) -> tuple[list[dict], int]:
             if isinstance(params, dict):
                 _walk(params)
                 continue
-        
+
         # Responses-format: {"name": "...", "parameters": {...}}
         # (used by codex_responses API mode — xAI, OpenAI Codex, etc.)
         params = tool.get("parameters")
@@ -440,6 +442,7 @@ def strip_slash_enum(tools: list[dict]) -> tuple[list[dict], int]:
     Returns:
         ``(tools, stripped_count)`` — same list reference plus a count of
         how many ``enum`` keywords were removed.
+
     """
     if not tools:
         return tools, 0

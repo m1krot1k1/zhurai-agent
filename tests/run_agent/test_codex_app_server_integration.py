@@ -23,7 +23,8 @@ from agent.transports.codex_app_server_session import CodexAppServerSession, Tur
 @pytest.fixture
 def fake_session(monkeypatch):
     """Replace CodexAppServerSession with a stub that returns a fixed
-    TurnResult, so we can drive AIAgent without spawning real codex."""
+    TurnResult, so we can drive AIAgent without spawning real codex.
+    """
 
     def fake_run_turn(self, user_input: str, **kwargs):
         return TurnResult(
@@ -45,14 +46,15 @@ def fake_session(monkeypatch):
 
     monkeypatch.setattr(CodexAppServerSession, "run_turn", fake_run_turn)
     monkeypatch.setattr(
-        CodexAppServerSession, "ensure_started", lambda self: "thread-stub-1"
+        CodexAppServerSession, "ensure_started", lambda self: "thread-stub-1",
     )
 
 
 def _make_codex_agent():
     """Construct an AIAgent in codex_app_server mode without contacting any
     real provider. We pass api_mode explicitly so the constructor takes the
-    fast path for direct credentials."""
+    fast path for direct credentials.
+    """
     return run_agent.AIAgent(
         api_key="stub",
         base_url="https://stub.invalid",
@@ -103,7 +105,7 @@ class TestRunConversationCodexPath:
 
         monkeypatch.setattr(CodexAppServerSession, "run_turn", fake_run_turn)
         monkeypatch.setattr(
-            CodexAppServerSession, "ensure_started", lambda self: "thread-usage-1"
+            CodexAppServerSession, "ensure_started", lambda self: "thread-usage-1",
         )
         agent = _make_codex_agent()
         with patch.object(agent, "_spawn_background_review", return_value=None):
@@ -163,7 +165,8 @@ class TestRunConversationCodexPath:
         """The skill nudge counter must accumulate tool_iterations across
         turns. The memory nudge counter is gated on memory being configured
         (which we skip via skip_memory=True), so we don't assert on it here —
-        a separate test below covers that path explicitly."""
+        a separate test below covers that path explicitly.
+        """
         agent = _make_codex_agent()
         agent._iters_since_skill = 0
         agent._user_turn_count = 0
@@ -181,7 +184,8 @@ class TestRunConversationCodexPath:
     def test_user_message_not_duplicated(self, fake_session):
         """Regression guard: the user message must appear exactly once in
         the messages list. The standard run_conversation pre-loop appends
-        it, and the codex helper must NOT append again."""
+        it, and the codex helper must NOT append again.
+        """
         agent = _make_codex_agent()
         with patch.object(agent, "_spawn_background_review", return_value=None):
             result = agent.run_conversation("ping unique 12345")
@@ -193,7 +197,8 @@ class TestRunConversationCodexPath:
 
     def test_background_review_NOT_invoked_below_threshold(self, fake_session):
         """A single turn shouldn't trigger background review — counters
-        haven't reached the nudge interval (default 10)."""
+        haven't reached the nudge interval (default 10).
+        """
         agent = _make_codex_agent()
         agent._memory_nudge_interval = 10
         agent._skill_nudge_interval = 10
@@ -207,16 +212,19 @@ class TestRunConversationCodexPath:
         assert not spawn.called
 
     def test_background_review_skill_trigger_fires_above_threshold(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         """When tool iterations cross the skill nudge interval, the
         background review fires with review_skills=True and the right
-        messages_snapshot signature."""
+        messages_snapshot signature.
+        """
         from agent.transports.codex_app_server_session import (
-            CodexAppServerSession, TurnResult,
+            CodexAppServerSession,
+            TurnResult,
         )
         # Make the fake session report 10 tool iterations in one turn
         # (matching the default skill threshold).
+
         def fake_run_turn(self, user_input: str, **kwargs):
             return TurnResult(
                 final_text=f"echo: {user_input}",
@@ -228,7 +236,7 @@ class TestRunConversationCodexPath:
             )
         monkeypatch.setattr(CodexAppServerSession, "run_turn", fake_run_turn)
         monkeypatch.setattr(
-            CodexAppServerSession, "ensure_started", lambda self: "th1"
+            CodexAppServerSession, "ensure_started", lambda self: "th1",
         )
 
         agent = _make_codex_agent()
@@ -258,7 +266,8 @@ class TestRunConversationCodexPath:
         _spawn_background_review with the wrong signature. Run a turn,
         then run another turn after manually tripping the skill counter
         and confirm the call shape is the kwargs-only form the function
-        actually accepts."""
+        actually accepts.
+        """
         agent = _make_codex_agent()
         agent._skill_nudge_interval = 1  # very low so any iter trips it
         agent._iters_since_skill = 0
@@ -283,12 +292,13 @@ class TestRunConversationCodexPath:
 
     def test_chat_completions_loop_is_not_entered(self, fake_session):
         """The early-return must bypass the regular API call loop entirely.
-        We confirm by patching the SDK call and asserting it's never invoked."""
+        We confirm by patching the SDK call and asserting it's never invoked.
+        """
         agent = _make_codex_agent()
         # The chat_completions loop calls self.client.chat.completions.create(...)
         # If our early-return works, that path is dead.
         with patch.object(agent, "client") as client_mock, patch.object(
-            agent, "_spawn_background_review", return_value=None
+            agent, "_spawn_background_review", return_value=None,
         ):
             agent.run_conversation("hi")
         assert not client_mock.chat.completions.create.called
@@ -296,9 +306,11 @@ class TestRunConversationCodexPath:
     def test_gateway_terminal_cwd_seeds_codex_thread_cwd(self, monkeypatch, tmp_path):
         """Gateway sessions set TERMINAL_CWD without stamping agent.session_cwd.
         Codex app-server must still start in that configured workspace instead
-        of falling back to the Hermes daemon process cwd."""
+        of falling back to the Hermes daemon process cwd.
+        """
         from agent.transports.codex_app_server_session import (
-            CodexAppServerSession, TurnResult,
+            CodexAppServerSession,
+            TurnResult,
         )
 
         captured: dict[str, str] = {}
@@ -331,13 +343,16 @@ class TestReviewForkApiModeDowngrade:
     """When the parent agent runs on codex_app_server, the background
     review fork must downgrade to codex_responses — otherwise the fork
     can't dispatch agent-loop tools (memory, skill_manage) which is the
-    whole point of the review."""
+    whole point of the review.
+    """
 
     def test_codex_app_server_parent_downgrades_review_fork(self):
         """Live test against the real _spawn_background_review code path:
         verify the review_agent gets api_mode=codex_responses when the
-        parent is codex_app_server."""
-        from unittest.mock import MagicMock, patch as _patch
+        parent is codex_app_server.
+        """
+        from unittest.mock import MagicMock
+        from unittest.mock import patch as _patch
         agent = _make_codex_agent()
         # Pretend memory + skills are configured so the review fork
         # reaches the AIAgent constructor.
@@ -440,7 +455,8 @@ class TestErrorHandling:
 
 class TestSessionRetirementOnRunAgent:
     """run_agent.py side: when run_turn returns should_retire=True, the
-    AIAgent must close + null _codex_session so the next turn respawns."""
+    AIAgent must close + null _codex_session so the next turn respawns.
+    """
 
     def test_should_retire_drops_session(self, monkeypatch):
         closes = {"count": 0}
@@ -478,7 +494,8 @@ class TestSessionRetirementOnRunAgent:
 
     def test_normal_turn_keeps_session(self, fake_session):
         """fake_session fixture returns should_retire=False (default).
-        The session must stay attached for the next turn to reuse."""
+        The session must stay attached for the next turn to reuse.
+        """
         agent = _make_codex_agent()
         with patch.object(agent, "_spawn_background_review", return_value=None):
             agent.run_conversation("hi")
@@ -488,7 +505,8 @@ class TestSessionRetirementOnRunAgent:
     def test_exception_path_also_drops_session(self, monkeypatch):
         """Even if run_turn raises (not just sets should_retire), we must
         drop the session — a thrown exception is the strongest possible
-        signal the process is dead."""
+        signal the process is dead.
+        """
         closes = {"count": 0}
 
         def boom_run_turn(self, user_input, **kwargs):
@@ -514,7 +532,8 @@ class TestSessionRetirementOnRunAgent:
 
 class TestCodexToolProgressBridge:
     """#38835: Codex app-server item/started notifications must surface as
-    Hermes tool-progress so gateways show verbose breadcrumbs on this route."""
+    Hermes tool-progress so gateways show verbose breadcrumbs on this route.
+    """
 
     def test_mapper_command_execution(self):
         from agent.codex_runtime import _codex_note_to_tool_progress
@@ -558,7 +577,8 @@ class TestCodexToolProgressBridge:
 
     def test_session_wired_with_on_event_that_fires_tool_progress(self, monkeypatch):
         """The session is constructed with an on_event hook that, when fed an
-        item/started note, calls the agent's tool_progress_callback."""
+        item/started note, calls the agent's tool_progress_callback.
+        """
         captured_init = {}
         events = []
 
@@ -588,4 +608,3 @@ class TestCodexToolProgressBridge:
 
         assert "on_event" in captured_init and captured_init["on_event"] is not None
         assert ("tool.started", "exec_command", "pytest") in events
-

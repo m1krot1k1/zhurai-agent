@@ -21,9 +21,7 @@ right before the force-close. The worker's exception handler checks it and
 exits cleanly (no retry, no fallback, no "reconnecting" status) instead of
 treating the forced error as transient.
 """
-import threading
 import time
-import types
 from unittest.mock import MagicMock
 
 import httpx
@@ -50,7 +48,8 @@ def _make_agent():
 
 def test_non_streaming_cancel_does_not_surface_network_error():
     """A force-close during a non-streaming call must raise InterruptedError,
-    not the swallowed transport error."""
+    not the swallowed transport error.
+    """
     agent = _make_agent()
 
     create_calls = {"n": 0}
@@ -81,11 +80,12 @@ def test_non_streaming_cancel_does_not_surface_network_error():
 
 def test_normal_transient_error_still_raises_when_not_cancelled():
     """Regression guard: a real transport error with NO interrupt must still
-    surface to the caller (so the outer retry loop can recover)."""
+    surface to the caller (so the outer retry loop can recover).
+    """
     agent = _make_agent()
     fake_client = MagicMock()
     fake_client.chat.completions.create.side_effect = httpx.RemoteProtocolError(
-        "genuine network drop"
+        "genuine network drop",
     )
     agent._create_request_openai_client.return_value = fake_client
     agent._close_request_openai_client = MagicMock()
@@ -102,7 +102,8 @@ def test_request_cancelled_token_is_request_local():
     interrupt flag flip back to False and mistake its own forced error for a
     network bug. We assert the helper reads agent._interrupt_requested at the
     force-close site (request-local token set there), by confirming two
-    independent calls don't share cancellation state."""
+    independent calls don't share cancellation state.
+    """
     agent = _make_agent()
 
     # First call: interrupted.
@@ -126,7 +127,7 @@ def test_request_cancelled_token_is_request_local():
     agent._interrupt_requested = False
     fake_client_2 = MagicMock()
     fake_client_2.chat.completions.create.side_effect = httpx.RemoteProtocolError(
-        "genuine drop turn B"
+        "genuine drop turn B",
     )
     agent._create_request_openai_client.return_value = fake_client_2
 

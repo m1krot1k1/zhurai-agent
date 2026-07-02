@@ -1,16 +1,17 @@
 """Tests for OSV malware check on MCP extension packages."""
 
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from tools.osv_check import (
-    check_package_for_malware,
     _infer_ecosystem,
-    _parse_package_from_args,
     _parse_npm_package,
+    _parse_package_from_args,
     _parse_pypi_package,
     _query_osv,
+    check_package_for_malware,
 )
 
 
@@ -41,7 +42,7 @@ class TestParseNpmPackage:
 
     def test_scoped(self):
         assert _parse_npm_package("@modelcontextprotocol/server-filesystem") == (
-            "@modelcontextprotocol/server-filesystem", None
+            "@modelcontextprotocol/server-filesystem", None,
         )
 
     def test_scoped_with_version(self):
@@ -87,7 +88,7 @@ class TestParsePackageFromArgs:
         # `npx --package=@scope/pkg@1.0 some-bin` -> install target is the
         # --package value, NOT the executed binary `some-bin`.
         name, ver = _parse_package_from_args(
-            ["--package=@scope/pkg@1.0", "some-bin"], "npm"
+            ["--package=@scope/pkg@1.0", "some-bin"], "npm",
         )
         assert name == "@scope/pkg"
         assert ver == "1.0"
@@ -95,7 +96,7 @@ class TestParsePackageFromArgs:
     def test_package_space_form(self):
         # `npx --package @scope/pkg some-bin` (value in the next token).
         name, ver = _parse_package_from_args(
-            ["--package", "@scope/pkg@2.0", "some-bin"], "npm"
+            ["--package", "@scope/pkg@2.0", "some-bin"], "npm",
         )
         assert name == "@scope/pkg"
         assert ver == "2.0"
@@ -103,7 +104,7 @@ class TestParsePackageFromArgs:
     def test_short_p_form(self):
         # `npx -p left-pad@1.3.0 cli-cmd` -> package is left-pad, not cli-cmd.
         name, ver = _parse_package_from_args(
-            ["-p", "left-pad@1.3.0", "cli-cmd"], "npm"
+            ["-p", "left-pad@1.3.0", "cli-cmd"], "npm",
         )
         assert name == "left-pad"
         assert ver == "1.3.0"
@@ -134,7 +135,7 @@ class TestCheckPackageForMalware:
             "vulns": [
                 {"id": "MAL-2023-7938", "summary": "Malicious code in evil-pkg"},
                 {"id": "CVE-2023-1234", "summary": "Regular vulnerability"},  # should be filtered
-            ]
+            ],
         }).encode()
         mock_response.__enter__ = lambda s: s
         mock_response.__exit__ = MagicMock(return_value=False)
@@ -158,7 +159,7 @@ class TestCheckPackageForMalware:
         assert result is None
 
     def test_uvx_pypi(self):
-        """uvx commands check PyPI ecosystem."""
+        """Uvx commands check PyPI ecosystem."""
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({"vulns": []}).encode()
         mock_response.__enter__ = lambda s: s
@@ -193,7 +194,7 @@ class TestLiveOsvQuery:
         reason="network required",
     )
     def test_clean_package(self):
-        """react should have zero MAL- advisories."""
+        """React should have zero MAL- advisories."""
         try:
             result = _query_osv("react", "npm")
             assert len(result) == 0

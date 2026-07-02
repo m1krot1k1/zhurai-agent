@@ -1,5 +1,4 @@
-"""
-Hermes Desktop (Chat GUI) uninstaller.
+"""Hermes Desktop (Chat GUI) uninstaller.
 
 The desktop GUI ships in two shapes and this module knows how to find and
 remove the artifacts of both, on Linux, macOS, and Windows, WITHOUT touching
@@ -40,9 +39,8 @@ import shutil
 import sys
 from pathlib import Path
 
-from hermes_constants import get_hermes_home
-
 from hermes_cli.colors import Colors, color
+from hermes_constants import get_hermes_home
 
 
 def log_info(msg: str):
@@ -279,7 +277,7 @@ def uninstall_gui(hermes_home: "Path | None" = None, *, remove_userdata: bool = 
             "If you installed the desktop via a .deb / .rpm package, remove it "
             "with your package manager (e.g. 'sudo apt remove hermes' or "
             "'sudo dnf remove hermes'). AppImage builds are a single file you "
-            "can delete from wherever you saved it."
+            "can delete from wherever you saved it.",
         )
 
     return removed

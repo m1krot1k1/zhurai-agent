@@ -1,5 +1,4 @@
-"""
-Session mirroring for cross-platform message delivery.
+"""Session mirroring for cross-platform message delivery.
 
 When a message is sent to a platform (via send_message or cron delivery),
 this module appends a "delivery-mirror" record to the target session's
@@ -11,8 +10,8 @@ the full SessionStore machinery.
 
 import json
 import logging
+import pathlib
 from datetime import datetime
-from typing import Optional
 
 from hermes_cli.config import get_hermes_home
 
@@ -27,11 +26,10 @@ def mirror_to_session(
     chat_id: str,
     message_text: str,
     source_label: str = "cli",
-    thread_id: Optional[str] = None,
-    user_id: Optional[str] = None,
+    thread_id: str | None = None,
+    user_id: str | None = None,
 ) -> bool:
-    """
-    Append a delivery-mirror message to the target session's transcript.
+    """Append a delivery-mirror message to the target session's transcript.
 
     Finds the gateway session that matches the given platform + chat_id,
     then writes a mirror entry to both the JSONL transcript and SQLite DB.
@@ -84,11 +82,10 @@ def mirror_to_session(
 def _find_session_id(
     platform: str,
     chat_id: str,
-    thread_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-) -> Optional[str]:
-    """
-    Find the active session_id for a platform + chat_id pair.
+    thread_id: str | None = None,
+    user_id: str | None = None,
+) -> str | None:
+    """Find the active session_id for a platform + chat_id pair.
 
     Scans sessions.json entries and matches where origin.chat_id == chat_id
     on the right platform.  DM session keys don't embed the chat_id
@@ -102,7 +99,7 @@ def _find_session_id(
         return None
 
     try:
-        with open(_SESSIONS_INDEX, encoding="utf-8") as f:
+        with pathlib.Path(_SESSIONS_INDEX).open(encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
         return None
@@ -147,7 +144,6 @@ def _find_session_id(
 
     best_entry = max(candidates, key=lambda entry: entry.get("updated_at", ""))
     return best_entry.get("session_id")
-
 
 
 def _append_to_sqlite(session_id: str, message: dict) -> None:

@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 from hermes_cli import setup as setup_mod
 
-
 # ---------------------------------------------------------------------------
 # _offer_openclaw_migration — unit tests
 # ---------------------------------------------------------------------------
@@ -91,7 +90,7 @@ class TestOfferOpenclawMigration:
 
         assert result is True
         fake_mod.resolve_selected_options.assert_called_once_with(
-            None, None, preset="full"
+            None, None, preset="full",
         )
         # Migrator called twice: once for dry-run preview, once for execution
         assert fake_mod.Migrator.call_count == 2
@@ -252,7 +251,7 @@ class TestSetupWizardOpenclawIntegration:
             patch.object(setup_mod, "prompt_choice", return_value=1),
             # Mock the migration offer
             patch.object(
-                setup_mod, "_offer_openclaw_migration", return_value=False
+                setup_mod, "_offer_openclaw_migration", return_value=False,
             ) as mock_migration,
             # Mock the actual setup sections so they don't run
             patch.object(setup_mod, "setup_model_provider"),
@@ -347,7 +346,7 @@ class TestSetupWizardOpenclawIntegration:
             # Returning user picks "Exit"
             patch.object(setup_mod, "prompt_choice", return_value=9),
             patch.object(
-                setup_mod, "_offer_openclaw_migration", return_value=False
+                setup_mod, "_offer_openclaw_migration", return_value=False,
             ) as mock_migration,
         ):
             setup_mod.run_setup_wizard(args)
@@ -374,7 +373,7 @@ class TestGetSectionConfigSummary:
 
         with patch.object(setup_mod, "get_env_value", side_effect=env_side):
             result = setup_mod._get_section_config_summary(
-                {"model": "openai/gpt-4"}, "model"
+                {"model": "openai/gpt-4"}, "model",
             )
         assert result == "openai/gpt-4"
 
@@ -392,14 +391,14 @@ class TestGetSectionConfigSummary:
     def test_terminal_always_returns(self):
         with patch.object(setup_mod, "get_env_value", return_value=""):
             result = setup_mod._get_section_config_summary(
-                {"terminal": {"backend": "docker"}}, "terminal"
+                {"terminal": {"backend": "docker"}}, "terminal",
             )
         assert result == "backend: docker"
 
     def test_agent_always_returns(self):
         with patch.object(setup_mod, "get_env_value", return_value=""):
             result = setup_mod._get_section_config_summary(
-                {"agent": {"max_turns": 120}}, "agent"
+                {"agent": {"max_turns": 120}}, "agent",
             )
         assert result == "max turns: 120"
 
@@ -459,7 +458,7 @@ class TestGetSectionConfigSummary:
 
         with patch.object(setup_mod, "get_env_value", side_effect=env_side):
             result = setup_mod._get_section_config_summary(
-                {"model": {"provider": "zai", "default": "glm-5"}}, "model"
+                {"model": {"provider": "zai", "default": "glm-5"}}, "model",
             )
         assert result == "glm-5"
 
@@ -502,7 +501,8 @@ class TestGetSectionConfigSummary:
     def test_model_ignores_bare_gh_token(self):
         """GH_TOKEN is commonly set for `gh` / git and must NOT count as a
         configured inference provider on its own — mirrors the copilot
-        exclusion in resolve_provider()."""
+        exclusion in resolve_provider().
+        """
         def env_side(key):
             return "gho_xxx" if key == "GH_TOKEN" else ""
 
@@ -522,7 +522,8 @@ class TestGetSectionConfigSummary:
     def test_model_ignores_claude_code_oauth_token(self):
         """CLAUDE_CODE_OAUTH_TOKEN is set by Claude Code itself and must not
         trigger skip — mirrors the _IMPLICIT_ENV_VARS guard in
-        is_provider_explicitly_configured()."""
+        is_provider_explicitly_configured().
+        """
         def env_side(key):
             return "sk-ant-oat01-xxx" if key == "CLAUDE_CODE_OAUTH_TOKEN" else ""
 
@@ -532,7 +533,8 @@ class TestGetSectionConfigSummary:
 
     def test_model_copilot_recognised_when_explicitly_chosen(self):
         """If the user picked copilot in config, GH_TOKEN *does* count —
-        only the auto-detect path excludes it."""
+        only the auto-detect path excludes it.
+        """
         def env_side(key):
             return "gho_xxx" if key == "GH_TOKEN" else ""
 
@@ -544,7 +546,8 @@ class TestGetSectionConfigSummary:
     def test_gateway_matches_platform_registry(self):
         """Every built-in platform should be recognised by its primary
         env-var sentinel — i.e. the summary must not drift from the
-        registry used by the setup checklist."""
+        registry used by the setup checklist.
+        """
         from hermes_cli.gateway import _PLATFORMS
 
         for plat in _PLATFORMS:
@@ -555,6 +558,7 @@ class TestGetSectionConfigSummary:
             # Some platforms require a specific value shape (e.g. WhatsApp
             # needs the literal "true"). Use a sentinel that satisfies every
             # real validator _platform_status() currently checks.
+
             def env_side(key, _target=env_var):
                 if key != _target:
                     return ""
@@ -589,7 +593,7 @@ class TestSkipConfiguredSection:
             patch.object(setup_mod, "prompt_yes_no", return_value=False),
         ):
             result = setup_mod._skip_configured_section(
-                {"model": "openai/gpt-4"}, "model", "Model"
+                {"model": "openai/gpt-4"}, "model", "Model",
             )
         assert result is True
 
@@ -602,7 +606,7 @@ class TestSkipConfiguredSection:
             patch.object(setup_mod, "prompt_yes_no", return_value=True),
         ):
             result = setup_mod._skip_configured_section(
-                {"model": "openai/gpt-4"}, "model", "Model"
+                {"model": "openai/gpt-4"}, "model", "Model",
             )
         assert result is False
 

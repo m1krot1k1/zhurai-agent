@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-check_deps.py — Verify a ComfyUI workflow's dependencies (custom nodes, models,
+"""check_deps.py — Verify a ComfyUI workflow's dependencies (custom nodes, models,
 embeddings) against a running server.
 
 Improvements over v1:
@@ -30,13 +29,21 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DEFAULT_LOCAL_HOST, ENV_API_KEY,
-    emit_json, folder_aliases_for, http_get, is_cloud_host,
-    iter_embedding_refs, iter_model_deps, iter_nodes, parse_model_list,
-    resolve_api_key, resolve_url, unwrap_workflow,
+from _common import (
+    DEFAULT_LOCAL_HOST,
+    ENV_API_KEY,
+    emit_json,
+    folder_aliases_for,
+    http_get,
+    is_cloud_host,
+    iter_embedding_refs,
+    iter_model_deps,
+    iter_nodes,
+    parse_model_list,
+    resolve_api_key,
+    resolve_url,
+    unwrap_workflow,
 )
-
 
 # Known node → custom-node-package map. When a workflow needs a node we don't
 # recognize, suggesting the right `comfy node install ...` makes the difference
@@ -260,7 +267,8 @@ def suggest_install_command(node_class: str) -> str | None:
 
 def suggest_git_url(node_class: str) -> str | None:
     """For nodes not on the registry, return a git URL the user can hand to
-    ComfyUI-Manager's `/manager/queue/install` endpoint."""
+    ComfyUI-Manager's `/manager/queue/install` endpoint.
+    """
     return NODE_TO_GIT_URL.get(node_class)
 
 
@@ -276,8 +284,7 @@ def check_deps(
 
     # ---- 1. Required nodes ----
     required_nodes: set[str] = set()
-    for _, node in iter_nodes(workflow):
-        required_nodes.add(node["class_type"])
+    required_nodes.update(node["class_type"] for _, node in iter_nodes(workflow))
 
     object_info_url = resolve_url(base, "/object_info", is_cloud=is_cloud)
     installed_nodes, obj_err = fetch_object_info(object_info_url, headers)

@@ -5,25 +5,25 @@ import os
 import pytest
 
 from hermes_cli.auth import (
-    PROVIDER_REGISTRY,
-    resolve_provider,
-    get_api_key_provider_status,
-    resolve_api_key_provider_credentials,
-    get_external_process_provider_status,
-    resolve_external_process_provider_credentials,
-    get_auth_status,
-    AuthError,
     KIMI_CODE_BASE_URL,
-    STEPFUN_STEP_PLAN_INTL_BASE_URL,
+    PROVIDER_REGISTRY,
     STEPFUN_STEP_PLAN_CN_BASE_URL,
+    STEPFUN_STEP_PLAN_INTL_BASE_URL,
+    AuthError,
     _resolve_kimi_base_url,
+    get_api_key_provider_status,
+    get_auth_status,
+    get_external_process_provider_status,
+    resolve_api_key_provider_credentials,
+    resolve_external_process_provider_credentials,
+    resolve_provider,
 )
 from hermes_cli.copilot_auth import _try_gh_cli_token
-
 
 # =============================================================================
 # Provider Registry tests
 # =============================================================================
+
 
 class TestProviderRegistry:
     """Test that new providers are correctly registered."""
@@ -154,7 +154,7 @@ PROVIDER_ENV_VARS = (
 def _clear_provider_env(monkeypatch):
     for key in PROVIDER_ENV_VARS:
         monkeypatch.delenv(key, raising=False)
-    monkeypatch.setattr("hermes_cli.auth._load_auth_store", lambda: {})
+    monkeypatch.setattr("hermes_cli.auth._load_auth_store", dict)
 
 
 class TestResolveProvider:
@@ -659,7 +659,7 @@ class TestRuntimeProviderResolution:
                     "id": "gpt-5.4",
                     "supported_endpoints": ["/responses"],
                     "capabilities": {"type": "chat"},
-                }
+                },
             ],
         )
         from hermes_cli.runtime_provider import resolve_runtime_provider
@@ -755,6 +755,7 @@ class TestHasAnyProviderConfigured:
     def test_config_provider_counts(self, monkeypatch, tmp_path):
         """config.yaml with model.provider set should count as configured."""
         import yaml
+
         from hermes_cli import config as config_module
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
@@ -775,6 +776,7 @@ class TestHasAnyProviderConfigured:
     def test_config_base_url_counts(self, monkeypatch, tmp_path):
         """config.yaml with model.base_url set (custom endpoint) should count."""
         import yaml
+
         from hermes_cli import config as config_module
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
@@ -794,6 +796,7 @@ class TestHasAnyProviderConfigured:
     def test_config_api_key_counts(self, monkeypatch, tmp_path):
         """config.yaml with model.api_key set should count."""
         import yaml
+
         from hermes_cli import config as config_module
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
@@ -813,6 +816,7 @@ class TestHasAnyProviderConfigured:
     def test_config_dict_no_provider_no_creds_still_false(self, monkeypatch, tmp_path):
         """config.yaml model dict with empty default and no creds stays false."""
         import yaml
+
         from hermes_cli import config as config_module
         from hermes_cli.auth import PROVIDER_REGISTRY
         hermes_home = tmp_path / ".hermes"
@@ -840,6 +844,7 @@ class TestHasAnyProviderConfigured:
     def test_claude_code_creds_counted_when_hermes_configured(self, monkeypatch, tmp_path):
         """Claude Code credentials should count when Hermes has been explicitly configured."""
         import yaml
+
         from hermes_cli import config as config_module
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
@@ -983,7 +988,6 @@ class TestZaiEndpointAutoDetect:
         def _never_called(*a, **kw):
             nonlocal probe_called
             probe_called = True
-            return None
 
         monkeypatch.setattr("hermes_cli.auth.detect_zai_endpoint", _never_called)
         creds = resolve_api_key_provider_credentials("zai")
@@ -1045,8 +1049,8 @@ class TestHuggingFaceModels:
 
     def test_model_metadata_has_context_lengths(self):
         """Every HF model should have a context length entry."""
-        from hermes_cli.models import _PROVIDER_MODELS
         from agent.model_metadata import DEFAULT_CONTEXT_LENGTHS
+        from hermes_cli.models import _PROVIDER_MODELS
         lower_keys = {k.lower() for k in DEFAULT_CONTEXT_LENGTHS}
         hf_models = _PROVIDER_MODELS["huggingface"]
         for model in hf_models:
@@ -1186,8 +1190,8 @@ class TestNovitaProvider:
                     "id": "x/y",
                     "input_token_price_per_m": 1000,
                     "output_token_price_per_m": 2000,
-                }
-            ]
+                },
+            ],
         }
 
         class _FakeResp:
@@ -1206,7 +1210,7 @@ class TestNovitaProvider:
             return _FakeResp()
 
         monkeypatch.setattr(
-            models_mod.urllib.request, "urlopen", fake_urlopen
+            models_mod.urllib.request, "urlopen", fake_urlopen,
         )
 
         # First call hits the network.
@@ -1239,10 +1243,10 @@ class TestMinimaxOAuthProvider:
 
     def test_minimax_oauth_has_correct_endpoints(self):
         from hermes_cli.auth import (
-            MINIMAX_OAUTH_GLOBAL_BASE,
-            MINIMAX_OAUTH_GLOBAL_INFERENCE,
             MINIMAX_OAUTH_CN_BASE,
             MINIMAX_OAUTH_CN_INFERENCE,
+            MINIMAX_OAUTH_GLOBAL_BASE,
+            MINIMAX_OAUTH_GLOBAL_INFERENCE,
         )
         pconfig = PROVIDER_REGISTRY["minimax-oauth"]
         assert pconfig.portal_base_url == MINIMAX_OAUTH_GLOBAL_BASE

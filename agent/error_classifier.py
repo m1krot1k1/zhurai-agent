@@ -14,7 +14,7 @@ from __future__ import annotations
 import enum
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +71,11 @@ class ClassifiedError:
     """Structured classification of an API error with recovery hints."""
 
     reason: FailoverReason
-    status_code: Optional[int] = None
-    provider: Optional[str] = None
-    model: Optional[str] = None
+    status_code: int | None = None
+    provider: str | None = None
+    model: str | None = None
     message: str = ""
-    error_context: Dict[str, Any] = field(default_factory=dict)
+    error_context: dict[str, Any] = field(default_factory=dict)
 
     # Recovery action hints — the retry loop checks these instead of
     # re-classifying the error itself.
@@ -87,7 +87,6 @@ class ClassifiedError:
     @property
     def is_auth(self) -> bool:
         return self.reason in {FailoverReason.auth, FailoverReason.auth_permanent}
-
 
 
 # ── Provider-specific patterns ──────────────────────────────────────────
@@ -468,6 +467,7 @@ def classify_api_error(
 
     Returns:
         ClassifiedError with reason and recovery action hints.
+
     """
     status_code = _extract_status_code(error)
     error_type = type(error).__name__
@@ -755,9 +755,8 @@ def _classify_by_status(
     context_length: int,
     num_messages: int = 0,
     result_fn,
-) -> Optional[ClassifiedError]:
+) -> ClassifiedError | None:
     """Classify based on HTTP status code with message-aware refinement."""
-
     if status_code == 401:
         # Not retryable on its own — credential pool rotation and
         # provider-specific refresh (Codex, Anthropic, Nous) run before
@@ -941,7 +940,6 @@ def _classify_400(
     result_fn,
 ) -> ClassifiedError:
     """Classify 400 Bad Request — context overflow, format error, or generic."""
-
     # Multimodal tool content rejected from 400.  Must be checked BEFORE
     # image_too_large because the recovery is different (strip image parts
     # from tool messages, mark the model as no-list-tool-content for the
@@ -1088,7 +1086,7 @@ def _classify_400(
 
 def _classify_by_error_code(
     error_code: str, error_msg: str, result_fn,
-) -> Optional[ClassifiedError]:
+) -> ClassifiedError | None:
     """Classify by structured error codes from the response body."""
     code_lower = error_code.lower()
 
@@ -1148,9 +1146,8 @@ def _classify_by_message(
     approx_tokens: int,
     context_length: int,
     result_fn,
-) -> Optional[ClassifiedError]:
+) -> ClassifiedError | None:
     """Classify based on error message patterns when no status code is available."""
-
     # Payload-too-large patterns (from message text when no status_code)
     if any(p in error_msg for p in _PAYLOAD_TOO_LARGE_PATTERNS):
         return result_fn(
@@ -1263,7 +1260,7 @@ def _classify_by_message(
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
-def _extract_status_code(error: Exception) -> Optional[int]:
+def _extract_status_code(error: Exception) -> int | None:
     """Walk the error and its cause chain to find an HTTP status code."""
     current = error
     for _ in range(5):  # Max depth to prevent infinite loops

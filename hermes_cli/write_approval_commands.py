@@ -16,7 +16,6 @@ platform the gateway truncates it and points the user at the dashboard / file.
 from __future__ import annotations
 
 import json
-from typing import List, Optional
 
 from tools import write_approval as wa
 
@@ -39,7 +38,7 @@ def _fmt_pending_list(subsystem: str) -> str:
         origin = r.get("origin", "foreground")
         tag = " [auto]" if origin == "background_review" else ""
         lines.append(f"  {r['id']}{tag}  {r.get('summary', '')}")
-    where = "/{s} approve <id>".format(s=subsystem)
+    where = f"/{subsystem} approve <id>"
     lines.append("")
     lines.append(f"Apply: {where}   Reject: /{subsystem} reject <id>")
     if subsystem == wa.SKILLS:
@@ -53,11 +52,11 @@ def _fmt_pending_list(subsystem: str) -> str:
 
 def handle_pending_subcommand(
     subsystem: str,
-    args: List[str],
+    args: list[str],
     *,
     memory_store=None,
     set_mode_fn=None,
-) -> Optional[str]:
+) -> str | None:
     """Dispatch a /memory or /skills subcommand.
 
     Args:
@@ -73,6 +72,7 @@ def handle_pending_subcommand(
     Returns a text string to show the user. Returns None when the args are not
     a write-approval subcommand (caller falls through to its other handling,
     e.g. /skills search).
+
     """
     if not args:
         # Bare /memory or /skills with no sub → show pending + gate state.
@@ -99,13 +99,13 @@ def handle_pending_subcommand(
     return None  # not ours — caller handles
 
 
-def _resolve_one(subsystem: str, rest: List[str]):
+def _resolve_one(subsystem: str, rest: list[str]):
     if not rest:
         return None, f"Usage: /{subsystem} approve|reject <id>  (or 'all')"
     return rest[0], None
 
 
-def _approve(subsystem: str, rest: List[str], memory_store) -> str:
+def _approve(subsystem: str, rest: list[str], memory_store) -> str:
     target, err = _resolve_one(subsystem, rest)
     if err or target is None:
         return err or f"Usage: /{subsystem} approve <id>"
@@ -147,15 +147,14 @@ def _apply_one(subsystem: str, rec, memory_store):
             from tools.memory_tool import apply_memory_pending
             result = apply_memory_pending(payload, memory_store)
             return bool(result.get("success")), result.get("error", "")
-        else:
-            from tools.skill_manager_tool import apply_skill_pending
-            result = json.loads(apply_skill_pending(payload))
-            return bool(result.get("success")), result.get("error", "")
+        from tools.skill_manager_tool import apply_skill_pending
+        result = json.loads(apply_skill_pending(payload))
+        return bool(result.get("success")), result.get("error", "")
     except Exception as e:
         return False, str(e)
 
 
-def _reject(subsystem: str, rest: List[str]) -> str:
+def _reject(subsystem: str, rest: list[str]) -> str:
     target, err = _resolve_one(subsystem, rest)
     if err or target is None:
         return err or f"Usage: /{subsystem} reject <id>"
@@ -170,7 +169,7 @@ def _reject(subsystem: str, rest: List[str]) -> str:
     return f"No pending {subsystem} write with id '{target}'."
 
 
-def _diff(rest: List[str]) -> str:
+def _diff(rest: list[str]) -> str:
     if not rest:
         return "Usage: /skills diff <id>"
     rec = wa.get_pending(wa.SKILLS, rest[0])
@@ -181,7 +180,7 @@ def _diff(rest: List[str]) -> str:
     return header + "\n" + diff
 
 
-def _set_approval(subsystem: str, rest: List[str], set_mode_fn) -> str:
+def _set_approval(subsystem: str, rest: list[str], set_mode_fn) -> str:
     """Turn the approval gate on/off for a subsystem.
 
     ``set_mode_fn`` (when provided) persists the new boolean to config.

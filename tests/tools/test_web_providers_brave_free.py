@@ -19,7 +19,6 @@ import pytest
 
 from tests.tools.conftest import register_all_web_providers
 
-
 # ---------------------------------------------------------------------------
 # BraveFreeWebSearchProvider unit tests
 # ---------------------------------------------------------------------------
@@ -58,8 +57,8 @@ class TestBraveFreeProviderSearch:
                 {"title": "A", "url": "https://a.example.com", "description": "desc A"},
                 {"title": "B", "url": "https://b.example.com", "description": "desc B"},
                 {"title": "C", "url": "https://c.example.com", "description": "desc C"},
-            ]
-        }
+            ],
+        },
     }
 
     @staticmethod
@@ -210,7 +209,7 @@ class TestBraveFreeBackendWiring:
 
     def test_auto_detect_picks_brave_free_when_only_key_set(self, monkeypatch):
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         for key in ("FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "PARALLEL_API_KEY",
                     "TAVILY_API_KEY", "EXA_API_KEY", "SEARXNG_URL"):
             monkeypatch.delenv(key, raising=False)
@@ -222,7 +221,7 @@ class TestBraveFreeBackendWiring:
     def test_brave_free_does_not_override_paid_provider(self, monkeypatch):
         """Tavily (higher priority) should win in auto-detect."""
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         for key in ("FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "PARALLEL_API_KEY", "EXA_API_KEY", "SEARXNG_URL"):
             monkeypatch.delenv(key, raising=False)
         monkeypatch.setenv("TAVILY_API_KEY", "tvly")
@@ -254,11 +253,13 @@ class TestBraveFreeSearchOnlyErrors:
 
     def test_web_extract_returns_search_only_error(self, monkeypatch):
         import asyncio
+
         from tools import web_tools
 
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {"backend": "brave-free"})
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "BSAkey123")
         monkeypatch.setattr(web_tools, "_is_tool_gateway_ready", lambda: False)
+
         async def _allow_ssrf(_url: str) -> bool:
             return True
 
@@ -266,7 +267,7 @@ class TestBraveFreeSearchOnlyErrors:
         monkeypatch.setattr("tools.interrupt.is_interrupted", lambda: False, raising=False)
 
         result_str = asyncio.get_event_loop().run_until_complete(
-            web_tools.web_extract_tool(["https://example.com"])
+            web_tools.web_extract_tool(["https://example.com"]),
         )
         result = json.loads(result_str)
         assert result["success"] is False

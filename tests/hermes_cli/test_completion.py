@@ -1,7 +1,7 @@
 """Tests for hermes_cli/completion.py — shell completion script generation."""
 
 import argparse
-import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -9,12 +9,12 @@ import tempfile
 
 import pytest
 
-from hermes_cli.completion import _walk, generate_bash, generate_zsh, generate_fish
-
+from hermes_cli.completion import _walk, generate_bash, generate_fish, generate_zsh
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_parser() -> argparse.ArgumentParser:
     """Build a minimal parser that mirrors the real hermes structure."""
@@ -117,7 +117,7 @@ class TestGenerateBash:
             result = subprocess.run(["bash", "-n", path], capture_output=True)
             assert result.returncode == 0, result.stderr.decode()
         finally:
-            os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ class TestGenerateZsh:
 
     def test_registers_compdef_instead_of_invoking_completion_function(self):
         out = generate_zsh(_make_parser())
-        assert 'compdef _hermes hermes' in out
+        assert "compdef _hermes hermes" in out
         assert '_hermes "$@"' not in out
 
     def test_preserves_valid_zsh_arguments_alias_syntax(self):
@@ -164,7 +164,7 @@ class TestGenerateZsh:
             result = subprocess.run(["zsh", "-n", path], capture_output=True, text=True)
             assert result.returncode == 0, result.stderr
         finally:
-            os.unlink(path)
+            pathlib.Path(path).unlink()
 
     def test_zsh_eval_style_source_registers_after_compinit(self):
         if not shutil.which("zsh"):
@@ -186,7 +186,7 @@ class TestGenerateZsh:
             assert result.returncode == 0, result.stderr
             assert result.stderr == ""
         finally:
-            os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ class TestGenerateFish:
             result = subprocess.run(["fish", path], capture_output=True)
             assert result.returncode == 0, result.stderr.decode()
         finally:
-            os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -232,10 +232,11 @@ class TestSubcommandDrift:
         multi-word session names after -c/-r are never accidentally split.
         """
         import inspect
+
         from hermes_cli.main import _coalesce_session_name_args
 
         source = inspect.getsource(_coalesce_session_name_args)
-        match = re.search(r'_SUBCOMMANDS\s*=\s*\{([^}]+)\}', source, re.DOTALL)
+        match = re.search(r"_SUBCOMMANDS\s*=\s*\{([^}]+)\}", source, re.DOTALL)
         assert match, "_SUBCOMMANDS block not found in _coalesce_session_name_args()"
         defined = set(re.findall(r'"(\w+)"', match.group(1)))
 
@@ -263,7 +264,7 @@ class TestProfileCompletion:
 
     def test_bash_completes_profiles_after_p_flag(self):
         out = generate_bash(_make_parser())
-        assert '"-p"' in out or "== \"-p\"" in out
+        assert '"-p"' in out or '== "-p"' in out
         assert '"--profile"' in out or '== "--profile"' in out
         assert "_hermes_profiles" in out
 

@@ -11,8 +11,9 @@ Covers:
 import json
 import os
 import time
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from tools.process_registry import (
     ProcessRegistry,
@@ -20,7 +21,7 @@ from tools.process_registry import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry():
     """Create a fresh ProcessRegistry."""
     return ProcessRegistry()
@@ -381,7 +382,8 @@ class TestCompletionConsumed:
     def test_poll_marks_poll_observed_for_cli_drain(self, registry):
         """poll() on an exited process records _poll_observed so the CLI drain
         dedups (the agent already saw the exit inline) without marking the
-        session _completion_consumed (which would suppress the gateway watcher)."""
+        session _completion_consumed (which would suppress the gateway watcher).
+        """
         s = _make_session(sid="proc_pobs", notify_on_complete=True, output="done")
         s.exited = True
         s.exit_code = 0
@@ -407,7 +409,8 @@ class TestCompletionConsumed:
     def test_poll_observed_does_not_suppress_gateway_watcher(self, registry):
         """The gateway/tui watcher gate (is_completion_consumed) must stay False
         after a read-only poll, so the autonomous delivery turn still fires
-        even though the CLI drain was deduped (#10156)."""
+        even though the CLI drain was deduped (#10156).
+        """
         s = _make_session(sid="proc_gw", notify_on_complete=True, output="done")
         s.exited = True
         s.exit_code = 0
@@ -429,7 +432,8 @@ class TestCompletionConsumed:
 
     def test_wait_and_log_still_skip_cli_drain(self, registry):
         """wait()/read_log() consume the output, so the CLI drain skips their
-        completions via _completion_consumed (the original #8228 contract)."""
+        completions via _completion_consumed (the original #8228 contract).
+        """
         for sid, action in (("proc_w", "wait"), ("proc_l", "log")):
             s = _make_session(sid=sid, notify_on_complete=True, output="done")
             s.exited = True
@@ -471,10 +475,12 @@ def _silent_bg_base_config(tmp_path):
 
 def _silent_bg_harness(monkeypatch, tmp_path):
     """Common test fixture: patch enough of terminal_tool to spawn a fake
-    background process and capture the JSON result the agent sees."""
+    background process and capture the JSON result the agent sees.
+    """
+    from types import SimpleNamespace
+
     import tools.terminal_tool as terminal_tool_module
     from tools import process_registry as process_registry_module
-    from types import SimpleNamespace
 
     config = _silent_bg_base_config(tmp_path)
     dummy_env = SimpleNamespace(env={})
@@ -504,14 +510,15 @@ def _silent_bg_harness(monkeypatch, tmp_path):
 
 def test_background_without_notify_emits_silent_process_hint(monkeypatch, tmp_path):
     """The footgun case (May 2026 PR #31231): bg=True alone runs silently
-    and the agent has no signal it finished. Tool must nudge."""
+    and the agent has no signal it finished. Tool must nudge.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
             tt.terminal_tool(
                 command="while true; do gh pr checks 999; sleep 30; done",
                 background=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -537,7 +544,7 @@ def test_background_with_notify_does_not_emit_hint(monkeypatch, tmp_path):
                 command="pytest tests/",
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -558,7 +565,7 @@ def test_background_with_watch_patterns_does_not_emit_hint(monkeypatch, tmp_path
                 command="uvicorn app:server --port 8080",
                 background=True,
                 watch_patterns=["Application startup complete"],
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -571,7 +578,8 @@ def test_background_with_watch_patterns_does_not_emit_hint(monkeypatch, tmp_path
 
 def test_foreground_command_does_not_emit_hint(monkeypatch, tmp_path):
     """Hint only applies to background processes — foreground returns its
-    result synchronously and the agent always sees the outcome."""
+    result synchronously and the agent always sees the outcome.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
 
     # Foreground path doesn't go through spawn_local. Patch the local-env
@@ -589,7 +597,7 @@ def test_foreground_command_does_not_emit_hint(monkeypatch, tmp_path):
             tt.terminal_tool(
                 command="echo hello",
                 background=False,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -616,7 +624,8 @@ def test_foreground_command_does_not_emit_hint(monkeypatch, tmp_path):
 
 def test_homebrew_ci_poller_via_statusCheckRollup_emits_hint(monkeypatch, tmp_path):
     """The canonical anti-pattern: jq pipeline parsing statusCheckRollup
-    JSON. Tool must point the agent at the green-ci-policy skill snippet."""
+    JSON. Tool must point the agent at the green-ci-policy skill snippet.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
@@ -626,11 +635,11 @@ def test_homebrew_ci_poller_via_statusCheckRollup_emits_hint(monkeypatch, tmp_pa
                     "status=$(gh pr view $PR --json statusCheckRollup "
                     "--jq '[.statusCheckRollup[] | .conclusion] "
                     "| group_by(.) | map({k:.[0],v:length}) | from_entries'); "
-                    "echo \"$status\"; sleep 30; done"
+                    'echo "$status"; sleep 30; done'
                 ),
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -650,7 +659,8 @@ def test_homebrew_ci_poller_via_statusCheckRollup_emits_hint(monkeypatch, tmp_pa
 def test_homebrew_ci_poller_via_gh_pr_checks_piped_to_jq_emits_hint(monkeypatch, tmp_path):
     """`gh pr checks` doesn't emit JSON, so piping it to jq is a confused-
     intent anti-pattern that produces silent failures (jq fails, loop
-    keeps spinning with empty data)."""
+    keeps spinning with empty data).
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
@@ -662,7 +672,7 @@ def test_homebrew_ci_poller_via_gh_pr_checks_piped_to_jq_emits_hint(monkeypatch,
                 ),
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -677,7 +687,8 @@ def test_canonical_column2_awk_poller_does_not_emit_homebrew_hint(monkeypatch, t
     """The blessed column-2 awk-on-tabs poller from green-ci-policy is the
     PREFERRED pattern for sharded matrices. Must not be flagged as
     homebrew — the gating signal is statusCheckRollup or `gh pr checks
-    | jq`, NOT awk on tabs."""
+    | jq`, NOT awk on tabs.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
@@ -685,16 +696,16 @@ def test_canonical_column2_awk_poller_does_not_emit_homebrew_hint(monkeypatch, t
                 command=(
                     "PR=1; while :; do "
                     "out=$(gh pr checks $PR 2>&1); "
-                    "pending=$(echo \"$out\" | awk -F\"\\t\" \"\\$2==\\\"pending\\\"\" | wc -l); "
-                    "failed=$(echo \"$out\" | awk -F\"\\t\" \"\\$2==\\\"fail\\\"\" | wc -l); "
-                    "if [ \"$pending\" -eq 0 ]; then "
-                    "[ \"$failed\" -gt 0 ] && exit 1 || exit 0; "
+                    'pending=$(echo "$out" | awk -F"\\t" "\\$2==\\"pending\\"" | wc -l); '
+                    'failed=$(echo "$out" | awk -F"\\t" "\\$2==\\"fail\\"" | wc -l); '
+                    'if [ "$pending" -eq 0 ]; then '
+                    '[ "$failed" -gt 0 ] && exit 1 || exit 0; '
                     "fi; sleep 30; "
                     "done"
                 ),
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -708,7 +719,8 @@ def test_canonical_column2_awk_poller_does_not_emit_homebrew_hint(monkeypatch, t
 def test_canonical_gh_pr_checks_exit_code_loop_does_not_emit_hint(monkeypatch, tmp_path):
     """The blessed exit-code-driven snippet from green-ci-policy is exactly
     what we want — no jq, no awk-on-stdout, gates the loop on exit code.
-    Must not be flagged as a homebrew anti-pattern."""
+    Must not be flagged as a homebrew anti-pattern.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
@@ -721,7 +733,7 @@ def test_canonical_gh_pr_checks_exit_code_loop_does_not_emit_hint(monkeypatch, t
                 ),
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)
@@ -737,7 +749,8 @@ def test_canonical_gh_pr_checks_exit_code_loop_does_not_emit_hint(monkeypatch, t
 def test_non_ci_background_command_does_not_emit_homebrew_hint(monkeypatch, tmp_path):
     """A long-running task that happens to use awk for unrelated reasons
     must not be mistaken for a CI poller — the gating signal is the
-    combination of `gh pr ...` AND a stdout parser."""
+    combination of `gh pr ...` AND a stdout parser.
+    """
     tt = _silent_bg_harness(monkeypatch, tmp_path)
     try:
         result = json.loads(
@@ -745,7 +758,7 @@ def test_non_ci_background_command_does_not_emit_homebrew_hint(monkeypatch, tmp_
                 command="cat /var/log/syslog | awk '/error/ {print}' > /tmp/errs.log",
                 background=True,
                 notify_on_complete=True,
-            )
+            ),
         )
     finally:
         tt._active_environments.pop("default", None)

@@ -11,7 +11,6 @@ import pytest
 
 from hermes_cli.nous_account import NousPortalAccountInfo
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_DIR = REPO_ROOT / "tools"
 PLUGINS_DIR = REPO_ROOT / "plugins"
@@ -116,7 +115,7 @@ def _install_fake_tools_package():
     )
     sys.modules["agent.browser_registry"] = types.SimpleNamespace(
         get_provider=lambda name: None,
-        list_providers=lambda: [],
+        list_providers=list,
         register_provider=lambda provider: None,
         _resolve=lambda configured: None,
     )
@@ -380,7 +379,7 @@ def test_browser_use_managed_gateway_preserves_pending_idempotency_key_for_in_pr
                 "error": {
                     "code": "CONFLICT",
                     "message": "Managed Browser Use session creation is already in progress for this idempotency key",
-                }
+                },
             }
 
     class _SuccessResponse:
@@ -598,7 +597,8 @@ def test_terminal_tool_respects_direct_modal_mode_without_falling_back_to_manage
 class TestShellEscapeBypass:
     """Regression for #36846/#36847: backslash escapes and empty-string
     literals split tokens so a denylisted command (rm) slips past detection
-    while the shell still executes it."""
+    while the shell still executes it.
+    """
 
     def test_backslash_escape_bypass_caught(self):
         from tools.approval import detect_dangerous_command

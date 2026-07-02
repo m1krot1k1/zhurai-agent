@@ -28,6 +28,8 @@ import logging
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+from agent.memory_provider import MemoryProvider
 from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
@@ -39,7 +41,7 @@ _MEMORY_PLUGINS_DIR = Path(__file__).parent
 _USER_NAMESPACE = "_hermes_user_memory"
 
 
-def _register_synthetic_package(name: str, search_locations: List[str]) -> None:
+def _register_synthetic_package(name: str, search_locations: list[str]) -> None:
     """Register an empty package shell in sys.modules.
 
     User-installed providers import as ``_hermes_user_memory.<name>``, a
@@ -61,7 +63,7 @@ def _register_synthetic_package(name: str, search_locations: List[str]) -> None:
 # Directory helpers
 # ---------------------------------------------------------------------------
 
-def _get_user_plugins_dir() -> Optional[Path]:
+def _get_user_plugins_dir() -> Path | None:
     """Return ``$HERMES_HOME/plugins/`` or None if unavailable."""
     try:
         from hermes_constants import get_hermes_home
@@ -87,14 +89,14 @@ def _is_memory_provider_dir(path: Path) -> bool:
         return False
 
 
-def _iter_provider_dirs() -> List[Tuple[str, Path]]:
+def _iter_provider_dirs() -> list[tuple[str, Path]]:
     """Yield ``(name, path)`` for all discovered provider directories.
 
     Scans bundled first, then user-installed.  Bundled takes precedence
     on name collisions (first-seen wins via ``seen`` set).
     """
     seen: set = set()
-    dirs: List[Tuple[str, Path]] = []
+    dirs: list[tuple[str, Path]] = []
 
     # 1. Bundled providers (plugins/memory/<name>/)
     if _MEMORY_PLUGINS_DIR.is_dir():
@@ -121,7 +123,7 @@ def _iter_provider_dirs() -> List[Tuple[str, Path]]:
     return dirs
 
 
-def find_provider_dir(name: str) -> Optional[Path]:
+def find_provider_dir(name: str) -> Path | None:
     """Resolve a provider name to its directory.
 
     Checks bundled first, then user-installed.
@@ -143,7 +145,7 @@ def find_provider_dir(name: str) -> Optional[Path]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def discover_memory_providers() -> List[Tuple[str, str, bool]]:
+def discover_memory_providers() -> list[tuple[str, str, bool]]:
     """Scan bundled and user-installed directories for available providers.
 
     Returns list of (name, description, is_available) tuples.
@@ -158,7 +160,7 @@ def discover_memory_providers() -> List[Tuple[str, str, bool]]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with Path(yaml_file).open(encoding="utf-8-sig") as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
             except Exception:
@@ -180,7 +182,7 @@ def discover_memory_providers() -> List[Tuple[str, str, bool]]:
     return results
 
 
-def load_memory_provider(name: str) -> Optional["MemoryProvider"]:
+def load_memory_provider(name: str) -> MemoryProvider | None:
     """Load and return a MemoryProvider instance by name.
 
     Checks both bundled (``plugins/memory/<name>/``) and user-installed
@@ -205,7 +207,7 @@ def load_memory_provider(name: str) -> Optional["MemoryProvider"]:
         return None
 
 
-def _load_provider_from_dir(provider_dir: Path) -> Optional["MemoryProvider"]:
+def _load_provider_from_dir(provider_dir: Path) -> MemoryProvider | None:
     """Import a provider module and extract the MemoryProvider instance.
 
     The module must have either:
@@ -240,7 +242,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["MemoryProvider"]:
                 if parent_init.exists():
                     spec = importlib.util.spec_from_file_location(
                         parent, str(parent_init),
-                        submodule_search_locations=[str(parent_path)]
+                        submodule_search_locations=[str(parent_path)],
                     )
                     if spec:
                         parent_mod = importlib.util.module_from_spec(spec)
@@ -258,7 +260,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["MemoryProvider"]:
         # Now load the provider module
         spec = importlib.util.spec_from_file_location(
             module_name, str(init_file),
-            submodule_search_locations=[str(provider_dir)]
+            submodule_search_locations=[str(provider_dir)],
         )
         if not spec:
             return None
@@ -275,7 +277,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["MemoryProvider"]:
             full_sub_name = f"{module_name}.{sub_name}"
             if full_sub_name not in sys.modules:
                 sub_spec = importlib.util.spec_from_file_location(
-                    full_sub_name, str(sub_file)
+                    full_sub_name, str(sub_file),
                 )
                 if sub_spec:
                     sub_mod = importlib.util.module_from_spec(sub_spec)
@@ -336,7 +338,7 @@ class _ProviderCollector:
         pass  # CLI registration happens via discover_plugin_cli_commands()
 
 
-def _get_active_memory_provider() -> Optional[str]:
+def _get_active_memory_provider() -> str | None:
     """Read the active memory provider name from config.yaml.
 
     Returns the provider name (e.g. ``"honcho"``) or None if no
@@ -351,7 +353,7 @@ def _get_active_memory_provider() -> Optional[str]:
         return None
 
 
-def discover_plugin_cli_commands() -> List[dict]:
+def discover_plugin_cli_commands() -> list[dict]:
     """Return CLI commands for the **active** memory plugin only.
 
     Only one memory provider can be active at a time (set via
@@ -368,7 +370,7 @@ def discover_plugin_cli_commands() -> List[dict]:
     full plugin module.  Safe to call during argparse setup before
     any provider is loaded.
     """
-    results: List[dict] = []
+    results: list[dict] = []
     if not _MEMORY_PLUGINS_DIR.is_dir():
         return results
 
@@ -402,10 +404,10 @@ def discover_plugin_cli_commands() -> List[dict]:
                 # module later instead of reusing the shell.
                 _register_synthetic_package(_USER_NAMESPACE, [])
                 _register_synthetic_package(
-                    f"{_USER_NAMESPACE}.{active_provider}", [str(plugin_dir)]
+                    f"{_USER_NAMESPACE}.{active_provider}", [str(plugin_dir)],
                 )
             spec = importlib.util.spec_from_file_location(
-                module_name, str(cli_file)
+                module_name, str(cli_file),
             )
             if not spec or not spec.loader:
                 return results
@@ -424,7 +426,7 @@ def discover_plugin_cli_commands() -> List[dict]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with Path(yaml_file).open(encoding="utf-8-sig") as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
                 if desc:

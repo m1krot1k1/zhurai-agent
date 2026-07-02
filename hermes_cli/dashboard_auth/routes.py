@@ -19,7 +19,7 @@ import logging
 import threading
 import time
 from collections import defaultdict, deque
-from typing import Any, Deque, Dict, Tuple
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -134,7 +134,7 @@ async def login_page(request: Request) -> HTMLResponse:
     # callback applies (defence in depth — the gate already filters,
     # but /login is reachable directly too).
     next_path = _validate_post_login_target(
-        request.query_params.get("next", "")
+        request.query_params.get("next", ""),
     )
     return HTMLResponse(
         render_login_html(next_path=next_path),
@@ -162,7 +162,7 @@ async def api_auth_providers() -> Any:
                 "name": p.name,
                 "display_name": p.display_name,
                 "supports_password": bool(
-                    getattr(p, "supports_password", False)
+                    getattr(p, "supports_password", False),
                 ),
             }
             for p in providers
@@ -403,7 +403,7 @@ def _validate_post_login_target(raw: str) -> str:
 
 _PW_RATE_MAX_ATTEMPTS = 10
 _PW_RATE_WINDOW_SEC = 60.0
-_pw_attempts: Dict[str, Deque[float]] = defaultdict(deque)
+_pw_attempts: dict[str, deque[float]] = defaultdict(deque)
 _pw_attempts_lock = threading.Lock()
 
 
@@ -486,7 +486,7 @@ async def auth_password_login(request: Request, body: _PasswordLoginBody):
 
     try:
         session = p.complete_password_login(
-            username=body.username, password=body.password
+            username=body.username, password=body.password,
         )
     except InvalidCredentialsError:
         audit_log(

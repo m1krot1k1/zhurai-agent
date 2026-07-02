@@ -22,9 +22,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ ReconcileActionLabel = Literal["started", "registered", "skipped"]
 @dataclass(frozen=True)
 class ReconcileAction:
     """One profile's outcome from a single reconciliation pass."""
+
     profile: str
     prior_state: str | None
     action: ReconcileActionLabel
@@ -92,6 +94,7 @@ def reconcile_profile_gateways(
     Returns:
         One :class:`ReconcileAction` per profile, in this order:
         ``default`` first, then named profiles in directory order.
+
     """
     actions: list[ReconcileAction] = []
 
@@ -346,7 +349,8 @@ def _read_desired_state(profile_dir: Path) -> str | None:
 def _cleanup_stale_runtime_files(profile_dir: Path) -> None:
     """Remove gateway.pid and processes.json — they reference PIDs in
     the dead container's process namespace and would otherwise confuse
-    the newly-started gateway's process-mismatch checks."""
+    the newly-started gateway's process-mismatch checks.
+    """
     for name in _STALE_RUNTIME_FILES:
         (profile_dir / name).unlink(missing_ok=True)
 
@@ -474,7 +478,7 @@ def _write_reconcile_log(
         for a in actions:
             f.write(
                 f"{ts} profile={a.profile} prior_state={a.prior_state} "
-                f"action={a.action}\n"
+                f"action={a.action}\n",
             )
 
 
@@ -500,7 +504,7 @@ def main() -> int:
     if _is_dashboard_container(_read_container_argv()):
         print(
             "reconcile: skipping (dashboard container — does not need "
-            "per-profile gateways)"
+            "per-profile gateways)",
         )
         return 0
 
@@ -512,7 +516,7 @@ def main() -> int:
     for a in actions:
         print(
             f"reconcile: profile={a.profile} "
-            f"prior_state={a.prior_state} action={a.action}"
+            f"prior_state={a.prior_state} action={a.action}",
         )
     return 0
 

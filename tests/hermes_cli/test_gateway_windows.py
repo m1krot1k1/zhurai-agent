@@ -4,9 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import hermes_cli.gateway as gateway
-import hermes_cli.gateway_windows as gateway_windows
-import hermes_cli.setup as setup
+from hermes_cli import gateway, gateway_windows, setup
 
 
 @pytest.mark.parametrize(
@@ -21,7 +19,6 @@ import hermes_cli.setup as setup
 )
 def test_schtasks_fallback_patterns_cover_localized_access_denied(detail):
     """Localized schtasks access-denied errors should use Startup fallback."""
-
     assert gateway_windows._should_fall_back(1, detail) is True
 
 
@@ -31,7 +28,6 @@ def test_schtasks_fallback_does_not_hide_unknown_errors():
 
 def test_schtasks_encoding_falls_back_to_utf8(monkeypatch):
     """A broken/empty locale must not leave us without a decoder (issue #38172)."""
-
     monkeypatch.setattr(gateway_windows.locale, "getpreferredencoding", lambda *a, **k: "")
     assert gateway_windows._schtasks_encoding() == "utf-8"
 
@@ -43,9 +39,9 @@ def test_schtasks_encoding_falls_back_to_utf8(monkeypatch):
 
 
 def test_exec_schtasks_decodes_with_replace_errors(monkeypatch):
-    """schtasks output must be decoded with errors='replace' so localized
-    (non-UTF-8) bytes never surface a UnicodeDecodeError traceback (#38172)."""
-
+    """Schtasks output must be decoded with errors='replace' so localized
+    (non-UTF-8) bytes never surface a UnicodeDecodeError traceback (#38172).
+    """
     captured: dict[str, object] = {}
 
     class _FakeCompleted:
@@ -74,7 +70,6 @@ def test_exec_schtasks_decodes_with_replace_errors(monkeypatch):
 
 def test_build_gateway_argv_uses_base_pythonw_for_uv_venv_launcher(monkeypatch, tmp_path):
     """Avoid uv's venv pythonw launcher because it respawns console python.exe."""
-
     project = tmp_path / "project"
     scripts = project / "venv" / "Scripts"
     site_packages = project / "venv" / "Lib" / "site-packages"
@@ -95,7 +90,7 @@ def test_build_gateway_argv_uses_base_pythonw_for_uv_venv_launcher(monkeypatch, 
         encoding="utf-8",
     )
 
-    import hermes_cli.gateway as gateway
+    from hermes_cli import gateway
 
     monkeypatch.setattr(gateway_windows.sys, "platform", "win32")
     monkeypatch.setattr(gateway, "PROJECT_ROOT", project)
@@ -202,7 +197,7 @@ def test_gateway_cmd_script_uses_pythonw_without_replace_or_start_churn(monkeypa
     assert "pythonw.exe" in content
     assert "gateway run" in content
     assert "--replace" not in content
-    assert "start \"\"" not in content
+    assert 'start ""' not in content
     assert "exit /b 0" in content
 
 
@@ -276,7 +271,7 @@ def test_install_scheduled_task_success_start_now_uses_direct_spawn_not_task_run
         "_install_scheduled_task",
         lambda task_name, script_path: (True, "Created Scheduled Task 'Hermes_Gateway_alice'"),
     )
-    monkeypatch.setattr(gateway_windows, "_gateway_pids", lambda: [])
+    monkeypatch.setattr(gateway_windows, "_gateway_pids", list)
     monkeypatch.setattr(gateway_windows, "_exec_schtasks", lambda args: calls.append(("schtasks", tuple(args))) or (0, "", ""))
     monkeypatch.setattr(gateway_windows, "_spawn_detached", lambda path=None: calls.append(("spawn", path)) or 12345)
     monkeypatch.setattr(gateway_windows, "_report_gateway_start", lambda via: calls.append(("report_start", via)))
@@ -399,7 +394,7 @@ def test_install_start_now_without_login_autostart_never_escalates(monkeypatch, 
     calls = []
     monkeypatch.setattr(gateway_windows, "_assert_windows", lambda: None)
     monkeypatch.setattr(gateway_windows, "_prompt_install_choices", lambda *args, **kwargs: (True, False))
-    monkeypatch.setattr(gateway_windows, "_gateway_pids", lambda: [])
+    monkeypatch.setattr(gateway_windows, "_gateway_pids", list)
     monkeypatch.setattr(gateway_windows, "_spawn_detached", lambda path=None: calls.append(("spawn", path)) or 12345)
     monkeypatch.setattr(gateway_windows, "_report_gateway_start", lambda via: calls.append(("report_start", via)))
     monkeypatch.setattr(gateway_windows, "_install_scheduled_task", lambda *args, **kwargs: calls.append(("install_task", args)) or (True, "should not happen"))
@@ -487,7 +482,7 @@ def test_install_access_denied_declined_elevation_uses_startup_fallback(monkeypa
         lambda force=False, start_now=None, start_on_login=None: calls.append(("elevate", force, start_now, start_on_login)) or True,
     )
     monkeypatch.setattr(gateway_windows, "_install_startup_entry", lambda path: calls.append(("install_startup", path)) or path)
-    monkeypatch.setattr(gateway, "find_gateway_pids", lambda: [])
+    monkeypatch.setattr(gateway, "find_gateway_pids", list)
     monkeypatch.setattr(gateway, "_profile_arg", lambda: "--profile alice")
     monkeypatch.setattr(gateway_windows, "_print_next_steps", lambda: calls.append(("next_steps", None)))
 
@@ -643,6 +638,7 @@ def test_stop_waits_for_graceful_drain_before_force_kill(monkeypatch):
 
     # Simulate the gateway exiting cleanly after one poll tick.
     poll_count = [0]
+
     def fake_pid_exists(check_pid):
         poll_count[0] += 1
         return poll_count[0] < 2  # alive on first poll, gone on second
@@ -773,6 +769,7 @@ def test_drain_helper_still_waits_if_marker_write_fails(monkeypatch):
     platform after all) still gets observed cleanly.
     """
     pid = 44444
+
     def fake_write(target_pid):
         raise OSError("disk full")
 

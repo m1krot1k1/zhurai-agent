@@ -203,6 +203,7 @@ async def test_reconnect_closes_previous_client_to_prevent_zombie_websocket(monk
 
     class TrackedBot(FakeBot):
         """FakeBot that records close() calls and reports open/closed state."""
+
         _closed = False
 
         def is_closed(self):
@@ -267,10 +268,10 @@ async def test_connect_releases_token_lock_on_timeout(monkeypatch):
     )
 
     async def fake_wait_for_ready(ready_event, bot_task, timeout):
-        raise asyncio.TimeoutError()
+        raise TimeoutError
 
     monkeypatch.setattr(
-        discord_platform, "_wait_for_ready_or_bot_exit", fake_wait_for_ready
+        discord_platform, "_wait_for_ready_or_bot_exit", fake_wait_for_ready,
     )
 
     ok = await adapter.connect()
@@ -302,6 +303,7 @@ async def test_connect_timeout_cancels_bot_task(monkeypatch):
 
     class NeverReadyBot(FakeBot):
         """Bot whose start() never fires on_ready — simulates a slow gateway handshake."""
+
         async def start(self, token):
             await asyncio.Event().wait()  # hang forever
 
@@ -316,10 +318,10 @@ async def test_connect_timeout_cancels_bot_task(monkeypatch):
     )
 
     async def fake_wait_for_ready(ready_event, bot_task, timeout):
-        raise asyncio.TimeoutError()
+        raise TimeoutError
 
     monkeypatch.setattr(
-        discord_platform, "_wait_for_ready_or_bot_exit", fake_wait_for_ready
+        discord_platform, "_wait_for_ready_or_bot_exit", fake_wait_for_ready,
     )
 
     ok = await adapter.connect()
@@ -400,7 +402,7 @@ async def test_connect_does_not_wait_for_slash_sync(monkeypatch):
 @pytest.mark.asyncio
 async def test_connect_respects_slash_commands_opt_out(monkeypatch):
     adapter = DiscordAdapter(
-        PlatformConfig(enabled=True, token="test-token", extra={"slash_commands": False})
+        PlatformConfig(enabled=True, token="test-token", extra={"slash_commands": False}),
     )
 
     monkeypatch.setenv("DISCORD_COMMAND_SYNC_POLICY", "off")
@@ -686,6 +688,7 @@ async def test_post_connect_initialization_respects_discord_retry_after(tmp_path
         application_id=999,
         user=SimpleNamespace(id=999),
     )
+
     class _DiscordRateLimit(RuntimeError):
         retry_after = 123.0
 

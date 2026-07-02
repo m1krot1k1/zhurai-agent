@@ -9,13 +9,19 @@ Also covers reply_to_text extraction from incoming messages.
 """
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from gateway.config import PlatformConfig, GatewayConfig, Platform, _apply_env_overrides, load_gateway_config
+from gateway.config import (
+    GatewayConfig,
+    Platform,
+    PlatformConfig,
+    _apply_env_overrides,
+    load_gateway_config,
+)
 
 
 def _ensure_discord_mock():
@@ -56,7 +62,7 @@ _ensure_discord_mock()
 from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
 
 
-@pytest.fixture()
+@pytest.fixture
 def adapter_factory():
     """Factory to create DiscordAdapter with custom reply_to_mode."""
     def create(reply_to_mode: str = "first"):
@@ -303,6 +309,7 @@ except (ImportError, AttributeError):
 
 class FakeDMChannel(_DMChannelBase):
     """Minimal DM channel stub (skips mention / channel-allow checks)."""
+
     def __init__(self, channel_id: int = 100, name: str = "dm"):
         # Do NOT call super().__init__() — real DMChannel requires State
         self.id = channel_id
@@ -318,7 +325,7 @@ def _make_message(*, content: str = "hi", reference=None):
         mentions=[],
         attachments=[],
         reference=reference,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         channel=FakeDMChannel(),
         author=author,
     )
@@ -429,7 +436,7 @@ class TestYamlConfigLoading:
     def test_extra_reply_to_mode_off(self, tmp_path, monkeypatch):
         """discord.extra.reply_to_mode is also honoured."""
         hermes_home = self._write_config(
-            tmp_path, "discord:\n  extra:\n    reply_to_mode: \"off\"\n"
+            tmp_path, 'discord:\n  extra:\n    reply_to_mode: "off"\n',
         )
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
         monkeypatch.delenv("DISCORD_REPLY_TO_MODE", raising=False)
@@ -452,7 +459,7 @@ class TestYamlConfigLoading:
         """discord.reply_to_mode wins over discord.extra.reply_to_mode."""
         hermes_home = self._write_config(
             tmp_path,
-            "discord:\n  reply_to_mode: all\n  extra:\n    reply_to_mode: \"off\"\n",
+            'discord:\n  reply_to_mode: all\n  extra:\n    reply_to_mode: "off"\n',
         )
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
         monkeypatch.delenv("DISCORD_REPLY_TO_MODE", raising=False)

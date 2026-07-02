@@ -14,7 +14,6 @@ from __future__ import annotations
 from pathlib import Path
 
 
-
 def _write_config(tmp_path: Path, body: str) -> None:
     hermes_home = tmp_path
     headroom = "headroom:\n  enabled: false\n"
@@ -185,6 +184,7 @@ providers:
     monkeypatch.delenv("HERMES_API_CALL_STALE_TIMEOUT", raising=False)
 
     import importlib
+
     from hermes_cli import timeouts as to_mod
     importlib.reload(to_mod)
 

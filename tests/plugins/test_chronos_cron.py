@@ -15,7 +15,7 @@ import pytest
 @pytest.fixture
 def temp_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    yield tmp_path
+    return tmp_path
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def test_is_available_true_with_config_and_token(temp_home, monkeypatch):
     import plugins.cron.chronos as mod
     from plugins.cron.chronos import ChronosCronScheduler
 
-    monkeypatch.setattr(mod, "_cfg", lambda *k, default="": "https://x" )
+    monkeypatch.setattr(mod, "_cfg", lambda *k, default="": "https://x")
     monkeypatch.setattr("hermes_cli.auth.get_provider_auth_state",
                         lambda pid: {"access_token": "tok"})
     assert ChronosCronScheduler().is_available() is True
@@ -104,7 +104,8 @@ def test_arm_one_shot_sends_provision(chronos):
 
 def test_arm_one_shot_preserves_sub_minute_fire(chronos):
     """Sub-minute fire times survive — the agent owns the time, so there's no
-    1-minute scheduler floor."""
+    1-minute scheduler floor.
+    """
     prov, fake = chronos
     prov._arm_one_shot({"id": "j2", "next_run_at": "2026-06-18T12:00:30+00:00"})
     assert fake.provisions[0]["fire_at"] == "2026-06-18T12:00:30+00:00"
@@ -183,7 +184,8 @@ def test_fire_due_rearms_next_oneshot(chronos, monkeypatch):
 
 def test_fire_due_no_rearm_when_job_gone(chronos, monkeypatch):
     """repeat-N exhausted / one-shot completed → mark_job_run deleted the job →
-    get_job None → no re-arm (the schedule stops cleanly)."""
+    get_job None → no re-arm (the schedule stops cleanly).
+    """
     prov, fake = chronos
     monkeypatch.setattr("cron.scheduler_provider.CronScheduler.fire_due",
                         lambda self, jid, **kw: True)

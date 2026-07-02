@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -328,6 +327,7 @@ class TestGenerate:
 class TestGenerateErrors:
     def test_submit_http_error(self):
         import requests as req_lib
+
         from plugins.image_gen.krea import KreaImageGenProvider
 
         resp = req_lib.Response()
@@ -335,7 +335,7 @@ class TestGenerateErrors:
         resp._content = b'{"error": {"message": "Invalid API key"}}'
         resp.headers["Content-Type"] = "application/json"
         resp.raise_for_status = MagicMock(
-            side_effect=req_lib.HTTPError(response=resp)
+            side_effect=req_lib.HTTPError(response=resp),
         )
 
         with patch("plugins.image_gen.krea.requests.post", return_value=resp):
@@ -348,10 +348,11 @@ class TestGenerateErrors:
 
     def test_submit_timeout(self):
         import requests as req_lib
+
         from plugins.image_gen.krea import KreaImageGenProvider
 
         with patch(
-            "plugins.image_gen.krea.requests.post", side_effect=req_lib.Timeout()
+            "plugins.image_gen.krea.requests.post", side_effect=req_lib.Timeout(),
         ):
             result = KreaImageGenProvider().generate(prompt="test")
 
@@ -360,6 +361,7 @@ class TestGenerateErrors:
 
     def test_submit_connection_error(self):
         import requests as req_lib
+
         from plugins.image_gen.krea import KreaImageGenProvider
 
         with patch(
@@ -454,6 +456,7 @@ class TestGenerateErrors:
     def test_url_download_failure_falls_back_to_bare_url(self):
         """Mirror of xAI behaviour — if local cache fails, return the URL."""
         import requests as req_lib
+
         from plugins.image_gen.krea import KreaImageGenProvider
 
         url = "https://krea.cdn/expired-soon.png"
@@ -512,7 +515,7 @@ class TestPollRetryPolicy:
         resp._content = b'{"error": "boom"}'
         resp.headers["Content-Type"] = "application/json"
         resp.raise_for_status = MagicMock(
-            side_effect=req_lib.HTTPError(response=resp)
+            side_effect=req_lib.HTTPError(response=resp),
         )
         return resp
 

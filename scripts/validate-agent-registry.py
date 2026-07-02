@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENT_DIR = ROOT / "agents"
@@ -39,8 +39,7 @@ def read_text_robust(
         "cp1252",
     ),
 ) -> str:
-    """
-    Read text files that may be saved in legacy encodings.
+    """Read text files that may be saved in legacy encodings.
 
     Goal: avoid hard failures in validators/benchmarks due to UnicodeDecodeError.
     """
@@ -70,7 +69,7 @@ def parse_frontmatter(rel_path: str, text: str) -> tuple[str, str]:
         re.DOTALL,
     )
     if not match:
-        fail(f'[frontmatter] Missing or malformed frontmatter in {rel_path}')
+        fail(f"[frontmatter] Missing or malformed frontmatter in {rel_path}")
         return "", ""
 
     block = match.group(1)
@@ -118,13 +117,13 @@ for path in agent_files:
 
     if name and name != basename:
         fail(
-            f'[registry] Frontmatter name "{name}" does not match filename "{basename}" in {rel_path}'
+            f'[registry] Frontmatter name "{name}" does not match filename "{basename}" in {rel_path}',
         )
 
     if name:
         if name in seen_names:
             fail(
-                f'[registry] Duplicate agent name "{name}" in {rel_path} and {seen_names[name]}'
+                f'[registry] Duplicate agent name "{name}" in {rel_path} and {seen_names[name]}',
             )
         else:
             seen_names[name] = rel_path

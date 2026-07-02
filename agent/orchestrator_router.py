@@ -10,12 +10,13 @@ Injected as API-call-time user-message context (never persisted) when
 
 from __future__ import annotations
 
-import json
 import functools
+import json
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
+from typing import Any, Literal
 
 from agent.ecosystem_paths import get_ecosystem_root
 
@@ -150,7 +151,7 @@ def _sanitize_original_request(text: str) -> str:
     _injection_patterns = re.compile(
         r"(?i)^.*?(?:ignore\s+(all\s+)?(?:previous|prior|above)"
         r"|disregard\s+(?:all\s+)?(?:previous|prior)"
-        r").*$"
+        r").*$",
     )
     text = _injection_patterns.sub("[SANITIZED]", text).strip()
 
@@ -158,6 +159,7 @@ def _sanitize_original_request(text: str) -> str:
         text = text[:_ORIGINAL_REQUEST_MAX_CHARS]
 
     return text
+
 
 _ACTION_RE = re.compile(
     r"\b("
@@ -181,7 +183,8 @@ def _load_delegation_cfg() -> dict:
 
 def _invalidate_delegation_cfg_cache() -> None:
     """Invalidate the cached delegation config so next call reloads from file.
-    Call this after delegation config changes mid-session (e.g., gateway config reload)."""
+    Call this after delegation config changes mid-session (e.g., gateway config reload).
+    """
     _load_delegation_cfg.cache_clear()
 
 
@@ -232,7 +235,7 @@ def _orchestration_scoring_text(message: str) -> str:
     return text
 
 
-def extract_original_request(text: str) -> Optional[str]:
+def extract_original_request(text: str) -> str | None:
     """Pull ORIGINAL_REQUEST from delegate / router envelopes."""
     if not text or not isinstance(text, str):
         return None
@@ -246,7 +249,7 @@ def extract_original_request(text: str) -> Optional[str]:
     return None
 
 
-def infer_agent_id_from_text(text: str) -> Optional[str]:
+def infer_agent_id_from_text(text: str) -> str | None:
     """Best-effort agent id when delegate context omits AGENT_ID."""
     explicit = parse_agent_id_from_envelope(text or "")
     if explicit:
@@ -263,7 +266,7 @@ def infer_agent_id_from_text(text: str) -> Optional[str]:
     return best_id
 
 
-def enrich_delegate_task_entry(task: Dict[str, Any]) -> Dict[str, Any]:
+def enrich_delegate_task_entry(task: dict[str, Any]) -> dict[str, Any]:
     """Ensure each batch entry carries AGENT_ID in context when inferrable."""
     from agent.ecosystem_delegate import build_delegate_branch_context
 
@@ -273,7 +276,7 @@ def enrich_delegate_task_entry(task: Dict[str, Any]) -> Dict[str, Any]:
     if "Review the conversation above and update the skill library" in context:
         logger.warning(
             "enrich_delegate_task_entry: detected _SKILL_REVIEW_PROMPT "
-            "in task context — stripping to prevent pollution cascade."
+            "in task context — stripping to prevent pollution cascade.",
         )
         context = ""
     agent_id = parse_agent_id_from_envelope(context) or parse_agent_id_from_envelope(goal)
@@ -323,13 +326,13 @@ def classify_complexity(message: str) -> str:
     return "trivial"
 
 
-def score_specialists(message: str) -> List[Tuple[str, float]]:
+def score_specialists(message: str) -> list[tuple[str, float]]:
     """Score ecosystem agents against *message*; higher is better."""
     text = (message or "").lower()
     if not text:
         return []
 
-    scores: List[Tuple[str, float]] = []
+    scores: list[tuple[str, float]] = []
     for agent_id, keywords in _SPECIALIST_KEYWORDS.items():
         hits = sum(1 for kw in keywords if kw in text)
         if hits:
@@ -338,7 +341,7 @@ def score_specialists(message: str) -> List[Tuple[str, float]]:
     return scores
 
 
-def suggest_specialists(message: str, *, max_branches: int = 4) -> List[str]:
+def suggest_specialists(message: str, *, max_branches: int = 4) -> list[str]:
     """Return ordered agent ids for a first parallel wave."""
     scored = score_specialists(message)
     if scored:
@@ -355,7 +358,7 @@ def suggest_specialists(message: str, *, max_branches: int = 4) -> List[str]:
 
     # Dedupe while preserving order.
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for agent_id in ids:
         if agent_id not in seen:
             seen.add(agent_id)
@@ -382,7 +385,7 @@ def is_start_router_turn(message: str) -> bool:
     return "router mode" in lower and "/start" in lower
 
 
-def _agent_ecosystem_id(agent) -> Optional[str]:
+def _agent_ecosystem_id(agent) -> str | None:
     # Clear any stale delegate context from background review forks before
     # building ORIGINAL_REQUEST.  The background review daemon sets
     # agent._delegate_branch_context = "" on the parent, but a race between
@@ -477,7 +480,7 @@ def _ensure_wave_on_agent(agent) -> int:
     return get_orchestrator_wave_number(agent)
 
 
-def _append_wave_to_task_context(task: Dict[str, Any], wave_number: int) -> Dict[str, Any]:
+def _append_wave_to_task_context(task: dict[str, Any], wave_number: int) -> dict[str, Any]:
     """Tag a delegate_task entry with WAVE_NUMBER for UI grouping and contracts."""
     out = dict(task)
     ctx = str(out.get("context") or "")
@@ -549,14 +552,14 @@ Rules (code-skeptic / evidence-first):
 _WAVE_JUDGE_BATCH_MAX_CHARS = 12000
 
 
-def _parse_batch_task_blocks(message: str) -> List[Dict[str, str]]:
+def _parse_batch_task_blocks(message: str) -> list[dict[str, str]]:
     """Parse formatted async batch completion text into per-task summaries."""
     text = message or ""
     headers = list(_BATCH_TASK_HEADER_RE.finditer(text))
     if not headers:
         return []
 
-    blocks: List[Dict[str, str]] = []
+    blocks: list[dict[str, str]] = []
     for idx, match in enumerate(headers):
         start = match.end()
         end = headers[idx + 1].start() if idx + 1 < len(headers) else len(text)
@@ -568,7 +571,7 @@ def _parse_batch_task_blocks(message: str) -> List[Dict[str, str]]:
                 "goal": (match.group(3) or "").strip(),
                 "status": (match.group(4) or "").strip().lower(),
                 "summary": body,
-            }
+            },
         )
     return blocks
 
@@ -591,8 +594,8 @@ def is_wave_llm_judge_enabled() -> bool:
 class WaveEvalResult:
     needs_wave: bool
     judge_source: Literal["llm", "heuristic", "none"]
-    tasks: List[Dict[str, Any]] = field(default_factory=list)
-    confidence: Optional[int] = None
+    tasks: list[dict[str, Any]] = field(default_factory=list)
+    confidence: int | None = None
     reason: str = ""
 
 
@@ -631,11 +634,14 @@ def _judge_batch_with_llm(
     original_request: str,
     *,
     current_wave: int,
-) -> Optional[dict]:
+) -> dict | None:
     if not is_wave_llm_judge_enabled():
         return None
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:
         logger.debug("wave judge: auxiliary import failed: %s", exc)
         return None
@@ -688,14 +694,14 @@ def _judge_batch_with_llm(
     return parsed
 
 
-def _parse_rework_specs_from_llm_verdict(parsed: dict) -> List[Dict[str, Any]]:
+def _parse_rework_specs_from_llm_verdict(parsed: dict) -> list[dict[str, Any]]:
     """Parse wave-judge rework_tasks (1+ branches, no fanout gate)."""
     if not isinstance(parsed, dict):
         return []
     raw_tasks = parsed.get("rework_tasks")
     if not isinstance(raw_tasks, list):
         return []
-    branches: List[Dict[str, Any]] = []
+    branches: list[dict[str, Any]] = []
     for entry in raw_tasks:
         if not isinstance(entry, dict):
             continue
@@ -703,7 +709,7 @@ def _parse_rework_specs_from_llm_verdict(parsed: dict) -> List[Dict[str, Any]]:
         objective = str(entry.get("objective") or "").strip()
         if agent_id not in _VALID_ROUTER_AGENT_IDS or not objective:
             continue
-        branch: Dict[str, Any] = {"agent_id": agent_id, "objective": objective}
+        branch: dict[str, Any] = {"agent_id": agent_id, "objective": objective}
         ownership = str(entry.get("ownership") or "").strip()
         steps = str(entry.get("steps") or "").strip()
         if ownership:
@@ -718,12 +724,12 @@ def _wave_tasks_from_llm_verdict(
     parsed: dict,
     original_request: str,
     wave_number: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     branches = _parse_rework_specs_from_llm_verdict(parsed)
     if not branches:
         return []
     tasks = _tasks_from_branch_specs(branches, original_request)
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for task in tasks:
         ctx = str(task.get("context") or "")
         extra_marker = f"WAVE_NUMBER: {wave_number}"
@@ -765,12 +771,12 @@ def evaluate_batch_for_next_wave(
     """LLM code-skeptic judge with heuristic fallback for wave continuation."""
     next_wave = current_wave + 1
     llm_verdict = _judge_batch_with_llm(
-        message, original_request, current_wave=current_wave
+        message, original_request, current_wave=current_wave,
     )
     if isinstance(llm_verdict, dict):
         needs = bool(llm_verdict.get("needs_wave"))
         confidence_raw = llm_verdict.get("confidence")
-        confidence: Optional[int] = None
+        confidence: int | None = None
         if isinstance(confidence_raw, (int, float)):
             confidence = max(0, min(100, int(confidence_raw)))
         gaps = llm_verdict.get("gaps")
@@ -798,7 +804,7 @@ def evaluate_batch_for_next_wave(
         if not tasks:
             logger.info(
                 "wave judge (llm): needs_wave=true but no valid rework_tasks; "
-                "falling back to heuristic planner"
+                "falling back to heuristic planner",
             )
             heur = _heuristic_wave_eval(message, original_request, next_wave)
             return WaveEvalResult(
@@ -830,7 +836,7 @@ def _plan_rework_tasks_from_batch(
     message: str,
     original_request: str,
     wave_number: int,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     from agent.ecosystem_delegate import build_delegate_branch_context
 
     blocks = _parse_batch_task_blocks(message)
@@ -838,7 +844,7 @@ def _plan_rework_tasks_from_batch(
     if not rework:
         return []
 
-    tasks: List[Dict[str, Any]] = []
+    tasks: list[dict[str, Any]] = []
     for block in rework:
         goal_hint = block.get("goal") or f"task {block.get('index', '?')}"
         agent_id = infer_agent_id_from_text(f"{goal_hint}\n{block.get('summary', '')}") or "code"
@@ -847,7 +853,7 @@ def _plan_rework_tasks_from_batch(
             f"({goal_hint[:100]})"
         )
         prior = (block.get("summary") or "")[:2000]
-        extra: Dict[str, Any] = {
+        extra: dict[str, Any] = {
             "WAVE_NUMBER": str(wave_number),
             "PRIOR_WAVE_SUMMARY": prior,
             "STEPS": (
@@ -869,10 +875,10 @@ def _plan_rework_tasks_from_batch(
 
 def format_wave_continue_message(
     wave_number: int,
-    tasks: Sequence[Dict[str, Any]],
+    tasks: Sequence[dict[str, Any]],
     dispatch_payload: dict,
 ) -> str:
-    labels: List[str] = []
+    labels: list[str] = []
     for task in tasks:
         ctx = str(task.get("context") or "")
         agent_id = parse_agent_id_from_envelope(ctx) or str(task.get("goal") or "specialist")
@@ -893,8 +899,8 @@ def format_wave_continue_message(
 
 
 def try_root_post_batch_wave_continue(
-    agent, user_message: str, *, task_id: str
-) -> Optional[str]:
+    agent, user_message: str, *, task_id: str,
+) -> str | None:
     """After a specialist wave completes, judge gaps and optionally dispatch wave N+1."""
     if not is_wave_eval_enabled():
         return None
@@ -947,7 +953,7 @@ def try_root_post_batch_wave_continue(
 
     next_wave = bump_orchestrator_wave(agent)
     tasks = wave_eval.tasks or _plan_rework_tasks_from_batch(
-        user_message, original, next_wave
+        user_message, original, next_wave,
     )
     if not tasks:
         agent._orchestrator_wave_number = current_wave
@@ -984,18 +990,18 @@ def _objective_for_agent(agent_id: str, message: str) -> str:
 
 
 def _tasks_from_branch_specs(
-    branches: Sequence[Dict[str, Any]],
+    branches: Sequence[dict[str, Any]],
     original_request: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     from agent.ecosystem_delegate import build_delegate_branch_context
 
-    tasks: List[Dict[str, Any]] = []
+    tasks: list[dict[str, Any]] = []
     for branch in branches:
         agent_id = str(branch.get("agent_id") or "").strip()
         objective = str(branch.get("objective") or "").strip()
         if not agent_id or not objective:
             continue
-        extra: Dict[str, Any] = {}
+        extra: dict[str, Any] = {}
         ownership = str(branch.get("ownership") or "").strip()
         steps = str(branch.get("steps") or "").strip()
         if steps:
@@ -1012,20 +1018,20 @@ def _tasks_from_branch_specs(
                 "goal": objective,
                 "context": ctx,
                 "role": "leaf",
-            }
+            },
         )
     return tasks
 
 
 def _tasks_from_agent_specs(
-    specs: Sequence[Tuple[str, str]],
+    specs: Sequence[tuple[str, str]],
     original_request: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     branches = [{"agent_id": aid, "objective": obj} for aid, obj in specs]
     return _tasks_from_branch_specs(branches, original_request)
 
 
-def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
+def plan_parallel_delegate_tasks(message: str) -> list[dict[str, Any]]:
     """Build delegate_task batch entries for a parallel first wave."""
     text = _orchestration_scoring_text(message) or (message or "").strip()
     if not text:
@@ -1044,7 +1050,7 @@ def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
                 if len(agent_ids) >= min_tasks:
                     break
         seen: set[str] = set()
-        unique_ids: List[str] = []
+        unique_ids: list[str] = []
         for aid in agent_ids:
             if aid not in seen:
                 seen.add(aid)
@@ -1057,7 +1063,7 @@ def plan_parallel_delegate_tasks(message: str) -> List[Dict[str, Any]]:
     return _tasks_from_agent_specs(specs, text)
 
 
-def _extract_json_blob(raw: str) -> Optional[dict]:
+def _extract_json_blob(raw: str) -> dict | None:
     text = (raw or "").strip()
     if not text:
         return None
@@ -1104,13 +1110,13 @@ If recon is too thin for fanout, return {"fanout": false}.
 """
 
 
-def _parse_branch_specs_from_llm(parsed: dict) -> List[Dict[str, Any]]:
+def _parse_branch_specs_from_llm(parsed: dict) -> list[dict[str, Any]]:
     if not parsed or not parsed.get("fanout"):
         return []
     raw_tasks = parsed.get("tasks")
     if not isinstance(raw_tasks, list):
         return []
-    branches: List[Dict[str, Any]] = []
+    branches: list[dict[str, Any]] = []
     for entry in raw_tasks:
         if not isinstance(entry, dict):
             continue
@@ -1118,7 +1124,7 @@ def _parse_branch_specs_from_llm(parsed: dict) -> List[Dict[str, Any]]:
         objective = str(entry.get("objective") or "").strip()
         if agent_id not in _VALID_ROUTER_AGENT_IDS or not objective:
             continue
-        branch: Dict[str, Any] = {"agent_id": agent_id, "objective": objective}
+        branch: dict[str, Any] = {"agent_id": agent_id, "objective": objective}
         ownership = str(entry.get("ownership") or "").strip()
         steps = str(entry.get("steps") or "").strip()
         if ownership:
@@ -1129,9 +1135,9 @@ def _parse_branch_specs_from_llm(parsed: dict) -> List[Dict[str, Any]]:
     return branches if len(branches) >= 2 else []
 
 
-def _extract_recon_summary(messages: Sequence[Dict[str, Any]], *, max_chars: int = 12000) -> str:
+def _extract_recon_summary(messages: Sequence[dict[str, Any]], *, max_chars: int = 12000) -> str:
     """Collect assistant + tool output text from the orchestrator recon turn."""
-    parts: List[str] = []
+    parts: list[str] = []
     for msg in messages:
         if not isinstance(msg, dict):
             continue
@@ -1155,7 +1161,7 @@ def _extract_recon_summary(messages: Sequence[Dict[str, Any]], *, max_chars: int
     return blob
 
 
-def _turn_includes_delegate_task(messages: Sequence[Dict[str, Any]]) -> bool:
+def _turn_includes_delegate_task(messages: Sequence[dict[str, Any]]) -> bool:
     for msg in messages:
         if not isinstance(msg, dict) or msg.get("role") != "tool":
             continue
@@ -1169,7 +1175,7 @@ def _turn_includes_delegate_task(messages: Sequence[Dict[str, Any]]) -> bool:
     return False
 
 
-def _count_recon_tool_turns(messages: Sequence[Dict[str, Any]]) -> int:
+def _count_recon_tool_turns(messages: Sequence[dict[str, Any]]) -> int:
     """Count tool messages that consumed a recon turn (read_file / search_files).
 
     Used as a timeout guard: if the orchestrator spends too many turns on
@@ -1186,12 +1192,15 @@ def _count_recon_tool_turns(messages: Sequence[Dict[str, Any]]) -> int:
     return count
 
 
-def _plan_tasks_from_recon(recon_summary: str, original_request: str) -> Optional[List[Dict[str, Any]]]:
+def _plan_tasks_from_recon(recon_summary: str, original_request: str) -> list[dict[str, Any]] | None:
     """LLM planner: recon findings → tailored branch specs."""
     if not recon_summary.strip():
         return None
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:
         logger.debug("orchestrator_router: auxiliary import failed: %s", exc)
         return None
@@ -1232,7 +1241,7 @@ def _plan_tasks_from_recon(recon_summary: str, original_request: str) -> Optiona
     return _tasks_from_branch_specs(branches, original_request)
 
 
-def build_orchestrator_recon_injection(agent, user_message: str) -> Optional[str]:
+def build_orchestrator_recon_injection(agent, user_message: str) -> str | None:
     """Two-phase orchestrator hint: recon with tools, then tailored delegate_task."""
     if not is_orchestrator_two_phase_enabled():
         return None
@@ -1267,7 +1276,7 @@ def build_orchestrator_recon_injection(agent, user_message: str) -> Optional[str
     )
 
 
-def build_root_synthesis_injection(message: str) -> Optional[str]:
+def build_root_synthesis_injection(message: str) -> str | None:
     """After specialist batch completes, instruct root to synthesize one answer."""
     try:
         from tools.process_registry import is_async_delegation_notification_text
@@ -1306,10 +1315,10 @@ def build_root_synthesis_injection(message: str) -> Optional[str]:
 
 def _dispatch_orchestrator_fanout(
     agent,
-    tasks: List[Dict[str, Any]],
+    tasks: list[dict[str, Any]],
     *,
     task_id: str,
-) -> Optional[str]:
+) -> str | None:
     wave_number = _ensure_wave_on_agent(agent)
     max_tasks = _max_orchestrator_wave_tasks()
     if len(tasks) > max_tasks:
@@ -1325,7 +1334,7 @@ def _dispatch_orchestrator_fanout(
     ]
     try:
         result_json = agent._dispatch_delegate_task(
-            {"tasks": tasks, "role": "leaf", "background": True}
+            {"tasks": tasks, "role": "leaf", "background": True},
         )
     except Exception as exc:
         logger.warning("orchestrator fan-out dispatch failed: %s", exc)
@@ -1350,11 +1359,11 @@ def _dispatch_orchestrator_fanout(
 
 def try_orchestrator_post_recon_fanout(
     agent,
-    messages: Sequence[Dict[str, Any]],
+    messages: Sequence[dict[str, Any]],
     user_message: str,
     *,
     task_id: str,
-) -> Optional[str]:
+) -> str | None:
     """After orchestrator recon turn, plan tailored tasks and fan out if needed."""
     if not is_orchestrator_two_phase_enabled():
         return None
@@ -1413,10 +1422,13 @@ def try_orchestrator_post_recon_fanout(
     return _dispatch_orchestrator_fanout(agent, tasks, task_id=task_id)
 
 
-def _plan_tasks_with_llm(message: str) -> Optional[List[Tuple[str, str]]]:
+def _plan_tasks_with_llm(message: str) -> list[tuple[str, str]] | None:
     """Optional auxiliary LLM decomposition; returns None on any failure."""
     try:
-        from agent.auxiliary_client import get_auxiliary_extra_body, get_text_auxiliary_client
+        from agent.auxiliary_client import (
+            get_auxiliary_extra_body,
+            get_text_auxiliary_client,
+        )
     except Exception as exc:
         logger.debug("orchestrator_router: auxiliary import failed: %s", exc)
         return None
@@ -1454,7 +1466,7 @@ def _plan_tasks_with_llm(message: str) -> Optional[List[Tuple[str, str]]]:
     if not isinstance(raw_tasks, list) or len(raw_tasks) < 2:
         return None
 
-    specs: List[Tuple[str, str]] = []
+    specs: list[tuple[str, str]] = []
     for entry in raw_tasks:
         if not isinstance(entry, dict):
             continue
@@ -1468,10 +1480,10 @@ def _plan_tasks_with_llm(message: str) -> Optional[List[Tuple[str, str]]]:
 
 
 def format_programmatic_dispatch_message(
-    tasks: Sequence[Dict[str, Any]],
+    tasks: Sequence[dict[str, Any]],
     dispatch_payload: dict,
 ) -> str:
-    labels: List[str] = []
+    labels: list[str] = []
     for task in tasks:
         ctx = str(task.get("context") or "")
         agent_id = parse_agent_id_from_envelope(ctx) or str(task.get("goal") or "specialist")
@@ -1527,8 +1539,8 @@ def format_start_handoff_message(dispatch_payload: dict) -> str:
 
 
 def try_programmatic_start_router(
-    agent, message: str, *, task_id: str
-) -> Optional[str]:
+    agent, message: str, *, task_id: str,
+) -> str | None:
     """Root ``/start``: spawn start subagent (not leaf specialists)."""
     from agent.ecosystem_delegate import build_delegate_branch_context
 
@@ -1556,7 +1568,7 @@ def try_programmatic_start_router(
                 "context": ctx,
                 "role": "orchestrator",
                 "background": True,
-            }
+            },
         )
     except Exception as exc:
         logger.warning("start router dispatch failed: %s", exc)
@@ -1575,8 +1587,8 @@ def try_programmatic_start_router(
 
 
 def try_start_child_handoff(
-    agent, user_message: str, *, task_id: str
-) -> Optional[str]:
+    agent, user_message: str, *, task_id: str,
+) -> str | None:
     """Start subagent → orchestrator before the start LLM turn."""
     if _agent_ecosystem_id(agent) != "start":
         return None
@@ -1627,7 +1639,7 @@ def try_start_child_handoff(
                 "context": ctx,
                 "role": "orchestrator",
                 "background": True,
-            }
+            },
         )
     except Exception as exc:
         logger.warning("start handoff failed: %s", exc)
@@ -1646,7 +1658,7 @@ def try_start_child_handoff(
     return format_start_handoff_message(payload)
 
 
-def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Optional[str]:
+def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> str | None:
     """Programmatically fan out delegate_task before the root LLM turn.
 
     Returns an assistant-facing message when dispatch succeeded, else None
@@ -1726,7 +1738,7 @@ def try_programmatic_orchestration(agent, message: str, *, task_id: str) -> Opti
     return format_programmatic_dispatch_message(tasks, payload)
 
 
-def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> Optional[str]:
+def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> str | None:
     """Parallel first wave when the active agent is an orchestrator subagent.
 
     With ``orchestrator_two_phase`` (default), recon + LLM-planned fan-out
@@ -1773,14 +1785,14 @@ def try_orchestrator_child_fanout(agent, user_message: str, *, task_id: str) -> 
     return _dispatch_orchestrator_fanout(agent, tasks, task_id=task_id)
 
 
-def build_orchestration_injection(message: str) -> Optional[str]:
+def build_orchestration_injection(message: str) -> str | None:
     """Build API-only user-message injection for multi-domain turns."""
     if is_start_router_turn(message):
         # Programmatic mode handles /start via start → orchestrator chain.
         if orchestrate_mode() == "programmatic":
             return None
         original = _sanitize_original_request(
-            _orchestration_scoring_text(message) or " ".join((message or "").split())
+            _orchestration_scoring_text(message) or " ".join((message or "").split()),
         )
         return (
             "[HERMES_START_ROUTER — orchestration hint; not shown to user]\n"
@@ -1789,7 +1801,7 @@ def build_orchestration_injection(message: str) -> Optional[str]:
             "the **start** subagent (AGENT_ID:start in context, role=orchestrator, "
             "background=true). Start will hand off to orchestrator; orchestrator "
             "will fan out parallel specialists.\n\n"
-            f'context must include ORIGINAL_REQUEST: {original}\\n'
+            f"context must include ORIGINAL_REQUEST: {original}\\n"
             "MODE: start_router\n\n"
             "No read_file/terminal/web before delegate_task."
         )
@@ -1821,7 +1833,7 @@ def build_orchestration_injection(message: str) -> Optional[str]:
     )
 
 
-def parse_agent_id_from_envelope(text: str) -> Optional[str]:
+def parse_agent_id_from_envelope(text: str) -> str | None:
     """Extract ecosystem agent id from delegate_task / Task() envelope."""
     if not text:
         return None

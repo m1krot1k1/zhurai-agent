@@ -1,8 +1,8 @@
 """Tests for native Discord slash command fast-paths (thread creation & auto-thread)."""
 
+import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
-import sys
 
 import pytest
 
@@ -166,7 +166,8 @@ async def test_registers_native_restart_slash_command(adapter):
 @pytest.mark.asyncio
 async def test_auto_registers_missing_gateway_commands(adapter):
     """Commands in COMMAND_REGISTRY that aren't explicitly registered should
-    be auto-registered by the dynamic catch-all block."""
+    be auto-registered by the dynamic catch-all block.
+    """
     adapter._run_simple_slash = AsyncMock()
     adapter._register_slash_commands()
 
@@ -205,7 +206,7 @@ async def test_auto_registered_command_with_args(adapter):
     adapter._run_simple_slash.reset_mock()
     await branch_cmd.callback(interaction, args="my-branch")
     adapter._run_simple_slash.assert_awaited_once_with(
-        interaction, "/branch my-branch"
+        interaction, "/branch my-branch",
     )
 
 
@@ -222,7 +223,7 @@ async def test_auto_registers_plugin_commands_for_discord(adapter):
                 "description": "Metrics dashboard",
                 "args_hint": "dias:7 formato:json",
                 "plugin": "metrics-plugin",
-            }
+            },
         },
     ):
         adapter._register_slash_commands()
@@ -234,7 +235,7 @@ async def test_auto_registers_plugin_commands_for_discord(adapter):
     interaction = SimpleNamespace()
     await metricas_cmd.callback(interaction, args="dias:7 formato:json")
     adapter._run_simple_slash.assert_awaited_once_with(
-        interaction, "/metricas dias:7 formato:json"
+        interaction, "/metricas dias:7 formato:json",
     )
 
 
@@ -251,7 +252,7 @@ async def test_auto_registered_plugin_command_without_args_hint(adapter):
                 "description": "Ping the plugin",
                 "args_hint": "",
                 "plugin": "ping-plugin",
-            }
+            },
         },
     ):
         adapter._register_slash_commands()
@@ -276,7 +277,7 @@ async def test_plugin_command_name_conflict_skipped(adapter):
                 "description": "Plugin status",
                 "args_hint": "",
                 "plugin": "shadow-plugin",
-            }
+            },
         },
     ):
         adapter._register_slash_commands()
@@ -537,7 +538,7 @@ def test_build_slash_event_uses_group_context_for_channels(adapter):
     assert event.source.chat_id == "123"
     assert event.source.chat_type == "group"
     assert event.source.thread_id is None
-    assert "TestGuild / #general" == event.source.chat_name
+    assert event.source.chat_name == "TestGuild / #general"
 
 
 # ------------------------------------------------------------------
@@ -591,7 +592,8 @@ async def test_auto_create_thread_strips_mention_syntax_from_name(adapter):
 @pytest.mark.asyncio
 async def test_auto_create_thread_falls_back_to_hermes_when_only_mentions(adapter):
     """If a message contains only mention syntax, the stripped content is
-    empty — fall back to the 'Hermes' default rather than ''."""
+    empty — fall back to the 'Hermes' default rather than ''.
+    """
     thread = SimpleNamespace(id=999, name="Hermes")
     message = SimpleNamespace(
         content="<@&1490963422786093149>",
@@ -823,8 +825,9 @@ async def test_auto_thread_skips_threads_and_dms(adapter, monkeypatch):
 
 def test_discord_auto_thread_config_bridge(monkeypatch, tmp_path):
     """discord.auto_thread in config.yaml should be bridged to DISCORD_AUTO_THREAD env var."""
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     # Write a config.yaml the loader will find
     hermes_dir = tmp_path / ".hermes"
@@ -1046,4 +1049,3 @@ def test_register_skill_command_autocomplete_filters_by_name_and_description(ada
     # (covered in other tests). The autocomplete filter itself is exercised
     # via direct function call in the real-discord integration path.
     assert skill_cmd.callback is not None
-

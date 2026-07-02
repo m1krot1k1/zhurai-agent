@@ -20,7 +20,6 @@ import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from hermes_constants import get_hermes_home
 from utils import atomic_replace
@@ -38,7 +37,7 @@ _REDACTION_BANNER = (
 _EMAIL_ADDRESS_RE = re.compile(
     r"(?<![A-Za-z0-9._%+-])"
     r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
-    r"(?![A-Za-z0-9._%+-])"
+    r"(?![A-Za-z0-9._%+-])",
 )
 
 
@@ -128,7 +127,7 @@ def _record_pending(urls: list[str], delay_seconds: int = _AUTO_DELETE_SECONDS) 
     _save_pending(merged)
 
 
-def _sweep_expired_pastes(now: Optional[float] = None) -> tuple[int, int]:
+def _sweep_expired_pastes(now: float | None = None) -> tuple[int, int]:
     """Synchronously DELETE any pending pastes whose ``expire_at`` has passed.
 
     Returns ``(deleted, remaining)``.  Best-effort: failed deletes stay in
@@ -208,7 +207,7 @@ _GATEWAY_PRIVACY_NOTICE = (
 )
 
 
-def _extract_paste_id(url: str) -> Optional[str]:
+def _extract_paste_id(url: str) -> str | None:
     """Extract the paste ID from a paste.rs or dpaste.com URL.
 
     Returns the ID string, or None if the URL doesn't match a known service.
@@ -229,7 +228,7 @@ def delete_paste(url: str) -> bool:
     paste_id = _extract_paste_id(url)
     if not paste_id:
         raise ValueError(
-            f"Cannot delete: only paste.rs URLs are supported.  Got: {url}"
+            f"Cannot delete: only paste.rs URLs are supported.  Got: {url}",
         )
 
     target = f"{_PASTE_RS_URL}{paste_id}"
@@ -334,7 +333,7 @@ def upload_to_pastebin(content: str, expiry_days: int = 7) -> str:
         errors.append(f"dpaste.com: {exc}")
 
     raise RuntimeError(
-        "Failed to upload to any paste service:\n  " + "\n  ".join(errors)
+        "Failed to upload to any paste service:\n  " + "\n  ".join(errors),
     )
 
 
@@ -347,12 +346,12 @@ def upload_to_pastebin(content: str, expiry_days: int = 7) -> str:
 class LogSnapshot:
     """Single-read snapshot of a log file used by debug-share."""
 
-    path: Optional[Path]
+    path: Path | None
     tail_text: str
-    full_text: Optional[str]
+    full_text: str | None
 
 
-def _primary_log_path(log_name: str) -> Optional[Path]:
+def _primary_log_path(log_name: str) -> Path | None:
     """Where *log_name* would live if present. Doesn't check existence."""
     from hermes_cli.logs import LOG_FILES
 
@@ -360,7 +359,7 @@ def _primary_log_path(log_name: str) -> Optional[Path]:
     return (get_hermes_home() / "logs" / filename) if filename else None
 
 
-def _resolve_log_path(log_name: str) -> Optional[Path]:
+def _resolve_log_path(log_name: str) -> Path | None:
     """Find the log file for *log_name*, falling back to the .1 rotation.
 
     Returns the first non-empty candidate (primary, then .1), or None.
@@ -429,7 +428,7 @@ def _capture_log_snapshot(
             # race: file was truncated between _resolve_log_path and stat
             return LogSnapshot(path=log_path, tail_text="(file empty)", full_text=None)
 
-        with open(log_path, "rb") as f:
+        with Path(log_path).open("rb") as f:
             if size <= max_bytes:
                 raw = f.read()
                 truncated = False
@@ -485,7 +484,7 @@ def _capture_log_snapshot(
 
 
 def _capture_default_log_snapshots(
-    log_lines: int, *, redact: bool = True
+    log_lines: int, *, redact: bool = True,
 ) -> dict[str, LogSnapshot]:
     """Capture all logs used by debug-share exactly once.
 
@@ -495,19 +494,19 @@ def _capture_default_log_snapshots(
     errors_lines = min(log_lines, 100)
     return {
         "agent": _capture_log_snapshot(
-            "agent", tail_lines=log_lines, redact=redact
+            "agent", tail_lines=log_lines, redact=redact,
         ),
         "errors": _capture_log_snapshot(
-            "errors", tail_lines=errors_lines, redact=redact
+            "errors", tail_lines=errors_lines, redact=redact,
         ),
         "gateway": _capture_log_snapshot(
-            "gateway", tail_lines=errors_lines, redact=redact
+            "gateway", tail_lines=errors_lines, redact=redact,
         ),
         "gui": _capture_log_snapshot(
-            "gui", tail_lines=errors_lines, redact=redact
+            "gui", tail_lines=errors_lines, redact=redact,
         ),
         "desktop": _capture_log_snapshot(
-            "desktop", tail_lines=errors_lines, redact=redact
+            "desktop", tail_lines=errors_lines, redact=redact,
         ),
     }
 
@@ -539,7 +538,7 @@ def collect_debug_report(
     *,
     log_lines: int = 200,
     dump_text: str = "",
-    log_snapshots: Optional[dict[str, LogSnapshot]] = None,
+    log_snapshots: dict[str, LogSnapshot] | None = None,
 ) -> str:
     """Build the summary debug report: system dump + log tails.
 
@@ -552,6 +551,7 @@ def collect_debug_report(
         internally.
 
     Returns the report as a plain-text string ready for upload.
+
     """
     buf = io.StringIO()
 
@@ -636,7 +636,7 @@ def build_debug_share(
 
     if redact:
         logger.info(
-            "hermes debug share: applied force-mode redaction to log snapshots before upload"
+            "hermes debug share: applied force-mode redaction to log snapshots before upload",
         )
 
     report = collect_debug_report(
@@ -776,7 +776,7 @@ def run_debug_share(args):
 
     # Print results
     label_width = max(len(k) for k in result.urls)
-    print(f"\nDebug report uploaded:")
+    print("\nDebug report uploaded:")
     for label, url in result.urls.items():
         print(f"  {label:<{label_width}}  {url}")
 
@@ -787,9 +787,9 @@ def run_debug_share(args):
     print(f"\n⏱  Pastes will auto-delete in {hours} hours.")
 
     # Manual delete fallback
-    print(f"To delete now:  hermes debug delete <url>")
+    print("To delete now:  hermes debug delete <url>")
 
-    print(f"\nShare these links with the Hermes team for support.")
+    print("\nShare these links with the Hermes team for support.")
 
 
 def run_debug_delete(args):

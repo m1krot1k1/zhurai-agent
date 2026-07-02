@@ -52,9 +52,9 @@ import os
 import random
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Lazy import: BasePlatformAdapter and friends live in the main repo.
 # Imported at module top because they're stdlib-only inside Hermes — no
@@ -86,7 +86,7 @@ _CORR_PREFIX = "hermes-"
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _parse_comma_list(value: str) -> List[str]:
+def _parse_comma_list(value: str) -> list[str]:
     """Split a comma-separated string into a stripped list."""
     return [v.strip() for v in value.split(",") if v.strip()]
 
@@ -163,14 +163,14 @@ class SimplexAdapter(BasePlatformAdapter):
         # are ignored entirely (safer default — a bot in a group otherwise
         # processes every member's traffic). Use ``*`` to accept any group.
         group_allowed_str = os.getenv("SIMPLEX_GROUP_ALLOWED", "") or extra.get(
-            "group_allowed", ""
+            "group_allowed", "",
         )
         self.group_allow_from = set(_parse_comma_list(group_allowed_str))
 
         # Running state
         self._ws = None  # websockets connection
-        self._ws_task: Optional[asyncio.Task] = None
-        self._health_task: Optional[asyncio.Task] = None
+        self._ws_task: asyncio.Task | None = None
+        self._health_task: asyncio.Task | None = None
         self._running = False
         self._last_ws_activity = 0.0
 
@@ -181,21 +181,21 @@ class SimplexAdapter(BasePlatformAdapter):
         # File transfers awaiting rcvFileComplete (keyed by fileId). Populated
         # when a newChatItems event carries an unfinished rcvFileTransfer,
         # consumed when the file finishes downloading.
-        self._pending_file_transfers: Dict[int, dict] = {}
+        self._pending_file_transfers: dict[int, dict] = {}
 
         # Correlation tracking for ``_send_command``. Separate from
         # ``_pending_corr_ids`` (which is the upstream cosmetic echo filter)
         # because we actually await responses to commands we send.
-        self._pending_responses: Dict[str, asyncio.Future] = {}
+        self._pending_responses: dict[str, asyncio.Future] = {}
         self._corr_counter = 0
 
         # Text message batching — concatenate rapid-fire messages into one
         # event before dispatching, mirroring Telegram's batching.
         self._text_batch_delay = float(
-            os.getenv("HERMES_SIMPLEX_TEXT_BATCH_DELAY", "0.8")
+            os.getenv("HERMES_SIMPLEX_TEXT_BATCH_DELAY", "0.8"),
         )
-        self._pending_text_batches: Dict[str, MessageEvent] = {}
-        self._pending_text_batch_tasks: Dict[str, asyncio.Task] = {}
+        self._pending_text_batches: dict[str, MessageEvent] = {}
+        self._pending_text_batch_tasks: dict[str, asyncio.Task] = {}
 
         logger.info(
             "SimpleX adapter initialized: url=%s auto_accept=%s groups=%s",
@@ -215,7 +215,7 @@ class SimplexAdapter(BasePlatformAdapter):
         except ImportError:
             logger.error(
                 "SimpleX: 'websockets' package not installed. "
-                "Run: pip install websockets"
+                "Run: pip install websockets",
             )
             return False
 
@@ -455,14 +455,14 @@ class SimplexAdapter(BasePlatformAdapter):
                 if file_path:
                     pending_item_data = pending.get("chatItem", {}) or {}
                     pending_item_data.setdefault("file", {})["fileSource"] = {
-                        "filePath": file_path
+                        "filePath": file_path,
                     }
                     pending["chatItem"] = pending_item_data
                     try:
                         await self._handle_chat_item(pending)
                     except Exception:
                         logger.exception(
-                            "SimpleX: error processing deferred file message"
+                            "SimpleX: error processing deferred file message",
                         )
             return
 
@@ -514,7 +514,7 @@ class SimplexAdapter(BasePlatformAdapter):
             contact = chat_info.get("contact", {}) or {}
             sender_id = str(contact.get("contactId", ""))
             sender_name = contact.get("localDisplayName", "") or contact.get(
-                "profile", {}
+                "profile", {},
             ).get("displayName", "")
             chat_id = sender_id
         elif chat_type == "group":
@@ -526,7 +526,7 @@ class SimplexAdapter(BasePlatformAdapter):
             member = item_direction.get("groupMember", {}) or {}
             sender_id = str(member.get("memberId", ""))
             sender_name = member.get("localDisplayName", "") or member.get(
-                "memberProfile", {}
+                "memberProfile", {},
             ).get("displayName", "")
 
             # Group allowlist
@@ -542,7 +542,7 @@ class SimplexAdapter(BasePlatformAdapter):
                     return
             else:
                 logger.debug(
-                    "SimpleX: ignoring group message (no SIMPLEX_GROUP_ALLOWED)"
+                    "SimpleX: ignoring group message (no SIMPLEX_GROUP_ALLOWED)",
                 )
                 return
         else:
@@ -555,8 +555,8 @@ class SimplexAdapter(BasePlatformAdapter):
 
         # File / image / voice attachment handling. File info is at
         # chatItem.chatItem.file (sibling of meta, content, chatDir).
-        media_urls: List[str] = []
-        media_types: List[str] = []
+        media_urls: list[str] = []
+        media_types: list[str] = []
         file_info = chat_item_data.get("file")
 
         if file_info and isinstance(file_info, dict):
@@ -607,7 +607,7 @@ class SimplexAdapter(BasePlatformAdapter):
         if is_group:
             group_info = chat_info.get("groupInfo", {}) or {}
             chat_name = group_info.get("localDisplayName", "") or group_info.get(
-                "groupProfile", {}
+                "groupProfile", {},
             ).get("displayName", chat_id)
 
         source = self.build_source(
@@ -637,9 +637,9 @@ class SimplexAdapter(BasePlatformAdapter):
             if ts_str:
                 timestamp = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
             else:
-                timestamp = datetime.now(tz=timezone.utc)
+                timestamp = datetime.now(tz=UTC)
         except (ValueError, AttributeError):
-            timestamp = datetime.now(tz=timezone.utc)
+            timestamp = datetime.now(tz=UTC)
 
         msg_event = MessageEvent(
             source=source,
@@ -693,7 +693,7 @@ class SimplexAdapter(BasePlatformAdapter):
         if prior_task and not prior_task.done():
             prior_task.cancel()
         self._pending_text_batch_tasks[key] = asyncio.create_task(
-            self._flush_text_batch(key)
+            self._flush_text_batch(key),
         )
 
     async def _flush_text_batch(self, key: str) -> None:
@@ -756,8 +756,8 @@ class SimplexAdapter(BasePlatformAdapter):
             logger.warning("SimpleX: WS send error: %s", e)
 
     async def _send_command(
-        self, command: str, timeout: float = 30.0
-    ) -> Optional[dict]:
+        self, command: str, timeout: float = 30.0,
+    ) -> dict | None:
         """Send a command and await the correlated response."""
         ws = self._ws
         if not ws:
@@ -775,7 +775,7 @@ class SimplexAdapter(BasePlatformAdapter):
             await ws.send(payload)
             result = await asyncio.wait_for(fut, timeout=timeout)
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("SimpleX: command timed out: %s", command[:50])
             self._pending_responses.pop(corr_id, None)
             return None
@@ -802,8 +802,8 @@ class SimplexAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Send a text message.
 
@@ -834,7 +834,7 @@ class SimplexAdapter(BasePlatformAdapter):
                 # Structured form: addresses by numeric ID, and json.dumps
                 # escapes newlines + special chars correctly.
                 composed = json.dumps(
-                    [{"msgContent": {"type": "text", "text": content}}]
+                    [{"msgContent": {"type": "text", "text": content}}],
                 )
                 cmd_str = f"/_send #{chat_id[6:]} json {composed}"
             else:
@@ -917,11 +917,11 @@ class SimplexAdapter(BasePlatformAdapter):
                     capture_output=True,
                     timeout=30,
                 )
-                with open(tmp_path, "rb") as f:
+                with Path(tmp_path).open("rb") as f:
                     thumb_uri = (
                         "data:image/jpg;base64," + base64.b64encode(f.read()).decode()
                     )
-                os.remove(tmp_path)
+                Path(tmp_path).unlink()
             except (FileNotFoundError, subprocess.SubprocessError) as exc:
                 logger.warning("SimpleX: image conversion unavailable: %s", exc)
 
@@ -931,7 +931,7 @@ class SimplexAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_url: str,
-        caption: Optional[str] = None,
+        caption: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send an image. Supports ``file://`` URLs and ``http(s)://`` URLs."""
@@ -964,8 +964,8 @@ class SimplexAdapter(BasePlatformAdapter):
                         "image": thumb_uri,
                         "text": caption or "",
                     },
-                }
-            ]
+                },
+            ],
         )
 
         if chat_id.startswith("group:"):
@@ -983,21 +983,21 @@ class SimplexAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a local image file via SimpleX."""
         return await self.send_image(
-            chat_id, f"file://{image_path}", caption=caption, **kwargs
+            chat_id, f"file://{image_path}", caption=caption, **kwargs,
         )
 
     async def send_video(
         self,
         chat_id: str,
         video_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a video file via SimpleX (as a file attachment)."""
@@ -1007,8 +1007,8 @@ class SimplexAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         file_path: str,
-        caption: Optional[str] = None,
-        filename: Optional[str] = None,
+        caption: str | None = None,
+        filename: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a document/file attachment."""
@@ -1020,8 +1020,8 @@ class SimplexAdapter(BasePlatformAdapter):
                 {
                     "filePath": file_path,
                     "msgContent": {"type": "file", "text": caption or ""},
-                }
-            ]
+                },
+            ],
         )
 
         if chat_id.startswith("group:"):
@@ -1039,8 +1039,8 @@ class SimplexAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         audio_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         duration: int = 0,
         **kwargs,
     ) -> SendResult:
@@ -1063,8 +1063,8 @@ class SimplexAdapter(BasePlatformAdapter):
                         "duration": duration,
                     },
                     "fileSource": {"filePath": audio_path},
-                }
-            ]
+                },
+            ],
         )
 
         if chat_id.startswith("group:"):
@@ -1081,7 +1081,7 @@ class SimplexAdapter(BasePlatformAdapter):
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         """SimpleX has no typing-indicator API — no-op."""
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         """Return basic chat info."""
         if chat_id.startswith("group:"):
             return {"chat_id": chat_id, "type": "group", "name": chat_id[6:]}
@@ -1122,7 +1122,7 @@ def is_connected(config) -> bool:
     return bool(ws_url)
 
 
-def _env_enablement() -> Optional[dict]:
+def _env_enablement() -> dict | None:
     """Seed ``PlatformConfig.extra`` from env vars during gateway config load.
 
     Called by the platform registry's env-enablement hook BEFORE adapter
@@ -1161,10 +1161,10 @@ async def _standalone_send(
     chat_id: str,
     message: str,
     *,
-    thread_id: Optional[str] = None,
-    media_files: Optional[List[str]] = None,
+    thread_id: str | None = None,
+    media_files: list[str] | None = None,
     force_document: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Open an ephemeral WebSocket to the daemon, send, and close.
 
     Used by ``tools/send_message_tool._send_via_adapter`` when the gateway
@@ -1185,7 +1185,7 @@ async def _standalone_send(
 
     extra = getattr(pconfig, "extra", {}) or {}
     ws_url = os.getenv("SIMPLEX_WS_URL") or extra.get(
-        "ws_url", "ws://127.0.0.1:5225"
+        "ws_url", "ws://127.0.0.1:5225",
     )
     if not ws_url:
         return {"error": "SimpleX standalone send: SIMPLEX_WS_URL is required"}
@@ -1194,7 +1194,7 @@ async def _standalone_send(
         if chat_id.startswith("group:"):
             group_id = chat_id[6:]
             composed = json.dumps(
-                [{"msgContent": {"type": "text", "text": message}}]
+                [{"msgContent": {"type": "text", "text": message}}],
             )
             cmd_str = f"/_send #{group_id} json {composed}"
         else:
@@ -1207,7 +1207,7 @@ async def _standalone_send(
         }
 
         async with _wsclient.connect(
-            ws_url, open_timeout=10, close_timeout=5
+            ws_url, open_timeout=10, close_timeout=5,
         ) as ws:
             await ws.send(json.dumps(payload))
             # Give the daemon a moment to process the command before closing.
@@ -1238,7 +1238,7 @@ def interactive_setup() -> None:
     except ImportError:
         print(
             "hermes_cli.config not available; set SIMPLEX_* vars manually in "
-            "~/.hermes/.env"
+            "~/.hermes/.env",
         )
         return
 
@@ -1270,7 +1270,7 @@ def interactive_setup() -> None:
     _prompt("SIMPLEX_HOME_CHANNEL", "Home channel contact/group ID (or empty)")
     print(
         "Done. Make sure the simplex-chat daemon is running before starting "
-        "the gateway."
+        "the gateway.",
     )
 
 

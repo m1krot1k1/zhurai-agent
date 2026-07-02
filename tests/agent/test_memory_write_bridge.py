@@ -65,7 +65,7 @@ def test_notifies_remove_with_old_text_after_success():
             "target": "memory",
             "content": "",
             "metadata": {"old_text": "stale preference entry"},
-        }
+        },
     ]
 
 
@@ -141,5 +141,5 @@ def test_build_metadata_callback_is_merged_per_op():
             "target": "memory",
             "content": "fact",
             "metadata": {"session_id": "s1", "tool_name": "memory"},
-        }
+        },
     ]

@@ -7,8 +7,9 @@ the file-write logic live here.
 
 import json
 import logging
+import pathlib
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def has_incomplete_scratchpad(content: str) -> bool:
     return "<REASONING_SCRATCHPAD>" in content and "</REASONING_SCRATCHPAD>" not in content
 
 
-def save_trajectory(trajectory: List[Dict[str, Any]], model: str,
+def save_trajectory(trajectory: list[dict[str, Any]], model: str,
                     completed: bool, filename: str = None):
     """Append a trajectory entry to a JSONL file.
 
@@ -37,6 +38,7 @@ def save_trajectory(trajectory: List[Dict[str, Any]], model: str,
         completed: Whether the conversation completed successfully.
         filename: Override output filename. Defaults to trajectory_samples.jsonl
                   or failed_trajectories.jsonl based on ``completed``.
+
     """
     if filename is None:
         filename = "trajectory_samples.jsonl" if completed else "failed_trajectories.jsonl"
@@ -49,7 +51,7 @@ def save_trajectory(trajectory: List[Dict[str, Any]], model: str,
     }
 
     try:
-        with open(filename, "a", encoding="utf-8") as f:
+        with pathlib.Path(filename).open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         logger.info("Trajectory saved to %s", filename)
     except Exception as e:

@@ -1,5 +1,4 @@
-"""
-show_snapshot.py — Dump the population from a darwinian-evolver snapshot pickle.
+"""show_snapshot.py — Dump the population from a darwinian-evolver snapshot pickle.
 
 Usage:
     python show_snapshot.py PATH/TO/iteration_N.pkl [--field prompt_template]
@@ -44,7 +43,7 @@ def main() -> int:
             "refusing to unpickle: pickle.loads is equivalent to executing arbitrary "
             "code from the snapshot file. Only proceed if you created/control this "
             "file, then re-run with --i-trust-this-file.\n"
-            f"  file: {args.snapshot}"
+            f"  file: {args.snapshot}",
         )
 
     print(
@@ -74,7 +73,7 @@ def main() -> int:
         field = args.field
         if field is None:
             for k, v in vars(org).items():
-                if isinstance(v, str) and not k.startswith("_") and k not in {"id",}:
+                if isinstance(v, str) and not k.startswith("_") and k not in {"id"}:
                     field = k
                     break
         val = getattr(org, field, None) if field else None

@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import UTC
 from pathlib import Path
 
 # Short timeouts: schtasks occasionally wedges and we don't want to hang forever.
@@ -491,8 +492,6 @@ def _install_scheduled_task(task_name: str, script_path: Path) -> tuple[bool, st
     return (False, f"schtasks /Create failed (code {last_code}): {last_err.strip()}")
 
 
-
-
 def _install_startup_entry(script_path: Path) -> Path:
     """Write the Startup-folder fallback launcher. Returns its path."""
     entry = get_startup_entry_path()
@@ -650,7 +649,7 @@ def _spawn_detached(script_path: Path | None = None) -> int:
     stray_log = log_dir / "gateway-stdio.log"
 
     try:
-        with open(stray_log, "ab", buffering=0) as log_fh:
+        with Path(stray_log).open("ab", buffering=0) as log_fh:
             proc = subprocess.Popen(
                 argv,
                 cwd=working_dir,
@@ -667,7 +666,7 @@ def _spawn_detached(script_path: Path | None = None) -> int:
         # Terminal configs). Retry without the breakaway flag — in most
         # setups pythonw.exe + DETACHED_PROCESS is enough on its own.
         flags_no_breakaway = flags & ~0x01000000
-        with open(stray_log, "ab", buffering=0) as log_fh:
+        with Path(stray_log).open("ab", buffering=0) as log_fh:
             proc = subprocess.Popen(
                 argv,
                 cwd=working_dir,
@@ -730,7 +729,7 @@ def _install_startup_fallback(script_path: Path, start_now: bool, detail: str) -
     # Startup-folder fallback only installs login persistence. Starting is
     # controlled by the pre-UAC start_now answer so all user decisions happen
     # before any elevation prompt.
-    from hermes_cli.gateway import find_gateway_pids, _profile_arg
+    from hermes_cli.gateway import _profile_arg, find_gateway_pids
 
     running_pids = list(find_gateway_pids())
     if running_pids:
@@ -852,7 +851,7 @@ def install(
         # Startup-folder fallback only installs login persistence. Starting is
         # controlled by the pre-UAC start_now answer so all user decisions happen
         # before any elevation prompt.
-        from hermes_cli.gateway import find_gateway_pids, _profile_arg
+        from hermes_cli.gateway import _profile_arg, find_gateway_pids
 
         running_pids = list(find_gateway_pids())
         if running_pids:
@@ -1019,7 +1018,7 @@ def _print_deep_probes() -> None:
       [6] Last lifecycle event in gateway-exit-diag.log
     """
     import json
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from hermes_cli.config import get_hermes_home
 
@@ -1095,7 +1094,7 @@ def _print_deep_probes() -> None:
             if updated_at:
                 try:
                     updated_dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-                    now = datetime.now(timezone.utc)
+                    now = datetime.now(UTC)
                     age_seconds = int((now - updated_dt).total_seconds())
                     age_str = f" (updated {age_seconds}s ago)"
                 except Exception:
@@ -1110,7 +1109,7 @@ def _print_deep_probes() -> None:
     # [6] Last lifecycle event from the exit-diag log
     if diag_path.exists():
         try:
-            with open(diag_path, "rb") as fh:
+            with Path(diag_path).open("rb") as fh:
                 # Read last ~4KB; one event is well under 500 bytes.
                 fh.seek(0, 2)
                 size = fh.tell()
@@ -1230,7 +1229,7 @@ def _drain_gateway_pid(pid: int, drain_timeout: float) -> bool:
     if pid <= 0:
         return False
     try:
-        from gateway.status import write_planned_stop_marker, _pid_exists
+        from gateway.status import _pid_exists, write_planned_stop_marker
     except ImportError:
         return False
 
@@ -1260,8 +1259,8 @@ def stop() -> None:
     + ``kill_gateway_processes(force=True)`` for any strays.
     """
     _assert_windows()
-    from hermes_cli.gateway import kill_gateway_processes, _get_restart_drain_timeout
     from gateway.status import get_running_pid
+    from hermes_cli.gateway import _get_restart_drain_timeout, kill_gateway_processes
 
     # Phase 1: ask the running gateway (if any) to drain itself by writing
     # the planned-stop marker, then wait briefly for it to exit cleanly.
@@ -1341,7 +1340,7 @@ def restart() -> None:
         if not _wait_for_gateway_absent(timeout_s=10.0):
             raise RuntimeError(
                 "Gateway process still detected after force kill; refusing to "
-                "start a duplicate. Investigate stray PIDs before retrying."
+                "start a duplicate. Investigate stray PIDs before retrying.",
             )
 
     # Give Windows a moment to release the listening port.
@@ -1351,5 +1350,5 @@ def restart() -> None:
     if not _wait_for_gateway_ready(timeout_s=15.0):
         raise RuntimeError(
             "Gateway restart did not produce a running gateway process. "
-            "Check logs/gateway.log and run `hermes gateway status`."
+            "Check logs/gateway.log and run `hermes gateway status`.",
         )

@@ -130,7 +130,8 @@ async def test_missing_job_id_400(adapter, monkeypatch):
 @pytest.mark.asyncio
 async def test_fire_does_not_require_api_server_key(adapter, monkeypatch):
     """The fire endpoint must NOT gate on API_SERVER_KEY — auth is the NAS-JWT.
-    A request with NO API key header but a valid fire token still succeeds."""
+    A request with NO API key header but a valid fire token still succeeds.
+    """
     spy = _SpyProvider()
     monkeypatch.setattr("cron.scheduler_provider.resolve_cron_scheduler", lambda: spy)
     monkeypatch.setattr(

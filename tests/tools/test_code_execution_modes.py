@@ -31,9 +31,9 @@ def _force_local_terminal(monkeypatch):
 
 
 from tools.code_execution_tool import (
-    SANDBOX_ALLOWED_TOOLS,
     DEFAULT_EXECUTION_MODE,
     EXECUTION_MODES,
+    SANDBOX_ALLOWED_TOOLS,
     _get_execution_mode,
     _is_usable_python,
     _resolve_child_cwd,
@@ -135,9 +135,10 @@ class TestResolveChildPython(unittest.TestCase):
             pytest.skip(
                 "Creates symlinks and assumes POSIX venv layout (bin/python). "
                 "Windows venvs use Scripts/python.exe and symlink creation "
-                "requires elevated privileges (WinError 1314)."
+                "requires elevated privileges (WinError 1314).",
             )
-        import tempfile, pathlib
+        import pathlib
+        import tempfile
         with tempfile.TemporaryDirectory() as td:
             fake_venv = pathlib.Path(td)
             (fake_venv / "bin").mkdir()
@@ -164,9 +165,10 @@ class TestResolveChildPython(unittest.TestCase):
             pytest.skip(
                 "Creates symlinks and assumes POSIX venv layout (bin/python). "
                 "Windows venvs use Scripts/python.exe and symlink creation "
-                "requires elevated privileges (WinError 1314)."
+                "requires elevated privileges (WinError 1314).",
             )
-        import tempfile, pathlib
+        import pathlib
+        import tempfile
         with tempfile.TemporaryDirectory() as ve_td, tempfile.TemporaryDirectory() as conda_td:
             ve = pathlib.Path(ve_td)
             (ve / "bin").mkdir()
@@ -283,15 +285,14 @@ class TestExecuteCodeModeIntegration(unittest.TestCase):
 
     def _run(self, code, mode, enabled_tools=None, extra_env=None):
         env_overrides = extra_env or {}
-        with _mock_mode(mode):
-            with patch.dict(os.environ, env_overrides):
-                with patch("model_tools.handle_function_call",
-                           side_effect=_mock_handle_function_call):
-                    raw = execute_code(
-                        code=code,
-                        task_id=f"test-{mode}",
-                        enabled_tools=enabled_tools or list(SANDBOX_ALLOWED_TOOLS),
-                    )
+        with _mock_mode(mode), patch.dict(os.environ, env_overrides):
+            with patch("model_tools.handle_function_call",
+                       side_effect=_mock_handle_function_call):
+                raw = execute_code(
+                    code=code,
+                    task_id=f"test-{mode}",
+                    enabled_tools=enabled_tools or list(SANDBOX_ALLOWED_TOOLS),
+                )
         return json.loads(raw)
 
     def test_strict_mode_runs_in_tmpdir(self):
@@ -318,7 +319,8 @@ class TestExecuteCodeModeIntegration(unittest.TestCase):
 
     def test_project_mode_interpreter_is_venv_python(self):
         """Project mode: sys.executable inside the child is the venv's python
-        when VIRTUAL_ENV is set to a real venv."""
+        when VIRTUAL_ENV is set to a real venv.
+        """
         # The hermes-agent venv is always active during tests, so this also
         # happens to equal sys.executable of the parent. What we're asserting
         # is: resolver picked a venv-bin/python path, not that it differs
@@ -383,14 +385,13 @@ class TestExecuteCodeModeIntegration(unittest.TestCase):
 class TestSecurityInvariantsAcrossModes(unittest.TestCase):
 
     def _run(self, code, mode):
-        with _mock_mode(mode):
-            with patch("model_tools.handle_function_call",
-                       side_effect=_mock_handle_function_call):
-                raw = execute_code(
-                    code=code,
-                    task_id=f"test-sec-{mode}",
-                    enabled_tools=list(SANDBOX_ALLOWED_TOOLS),
-                )
+        with _mock_mode(mode), patch("model_tools.handle_function_call",
+                   side_effect=_mock_handle_function_call):
+            raw = execute_code(
+                code=code,
+                task_id=f"test-sec-{mode}",
+                enabled_tools=list(SANDBOX_ALLOWED_TOOLS),
+            )
         return json.loads(raw)
 
     def test_api_keys_scrubbed_in_strict_mode(self):

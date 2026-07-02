@@ -19,10 +19,10 @@ import pytest
 
 from gateway.config import Platform
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_adapter(**overrides):
     """Build a WhatsAppCloudAdapter with test attributes (bypass __init__).
@@ -117,8 +117,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.abc"}]}
-            )
+                200, {"messages": [{"id": "wamid.abc"}]},
+            ),
         )
 
         await adapter.send("15551234567", "hello")
@@ -132,8 +132,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.abc"}]}
-            )
+                200, {"messages": [{"id": "wamid.abc"}]},
+            ),
         )
 
         await adapter.send("15551234567", "hi")
@@ -148,8 +148,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.abc"}]}
-            )
+                200, {"messages": [{"id": "wamid.abc"}]},
+            ),
         )
 
         await adapter.send("15551234567", "hello world")
@@ -168,8 +168,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.HBgL...="}]}
-            )
+                200, {"messages": [{"id": "wamid.HBgL...="}]},
+            ),
         )
 
         result = await adapter.send("15551234567", "hi")
@@ -184,8 +184,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.x"}]}
-            )
+                200, {"messages": [{"id": "wamid.x"}]},
+            ),
         )
 
         await adapter.send("15551234567", "**bold** text")
@@ -199,8 +199,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.x"}]}
-            )
+                200, {"messages": [{"id": "wamid.x"}]},
+            ),
         )
 
         await adapter.send("15551234567", "short reply", reply_to="wamid.original")
@@ -215,8 +215,8 @@ class TestSendText:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                200, {"messages": [{"id": "wamid.x"}]}
-            )
+                200, {"messages": [{"id": "wamid.x"}]},
+            ),
         )
 
         # MAX_MESSAGE_LENGTH = 4096 from the mixin. 8500 chars forces 2+ chunks.
@@ -244,9 +244,9 @@ class TestSendText:
                         "type": "OAuthException",
                         "code": 100,
                         "fbtrace_id": "abc",
-                    }
+                    },
                 },
-            )
+            ),
         )
 
         result = await adapter.send("15551234567", "hi")
@@ -386,7 +386,7 @@ import hmac as _hmac_lib
 def _sign(secret: str, body: bytes) -> str:
     """Compute the X-Hub-Signature-256 header value Meta would send."""
     digest = _hmac_lib.new(
-        secret.encode("utf-8"), body, hashlib.sha256
+        secret.encode("utf-8"), body, hashlib.sha256,
     ).hexdigest()
     return f"sha256={digest}"
 
@@ -419,7 +419,7 @@ _SAMPLE_INBOUND_TEXT_PAYLOAD = {
                             {
                                 "profile": {"name": "Jessica Laverdetman"},
                                 "wa_id": "13557825698",
-                            }
+                            },
                         ],
                         "messages": [
                             {
@@ -428,12 +428,12 @@ _SAMPLE_INBOUND_TEXT_PAYLOAD = {
                                 "timestamp": "1758254144",
                                 "text": {"body": "Hi!"},
                                 "type": "text",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
-        }
+        },
     ],
 }
 
@@ -580,7 +580,8 @@ class TestWebhookReplay:
 
     def test_dedup_no_wamid_lets_through(self):
         """Defensive — Meta should always populate ``id``, but we don't
-        want to silently drop messages if it's missing."""
+        want to silently drop messages if it's missing.
+        """
         adapter = _make_adapter()
         assert adapter._dedup_wamid("") is True
         assert adapter._dedup_wamid("") is True  # both pass
@@ -625,7 +626,7 @@ class TestWebhookDispatch:
         sig = _sign("key", body)
 
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
 
         assert response.status == 200
@@ -636,14 +637,15 @@ class TestWebhookDispatch:
     @pytest.mark.asyncio
     async def test_dispatch_handler_exception_does_not_crash(self):
         """If the agent dispatch raises, we still return 200 to Meta so
-        retries don't multiply the bug into a 7-day storm."""
+        retries don't multiply the bug into a 7-day storm.
+        """
         adapter = _make_adapter(app_secret="key")
         adapter.handle_message = AsyncMock(side_effect=RuntimeError("boom"))
         body = json.dumps(_SAMPLE_INBOUND_TEXT_PAYLOAD).encode("utf-8")
         sig = _sign("key", body)
 
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert response.status == 200
 
@@ -661,16 +663,16 @@ class TestWebhookDispatch:
                         {
                             "field": "account_alerts",
                             "value": {"some": "alert"},
-                        }
+                        },
                     ],
-                }
+                },
             ],
         }
         body = json.dumps(payload).encode("utf-8")
         sig = _sign("key", body)
 
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert response.status == 200
         adapter.handle_message.assert_not_called()
@@ -684,7 +686,7 @@ class TestWebhookDispatch:
         sig = _sign("key", body)
 
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert response.status == 200
         adapter.handle_message.assert_not_called()
@@ -710,7 +712,7 @@ class TestWebhookDispatch:
                                 "messaging_product": "whatsapp",
                                 "metadata": {"phone_number_id": "1"},
                                 "contacts": [
-                                    {"profile": {"name": "U"}, "wa_id": "1555"}
+                                    {"profile": {"name": "U"}, "wa_id": "1555"},
                                 ],
                                 "messages": [
                                     {
@@ -725,19 +727,19 @@ class TestWebhookDispatch:
                                                 "title": "Yes please",
                                             },
                                         },
-                                    }
+                                    },
                                 ],
                             },
-                        }
+                        },
                     ],
-                }
+                },
             ],
         }
         body = json.dumps(payload).encode("utf-8")
         sig = _sign("key", body)
 
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert response.status == 200
         assert len(captured) == 1
@@ -755,7 +757,7 @@ class TestWebhookDispatch:
         adapter.handle_message = _capture
 
         payload_with_ctx = json.loads(
-            json.dumps(_SAMPLE_INBOUND_TEXT_PAYLOAD)
+            json.dumps(_SAMPLE_INBOUND_TEXT_PAYLOAD),
         )  # deep copy
         msg = payload_with_ctx["entry"][0]["changes"][0]["value"]["messages"][0]
         msg["context"] = {"id": "wamid.our_outbound", "from": "15551797781"}
@@ -763,7 +765,7 @@ class TestWebhookDispatch:
         sig = _sign("key", body)
 
         await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert len(captured) == 1
         assert captured[0].reply_to_message_id == "wamid.our_outbound"
@@ -775,7 +777,7 @@ class TestWebhookDispatch:
         body = b"not-json"
         sig = _sign("key", body)
         response = await adapter._handle_webhook(
-            _post_request(body, {"X-Hub-Signature-256": sig})
+            _post_request(body, {"X-Hub-Signature-256": sig}),
         )
         assert response.status == 400
 
@@ -870,6 +872,7 @@ class TestMixinInherited:
 # ---------------------------------------------------------------------------
 
 import os as _os
+import pathlib
 import tempfile as _tempfile
 from unittest.mock import patch as _patch
 
@@ -942,7 +945,7 @@ class TestSendImage:
             send_payload = adapter._http_client.post.call_args_list[1].kwargs["json"]
             assert send_payload["image"] == {"id": "media_uploaded_id"}
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
     @pytest.mark.asyncio
     async def test_send_image_caption_attached(self):
@@ -951,7 +954,7 @@ class TestSendImage:
         adapter._http_client.post = AsyncMock(return_value=_mock_message_response())
 
         await adapter.send_image(
-            "15551234567", "https://cdn.example.com/cat.jpg", caption="cute cat"
+            "15551234567", "https://cdn.example.com/cat.jpg", caption="cute cat",
         )
         payload = adapter._http_client.post.call_args.kwargs["json"]
         assert payload["image"]["caption"] == "cute cat"
@@ -971,7 +974,7 @@ class TestSendImage:
             # Never even POSTed
             adapter._http_client.post.assert_not_called()
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
     @pytest.mark.asyncio
     async def test_send_image_missing_local_file_returns_failure(self):
@@ -980,7 +983,7 @@ class TestSendImage:
         adapter._http_client.post = AsyncMock()
 
         result = await adapter.send_image_file(
-            "15551234567", "/nonexistent/path/foo.jpg"
+            "15551234567", "/nonexistent/path/foo.jpg",
         )
         assert result.success is False
         assert "File not found" in result.error
@@ -993,7 +996,7 @@ class TestSendImage:
         upload_fail = MagicMock()
         upload_fail.status_code = 400
         upload_fail.json = MagicMock(return_value={
-            "error": {"code": 100, "message": "Bad media"}
+            "error": {"code": 100, "message": "Bad media"},
         })
         upload_fail.text = '{"error":{"code":100,"message":"Bad media"}}'
         adapter._http_client = MagicMock()
@@ -1007,7 +1010,7 @@ class TestSendImage:
             # Only the upload call — never reached /messages
             assert adapter._http_client.post.call_count == 1
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 class TestSendVideo:
@@ -1062,7 +1065,7 @@ class TestSendMethodsAcceptBaseClassKwargs:
             )
             assert result.success is True
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
     @pytest.mark.asyncio
     async def test_send_video_accepts_metadata(self):
@@ -1101,7 +1104,7 @@ class TestSendMethodsAcceptBaseClassKwargs:
             )
             assert result.success is True
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 class TestSendDocument:
@@ -1125,7 +1128,7 @@ class TestSendDocument:
             assert send_payload["document"]["caption"] == "Q3 report"
             assert send_payload["document"]["filename"] == "report.pdf"
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
 
 class TestSendVoice:
@@ -1152,7 +1155,7 @@ class TestSendVoice:
             assert send_payload["type"] == "audio"
             assert send_payload["audio"]["id"] == "audio_id"
         finally:
-            _os.unlink(path)
+            pathlib.Path(path).unlink()
 
     @pytest.mark.asyncio
     async def test_send_voice_ffmpeg_present_uses_opus(self):
@@ -1176,9 +1179,9 @@ class TestSendVoice:
             send_payload = adapter._http_client.post.call_args_list[1].kwargs["json"]
             assert send_payload["type"] == "audio"
         finally:
-            _os.unlink(mp3_path)
-            if _os.path.exists(opus_path):
-                _os.unlink(opus_path)
+            pathlib.Path(mp3_path).unlink()
+            if pathlib.Path(opus_path).exists():
+                pathlib.Path(opus_path).unlink()
 
     @pytest.mark.asyncio
     async def test_warn_once_no_ffmpeg_actually_only_warns_once(self):
@@ -1225,10 +1228,10 @@ class TestDownloadMedia:
 
         assert mime == "image/jpeg"
         assert local_path is not None
-        assert _os.path.exists(local_path)
+        assert pathlib.Path(local_path).exists()
         assert _os.path.basename(local_path).startswith("media_xyz")
         assert _os.path.basename(local_path).endswith(".jpg")
-        with open(local_path, "rb") as fh:
+        with pathlib.Path(local_path).open("rb") as fh:
             assert fh.read() == b"\xff\xd8\xff\xe0jpegdata"
 
     @pytest.mark.asyncio
@@ -1363,7 +1366,7 @@ class TestInboundMediaDispatch:
 
         with _patch.object(wac, "_INBOUND_MEDIA_CACHE", tmp_path):
             response = await adapter._handle_webhook(
-                _post_request(body, {"X-Hub-Signature-256": sig})
+                _post_request(body, {"X-Hub-Signature-256": sig}),
             )
 
         assert response.status == 200
@@ -1373,7 +1376,7 @@ class TestInboundMediaDispatch:
         assert event.text == "look at this"
         # Cached file path populated
         assert len(event.media_urls) == 1
-        assert _os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert event.media_types[0] == "image/jpeg"
         from gateway.platforms.base import MessageType
         assert event.message_type == MessageType.PHOTO
@@ -1431,7 +1434,7 @@ class TestInboundMediaDispatch:
 
         with _patch.object(wac, "_INBOUND_MEDIA_CACHE", tmp_path):
             await adapter._handle_webhook(
-                _post_request(body, {"X-Hub-Signature-256": sig})
+                _post_request(body, {"X-Hub-Signature-256": sig}),
             )
 
         assert len(captured) == 1
@@ -1444,7 +1447,8 @@ class TestInboundMediaDispatch:
     @pytest.mark.asyncio
     async def test_inbound_image_download_failure_still_dispatches(self, tmp_path):
         """If the binary fetch fails we still want the agent to see the
-        message metadata + caption — better than silently dropping."""
+        message metadata + caption — better than silently dropping.
+        """
         from gateway.platforms import whatsapp_cloud as wac
 
         adapter = _make_adapter(app_secret="key")
@@ -1484,7 +1488,7 @@ class TestInboundMediaDispatch:
 
         with _patch.object(wac, "_INBOUND_MEDIA_CACHE", tmp_path):
             response = await adapter._handle_webhook(
-                _post_request(body, {"X-Hub-Signature-256": sig})
+                _post_request(body, {"X-Hub-Signature-256": sig}),
             )
 
         assert response.status == 200
@@ -1504,7 +1508,8 @@ class TestGroupMessageGuard:
     on the message object — the adapter should refuse cleanly rather
     than silently treating the sender's wa_id as the chat_id (which
     would route the bot's reply back to the sender as a DM, not the
-    group)."""
+    group).
+    """
 
     @pytest.mark.asyncio
     async def test_group_shaped_message_dropped_with_warning(self, caplog):
@@ -1520,7 +1525,7 @@ class TestGroupMessageGuard:
         }
         with caplog.at_level("WARNING"):
             event = await adapter._build_message_event_from_cloud(
-                raw, {"15551234567": "Alice"}, {}
+                raw, {"15551234567": "Alice"}, {},
             )
         assert event is None
         # Warning surfaced so the operator knows group messages are being dropped
@@ -1534,7 +1539,8 @@ class TestGroupMessageGuard:
     @pytest.mark.asyncio
     async def test_normal_dm_still_dispatches(self):
         """Sanity: the guard is keyed on `chat`, not just `from`. Normal
-        DMs (which only have `from`, no `chat`) must still dispatch."""
+        DMs (which only have `from`, no `chat`) must still dispatch.
+        """
         adapter = _make_adapter()
         raw = {
             "from": "15551234567",
@@ -1545,7 +1551,7 @@ class TestGroupMessageGuard:
             # NO `chat` field — this is a DM
         }
         event = await adapter._build_message_event_from_cloud(
-            raw, {"15551234567": "Alice"}, {}
+            raw, {"15551234567": "Alice"}, {},
         )
         assert event is not None
         assert event.text == "hi from a DM"
@@ -1577,7 +1583,7 @@ class TestSendClarifyButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q1"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q1"}]}),
         )
 
         result = await adapter.send_clarify(
@@ -1607,7 +1613,7 @@ class TestSendClarifyButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q2"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q2"}]}),
         )
 
         result = await adapter.send_clarify(
@@ -1634,7 +1640,7 @@ class TestSendClarifyButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q3"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.q3"}]}),
         )
 
         result = await adapter.send_clarify(
@@ -1660,8 +1666,8 @@ class TestSendClarifyButtons:
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                400, {"error": {"code": 100, "message": "bad payload"}}
-            )
+                400, {"error": {"code": 100, "message": "bad payload"}},
+            ),
         )
 
         result = await adapter.send_clarify(
@@ -1684,7 +1690,7 @@ class TestSendExecApprovalButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.a1"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.a1"}]}),
         )
 
         result = await adapter.send_exec_approval(
@@ -1718,7 +1724,7 @@ class TestSendExecApprovalButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]}),
         )
 
         huge = "echo " + ("x" * 5000)
@@ -1740,7 +1746,7 @@ class TestSendSlashConfirmButtons:
         adapter = _make_adapter()
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.s1"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "wamid.s1"}]}),
         )
 
         result = await adapter.send_slash_confirm(
@@ -1776,7 +1782,7 @@ class TestDispatchInteractiveReplyClarify:
             return True
 
         monkeypatch.setattr(
-            "tools.clarify_gateway.resolve_gateway_clarify", fake_resolve
+            "tools.clarify_gateway.resolve_gateway_clarify", fake_resolve,
         )
 
         raw = {
@@ -1801,12 +1807,13 @@ class TestDispatchInteractiveReplyClarify:
         resolve the next typed message. Without the flip,
         ``get_pending_for_session`` wouldn't return the entry and the
         user's next message would collide with the still-blocked agent
-        thread, producing an "Interrupting current task" loop."""
+        thread, producing an "Interrupting current task" loop.
+        """
         adapter = _make_adapter()
         adapter._clarify_state["q1"] = "sess-1"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]}),
         )
 
         flipped_ids = []
@@ -1838,7 +1845,8 @@ class TestDispatchInteractiveReplyClarify:
         """If the underlying clarify entry vanished (timed out, /new,
         gateway restart) between the prompt and the tap,
         ``mark_awaiting_text`` returns False — drop the stale adapter
-        state and fall through to text dispatch."""
+        state and fall through to text dispatch.
+        """
         adapter = _make_adapter()
         adapter._clarify_state["q1"] = "sess-1"
         monkeypatch.setattr(
@@ -1880,7 +1888,8 @@ class TestDispatchInteractiveReplyClarify:
     @pytest.mark.asyncio
     async def test_clarify_resolver_no_waiter_falls_back(self, monkeypatch):
         """Resolver returns False (e.g. agent timed out) → caller falls
-        back to text dispatch."""
+        back to text dispatch.
+        """
         adapter = _make_adapter()
         adapter._clarify_state["q1"] = "sess-1"
         monkeypatch.setattr(
@@ -1909,7 +1918,7 @@ class TestDispatchInteractiveReplyApproval:
         adapter._exec_approval_state["app1"] = "sess-app-1"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]}),
         )
 
         calls = []
@@ -1941,7 +1950,7 @@ class TestDispatchInteractiveReplyApproval:
         adapter._exec_approval_state["app2"] = "sess-app-2"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]}),
         )
 
         choices_seen = []
@@ -1974,14 +1983,14 @@ class TestDispatchInteractiveReplySlashConfirm:
         adapter._slash_confirm_state["cf-9"] = "sess-sc-1"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]})
+            return_value=_mock_httpx_response(200, {"messages": [{"id": "x"}]}),
         )
 
         captured = {}
 
         async def fake_resolve(session_key, confirm_id, choice):
             captured.update(
-                session_key=session_key, confirm_id=confirm_id, choice=choice
+                session_key=session_key, confirm_id=confirm_id, choice=choice,
             )
             return "MCP reloaded."
 
@@ -2011,7 +2020,8 @@ class TestDispatchInteractiveReplySlashConfirm:
 class TestInteractiveReplyEndToEnd:
     """Integration: `_build_message_event_from_cloud` must SHORT-CIRCUIT
     on a recognized interactive reply and NOT also produce a fresh
-    conversation turn (which would double-fire the agent)."""
+    conversation turn (which would double-fire the agent).
+    """
 
     @pytest.mark.asyncio
     async def test_recognized_tap_returns_none_no_text_dispatch(self, monkeypatch):
@@ -2032,7 +2042,7 @@ class TestInteractiveReplyEndToEnd:
             },
         }
         event = await adapter._build_message_event_from_cloud(
-            raw, {"15551234567": "Alice"}, {}
+            raw, {"15551234567": "Alice"}, {},
         )
         # The tap resolved the clarify; no MessageEvent dispatched so the
         # agent thread that was waiting on clarify is unblocked exactly
@@ -2043,7 +2053,8 @@ class TestInteractiveReplyEndToEnd:
     async def test_unrecognized_tap_falls_through_to_text(self):
         """Button taps from unrelated plugin adapters (or stale taps)
         should be treated as plain text input — this preserves the
-        graceful-degrade path the gateway already relies on."""
+        graceful-degrade path the gateway already relies on.
+        """
         adapter = _make_adapter()
         raw = {
             "from": "15551234567",
@@ -2055,7 +2066,7 @@ class TestInteractiveReplyEndToEnd:
             },
         }
         event = await adapter._build_message_event_from_cloud(
-            raw, {"15551234567": "Alice"}, {}
+            raw, {"15551234567": "Alice"}, {},
         )
         # Falls through to text dispatch — the button title becomes the
         # user message body so the agent at least sees what they tapped.
@@ -2086,7 +2097,7 @@ class TestInboundWamidCache:
             "text": {"body": "hi"},
         }
         event = await adapter._build_message_event_from_cloud(
-            raw, {"15551234567": "Alice"}, {}
+            raw, {"15551234567": "Alice"}, {},
         )
         assert event is not None
         assert adapter._last_inbound_wamid_by_chat["15551234567"] == "wamid.AAA"
@@ -2094,7 +2105,8 @@ class TestInboundWamidCache:
     @pytest.mark.asyncio
     async def test_subsequent_messages_overwrite_cache(self):
         """Cache holds the LATEST inbound, not the first — typing indicator
-        must attach to the most recent message in the conversation."""
+        must attach to the most recent message in the conversation.
+        """
         adapter = _make_adapter()
         for wamid in ("wamid.first", "wamid.second", "wamid.third"):
             await adapter._build_message_event_from_cloud(
@@ -2113,7 +2125,8 @@ class TestInboundWamidCache:
     async def test_filtered_message_does_not_pollute_cache(self):
         """Group-shaped messages get dropped before the cache write —
         we don't want typing indicators triggered by inbound traffic the
-        agent never sees."""
+        agent never sees.
+        """
         adapter = _make_adapter()
         raw = {
             "from": "15551234567",
@@ -2123,7 +2136,7 @@ class TestInboundWamidCache:
             "chat": "120363012345678901@g.us",  # group marker
         }
         event = await adapter._build_message_event_from_cloud(
-            raw, {"15551234567": "Alice"}, {}
+            raw, {"15551234567": "Alice"}, {},
         )
         assert event is None  # group guard rejected it
         # Cache stays empty
@@ -2139,7 +2152,7 @@ class TestSendTyping:
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.LATEST"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"success": True})
+            return_value=_mock_httpx_response(200, {"success": True}),
         )
 
         await adapter.send_typing("15551234567")
@@ -2157,13 +2170,14 @@ class TestSendTyping:
         """If multiple messages have arrived, the indicator must attach
         to the LATEST one (mirrors Meta's documented behavior — the
         typing indicator only renders against the most recent message
-        in the conversation)."""
+        in the conversation).
+        """
         adapter = _make_adapter()
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.OLD"
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.NEW"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"success": True})
+            return_value=_mock_httpx_response(200, {"success": True}),
         )
 
         await adapter.send_typing("15551234567")
@@ -2174,12 +2188,13 @@ class TestSendTyping:
     async def test_send_typing_no_cached_wamid_is_noop(self):
         """No inbound message yet for this chat (or cache cleared on
         gateway restart) → skip silently. Don't fail, don't log noisily.
-        The next inbound message will repopulate the cache."""
+        The next inbound message will repopulate the cache.
+        """
         adapter = _make_adapter()
         # _last_inbound_wamid_by_chat is empty
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"success": True})
+            return_value=_mock_httpx_response(200, {"success": True}),
         )
 
         await adapter.send_typing("15551234567")
@@ -2190,12 +2205,13 @@ class TestSendTyping:
     async def test_send_typing_swallows_network_errors(self):
         """Any HTTP exception must NOT propagate — typing is best-effort
         UX polish and must never block the agent's main reply path.
-        Verified by the absence of a raise."""
+        Verified by the absence of a raise.
+        """
         adapter = _make_adapter()
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.X"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            side_effect=RuntimeError("connection refused")
+            side_effect=RuntimeError("connection refused"),
         )
 
         # Should NOT raise
@@ -2205,14 +2221,15 @@ class TestSendTyping:
     async def test_send_typing_stale_message_logged_at_info(self, caplog):
         """Graph error 131009 = wamid > 30 days old. Common after a
         long-quiet conversation — log at INFO so it doesn't pollute
-        WARNING-level monitoring dashboards."""
+        WARNING-level monitoring dashboards.
+        """
         adapter = _make_adapter()
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.OLD"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
             return_value=_mock_httpx_response(
-                400, {"error": {"code": 131009, "message": "Parameter value is not valid"}}
-            )
+                400, {"error": {"code": 131009, "message": "Parameter value is not valid"}},
+            ),
         )
 
         with caplog.at_level("INFO"):
@@ -2227,7 +2244,8 @@ class TestSendTyping:
     async def test_send_typing_no_http_client_is_noop(self):
         """If the adapter isn't connected yet, send_typing must be a
         silent no-op — matches the rest of the adapter's "best-effort
-        when not running" pattern."""
+        when not running" pattern.
+        """
         adapter = _make_adapter()
         adapter._http_client = None
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.X"
@@ -2237,12 +2255,13 @@ class TestSendTyping:
     @pytest.mark.asyncio
     async def test_send_typing_includes_bearer_auth(self):
         """Same auth shape as the rest of the Graph API surface — bearer
-        token in the Authorization header."""
+        token in the Authorization header.
+        """
         adapter = _make_adapter(access_token="my-test-token")
         adapter._last_inbound_wamid_by_chat["15551234567"] = "wamid.X"
         adapter._http_client = MagicMock()
         adapter._http_client.post = AsyncMock(
-            return_value=_mock_httpx_response(200, {"success": True})
+            return_value=_mock_httpx_response(200, {"success": True}),
         )
 
         await adapter.send_typing("15551234567")
@@ -2264,20 +2283,22 @@ class TestAllowlistNormalization:
 
     def test_dm_allowlist_matches_bare_wa_id_against_jid_entry(self):
         """A Baileys-style JID in the allowlist must match the Cloud API's
-        bare wa_id sender — users share allowlists between both adapters."""
+        bare wa_id sender — users share allowlists between both adapters.
+        """
         from gateway.platforms.whatsapp_cloud import WhatsAppCloudAdapter
 
         adapter = _make_adapter()
         adapter._dm_policy = "allowlist"
         adapter._allow_from = WhatsAppCloudAdapter._normalize_allow_ids(
-            {"15551234567@s.whatsapp.net"}
+            {"15551234567@s.whatsapp.net"},
         )
         assert adapter._is_dm_allowed("15551234567") is True
         assert adapter._is_dm_allowed("19998887777") is False
 
     def test_cloud_env_overrides_take_precedence(self, monkeypatch):
         """WHATSAPP_CLOUD_DM_POLICY wins over the shared WHATSAPP_DM_POLICY
-        so both adapters can run in parallel with independent policies."""
+        so both adapters can run in parallel with independent policies.
+        """
         from gateway.platforms.whatsapp_cloud import WhatsAppCloudAdapter
 
         monkeypatch.setenv("WHATSAPP_DM_POLICY", "allowlist")

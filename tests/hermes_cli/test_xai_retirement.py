@@ -1,22 +1,21 @@
 """Unit tests for hermes_cli.xai_retirement (May 15, 2026 model retirement)."""
 from __future__ import annotations
 
-
 from hermes_cli.xai_retirement import (
+    _RETIRED_MODELS,
     MIGRATION_GUIDE_URL,
     RETIREMENT_DATE,
     RetirementIssue,
-    _RETIRED_MODELS,
     _looks_like_xai,
     _normalize,
     find_retired_xai_refs,
     format_issue,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _paths(issues):
     return [i.config_path for i in issues]
@@ -121,7 +120,7 @@ class TestFindRetiredPerSlot:
                 "compression": {"model": "grok-code-fast-1"},
                 "curator":     {"model": "grok-4.3"},  # not retired
                 "approval":    {"model": "gpt-4o-mini"},  # not xAI
-            }
+            },
         }
         issues = find_retired_xai_refs(cfg)
         assert sorted(_paths(issues)) == [
@@ -150,9 +149,9 @@ class TestFindRetiredPerSlot:
         cfg = {
             "plugins": {
                 "image_gen": {
-                    "xai": {"model": "grok-imagine-image-pro"}
-                }
-            }
+                    "xai": {"model": "grok-imagine-image-pro"},
+                },
+            },
         }
         issues = find_retired_xai_refs(cfg)
         assert _paths(issues) == ["plugins.image_gen.xai.model"]
@@ -253,7 +252,7 @@ class TestFormatIssue:
 
 class TestModuleConstants:
     def test_retirement_date_is_may_15(self):
-        assert "May 15, 2026" == RETIREMENT_DATE
+        assert RETIREMENT_DATE == "May 15, 2026"
 
     def test_migration_guide_url_points_to_xai(self):
         assert MIGRATION_GUIDE_URL.startswith("https://docs.x.ai/")

@@ -11,8 +11,8 @@ before mutation, so ``--global`` succeeds and the config is rewritten in
 the proper ``model: {default: ..., provider: ...}`` form.
 """
 
-import yaml
 import pytest
+import yaml
 
 from gateway.config import Platform
 from gateway.platforms.base import MessageEvent, MessageType
@@ -67,7 +67,7 @@ def _setup_isolated_home(tmp_path, monkeypatch, model_yaml_value):
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
-    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", dict)
     monkeypatch.setattr(
         "hermes_cli.model_switch.switch_model",
         lambda **kw: _fake_switch_result(),
@@ -88,7 +88,7 @@ async def test_model_global_persists_when_config_has_flat_string_model(tmp_path,
     cfg_path = _setup_isolated_home(tmp_path, monkeypatch, "deepseek-v4-flash")
 
     result = await _make_runner()._handle_model_command(
-        _make_event("/model gpt-5.5 --global")
+        _make_event("/model gpt-5.5 --global"),
     )
 
     # Sanity: the handler returned a success-looking message (not a crash log).
@@ -118,7 +118,7 @@ async def test_model_global_persists_when_config_has_missing_model(tmp_path, mon
     cfg_path.write_text(yaml.safe_dump({"providers": {}}), encoding="utf-8")
 
     monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
-    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", dict)
     monkeypatch.setattr(
         "hermes_cli.model_switch.switch_model",
         lambda **kw: _fake_switch_result(),
@@ -127,7 +127,7 @@ async def test_model_global_persists_when_config_has_missing_model(tmp_path, mon
     monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: hermes_home)
 
     result = await _make_runner()._handle_model_command(
-        _make_event("/model gpt-5.5 --global")
+        _make_event("/model gpt-5.5 --global"),
     )
 
     assert result is not None
@@ -149,7 +149,7 @@ async def test_model_global_persists_when_config_has_proper_dict_model(tmp_path,
     )
 
     result = await _make_runner()._handle_model_command(
-        _make_event("/model gpt-5.5 --global")
+        _make_event("/model gpt-5.5 --global"),
     )
 
     assert result is not None
@@ -172,7 +172,7 @@ async def test_model_no_flag_persists_by_default(tmp_path, monkeypatch):
     )
 
     result = await _make_runner()._handle_model_command(
-        _make_event("/model gpt-5.5")
+        _make_event("/model gpt-5.5"),
     )
 
     assert result is not None
@@ -191,7 +191,7 @@ async def test_model_session_flag_does_not_persist(tmp_path, monkeypatch):
     )
 
     result = await _make_runner()._handle_model_command(
-        _make_event("/model gpt-5.5 --session")
+        _make_event("/model gpt-5.5 --session"),
     )
 
     assert result is not None

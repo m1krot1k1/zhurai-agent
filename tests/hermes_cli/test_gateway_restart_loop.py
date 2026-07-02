@@ -7,7 +7,6 @@ Covers:
 """
 
 import json
-import os
 from argparse import Namespace
 
 import pytest
@@ -17,10 +16,10 @@ from hermes_cli.cron import (
     cron_command,
 )
 
-
 # ---------------------------------------------------------------------------
 # Defense 2: _contains_gateway_lifecycle_command pattern tests
 # ---------------------------------------------------------------------------
+
 
 class TestGatewayLifecyclePattern:
     """Verify the regex catches gateway lifecycle commands."""
@@ -167,7 +166,8 @@ class TestCronCreateLifecycleBlock:
     def test_allow_empty_prompt(self, capsys):
         """Empty prompt (no lifecycle content) should pass the filter — the
         API will still reject it for lacking prompt+skill, but that's a
-        separate validation, not the lifecycle guard."""
+        separate validation, not the lifecycle guard.
+        """
         args = Namespace(
             cron_command="create",
             schedule="30m",
@@ -225,7 +225,7 @@ class TestGatewaySelfTargetingGuard:
             pass
 
         def _sentinel(*a, **k):
-            raise _Reached()
+            raise _Reached
 
         monkeypatch.setattr(gw, "_dispatch_via_service_manager_if_s6", _sentinel)
         monkeypatch.setattr(gw, "_dispatch_all_via_service_manager_if_s6", _sentinel)
@@ -244,7 +244,7 @@ class TestGatewaySelfTargetingGuard:
             pass
 
         def _sentinel(*a, **k):
-            raise _Reached()
+            raise _Reached
 
         monkeypatch.setattr(gw, "_dispatch_via_service_manager_if_s6", _sentinel)
         monkeypatch.setattr(gw, "_dispatch_all_via_service_manager_if_s6", _sentinel)
@@ -269,6 +269,7 @@ class TestTerminalToolGatewayLifecycleGuard:
     def _make_fake_env(self):
         class _FakeEnv:
             env = {}
+
             def execute(self, command, **kwargs):  # pragma: no cover
                 raise AssertionError("execute must not be reached")
         return _FakeEnv()
@@ -310,7 +311,7 @@ class TestTerminalToolGatewayLifecycleGuard:
         self._patch_env(monkeypatch, self._make_fake_env(), inside_gateway=True)
 
         result = json.loads(tt.terminal_tool(
-            command="systemctl restart hermes-gateway", force=True
+            command="systemctl restart hermes-gateway", force=True,
         ))
 
         assert result["exit_code"] == 1
@@ -324,6 +325,7 @@ class TestTerminalToolGatewayLifecycleGuard:
 
         class _FakeEnv:
             env = {}
+
             def execute(self, command, **kwargs):
                 calls.append(command)
                 return {"output": "Active: running", "returncode": 0}
@@ -344,6 +346,7 @@ class TestTerminalToolGatewayLifecycleGuard:
 
         class _FakeEnv:
             env = {}
+
             def execute(self, command, **kwargs):
                 calls.append(command)
                 return {"output": "restarting...", "returncode": 0}

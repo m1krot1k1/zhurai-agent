@@ -16,10 +16,10 @@ import os
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Callable
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from plugins.memory.honcho import oauth
@@ -81,7 +81,7 @@ def _is_loopback_url(url: str | None) -> bool:
 
 
 def resolve_endpoints(
-    environment: str | None = None, base_url: str | None = None
+    environment: str | None = None, base_url: str | None = None,
 ) -> OAuthEndpoints:
     """Resolve OAuth endpoints, zero-config by default.
 
@@ -252,7 +252,7 @@ def _bind_loopback_server() -> tuple[HTTPServer, dict[str, str]]:
     captured: dict[str, str] = {}
 
     class _Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - stdlib API name
+        def do_GET(self):
             parsed = urlparse(self.path)
             if parsed.path != "/callback":
                 self.send_response(404)
@@ -278,7 +278,7 @@ def _bind_loopback_server() -> tuple[HTTPServer, dict[str, str]]:
 
 
 def capture_loopback_code(
-    server: HTTPServer, captured: dict[str, str], *, timeout: float = 300.0
+    server: HTTPServer, captured: dict[str, str], *, timeout: float = 300.0,
 ) -> tuple[str, str]:
     """Serve a single ``/callback`` GET on ``server`` and return ``(code, state)``.
 
@@ -326,7 +326,7 @@ def authorize_via_loopback(
     endpoints = resolve_endpoints()
     path = config_path or resolve_config_path()
     authorize_url, state = begin_authorization(
-        endpoints, redirect_uri, source=source, config_path=_display_config_path(path)
+        endpoints, redirect_uri, source=source, config_path=_display_config_path(path),
     )
 
     if open_url is None:

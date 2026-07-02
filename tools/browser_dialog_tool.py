@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from tools.browser_supervisor import SUPERVISOR_REGISTRY
 from tools.registry import registry
@@ -25,7 +25,7 @@ from tools.registry import registry
 logger = logging.getLogger(__name__)
 
 
-BROWSER_DIALOG_SCHEMA: Dict[str, Any] = {
+BROWSER_DIALOG_SCHEMA: dict[str, Any] = {
     "name": "browser_dialog",
     "description": (
         "Respond to a native JavaScript dialog (alert / confirm / prompt / "
@@ -81,9 +81,9 @@ BROWSER_DIALOG_SCHEMA: Dict[str, Any] = {
 
 def browser_dialog(
     action: str,
-    prompt_text: Optional[str] = None,
-    dialog_id: Optional[str] = None,
-    task_id: Optional[str] = None,
+    prompt_text: str | None = None,
+    dialog_id: str | None = None,
+    task_id: str | None = None,
 ) -> str:
     """Respond to a pending dialog on the active task's CDP supervisor."""
     effective_task_id = task_id or "default"
@@ -98,7 +98,7 @@ def browser_dialog(
                     "Playwright) or no browser session has been started yet. "
                     "Call browser_navigate or /browser connect first."
                 ),
-            }
+            },
         )
 
     result = supervisor.respond_to_dialog(
@@ -112,7 +112,7 @@ def browser_dialog(
                 "success": True,
                 "action": action,
                 "dialog": result.get("dialog", {}),
-            }
+            },
         )
     return json.dumps({"success": False, "error": result.get("error", "unknown error")})
 
@@ -126,7 +126,9 @@ def _browser_dialog_check() -> bool:
     CDP URL is enough to commit to showing the tool.
     """
     try:
-        from tools.browser_cdp_tool import _browser_cdp_check  # type: ignore[import-not-found]
+        from tools.browser_cdp_tool import (
+            _browser_cdp_check,  # type: ignore[import-not-found]
+        )
     except Exception as exc:  # pragma: no cover — defensive
         logger.debug("browser_dialog check: browser_cdp_tool import failed: %s", exc)
         return False

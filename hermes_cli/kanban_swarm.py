@@ -16,10 +16,11 @@ new service.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import sqlite3
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from typing import Any
 
 from hermes_cli import kanban_db as kb
 
@@ -35,7 +36,7 @@ class SwarmWorkerSpec:
     body: str
     skills: list[str] = field(default_factory=list)
     priority: int = 0
-    max_runtime_seconds: Optional[int] = None
+    max_runtime_seconds: int | None = None
 
 
 @dataclass(frozen=True)
@@ -81,15 +82,15 @@ def create_swarm(
     workers: Iterable[SwarmWorkerSpec],
     verifier_assignee: str,
     synthesizer_assignee: str,
-    root_title: Optional[str] = None,
+    root_title: str | None = None,
     verifier_title: str = "Verify swarm outputs",
     synthesizer_title: str = "Synthesize swarm outputs",
-    tenant: Optional[str] = None,
+    tenant: str | None = None,
     created_by: str = "swarm-orchestrator",
     workspace_kind: str = "scratch",
-    workspace_path: Optional[str] = None,
+    workspace_path: str | None = None,
     priority: int = 0,
-    idempotency_key: Optional[str] = None,
+    idempotency_key: str | None = None,
 ) -> SwarmCreated:
     """Create a durable Kanban swarm graph.
 
@@ -97,7 +98,6 @@ def create_swarm(
     ``done`` with topology metadata, parallel workers are ``ready``, the verifier
     waits for every worker, and the synthesizer waits for the verifier.
     """
-
     goal = _require_text(goal, "goal")
     verifier_assignee = _require_text(verifier_assignee, "verifier_assignee")
     synthesizer_assignee = _require_text(synthesizer_assignee, "synthesizer_assignee")
@@ -174,7 +174,7 @@ def create_swarm(
 
     verifier_body = (
         "Review every worker handoff and blackboard update. Gate the swarm: "
-        "complete only with metadata {\"gate\": \"pass\"} when evidence is "
+        'complete only with metadata {"gate": "pass"} when evidence is '
         "sufficient; otherwise block with exact missing work."
         + context_suffix
     )
@@ -231,7 +231,6 @@ def post_blackboard_update(
     value: Any,
 ) -> int:
     """Append one structured update to the swarm root blackboard."""
-
     _require_text(root_id, "root_id")
     author = _require_text(author, "author")
     key = _require_text(key, "key")
@@ -245,7 +244,6 @@ def latest_blackboard(conn: sqlite3.Connection, root_id: str) -> dict[str, Any]:
     Later comments replace earlier values for the same key. ``_authors`` records
     the author of the winning value for traceability.
     """
-
     merged: dict[str, Any] = {}
     authors: dict[str, str] = {}
     for comment in kb.list_comments(conn, root_id):
@@ -268,7 +266,6 @@ def latest_blackboard(conn: sqlite3.Connection, root_id: str) -> dict[str, Any]:
 
 def parse_worker_arg(raw: str) -> SwarmWorkerSpec:
     """Parse CLI ``--worker profile:title[:skill,skill]`` values."""
-
     parts = [p.strip() for p in raw.split(":", 2)]
     if len(parts) < 2:
         raise ValueError("worker must be profile:title or profile:title:skill,skill")

@@ -12,8 +12,8 @@ import pytest
 
 from hermes_cli.psutil_android import (
     MARKER,
-    REPLACEMENT,
     PSUTIL_URL,
+    REPLACEMENT,
     PsutilAndroidInstallError,
     prepare_patched_psutil_sdist,
 )
@@ -82,7 +82,7 @@ def test_install_psutil_android_compat_uses_patched_tree(tmp_path):
         captured["cmd"] = cmd
         captured["env"] = env
         captured["common_py"] = (src_root / "psutil" / "_common.py").read_text(
-            encoding="utf-8"
+            encoding="utf-8",
         )
 
     with patch("urllib.request.urlretrieve", side_effect=fake_urlretrieve), \

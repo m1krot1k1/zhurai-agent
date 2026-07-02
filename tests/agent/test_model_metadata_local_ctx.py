@@ -4,12 +4,11 @@ get_model_context_length.
 All tests use synthetic inputs — no filesystem or live server required.
 """
 
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +29,7 @@ class TestQueryLocalContextLengthOllama:
         from agent.model_metadata import _query_local_context_length
 
         show_resp = self._make_resp(200, {
-            "model_info": {"llama.context_length": 131072}
+            "model_info": {"llama.context_length": 131072},
         })
         models_resp = self._make_resp(404, {})
 
@@ -52,7 +51,7 @@ class TestQueryLocalContextLengthOllama:
 
         show_resp = self._make_resp(200, {
             "model_info": {},
-            "parameters": "num_ctx 32768\ntemperature 0.7\n"
+            "parameters": "num_ctx 32768\ntemperature 0.7\n",
         })
         models_resp = self._make_resp(404, {})
 
@@ -98,7 +97,7 @@ class TestQueryLocalContextLengthOllama:
         with patch("agent.model_metadata.detect_local_server_type", return_value="ollama"), \
              patch("httpx.Client", return_value=client_mock):
             result = _query_local_context_length(
-                "hermes-brain:qwen3-14b-ctx32k", "http://100.77.243.5:11434/v1"
+                "hermes-brain:qwen3-14b-ctx32k", "http://100.77.243.5:11434/v1",
             )
 
         assert result == 32768, (
@@ -191,10 +190,11 @@ class TestQueryLocalContextLengthModelsList:
             "data": [
                 {"id": "other-model", "max_model_len": 4096},
                 {"id": "omnicoder-9b", "max_model_len": 131072},
-            ]
+            ],
         })
 
         call_count = [0]
+
         def side_effect(url, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -219,10 +219,11 @@ class TestQueryLocalContextLengthModelsList:
 
         detail_resp = self._make_resp(404, {})
         list_resp = self._make_resp(200, {
-            "data": [{"id": "other-model", "max_model_len": 4096}]
+            "data": [{"id": "other-model", "max_model_len": 4096}],
         })
 
         call_count = [0]
+
         def side_effect(url, **kwargs):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -281,7 +282,7 @@ class TestQueryLocalContextLengthLmStudio:
                  "id": "nvidia/nvidia-nemotron-super-49b-v1",
                  "max_context_length": 1_048_576,
                  "loaded_instances": [{"config": {"context_length": 131072}}]},
-            ]
+            ],
         })
         client_mock = self._make_client(
             native_resp,
@@ -292,7 +293,7 @@ class TestQueryLocalContextLengthLmStudio:
         with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
              patch("httpx.Client", return_value=client_mock):
             result = _query_local_context_length(
-                "nvidia/nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1"
+                "nvidia/nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1",
             )
 
         assert result == 131072
@@ -312,7 +313,7 @@ class TestQueryLocalContextLengthLmStudio:
                  "id": "nvidia/nvidia-nemotron-super-49b-v1",
                  "max_context_length": 1_048_576,
                  "loaded_instances": [{"config": {"context_length": 131072}}]},
-            ]
+            ],
         })
         client_mock = self._make_client(
             native_resp,
@@ -324,7 +325,7 @@ class TestQueryLocalContextLengthLmStudio:
              patch("httpx.Client", return_value=client_mock):
             # Model passed in is just the slug after stripping "local:" prefix
             result = _query_local_context_length(
-                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1"
+                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1",
             )
 
         assert result == 131072
@@ -345,14 +346,14 @@ class TestQueryLocalContextLengthLmStudio:
         list_resp = self._make_resp(200, {
             "data": [
                 {"id": "nvidia/nvidia-nemotron-super-49b-v1", "context_length": 131072},
-            ]
+            ],
         })
         client_mock = self._make_client(native_resp, detail_resp, list_resp)
 
         with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
              patch("httpx.Client", return_value=client_mock):
             result = _query_local_context_length(
-                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1"
+                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1",
             )
 
         assert result == 131072
@@ -370,7 +371,7 @@ class TestQueryLocalContextLengthLmStudio:
                         {"config": {"context_length": 65536}},
                     ],
                 },
-            ]
+            ],
         })
         client_mock = self._make_client(
             native_resp,
@@ -381,7 +382,7 @@ class TestQueryLocalContextLengthLmStudio:
         with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
              patch("httpx.Client", return_value=client_mock):
             result = _query_local_context_length(
-                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1"
+                "nvidia-nemotron-super-49b-v1", "http://192.168.1.22:1234/v1",
             )
 
         assert result == 65536
@@ -405,7 +406,7 @@ class TestQueryLocalContextLengthLmStudio:
                         {"config": {"context_length": 122_651}},
                     ],
                 },
-            ]
+            ],
         })
         client_mock = self._make_client(
             native_resp,
@@ -416,7 +417,7 @@ class TestQueryLocalContextLengthLmStudio:
         with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
              patch("httpx.Client", return_value=client_mock):
             result = _query_local_context_length(
-                "nvidia-nemotron-3-nano-4b", "http://192.168.1.22:1234/v1"
+                "nvidia-nemotron-3-nano-4b", "http://192.168.1.22:1234/v1",
             )
 
         assert result == 122_651, (
@@ -442,7 +443,7 @@ class TestDetectLocalServerTypeAuth:
 
         assert result == "lm-studio"
         assert mock_client.call_args.kwargs["headers"] == {
-            "Authorization": "Bearer lm-token"
+            "Authorization": "Bearer lm-token",
         }
 
 
@@ -466,11 +467,11 @@ class TestFetchEndpointModelMetadataLmStudio:
                         "id": "lmstudio-community/Qwen3.5-27B-GGUF/Qwen3.5-27B-Q8_0.gguf",
                         "max_context_length": 1_048_576,
                         "loaded_instances": [
-                            {"config": {"context_length": 131072}}
+                            {"config": {"context_length": 131072}},
                         ],
-                    }
-                ]
-            }
+                    },
+                ],
+            },
         )
 
         with patch("agent.model_metadata.detect_local_server_type", return_value="lm-studio"), \
@@ -484,7 +485,7 @@ class TestFetchEndpointModelMetadataLmStudio:
         assert mock_get.call_count == 1
         assert mock_get.call_args[0][0] == "http://localhost:1234/api/v1/models"
         assert mock_get.call_args.kwargs["headers"] == {
-            "Authorization": "Bearer lm-token"
+            "Authorization": "Bearer lm-token",
         }
         assert result["lmstudio-community/Qwen3.5-27B-GGUF/Qwen3.5-27B-Q8_0.gguf"]["context_length"] == 131072
         assert result["Qwen3.5-27B-GGUF/Qwen3.5-27B-Q8_0.gguf"]["context_length"] == 131072
@@ -547,7 +548,7 @@ class TestGetModelContextLengthLocalFallback:
 
     def test_local_endpoint_server_returns_none_falls_back_to_2m(self):
         """When local server returns None, still falls back to 2M probe tier."""
-        from agent.model_metadata import get_model_context_length, CONTEXT_PROBE_TIERS
+        from agent.model_metadata import CONTEXT_PROBE_TIERS, get_model_context_length
 
         with patch("agent.model_metadata.get_cached_context_length", return_value=None), \
              patch("agent.model_metadata.fetch_endpoint_model_metadata", return_value={}), \
@@ -568,7 +569,7 @@ class TestGetModelContextLengthLocalFallback:
              patch("agent.model_metadata.is_local_endpoint", return_value=False), \
              patch("agent.model_metadata._query_local_context_length") as mock_query:
             result = get_model_context_length(
-                "unknown-model", "https://some-cloud-api.example.com/v1"
+                "unknown-model", "https://some-cloud-api.example.com/v1",
             )
 
         mock_query.assert_not_called()

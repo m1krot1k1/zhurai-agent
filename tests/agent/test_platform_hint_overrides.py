@@ -91,11 +91,11 @@ class TestResolvePlatformHint:
         assert _resolve_platform_hint(a, "whatsapp", DEFAULT) == DEFAULT
 
     def test_replace_with_empty_default_hint(self):
-        """replace works even when the platform had no built-in default."""
+        """Replace works even when the platform had no built-in default."""
         a = _agent({"customplat": {"replace": "Custom hint."}})
         assert _resolve_platform_hint(a, "customplat", "") == "Custom hint."
 
     def test_append_with_empty_default_hint(self):
-        """append on a platform with no default just yields the extra text."""
+        """Append on a platform with no default just yields the extra text."""
         a = _agent({"customplat": {"append": "Only this."}})
         assert _resolve_platform_hint(a, "customplat", "") == "Only this."

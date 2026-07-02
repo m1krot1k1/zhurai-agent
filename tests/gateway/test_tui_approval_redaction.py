@@ -11,8 +11,6 @@ before emitting.
 
 import inspect
 
-import pytest
-
 
 class TestTuiApprovalEmitRedaction:
     def test_emit_approval_request_redacts_command_in_payload(self, monkeypatch):
@@ -22,7 +20,7 @@ class TestTuiApprovalEmitRedaction:
         monkeypatch.setattr(
             tui_server, "_emit",
             lambda event, sid, payload=None: emitted.update(
-                {"event": event, "sid": sid, "payload": payload}
+                {"event": event, "sid": sid, "payload": payload},
             ),
         )
         raw = "curl -H 'Authorization: token ghp_01...6789' https://api.github.com"
@@ -51,7 +49,8 @@ class TestTuiApprovalEmitRedaction:
         """Every register_gateway_notify approval callback must route through the
         redacting `_emit_approval_request` helper — no registration may emit the
         raw payload via `_emit("approval.request", ...)` directly. The ONLY
-        allowed raw emit is inside the helper itself."""
+        allowed raw emit is inside the helper itself.
+        """
         from tui_gateway import server as tui_server
 
         src = inspect.getsource(tui_server)

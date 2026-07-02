@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import tempfile
 from collections import defaultdict
 from pathlib import Path
-import tempfile
 
 from setuptools import setup
 from setuptools.command.build import build as _build
 from setuptools.command.egg_info import egg_info as _egg_info
-
 
 REPO_ROOT = Path(__file__).parent.resolve()
 
@@ -83,5 +82,5 @@ setup(
     data_files=[
         *_data_file_tree("skills"),
         *_data_file_tree("optional-skills"),
-    ]
+    ],
 )

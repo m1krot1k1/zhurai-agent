@@ -29,14 +29,13 @@ def _make_fake_supervisor(cdp_url: str, *, thread_alive: bool, loop_running: boo
     Only the attributes touched by the healthcheck (_thread, _loop, cdp_url)
     and by the teardown path (stop()) need to exist.
     """
-
     if thread_alive:
         # A thread that is actually running — parks on an Event we never set.
         hold = threading.Event()
         t = threading.Thread(target=hold.wait, daemon=True)
         t.start()
         # Attach the release hook so the test can let the thread exit.
-        setattr(t, "_release", hold.set)
+        t._release = hold.set
     else:
         # An un-started thread — is_alive() returns False.
         t = threading.Thread(target=lambda: None)
@@ -103,7 +102,7 @@ def stub_cdp_supervisor(monkeypatch):
 
 
 def test_cache_hit_returns_same_instance_when_healthy(
-    isolated_registry, stub_cdp_supervisor
+    isolated_registry, stub_cdp_supervisor,
 ):
     """Sanity: healthy cached supervisor is returned without recreate."""
     first = isolated_registry.get_or_start(task_id="t1", cdp_url="http://h/1")
@@ -149,7 +148,7 @@ def test_stopped_loop_triggers_recreate(isolated_registry, stub_cdp_supervisor):
 
 
 def test_missing_thread_and_loop_attrs_trigger_recreate(
-    isolated_registry, stub_cdp_supervisor
+    isolated_registry, stub_cdp_supervisor,
 ):
     """Defensive: None _thread or None _loop counts as unhealthy."""
     cdp_url = "http://h/4"

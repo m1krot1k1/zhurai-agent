@@ -27,7 +27,7 @@ from tools.mcp_tool import MCPServerTask
 def _caps(tools=None, prompts=None, resources=None):
     """Build a fake InitializeResult with the given capability sub-objects."""
     return SimpleNamespace(
-        capabilities=SimpleNamespace(tools=tools, prompts=prompts, resources=resources)
+        capabilities=SimpleNamespace(tools=tools, prompts=prompts, resources=resources),
     )
 
 
@@ -77,7 +77,7 @@ class TestDiscoverToolsGating:
         task.initialize_result = _caps(tools=SimpleNamespace())
         fake_tool = SimpleNamespace(name="echo")
         task.session = SimpleNamespace(
-            list_tools=AsyncMock(return_value=SimpleNamespace(tools=[fake_tool]))
+            list_tools=AsyncMock(return_value=SimpleNamespace(tools=[fake_tool])),
         )
 
         await task._discover_tools()
@@ -88,7 +88,7 @@ class TestDiscoverToolsGating:
     async def test_legacy_fallback_still_calls_list_tools(self):
         task = MCPServerTask("test")
         task.session = SimpleNamespace(
-            list_tools=AsyncMock(return_value=SimpleNamespace(tools=[]))
+            list_tools=AsyncMock(return_value=SimpleNamespace(tools=[])),
         )
 
         await task._discover_tools()
@@ -112,7 +112,8 @@ class TestRefreshToolsGating:
 class TestKeepaliveProbe:
     async def _run_one_keepalive_cycle(self, task):
         """Drive _wait_for_lifecycle_event through exactly one keepalive
-        timeout, then fire shutdown so it returns."""
+        timeout, then fire shutdown so it returns.
+        """
         real_wait = asyncio.wait
         cycles = {"n": 0}
 
@@ -124,7 +125,7 @@ class TestKeepaliveProbe:
             # Second cycle: let shutdown win.
             task._shutdown_event.set()
             return await real_wait(
-                tasks, timeout=0.5, return_when=return_when or asyncio.FIRST_COMPLETED
+                tasks, timeout=0.5, return_when=return_when or asyncio.FIRST_COMPLETED,
             )
 
         import tools.mcp_tool as mcp_mod
@@ -152,7 +153,8 @@ class TestKeepaliveProbe:
     async def test_keepalive_uses_ping_for_tool_capable_server(self):
         """Keepalive uses ``ping`` even for tool-capable servers, so the probe
         stays a few bytes regardless of tool count (no ``list_tools`` payload).
-        Tool-list changes still arrive via tools/list_changed notifications."""
+        Tool-list changes still arrive via tools/list_changed notifications.
+        """
         task = MCPServerTask("test")
         task.initialize_result = _caps(tools=SimpleNamespace())
         task.session = SimpleNamespace(
@@ -200,7 +202,7 @@ class TestKeepaliveInterval:
             captured["timeout"] = timeout
             task._shutdown_event.set()
             return await real_wait(
-                tasks, timeout=0.5, return_when=return_when or asyncio.FIRST_COMPLETED
+                tasks, timeout=0.5, return_when=return_when or asyncio.FIRST_COMPLETED,
             )
 
         import tools.mcp_tool as mcp_mod
@@ -270,7 +272,8 @@ class TestMethodNotFoundDetection:
 class TestKeepaliveProbeFallback:
     """The probe prefers ``ping`` but falls back to ``list_tools`` for servers
     that don't implement the optional ping utility — without reconnect-looping,
-    and without regressing servers that DO support ping."""
+    and without regressing servers that DO support ping.
+    """
 
     async def test_uses_ping_when_supported(self):
         task = MCPServerTask("test")
@@ -304,7 +307,8 @@ class TestKeepaliveProbeFallback:
     async def test_falls_back_on_unknown_method_string(self):
         """Regression for #50028: a server that surfaces method-not-found as a
         plain "Unknown method: ping" string (no structural -32601 code) must
-        still latch the fallback and use list_tools, NOT reconnect-loop."""
+        still latch the fallback and use list_tools, NOT reconnect-loop.
+        """
         task = MCPServerTask("test")
         task.initialize_result = _caps(tools=SimpleNamespace())
         task.session = SimpleNamespace(
@@ -334,7 +338,8 @@ class TestKeepaliveProbeFallback:
 
     async def test_real_liveness_failure_propagates_not_swallowed(self):
         """A non-(-32601) ping error is a genuine connection failure: it must
-        propagate so the caller reconnects, and must NOT latch the fallback."""
+        propagate so the caller reconnects, and must NOT latch the fallback.
+        """
         task = MCPServerTask("test")
         task.initialize_result = _caps(tools=SimpleNamespace())
         task.session = SimpleNamespace(
@@ -351,7 +356,8 @@ class TestKeepaliveProbeFallback:
     async def test_no_ping_no_tools_propagates_method_not_found(self):
         """A server advertising neither working ping nor tools has no cheaper
         probe — the -32601 must propagate rather than calling list_tools on a
-        server that doesn't support it."""
+        server that doesn't support it.
+        """
         task = MCPServerTask("test")
         task.initialize_result = _caps(prompts=SimpleNamespace())  # not tool-capable
         task.session = SimpleNamespace(
@@ -376,5 +382,3 @@ class TestKeepaliveProbeFallback:
         await task._discover_tools()
 
         assert task._ping_unsupported is False
-
-

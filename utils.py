@@ -8,7 +8,7 @@ import shutil
 import stat
 import tempfile
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 from urllib.parse import urlparse
 
 import yaml
@@ -55,12 +55,12 @@ def _restore_file_mode(path: Path, mode: "int | None") -> None:
     if mode is None:
         return
     try:
-        os.chmod(path, mode)
+        Path(path).chmod(mode)
     except OSError:
         pass
 
 
-def atomic_replace(tmp_path: Union[str, Path], target: Union[str, Path]) -> str:
+def atomic_replace(tmp_path: str | Path, target: str | Path) -> str:
     """Atomically move *tmp_path* onto *target*, preserving symlinks.
 
     ``os.replace(tmp, target)`` atomically swaps ``tmp`` into place at
@@ -81,10 +81,10 @@ def atomic_replace(tmp_path: Union[str, Path], target: Union[str, Path]) -> str:
     need to re-apply permissions can target it instead of the symlink.
     """
     target_str = str(target)
-    real_path = os.path.realpath(target_str) if os.path.islink(target_str) else target_str
+    real_path = os.path.realpath(target_str) if Path(target_str).is_symlink() else target_str
     tmp_str = str(tmp_path)
     try:
-        os.replace(tmp_str, real_path)
+        Path(tmp_str).replace(real_path)
     except OSError as exc:
         if exc.errno not in (errno.EXDEV, errno.EBUSY):
             raise
@@ -100,16 +100,16 @@ def atomic_replace(tmp_path: Union[str, Path], target: Union[str, Path]) -> str:
         except OSError:
             pass
         try:
-            with open(real_path, "rb") as f:
+            with Path(real_path).open("rb") as f:
                 os.fsync(f.fileno())
         except OSError:
             pass
-        os.unlink(tmp_str)
+        Path(tmp_str).unlink()
     return real_path
 
 
 def atomic_json_write(
-    path: Union[str, Path],
+    path: str | Path,
     data: Any,
     *,
     indent: int = 2,
@@ -131,6 +131,7 @@ def atomic_json_write(
             TOCTOU exposure for secret-bearing files.
         **dump_kwargs: Additional keyword args forwarded to json.dump(), such
             as default=str for non-native types.
+
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,7 +163,7 @@ def atomic_json_write(
         real_path = atomic_replace(tmp_path, path)
         if mode is not None:
             try:
-                os.chmod(real_path, mode)
+                Path(real_path).chmod(mode)
             except OSError:
                 pass
         else:
@@ -171,14 +172,14 @@ def atomic_json_write(
         # Intentionally catch BaseException so temp-file cleanup still runs for
         # KeyboardInterrupt/SystemExit before re-raising the original signal.
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
 
 
 def atomic_yaml_write(
-    path: Union[str, Path],
+    path: str | Path,
     data: Any,
     *,
     default_flow_style: bool = False,
@@ -198,6 +199,7 @@ def atomic_yaml_write(
         sort_keys: Whether to sort dict keys (default False).
         extra_content: Optional string to append after the YAML dump
             (e.g. commented-out sections for user reference).
+
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -223,14 +225,14 @@ def atomic_yaml_write(
         # Match atomic_json_write: cleanup must also happen for process-level
         # interruptions before we re-raise them.
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
 
 
 def atomic_roundtrip_yaml_update(
-    path: Union[str, Path],
+    path: str | Path,
     key_path: str,
     value: Any,
 ) -> None:
@@ -287,7 +289,7 @@ def atomic_roundtrip_yaml_update(
         _restore_file_mode(real_path, original_mode)
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise

@@ -15,11 +15,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from tools.approval import (
+    _smart_approve,
     _strip_line_comment,
     _strip_shell_comments,
-    _smart_approve,
 )
-
 
 # ── _strip_line_comment ──────────────────────────────────────────────────
 
@@ -93,7 +92,7 @@ class TestStripShellComments(unittest.TestCase):
     def test_preserves_quoted_hashes(self):
         cmd = 'grep "# TODO" src/*.py  # find todos'
         result = _strip_shell_comments(cmd)
-        assert '# TODO' in result
+        assert "# TODO" in result
         assert "find todos" not in result
 
     def test_single_line_no_comment(self):

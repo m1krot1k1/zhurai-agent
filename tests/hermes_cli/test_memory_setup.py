@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import hermes_cli.memory_setup as memory_setup
+from hermes_cli import memory_setup
 from hermes_cli.memory_setup import _CANCELLED, _curses_select
 
 
@@ -153,7 +153,7 @@ def test_cmd_status_prefers_provider_status_config(monkeypatch, capsys):
                 "ovcli_config_path": "/tmp/ovcli.conf.VPS_ROOT",
                 "endpoint": "http://stale.local",
             },
-        }
+        },
     }
     monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
     monkeypatch.setattr(memory_setup, "_get_available_providers", lambda: [("openviking", "API key / local", StatusProvider())])

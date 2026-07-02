@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # API layer — _api_post + error mapping
 # ---------------------------------------------------------------------------
@@ -16,7 +15,8 @@ class TestApiPost:
 
     def test_raises_on_network_error(self):
         import requests
-        from hermes_cli.dingtalk_auth import _api_post, RegistrationError
+
+        from hermes_cli.dingtalk_auth import RegistrationError, _api_post
 
         with patch("hermes_cli.dingtalk_auth.requests.post",
                    side_effect=requests.ConnectionError("nope")):
@@ -24,7 +24,7 @@ class TestApiPost:
                 _api_post("/app/registration/init", {"source": "hermes"})
 
     def test_raises_on_nonzero_errcode(self):
-        from hermes_cli.dingtalk_auth import _api_post, RegistrationError
+        from hermes_cli.dingtalk_auth import RegistrationError, _api_post
 
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
@@ -75,7 +75,7 @@ class TestBeginRegistration:
         assert result["expires_in"] == 7200
 
     def test_missing_nonce_raises(self):
-        from hermes_cli.dingtalk_auth import begin_registration, RegistrationError
+        from hermes_cli.dingtalk_auth import RegistrationError, begin_registration
 
         with patch("hermes_cli.dingtalk_auth._api_post",
                    return_value={"errcode": 0, "nonce": ""}):
@@ -83,7 +83,7 @@ class TestBeginRegistration:
                 begin_registration()
 
     def test_missing_device_code_raises(self):
-        from hermes_cli.dingtalk_auth import begin_registration, RegistrationError
+        from hermes_cli.dingtalk_auth import RegistrationError, begin_registration
 
         responses = [
             {"errcode": 0, "nonce": "n1"},
@@ -94,7 +94,7 @@ class TestBeginRegistration:
                 begin_registration()
 
     def test_missing_verification_uri_raises(self):
-        from hermes_cli.dingtalk_auth import begin_registration, RegistrationError
+        from hermes_cli.dingtalk_auth import RegistrationError, begin_registration
 
         responses = [
             {"errcode": 0, "nonce": "n1"},
@@ -124,20 +124,23 @@ class TestWaitForSuccess:
         with patch("hermes_cli.dingtalk_auth.poll_registration", side_effect=responses), \
              patch("hermes_cli.dingtalk_auth.time.sleep"):
             cid, secret = wait_for_registration_success(
-                device_code="dev", interval=0, expires_in=60
+                device_code="dev", interval=0, expires_in=60,
             )
             assert cid == "cid-1"
             assert secret == "sec-1"
 
     def test_success_without_credentials_raises(self):
-        from hermes_cli.dingtalk_auth import wait_for_registration_success, RegistrationError
+        from hermes_cli.dingtalk_auth import (
+            RegistrationError,
+            wait_for_registration_success,
+        )
 
         with patch("hermes_cli.dingtalk_auth.poll_registration",
                    return_value={"status": "SUCCESS", "client_id": "", "client_secret": ""}), \
              patch("hermes_cli.dingtalk_auth.time.sleep"):
             with pytest.raises(RegistrationError, match="credentials are missing"):
                 wait_for_registration_success(
-                    device_code="dev", interval=0, expires_in=60
+                    device_code="dev", interval=0, expires_in=60,
                 )
 
     def test_invokes_waiting_callback(self):
@@ -152,7 +155,7 @@ class TestWaitForSuccess:
         with patch("hermes_cli.dingtalk_auth.poll_registration", side_effect=responses), \
              patch("hermes_cli.dingtalk_auth.time.sleep"):
             wait_for_registration_success(
-                device_code="dev", interval=0, expires_in=60, on_waiting=callback
+                device_code="dev", interval=0, expires_in=60, on_waiting=callback,
             )
         assert callback.call_count == 2
 
@@ -196,6 +199,7 @@ class TestConfigOverrides:
         monkeypatch.delenv("DINGTALK_REGISTRATION_BASE_URL", raising=False)
         # Force module reload to pick up current env
         import importlib
+
         import hermes_cli.dingtalk_auth as mod
         importlib.reload(mod)
         assert mod.REGISTRATION_BASE_URL == "https://oapi.dingtalk.com"
@@ -204,6 +208,7 @@ class TestConfigOverrides:
         monkeypatch.setenv("DINGTALK_REGISTRATION_BASE_URL",
                            "https://test.example.com/")
         import importlib
+
         import hermes_cli.dingtalk_auth as mod
         importlib.reload(mod)
         # Trailing slash stripped
@@ -212,6 +217,7 @@ class TestConfigOverrides:
     def test_source_default(self, monkeypatch):
         monkeypatch.delenv("DINGTALK_REGISTRATION_SOURCE", raising=False)
         import importlib
+
         import hermes_cli.dingtalk_auth as mod
         importlib.reload(mod)
         assert mod.REGISTRATION_SOURCE == "openClaw"

@@ -28,10 +28,10 @@ from gateway.session_context import (
     set_session_vars,
 )
 
-
 # ---------------------------------------------------------------------------
 # Capability helper
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncDeliverySupported:
     def test_default_unbound_is_supported(self):
@@ -77,9 +77,10 @@ class TestAsyncDeliverySupported:
 
     def test_clear_resets_to_default_supported(self):
         """A cleared context must fall back to default-supported, NOT be
-        mistaken for an opted-out stateless adapter."""
+        mistaken for an opted-out stateless adapter.
+        """
         tokens = set_session_vars(
-            platform="api_server", session_key="s1", async_delivery=False
+            platform="api_server", session_key="s1", async_delivery=False,
         )
         assert async_delivery_supported() is False
         clear_session_vars(tokens)
@@ -104,12 +105,13 @@ class TestAdapterCapabilityFlag:
     def test_api_server_bind_chokepoint_hardwires_no_delivery(self):
         """Every API-server agent-entry path binds through
         _bind_api_server_session, which hardwires async_delivery=False — a new
-        route physically cannot reintroduce the silent no-op (#10760)."""
+        route physically cannot reintroduce the silent no-op (#10760).
+        """
         from gateway.platforms.api_server import APIServerAdapter
         from gateway.session_context import clear_session_vars, get_session_env
 
         tokens = APIServerAdapter._bind_api_server_session(
-            chat_id="c1", session_key="sk1", session_id="sid1"
+            chat_id="c1", session_key="sk1", session_id="sid1",
         )
         try:
             assert async_delivery_supported() is False
@@ -120,7 +122,8 @@ class TestAdapterCapabilityFlag:
     def test_api_server_binding_does_not_outlive_turn(self):
         """The no-delivery decision is request-scoped, NOT stuck to the session.
         After clear, a session resumed on a delivering interface re-binds fresh
-        and is NOT blocked."""
+        and is NOT blocked.
+        """
         from gateway.platforms.api_server import APIServerAdapter
         from gateway.session_context import clear_session_vars
 
@@ -159,14 +162,14 @@ class TestTerminalNotifyGate:
         from tools.terminal_tool import terminal_tool
 
         return json.loads(
-            terminal_tool(command=command, background=True, notify_on_complete=True)
+            terminal_tool(command=command, background=True, notify_on_complete=True),
         )
 
     def test_api_server_skips_watcher_and_notes(self):
         from tools.process_registry import process_registry
 
         tokens = set_session_vars(
-            platform="api_server", chat_id="s1", session_key="s1", async_delivery=False
+            platform="api_server", chat_id="s1", session_key="s1", async_delivery=False,
         )
         try:
             d = self._run_bg("sleep 30 && echo DONE")
@@ -201,7 +204,8 @@ class TestTerminalNotifyGate:
 
     def test_cli_stays_supported(self):
         """CLI delivers via the in-process completion_queue: notify stays on,
-        no false 'unsupported' note, and no pending_watcher (empty platform)."""
+        no false 'unsupported' note, and no pending_watcher (empty platform).
+        """
         from tools.process_registry import process_registry
 
         d = self._run_bg("sleep 30 && echo DONE")

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Hyperliquid CLI Tool for Hermes Agent
+"""Hyperliquid CLI Tool for Hermes Agent
 -------------------------------------
 Queries the Hyperliquid info endpoint for market and account data.
 Uses only Python standard library - no external packages required.
@@ -36,9 +35,9 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
-
+from typing import Any
 
 USER_AGENT = "HermesAgent/1.0"
 DEFAULT_USER_ENV = "HYPERLIQUID_USER_ADDRESS"
@@ -49,8 +48,8 @@ def _hermes_home() -> Path:
     return Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser()
 
 
-def _dotenv_paths() -> List[Path]:
-    paths: List[Path] = []
+def _dotenv_paths() -> list[Path]:
+    paths: list[Path] = []
     project_env = Path.cwd() / ".env"
     if project_env.exists():
         paths.append(project_env)
@@ -62,8 +61,8 @@ def _dotenv_paths() -> List[Path]:
     return paths
 
 
-def _load_dotenv_values() -> Dict[str, str]:
-    values: Dict[str, str] = {}
+def _load_dotenv_values() -> dict[str, str]:
+    values: dict[str, str] = {}
     for env_path in _dotenv_paths():
         try:
             lines = env_path.read_text(encoding="utf-8").splitlines()
@@ -78,7 +77,7 @@ def _load_dotenv_values() -> Dict[str, str]:
             key = key.strip()
             value = value.strip()
             if value.startswith('"') and value.endswith('"') and len(value) >= 2:
-                value = value[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+                value = value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
             values[key] = value
     return values
 
@@ -104,7 +103,7 @@ def _info_url() -> str:
     return f"{api_base}/info"
 
 
-def _resolve_user(user: Optional[str]) -> str:
+def _resolve_user(user: str | None) -> str:
     candidate = (user or "").strip()
     if candidate:
         return candidate
@@ -115,11 +114,11 @@ def _resolve_user(user: Optional[str]) -> str:
 
     sys.exit(
         "Missing Hyperliquid address. Pass <address> explicitly or set "
-        f"{DEFAULT_USER_ENV} in your environment or {_hermes_home() / '.env'}."
+        f"{DEFAULT_USER_ENV} in your environment or {_hermes_home() / '.env'}.",
     )
 
 
-def _post_info(payload: Dict[str, Any], timeout: int = 20, retries: int = 2) -> Any:
+def _post_info(payload: dict[str, Any], timeout: int = 20, retries: int = 2) -> Any:
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
@@ -146,7 +145,7 @@ def _post_info(payload: Dict[str, Any], timeout: int = 20, retries: int = 2) -> 
     return None
 
 
-def _safe_float(value: Any) -> Optional[float]:
+def _safe_float(value: Any) -> float | None:
     try:
         if value is None or value == "":
             return None
@@ -155,13 +154,13 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _limit_items(items: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+def _limit_items(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     if limit <= 0:
         return items
     return items[:limit]
 
 
-def _hours_ago_ms(hours: float, now_ms: Optional[int] = None) -> int:
+def _hours_ago_ms(hours: float, now_ms: int | None = None) -> int:
     end_ms = now_ms if now_ms is not None else int(time.time() * 1000)
     return end_ms - int(hours * 60 * 60 * 1000)
 
@@ -218,7 +217,7 @@ def _format_fraction_percent(value: Any, decimals: int = 4) -> str:
     return f"{number * 100:+.{decimals}f}%"
 
 
-def _percent_change(current: Any, previous: Any) -> Optional[float]:
+def _percent_change(current: Any, previous: Any) -> float | None:
     curr = _safe_float(current)
     prev = _safe_float(previous)
     if curr is None or prev is None or prev == 0:
@@ -232,11 +231,11 @@ def _short_address(address: Any) -> str:
     return f"{address[:6]}...{address[-4:]}"
 
 
-def _render_table(headers: List[tuple[str, str]], rows: List[Dict[str, Any]]) -> str:
+def _render_table(headers: list[tuple[str, str]], rows: list[dict[str, Any]]) -> str:
     if not rows:
         return "(no data)"
 
-    prepared_rows: List[List[str]] = []
+    prepared_rows: list[list[str]] = []
     widths = [len(label) for label, _ in headers]
 
     for row in rows:
@@ -245,8 +244,7 @@ def _render_table(headers: List[tuple[str, str]], rows: List[Dict[str, Any]]) ->
             value = row.get(key, "")
             text = str(value)
             rendered.append(text)
-            if len(text) > widths[index]:
-                widths[index] = len(text)
+            widths[index] = max(widths[index], len(text))
         prepared_rows.append(rendered)
 
     lines = []
@@ -259,8 +257,8 @@ def _render_table(headers: List[tuple[str, str]], rows: List[Dict[str, Any]]) ->
     return "\n".join(lines)
 
 
-def _normalize_dexs(payload: Any) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _normalize_dexs(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not isinstance(payload, list):
         return rows
 
@@ -274,7 +272,7 @@ def _normalize_dexs(payload: Any) -> List[Dict[str, Any]]:
                     "full_name": "First perp dex",
                     "deployer": "-",
                     "asset_caps": 0,
-                }
+                },
             )
             continue
 
@@ -290,12 +288,12 @@ def _normalize_dexs(payload: Any) -> List[Dict[str, Any]]:
                 "full_name": item.get("fullName") or "-",
                 "deployer": item.get("deployer") or "-",
                 "asset_caps": len(caps) if isinstance(caps, list) else 0,
-            }
+            },
         )
     return rows
 
 
-def _normalize_perp_markets(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_perp_markets(payload: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, list) or len(payload) < 2:
         return []
 
@@ -305,7 +303,7 @@ def _normalize_perp_markets(payload: Any) -> List[Dict[str, Any]]:
     if not isinstance(universe, list):
         return []
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for index, spec in enumerate(universe):
         if not isinstance(spec, dict):
             continue
@@ -333,7 +331,7 @@ def _normalize_perp_markets(payload: Any) -> List[Dict[str, Any]]:
     return rows
 
 
-def _normalize_spot_markets(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_spot_markets(payload: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, list) or len(payload) < 2:
         return []
 
@@ -347,7 +345,7 @@ def _normalize_spot_markets(payload: Any) -> List[Dict[str, Any]]:
             if isinstance(token, dict) and "index" in token:
                 token_lookup[token["index"]] = token.get("name", str(token["index"]))
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     if not isinstance(pairs, list):
         return rows
 
@@ -373,13 +371,13 @@ def _normalize_spot_markets(payload: Any) -> List[Dict[str, Any]]:
                 "prev_day_px": ctx.get("prevDayPx"),
                 "change_pct": _percent_change(mark_px, ctx.get("prevDayPx")),
                 "day_ntl_vlm": ctx.get("dayNtlVlm"),
-            }
+            },
         )
     return rows
 
 
-def _normalize_candles(payload: Any) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _normalize_candles(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not isinstance(payload, list):
         return rows
 
@@ -395,15 +393,15 @@ def _normalize_candles(payload: Any) -> List[Dict[str, Any]]:
                 "close": candle.get("c"),
                 "volume": candle.get("v"),
                 "trades": candle.get("n"),
-            }
+            },
         )
 
     rows.sort(key=lambda item: int(item.get("time") or 0))
     return rows
 
 
-def _normalize_funding_history(payload: Any) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _normalize_funding_history(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not isinstance(payload, list):
         return rows
 
@@ -416,14 +414,14 @@ def _normalize_funding_history(payload: Any) -> List[Dict[str, Any]]:
                 "funding_rate": item.get("fundingRate"),
                 "premium": item.get("premium"),
                 "time": item.get("time"),
-            }
+            },
         )
 
     rows.sort(key=lambda item: int(item.get("time") or 0))
     return rows
 
 
-def _normalize_book_levels(payload: Any) -> Dict[str, List[Dict[str, Any]]]:
+def _normalize_book_levels(payload: Any) -> dict[str, list[dict[str, Any]]]:
     if not isinstance(payload, dict):
         return {"bids": [], "asks": []}
 
@@ -431,7 +429,7 @@ def _normalize_book_levels(payload: Any) -> Dict[str, List[Dict[str, Any]]]:
     if not isinstance(levels, list) or len(levels) < 2:
         return {"bids": [], "asks": []}
 
-    def convert(side: Iterable[Any]) -> List[Dict[str, Any]]:
+    def convert(side: Iterable[Any]) -> list[dict[str, Any]]:
         converted = []
         for entry in side:
             if isinstance(entry, dict):
@@ -440,7 +438,7 @@ def _normalize_book_levels(payload: Any) -> Dict[str, List[Dict[str, Any]]]:
                         "px": entry.get("px"),
                         "sz": entry.get("sz"),
                         "orders": entry.get("n"),
-                    }
+                    },
                 )
             elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
                 converted.append(
@@ -448,18 +446,18 @@ def _normalize_book_levels(payload: Any) -> Dict[str, List[Dict[str, Any]]]:
                         "px": entry[0],
                         "sz": entry[1],
                         "orders": entry[2] if len(entry) > 2 else None,
-                    }
+                    },
                 )
         return converted
 
     return {"bids": convert(levels[0]), "asks": convert(levels[1])}
 
 
-def _normalize_positions(payload: Any) -> Dict[str, Any]:
+def _normalize_positions(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"summary": {}, "positions": []}
 
-    positions: List[Dict[str, Any]] = []
+    positions: list[dict[str, Any]] = []
     for item in payload.get("assetPositions", []):
         if not isinstance(item, dict):
             continue
@@ -479,7 +477,7 @@ def _normalize_positions(payload: Any) -> Dict[str, Any]:
                 "margin_used": position.get("marginUsed"),
                 "leverage": leverage.get("value"),
                 "leverage_type": leverage.get("type"),
-            }
+            },
         )
 
     positions.sort(
@@ -504,11 +502,11 @@ def _normalize_positions(payload: Any) -> Dict[str, Any]:
     }
 
 
-def _normalize_spot_balances(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_spot_balances(payload: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, dict):
         return []
 
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for item in payload.get("balances", []):
         if not isinstance(item, dict):
             continue
@@ -518,15 +516,15 @@ def _normalize_spot_balances(payload: Any) -> List[Dict[str, Any]]:
                 "total": item.get("total"),
                 "hold": item.get("hold"),
                 "entry_ntl": item.get("entryNtl"),
-            }
+            },
         )
 
     rows.sort(key=lambda item: abs(_safe_float(item.get("entry_ntl")) or 0.0), reverse=True)
     return rows
 
 
-def _normalize_fills(payload: Any) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _normalize_fills(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not isinstance(payload, list):
         return rows
 
@@ -548,15 +546,15 @@ def _normalize_fills(payload: Any) -> List[Dict[str, Any]]:
                 "hash": fill.get("hash"),
                 "oid": fill.get("oid"),
                 "twap_id": item.get("twapId"),
-            }
+            },
         )
 
     rows.sort(key=lambda item: int(item.get("time") or 0), reverse=True)
     return rows
 
 
-def _normalize_orders(payload: Any) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _normalize_orders(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     if not isinstance(payload, list):
         return rows
 
@@ -576,7 +574,7 @@ def _normalize_orders(payload: Any) -> List[Dict[str, Any]]:
                 "status": item.get("status") or order.get("status") or "-",
                 "oid": order.get("oid"),
                 "order_type": order.get("orderType") or "-",
-            }
+            },
         )
 
     rows.sort(key=lambda item: int(item.get("timestamp") or 0), reverse=True)
@@ -600,7 +598,7 @@ def _direction_bucket(direction: Any) -> str:
     return "other"
 
 
-def _average(values: Iterable[Optional[float]]) -> Optional[float]:
+def _average(values: Iterable[float | None]) -> float | None:
     clean_values = [value for value in values if value is not None]
     if not clean_values:
         return None
@@ -611,14 +609,14 @@ def _is_spot_coin(coin: str) -> bool:
     return "/" in coin or coin.startswith("@")
 
 
-def _safe_info_query(payload: Dict[str, Any]) -> Any:
+def _safe_info_query(payload: dict[str, Any]) -> Any:
     try:
         return _post_info(payload)
     except SystemExit:
         return None
 
 
-def _market_context_for_coin(coin: str, interval: str, start_ms: int, end_ms: int) -> Dict[str, Any]:
+def _market_context_for_coin(coin: str, interval: str, start_ms: int, end_ms: int) -> dict[str, Any]:
     candles = _normalize_candles(
         _safe_info_query(
             {
@@ -629,10 +627,10 @@ def _market_context_for_coin(coin: str, interval: str, start_ms: int, end_ms: in
                     "startTime": start_ms,
                     "endTime": end_ms,
                 },
-            }
-        )
+            },
+        ),
     )
-    funding_history: List[Dict[str, Any]] = []
+    funding_history: list[dict[str, Any]] = []
     if not _is_spot_coin(coin):
         funding_history = _normalize_funding_history(
             _safe_info_query(
@@ -641,8 +639,8 @@ def _market_context_for_coin(coin: str, interval: str, start_ms: int, end_ms: in
                     "coin": coin,
                     "startTime": start_ms,
                     "endTime": end_ms,
-                }
-            )
+                },
+            ),
         )
 
     candle_change = None
@@ -662,7 +660,7 @@ def _market_context_for_coin(coin: str, interval: str, start_ms: int, end_ms: in
     }
 
 
-def _build_coin_review(coin: str, fills: List[Dict[str, Any]], interval: str, start_ms: int, end_ms: int) -> Dict[str, Any]:
+def _build_coin_review(coin: str, fills: list[dict[str, Any]], interval: str, start_ms: int, end_ms: int) -> dict[str, Any]:
     pnl_values = [_safe_float(fill.get("closed_pnl")) for fill in fills]
     fee_values = [_safe_float(fill.get("fee")) for fill in fills]
     scored = [value for value in pnl_values if value is not None]
@@ -704,8 +702,8 @@ def _build_coin_review(coin: str, fills: List[Dict[str, Any]], interval: str, st
     }
 
 
-def _review_findings(summary: Dict[str, Any], coin_reviews: List[Dict[str, Any]]) -> List[str]:
-    findings: List[str] = []
+def _review_findings(summary: dict[str, Any], coin_reviews: list[dict[str, Any]]) -> list[str]:
+    findings: list[str] = []
 
     if summary["fill_count"] == 0:
         return ["No fills were found in the requested review window."]
@@ -715,11 +713,11 @@ def _review_findings(summary: Dict[str, Any], coin_reviews: List[Dict[str, Any]]
 
     if summary["net_after_fees"] < 0:
         findings.append(
-            f"Net realized PnL after fees was negative ({_compact_number(summary['net_after_fees'])} USDC-equivalent units in reported fill terms)."
+            f"Net realized PnL after fees was negative ({_compact_number(summary['net_after_fees'])} USDC-equivalent units in reported fill terms).",
         )
     elif summary["net_after_fees"] > 0:
         findings.append(
-            f"Net realized PnL after fees was positive ({_compact_number(summary['net_after_fees'])} USDC-equivalent units in reported fill terms)."
+            f"Net realized PnL after fees was positive ({_compact_number(summary['net_after_fees'])} USDC-equivalent units in reported fill terms).",
         )
 
     realized_abs = abs(summary["realized_pnl"])
@@ -740,11 +738,11 @@ def _review_findings(summary: Dict[str, Any], coin_reviews: List[Dict[str, Any]]
         best_coin = max(coin_reviews, key=lambda item: item["net_after_fees"])
         if worst_coin["net_after_fees"] < 0:
             findings.append(
-                f"The weakest coin was {worst_coin['coin']} with net after fees of {_compact_number(worst_coin['net_after_fees'])}."
+                f"The weakest coin was {worst_coin['coin']} with net after fees of {_compact_number(worst_coin['net_after_fees'])}.",
             )
         if best_coin["net_after_fees"] > 0 and best_coin["coin"] != worst_coin["coin"]:
             findings.append(
-                f"The strongest coin was {best_coin['coin']} with net after fees of {_compact_number(best_coin['net_after_fees'])}."
+                f"The strongest coin was {best_coin['coin']} with net after fees of {_compact_number(best_coin['net_after_fees'])}.",
             )
 
     for item in coin_reviews:
@@ -756,14 +754,14 @@ def _review_findings(summary: Dict[str, Any], coin_reviews: List[Dict[str, Any]]
         elif market_change < -2 and item["open_long_count"] > item["open_short_count"]:
             findings.append(f"{item['coin']}: losses came while leaning long into a falling market window.")
 
-    deduped: List[str] = []
+    deduped: list[str] = []
     for finding in findings:
         if finding not in deduped:
             deduped.append(finding)
     return deduped[:6]
 
 
-def _recent_fill_rows(fills: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+def _recent_fill_rows(fills: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     rows = []
     for fill in _limit_items(fills, limit):
         rows.append(
@@ -776,7 +774,7 @@ def _recent_fill_rows(fills: List[Dict[str, Any]], limit: int) -> List[Dict[str,
                 "closed_pnl": fill.get("closed_pnl"),
                 "fee": fill.get("fee"),
                 "fee_token": fill.get("fee_token"),
-            }
+            },
         )
     return rows
 
@@ -794,12 +792,12 @@ def _default_export_path(coin: str, interval: str, hours: float) -> Path:
     return Path.cwd() / filename
 
 
-def _write_json_file(path: Path, payload: Dict[str, Any]) -> None:
+def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _export_summary(candles: List[Dict[str, Any]], funding_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _export_summary(candles: list[dict[str, Any]], funding_history: list[dict[str, Any]]) -> dict[str, Any]:
     candle_change = None
     if candles:
         candle_change = _percent_change(candles[-1].get("close"), candles[0].get("open"))
@@ -813,14 +811,14 @@ def _export_summary(candles: List[Dict[str, Any]], funding_history: List[Dict[st
     }
 
 
-def run_dexs(_args: argparse.Namespace) -> Dict[str, Any]:
+def run_dexs(_args: argparse.Namespace) -> dict[str, Any]:
     payload = _post_info({"type": "perpDexs"})
     rows = _normalize_dexs(payload)
     return {"api_url": _info_url(), "count": len(rows), "dexs": rows}
 
 
-def run_markets(args: argparse.Namespace) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {"type": "metaAndAssetCtxs"}
+def run_markets(args: argparse.Namespace) -> dict[str, Any]:
+    payload: dict[str, Any] = {"type": "metaAndAssetCtxs"}
     if args.dex:
         payload["dex"] = args.dex
     rows = _normalize_perp_markets(_post_info(payload))
@@ -844,7 +842,7 @@ def run_markets(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_spots(args: argparse.Namespace) -> Dict[str, Any]:
+def run_spots(args: argparse.Namespace) -> dict[str, Any]:
     rows = _normalize_spot_markets(_post_info({"type": "spotMetaAndAssetCtxs"}))
 
     if args.sort == "name":
@@ -857,7 +855,7 @@ def run_spots(args: argparse.Namespace) -> Dict[str, Any]:
     return {"count": len(rows), "sort": args.sort, "pairs": _limit_items(rows, args.limit)}
 
 
-def run_candles(args: argparse.Namespace) -> Dict[str, Any]:
+def run_candles(args: argparse.Namespace) -> dict[str, Any]:
     end_ms = int(time.time() * 1000)
     start_ms = _hours_ago_ms(args.hours, end_ms)
     payload = {
@@ -895,7 +893,7 @@ def run_candles(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_funding(args: argparse.Namespace) -> Dict[str, Any]:
+def run_funding(args: argparse.Namespace) -> dict[str, Any]:
     end_ms = int(time.time() * 1000)
     start_ms = _hours_ago_ms(args.hours, end_ms)
     payload = {"type": "fundingHistory", "coin": args.coin, "startTime": start_ms, "endTime": end_ms}
@@ -915,8 +913,8 @@ def run_funding(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_l2(args: argparse.Namespace) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {"type": "l2Book", "coin": args.coin}
+def run_l2(args: argparse.Namespace) -> dict[str, Any]:
+    payload: dict[str, Any] = {"type": "l2Book", "coin": args.coin}
     if args.n_sig_figs is not None:
         payload["nSigFigs"] = args.n_sig_figs
     if args.mantissa is not None:
@@ -931,9 +929,9 @@ def run_l2(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_state(args: argparse.Namespace) -> Dict[str, Any]:
+def run_state(args: argparse.Namespace) -> dict[str, Any]:
     user = _resolve_user(args.user)
-    payload: Dict[str, Any] = {"type": "clearinghouseState", "user": user}
+    payload: dict[str, Any] = {"type": "clearinghouseState", "user": user}
     if args.dex:
         payload["dex"] = args.dex
     normalized = _normalize_positions(_post_info(payload))
@@ -945,16 +943,16 @@ def run_state(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_spot_balances(args: argparse.Namespace) -> Dict[str, Any]:
+def run_spot_balances(args: argparse.Namespace) -> dict[str, Any]:
     user = _resolve_user(args.user)
     payload = {"type": "spotClearinghouseState", "user": user}
     rows = _normalize_spot_balances(_post_info(payload))
     return {"user": user, "count": len(rows), "balances": _limit_items(rows, args.limit)}
 
 
-def run_fills(args: argparse.Namespace) -> Dict[str, Any]:
+def run_fills(args: argparse.Namespace) -> dict[str, Any]:
     user = _resolve_user(args.user)
-    payload: Dict[str, Any] = {"user": user}
+    payload: dict[str, Any] = {"user": user}
     if args.hours is not None:
         payload["type"] = "userFillsByTime"
         payload["startTime"] = _hours_ago_ms(args.hours)
@@ -972,18 +970,18 @@ def run_fills(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_orders(args: argparse.Namespace) -> Dict[str, Any]:
+def run_orders(args: argparse.Namespace) -> dict[str, Any]:
     user = _resolve_user(args.user)
     payload = {"type": "historicalOrders", "user": user}
     rows = _normalize_orders(_post_info(payload))
     return {"user": user, "count": len(rows), "orders": _limit_items(rows, args.limit)}
 
 
-def run_review(args: argparse.Namespace) -> Dict[str, Any]:
+def run_review(args: argparse.Namespace) -> dict[str, Any]:
     user = _resolve_user(args.user)
     end_ms = int(time.time() * 1000)
     start_ms = _hours_ago_ms(args.hours, end_ms)
-    payload: Dict[str, Any] = {"type": "userFillsByTime", "user": user, "startTime": start_ms}
+    payload: dict[str, Any] = {"type": "userFillsByTime", "user": user, "startTime": start_ms}
     if args.aggregate_by_time:
         payload["aggregateByTime"] = True
 
@@ -993,7 +991,7 @@ def run_review(args: argparse.Namespace) -> Dict[str, Any]:
         fills = [fill for fill in fills if str(fill.get("coin", "")).lower() == target]
     fills = _limit_items(fills, args.fills)
 
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    grouped: dict[str, list[dict[str, Any]]] = {}
     for fill in fills:
         grouped.setdefault(fill.get("coin", "-"), []).append(fill)
 
@@ -1042,7 +1040,7 @@ def run_review(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_export(args: argparse.Namespace) -> Dict[str, Any]:
+def run_export(args: argparse.Namespace) -> dict[str, Any]:
     end_ms = args.end_time_ms if args.end_time_ms is not None else int(time.time() * 1000)
     start_ms = _hours_ago_ms(args.hours, end_ms)
 
@@ -1057,7 +1055,7 @@ def run_export(args: argparse.Namespace) -> Dict[str, Any]:
     }
     candles = _normalize_candles(_post_info(candle_payload))
 
-    funding_history: List[Dict[str, Any]] = []
+    funding_history: list[dict[str, Any]] = []
     if not _is_spot_coin(args.coin):
         funding_history = _normalize_funding_history(
             _safe_info_query(
@@ -1066,8 +1064,8 @@ def run_export(args: argparse.Namespace) -> Dict[str, Any]:
                     "coin": args.coin,
                     "startTime": start_ms,
                     "endTime": end_ms,
-                }
-            )
+                },
+            ),
         )
 
     output_path = Path(args.output) if args.output else _default_export_path(args.coin, args.interval, args.hours)
@@ -1099,7 +1097,7 @@ def run_export(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def render_dexs(data: Dict[str, Any]) -> str:
+def render_dexs(data: dict[str, Any]) -> str:
     rows = [
         {
             "label": item["label"],
@@ -1123,11 +1121,11 @@ def render_dexs(data: Dict[str, Any]) -> str:
                 ],
                 rows,
             ),
-        ]
+        ],
     )
 
 
-def render_markets(data: Dict[str, Any]) -> str:
+def render_markets(data: dict[str, Any]) -> str:
     rows = [
         {
             "coin": item["coin"],
@@ -1158,7 +1156,7 @@ def render_markets(data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_spots(data: Dict[str, Any]) -> str:
+def render_spots(data: dict[str, Any]) -> str:
     rows = [
         {
             "pair": item["display_name"],
@@ -1181,11 +1179,11 @@ def render_spots(data: Dict[str, Any]) -> str:
                 ],
                 rows,
             ),
-        ]
+        ],
     )
 
 
-def render_candles(data: Dict[str, Any]) -> str:
+def render_candles(data: dict[str, Any]) -> str:
     rows = [
         {
             "time": _format_timestamp_ms(item["time"]),
@@ -1210,7 +1208,7 @@ def render_candles(data: Dict[str, Any]) -> str:
                 f"Open -> Close: {_format_price(summary.get('open'))} -> {_format_price(summary.get('close'))}",
                 f"Range: {_format_price(summary.get('low'))} to {_format_price(summary.get('high'))}",
                 f"Change: {_format_percent(summary.get('change_pct'))}",
-            ]
+            ],
         )
     lines.extend(
         [
@@ -1226,12 +1224,12 @@ def render_candles(data: Dict[str, Any]) -> str:
                 ],
                 rows,
             ),
-        ]
+        ],
     )
     return "\n".join(lines)
 
 
-def render_funding(data: Dict[str, Any]) -> str:
+def render_funding(data: dict[str, Any]) -> str:
     rows = [
         {
             "time": _format_timestamp_ms(item["time"]),
@@ -1260,7 +1258,7 @@ def render_funding(data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_l2(data: Dict[str, Any]) -> str:
+def render_l2(data: dict[str, Any]) -> str:
     bid_rows = [
         {"px": _format_price(item["px"]), "sz": _compact_number(item["sz"]), "orders": item["orders"] or "-"}
         for item in data["bids"]
@@ -1282,7 +1280,7 @@ def render_l2(data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_state(data: Dict[str, Any]) -> str:
+def render_state(data: dict[str, Any]) -> str:
     summary = data["summary"]
     position_rows = [
         {
@@ -1323,12 +1321,12 @@ def render_state(data: Dict[str, Any]) -> str:
                     ],
                     position_rows,
                 ),
-            ]
+            ],
         )
     return "\n".join(lines)
 
 
-def render_spot_balances(data: Dict[str, Any]) -> str:
+def render_spot_balances(data: dict[str, Any]) -> str:
     rows = [
         {
             "coin": item["coin"],
@@ -1352,11 +1350,11 @@ def render_spot_balances(data: Dict[str, Any]) -> str:
                 ],
                 rows,
             ),
-        ]
+        ],
     )
 
 
-def render_fills(data: Dict[str, Any]) -> str:
+def render_fills(data: dict[str, Any]) -> str:
     rows = [
         {
             "time": _format_timestamp_ms(item["time"]),
@@ -1390,7 +1388,7 @@ def render_fills(data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_orders(data: Dict[str, Any]) -> str:
+def render_orders(data: dict[str, Any]) -> str:
     rows = [
         {
             "time": _format_timestamp_ms(item["timestamp"]),
@@ -1420,11 +1418,11 @@ def render_orders(data: Dict[str, Any]) -> str:
                 ],
                 rows,
             ),
-        ]
+        ],
     )
 
 
-def render_review(data: Dict[str, Any]) -> str:
+def render_review(data: dict[str, Any]) -> str:
     summary = data["summary"]
     coin_rows = [
         {
@@ -1485,7 +1483,7 @@ def render_review(data: Dict[str, Any]) -> str:
                     ],
                     coin_rows,
                 ),
-            ]
+            ],
         )
 
     if recent_rows:
@@ -1505,13 +1503,13 @@ def render_review(data: Dict[str, Any]) -> str:
                     ],
                     recent_rows,
                 ),
-            ]
+            ],
         )
 
     return "\n".join(lines)
 
 
-def render_export(data: Dict[str, Any]) -> str:
+def render_export(data: dict[str, Any]) -> str:
     summary = data["summary"]
     return "\n".join(
         [
@@ -1525,7 +1523,7 @@ def render_export(data: Dict[str, Any]) -> str:
             f"Window open -> close: {_format_price(summary.get('window_open'))} -> {_format_price(summary.get('window_close'))}",
             f"Price change: {_format_percent(summary.get('price_change_pct'))}",
             f"Average funding: {_format_fraction_percent(summary.get('average_funding_rate'))}",
-        ]
+        ],
     )
 
 
@@ -1644,7 +1642,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 

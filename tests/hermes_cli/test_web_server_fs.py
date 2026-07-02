@@ -1,5 +1,4 @@
 import base64
-from pathlib import Path
 
 import pytest
 
@@ -20,7 +19,7 @@ def client(monkeypatch):
     finally:
         if previous_auth_required is None:
             try:
-                delattr(web_server.app.state, "auth_required")
+                del web_server.app.state.auth_required
             except AttributeError:
                 pass
         else:
@@ -54,7 +53,7 @@ def test_fs_list_accepts_relative_paths(client, tmp_path, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["entries"] == [
-        {"name": "file.txt", "path": str(tmp_path / "rel" / "file.txt"), "isDirectory": False}
+        {"name": "file.txt", "path": str(tmp_path / "rel" / "file.txt"), "isDirectory": False},
     ]
 
 

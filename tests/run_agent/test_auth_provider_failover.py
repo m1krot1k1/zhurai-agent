@@ -17,9 +17,9 @@ fell through to "switch providers manually" advice and never called
 
 from unittest.mock import MagicMock, patch
 
-from run_agent import AIAgent
-from agent.error_classifier import classify_api_error, FailoverReason
+from agent.error_classifier import FailoverReason, classify_api_error
 from agent.turn_retry_state import TurnRetryState
+from run_agent import AIAgent
 
 
 def _make_agent(fallback_model=None):
@@ -77,7 +77,8 @@ class TestAuthFailoverGuardFlag:
 
 class TestAuthFailoverActivation:
     """The decision the loop makes on a persistent auth failure: when a
-    fallback chain exists and the guard hasn't fired, escalate to it."""
+    fallback chain exists and the guard hasn't fired, escalate to it.
+    """
 
     def _should_failover(self, agent, classified, retry):
         # Mirror the exact gating condition added to conversation_loop.py.
@@ -104,7 +105,8 @@ class TestAuthFailoverActivation:
     def test_no_failover_without_chain(self):
         """A user with no fallback configured (the common case for the
         original incident) does NOT failover — falls through to the
-        existing terminal handling + troubleshooting advice."""
+        existing terminal handling + troubleshooting advice.
+        """
         agent = _make_agent(fallback_model=None)
         retry = TurnRetryState()
         classified = classify_api_error(_auth_error(401))

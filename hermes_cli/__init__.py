@@ -1,5 +1,4 @@
-"""
-Hermes CLI - Unified command-line interface for Hermes Agent.
+"""Hermes CLI - Unified command-line interface for Hermes Agent.
 
 Provides subcommands for:
 - hermes chat          - Interactive chat (same as ./hermes)
@@ -14,8 +13,8 @@ Provides subcommands for:
 import os
 import sys
 
-__version__ = "0.79.0"
-__release_date__ = "2026.6.19"
+__version__ = "0.80.0"
+__release_date__ = "2026.7.3"
 
 
 def _ensure_utf8():

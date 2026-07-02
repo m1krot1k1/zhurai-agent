@@ -27,7 +27,6 @@ import asyncio
 import concurrent.futures
 import json
 import logging
-import os
 import socket
 from typing import Any
 
@@ -219,7 +218,7 @@ async def handle_ws(ws: Any) -> None:
                     "type": "gateway.ready",
                     "payload": {"skin": server.resolve_skin()},
                 },
-            }
+            },
         )
         if not ready_ok:
             disconnect_reason = "ready_send_failed"
@@ -263,7 +262,7 @@ async def handle_ws(ws: Any) -> None:
                         "jsonrpc": "2.0",
                         "error": {"code": -32700, "message": "parse error"},
                         "id": None,
-                    }
+                    },
                 )
                 if not ok:
                     disconnect_reason = "send_failed_after_parse_error"
@@ -294,7 +293,7 @@ async def handle_ws(ws: Any) -> None:
                         "jsonrpc": "2.0",
                         "error": {"code": -32603, "message": "internal error"},
                         "id": req_id if req_id is not None else None,
-                    }
+                    },
                 )
                 if not ok:
                     disconnect_reason = "send_failed_after_dispatch_crash"

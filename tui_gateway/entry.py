@@ -13,6 +13,7 @@ sys.path = [p for p in sys.path if p not in {"", "."}]
 
 import json
 import logging
+import pathlib
 import signal
 import time
 import traceback
@@ -45,7 +46,7 @@ def _install_sidecar_publisher() -> None:
     from tui_gateway.event_publisher import WsPublisherTransport
 
     server._stdio_transport = TeeTransport(
-        server._stdio_transport, WsPublisherTransport(url)
+        server._stdio_transport, WsPublisherTransport(url),
     )
 
 
@@ -99,10 +100,10 @@ def _log_signal(signum: int, frame) -> None:
             _signal_names[int(_sig)] = _attr
     name = _signal_names.get(signum, f"signal {signum}")
     try:
-        os.makedirs(os.path.dirname(_CRASH_LOG), exist_ok=True)
-        with open(_CRASH_LOG, "a", encoding="utf-8") as f:
+        pathlib.Path(os.path.dirname(_CRASH_LOG)).mkdir(exist_ok=True, parents=True)
+        with pathlib.Path(_CRASH_LOG).open("a", encoding="utf-8") as f:
             f.write(
-                f"\n=== {name} received · {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n"
+                f"\n=== {name} received · {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n",
             )
             if frame is not None:
                 f.write("main-thread stack at signal delivery:\n")
@@ -195,11 +196,11 @@ def _log_exit(reason: str) -> None:
     crashes when the real story is "TUI read pipe closed on this event".
     """
     try:
-        os.makedirs(os.path.dirname(_CRASH_LOG), exist_ok=True)
-        with open(_CRASH_LOG, "a", encoding="utf-8") as f:
+        pathlib.Path(os.path.dirname(_CRASH_LOG)).mkdir(exist_ok=True, parents=True)
+        with pathlib.Path(_CRASH_LOG).open("a", encoding="utf-8") as f:
             f.write(
                 f"\n=== gateway exit · {time.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"· reason={reason} ===\n"
+                f"· reason={reason} ===\n",
             )
     except Exception:
         pass
@@ -303,7 +304,7 @@ def main():
                 discover_mcp_tools()
             except Exception:
                 logger.warning(
-                    "Background MCP tool discovery failed", exc_info=True
+                    "Background MCP tool discovery failed", exc_info=True,
                 )
 
         import threading as _mcp_threading

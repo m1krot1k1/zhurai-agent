@@ -1,6 +1,14 @@
 """Tests for acp_adapter.tools — tool kind mapping and ACP content building."""
 
 
+from acp.schema import (
+    ContentToolCallContent,
+    FileEditToolCallContent,
+    ToolCallLocation,
+    ToolCallProgress,
+    ToolCallStart,
+)
+
 from acp_adapter.edit_approval import EditProposal
 from acp_adapter.tools import (
     TOOL_KIND_MAP,
@@ -11,14 +19,6 @@ from acp_adapter.tools import (
     get_tool_kind,
     make_tool_call_id,
 )
-from acp.schema import (
-    FileEditToolCallContent,
-    ContentToolCallContent,
-    ToolCallLocation,
-    ToolCallStart,
-    ToolCallProgress,
-)
-
 
 # ---------------------------------------------------------------------------
 # TOOL_KIND_MAP coverage
@@ -147,7 +147,7 @@ class TestBuildToolTitle:
 
 class TestBuildToolStart:
     def test_build_tool_start_for_patch(self):
-        """patch start should not duplicate the edit-approval diff."""
+        """Patch start should not duplicate the edit-approval diff."""
         args = {
             "path": "src/main.py",
             "old_string": "print('hello')",
@@ -194,7 +194,7 @@ class TestBuildToolStart:
         assert item.new_text == "new\n"
 
     def test_build_tool_start_for_terminal(self):
-        """terminal should produce text content with the command."""
+        """Terminal should produce text content with the command."""
         args = {"command": "ls -la /tmp"}
         result = build_tool_start("tc-2", "terminal", args)
         assert isinstance(result, ToolCallStart)
@@ -413,7 +413,7 @@ class TestBuildToolComplete:
         assert "`patch`" in text
         assert "`hermes-agent-operations`" in text
         assert "references/hermes-acp-zed-rendering.md" in text
-        assert "{\"success\"" not in text
+        assert '{"success"' not in text
         assert result.raw_output is None
 
     def test_build_tool_complete_for_read_file_formats_content(self):
@@ -421,7 +421,7 @@ class TestBuildToolComplete:
             "tc-read",
             "read_file",
             '{"content":"1|hello\\n2|world","total_lines":2}',
-            function_args={"path":"README.md","offset":1,"limit":20},
+            function_args={"path": "README.md", "offset": 1, "limit": 20},
         )
         text = result.content[0].content.text
         assert "Read README.md" in text
@@ -447,7 +447,7 @@ class TestBuildToolComplete:
             "tc-process",
             "process",
             '{"processes":[{"session_id":"p1","status":"running","pid":123,"command":"npm run dev"}]}',
-            function_args={"action":"list"},
+            function_args={"action": "list"},
         )
         text = result.content[0].content.text
         assert "Processes: 1" in text
@@ -485,7 +485,7 @@ class TestBuildToolComplete:
             "tc-memory",
             "memory",
             '{"success":true,"target":"user","entries":["private long memory"],"usage":"1% — 19/2000 chars","entry_count":1,"message":"Entry added."}',
-            function_args={"action":"add","target":"user","content":"User likes concise ACP rendering."},
+            function_args={"action": "add", "target": "user", "content": "User likes concise ACP rendering."},
         )
         text = result.content[0].content.text
         assert "Memory add saved" in text
@@ -524,7 +524,7 @@ class TestBuildToolComplete:
         assert "memory_archive_search result" in text
         assert "lower-trust archive evidence" in text
         assert "Recall should render as a readable summary" in text
-        assert "{\"results\"" not in text
+        assert '{"results"' not in text
         assert result.raw_output is None
 
     def test_build_tool_complete_generically_formats_unknown_json_list_without_raw_output(self):
@@ -552,8 +552,8 @@ class TestBuildToolComplete:
         assert "sqlite-fts5-archive" in text
         assert "**audit:**" in text
         assert "**ok:** True" in text
-        assert "{\"active\"" not in text
-        assert "[\"sqlite" not in text
+        assert '{"active"' not in text
+        assert '["sqlite' not in text
         assert result.raw_output is None
 
     def test_build_tool_complete_for_search_files_files_only_formats_file_list(self):
@@ -567,7 +567,7 @@ class TestBuildToolComplete:
         assert "Found 36 files; showing 2." in text
         assert "/home/nour/.hermes/config.yaml" in text
         assert "use offset to page" in text
-        assert "{\"total_count\"" not in text
+        assert '{"total_count"' not in text
         assert result.raw_output is None
 
     def test_build_tool_complete_truncates_large_output(self):

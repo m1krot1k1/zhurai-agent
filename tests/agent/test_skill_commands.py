@@ -16,7 +16,7 @@ from agent.skill_commands import (
 
 
 def _make_skill(
-    skills_dir, name, frontmatter_extra="", body="Do the thing.", category=None
+    skills_dir, name, frontmatter_extra="", body="Do the thing.", category=None,
 ):
     """Helper to create a minimal skill directory with SKILL.md."""
     if category:
@@ -334,7 +334,6 @@ class TestScanSkillCommands:
                 get_skill_commands()
             assert scan_spy.call_count == 0
 
-
     def test_special_chars_stripped_from_cmd_key(self, tmp_path):
         """Skill names with +, /, or other special chars produce clean cmd keys."""
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -343,7 +342,7 @@ class TestScanSkillCommands:
             skill_dir.mkdir()
             (skill_dir / "SKILL.md").write_text(
                 "---\nname: Jellyfin + Jellystat 24h Summary\n"
-                "description: Test skill\n---\n\nBody.\n"
+                "description: Test skill\n---\n\nBody.\n",
             )
             result = scan_skill_commands()
         # The + should be stripped, not left as a literal character
@@ -357,7 +356,7 @@ class TestScanSkillCommands:
             skill_dir = tmp_path / "bad-name"
             skill_dir.mkdir()
             (skill_dir / "SKILL.md").write_text(
-                "---\nname: +++\ndescription: Bad skill\n---\n\nBody.\n"
+                "---\nname: +++\ndescription: Bad skill\n---\n\nBody.\n",
             )
             result = scan_skill_commands()
         # Should not create a "/" key or any entry
@@ -371,7 +370,7 @@ class TestScanSkillCommands:
             skill_dir.mkdir()
             (skill_dir / "SKILL.md").write_text(
                 "---\nname: Sonarr v3/v4 API\n"
-                "description: Test skill\n---\n\nBody.\n"
+                "description: Test skill\n---\n\nBody.\n",
             )
             result = scan_skill_commands()
         assert "/sonarr-v3v4-api" in result
@@ -431,7 +430,7 @@ class TestBuildPreloadedSkillsPrompt:
             _make_skill(tmp_path, "first-skill")
             _make_skill(tmp_path, "second-skill")
             prompt, loaded, missing = build_preloaded_skills_prompt(
-                ["first-skill", "second-skill"]
+                ["first-skill", "second-skill"],
             )
 
         assert missing == []
@@ -444,7 +443,7 @@ class TestBuildPreloadedSkillsPrompt:
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
             _make_skill(tmp_path, "present-skill")
             prompt, loaded, missing = build_preloaded_skills_prompt(
-                ["present-skill", "missing-skill"]
+                ["present-skill", "missing-skill"],
             )
 
         assert "present-skill" in prompt
@@ -466,7 +465,7 @@ description: Generate audio with AudioCraft.
 # AudioCraft
 
 Generate some audio.
-"""
+""",
         )
 
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -555,13 +554,13 @@ Generate some audio.
         assert calls[0][0] == "TENOR_API_KEY"
 
     def test_gateway_still_loads_skill_but_returns_setup_guidance(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.delenv("TENOR_API_KEY", raising=False)
 
         def fail_if_called(var_name, prompt, metadata=None):
             raise AssertionError(
-                "gateway flow should not try secure in-band secret capture"
+                "gateway flow should not try secure in-band secret capture",
             )
 
         monkeypatch.setattr(
@@ -635,7 +634,8 @@ Generate some audio.
 class TestSkillDirectoryHeader:
     """The activation message must expose the absolute skill directory and
     explain how to resolve relative paths, so skills with bundled scripts
-    don't force the agent into a second ``skill_view()`` round-trip."""
+    don't force the agent into a second ``skill_view()`` round-trip.
+    """
 
     def test_header_contains_absolute_skill_dir(self, tmp_path):
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -666,7 +666,8 @@ class TestSkillDirectoryHeader:
 
 class TestTemplateVarSubstitution:
     """``${HERMES_SKILL_DIR}`` and ``${HERMES_SESSION_ID}`` in SKILL.md body
-    are replaced before the agent sees the content."""
+    are replaced before the agent sees the content.
+    """
 
     def test_substitutes_skill_dir(self, tmp_path):
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -692,7 +693,7 @@ class TestTemplateVarSubstitution:
             )
             scan_skill_commands()
             msg = build_skill_invocation_message(
-                "/sess-templated", task_id="abc-123"
+                "/sess-templated", task_id="abc-123",
             )
 
         assert msg is not None
@@ -735,7 +736,8 @@ class TestTemplateVarSubstitution:
 
 class TestInlineShellExpansion:
     """Inline ``!`cmd`` snippets in SKILL.md run before the agent sees the
-    content — but only when the user has opted in via config."""
+    content — but only when the user has opted in via config.
+    """
 
     def test_inline_shell_is_off_by_default(self, tmp_path):
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):

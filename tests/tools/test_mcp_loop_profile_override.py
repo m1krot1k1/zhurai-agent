@@ -15,7 +15,7 @@ import pytest
 
 @pytest.fixture
 def mcp_loop():
-    import tools.mcp_tool as mcp_tool
+    from tools import mcp_tool
 
     mcp_tool._ensure_mcp_loop()
     yield mcp_tool
@@ -47,7 +47,7 @@ def test_override_propagates_to_mcp_loop(tmp_path, monkeypatch, mcp_loop):
         assert mcp_loop._run_on_mcp_loop(read_home(), timeout=10) == str(profile_home)
         # Factory form must be wrapped too.
         assert mcp_loop._run_on_mcp_loop(lambda: read_home(), timeout=10) == str(
-            profile_home
+            profile_home,
         )
     finally:
         reset_hermes_home_override(token)
@@ -59,7 +59,8 @@ def test_override_propagates_to_mcp_loop(tmp_path, monkeypatch, mcp_loop):
 def test_oauth_token_paths_follow_override(tmp_path, monkeypatch, mcp_loop):
     """The actual symptom path: HermesTokenStorage resolving inside the
     probe's MCP-loop coroutine must land in the selected profile's
-    mcp-tokens dir, not the process home's."""
+    mcp-tokens dir, not the process home's.
+    """
     from hermes_constants import (
         reset_hermes_home_override,
         set_hermes_home_override,
@@ -87,7 +88,8 @@ def test_oauth_token_paths_follow_override(tmp_path, monkeypatch, mcp_loop):
 
 def test_concurrent_scopes_do_not_interfere(tmp_path, monkeypatch, mcp_loop):
     """Two threads carrying DIFFERENT overrides scheduling onto the same
-    loop must each see their own home — the wrapper is task-local."""
+    loop must each see their own home — the wrapper is task-local.
+    """
     import threading
 
     from hermes_constants import (

@@ -13,7 +13,7 @@ from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
 
 # Registry of available adapter classes keyed by provider name as used on
 # the ``hermes proxy start --provider <name>`` CLI flag.
-ADAPTERS: Dict[str, Type[UpstreamAdapter]] = {
+ADAPTERS: dict[str, type[UpstreamAdapter]] = {
     "nous": NousPortalAdapter,
     "xai": XAIGrokAdapter,
 }
@@ -24,14 +24,15 @@ def get_adapter(name: str) -> UpstreamAdapter:
 
     Raises:
         ValueError: if ``name`` is not a registered adapter.
+
     """
     key = (name or "").strip().lower()
     if key not in ADAPTERS:
         available = ", ".join(sorted(ADAPTERS)) or "(none)"
         raise ValueError(
-            f"Unknown proxy upstream provider: {name!r}. Available: {available}"
+            f"Unknown proxy upstream provider: {name!r}. Available: {available}",
         )
     return ADAPTERS[key]()
 
 
-__all__ = ["UpstreamAdapter", "ADAPTERS", "get_adapter"]
+__all__ = ["ADAPTERS", "UpstreamAdapter", "get_adapter"]

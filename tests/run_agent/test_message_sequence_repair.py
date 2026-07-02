@@ -208,7 +208,8 @@ from agent.agent_runtime_helpers import repair_message_sequence_with_cursor
 
 def test_cursor_clamped_when_compaction_shrinks_below_cursor():
     """Cursor past the new end of the list must come back in range so the
-    turn-end flush doesn't skip the assistant/tool chain (#44837)."""
+    turn-end flush doesn't skip the assistant/tool chain (#44837).
+    """
     agent = _bare_agent()
     messages = [
         {"role": "user", "content": "first"},
@@ -226,7 +227,8 @@ def test_cursor_clamped_when_compaction_shrinks_below_cursor():
 def test_cursor_rewinds_when_compaction_happens_before_cursor():
     """Repair that drops/merges messages at indexes BELOW the cursor must
     rewind it by the number removed, or unflushed rows get skipped.
-    A plain min() clamp does NOT catch this case."""
+    A plain min() clamp does NOT catch this case.
+    """
     agent = _bare_agent()
     flushed_a = {"role": "user", "content": "first"}
     flushed_b = {"role": "user", "content": "second"}  # merged into flushed_a
@@ -274,7 +276,8 @@ def test_cursor_helper_safe_without_cursor_attribute():
 
 def test_flush_guard_clamps_overshooting_cursor():
     """_flush_messages_to_session_db safety net: an overshooting cursor must
-    not produce a negative-start slice that skips everything (#44837)."""
+    not produce a negative-start slice that skips everything (#44837).
+    """
 
     class _DB:
         def __init__(self):

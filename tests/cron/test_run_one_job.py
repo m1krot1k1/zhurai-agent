@@ -29,7 +29,6 @@ def _patch_pipeline(monkeypatch, *, success=True, output="out", final="final res
 
     def fake_deliver(job, content, adapters=None, loop=None):
         calls.append(("deliver", job["id"]))
-        return None
 
     def fake_mark(jid, ok, err=None, delivery_error=None):
         calls.append(("mark", jid, ok))
@@ -43,7 +42,8 @@ def _patch_pipeline(monkeypatch, *, success=True, output="out", final="final res
 
 def test_tick_process_job_sequence(monkeypatch):
     """Characterization: a single due job driven through tick() runs the
-    sequence run_job → save → deliver → mark, in that order."""
+    sequence run_job → save → deliver → mark, in that order.
+    """
     calls = _patch_pipeline(monkeypatch)
     monkeypatch.setattr(s, "get_due_jobs", lambda: [{"id": "j1", "name": "t"}])
     monkeypatch.setattr(s, "advance_next_run", lambda jid: True)
@@ -56,7 +56,8 @@ def test_tick_process_job_sequence(monkeypatch):
 
 def test_run_one_job_success_sequence(monkeypatch):
     """The extracted helper runs the same execute→save→deliver→mark sequence
-    for a successful job."""
+    for a successful job.
+    """
     calls = _patch_pipeline(monkeypatch)
 
     ok = s.run_one_job({"id": "j2", "name": "t"})
@@ -68,7 +69,8 @@ def test_run_one_job_success_sequence(monkeypatch):
 
 def test_run_one_job_silent_skips_delivery(monkeypatch):
     """A [SILENT] final response saves output + marks the run but does NOT
-    deliver."""
+    deliver.
+    """
     calls = _patch_pipeline(monkeypatch, silent_marker_in="[SILENT]")
 
     s.run_one_job({"id": "j3", "name": "t"})
@@ -102,7 +104,8 @@ def test_run_one_job_failed_job_delivers_error(monkeypatch):
 
 def test_run_one_job_exception_marks_failure(monkeypatch):
     """If run_job raises, the helper marks the run failed and returns False
-    rather than propagating."""
+    rather than propagating.
+    """
     def boom(job):
         raise RuntimeError("kaboom")
 

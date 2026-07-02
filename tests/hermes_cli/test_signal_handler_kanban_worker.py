@@ -22,6 +22,7 @@ full CLI (which needs a real provider config).
 from __future__ import annotations
 
 import os
+import pathlib
 import signal
 import subprocess
 import sys
@@ -74,7 +75,7 @@ def _synthetic_worker_script() -> str:
             threading.Event().wait()
         except KeyboardInterrupt:
             sys.exit(0)
-        """
+        """,
     )
 
 
@@ -95,7 +96,7 @@ def _is_alive_like_dispatcher(pid: int) -> bool:
         return True
     if sys.platform == "linux":
         try:
-            with open(f"/proc/{pid}/status") as f:
+            with pathlib.Path(f"/proc/{pid}/status").open() as f:
                 for line in f:
                     if line.startswith("State:"):
                         if "Z" in line.split(":", 1)[1]:
@@ -144,7 +145,8 @@ def _cleanup(proc: subprocess.Popen) -> None:
 )
 def test_sigterm_with_kanban_task_env_terminates_quickly():
     """With HERMES_KANBAN_TASK set, SIGTERM should kill the process in <2s
-    even when a non-daemon thread is still alive."""
+    even when a non-daemon thread is still alive.
+    """
     proc = _spawn_synthetic({"HERMES_KANBAN_TASK": "t_test_28181"})
     try:
         t0 = time.time()
@@ -160,8 +162,8 @@ def test_sigterm_with_kanban_task_env_terminates_quickly():
                 return
             time.sleep(0.02)
         pytest.fail(
-            f"process still alive 2s after SIGTERM with HERMES_KANBAN_TASK set "
-            f"(dispatcher would keep extending claim) — fix regressed"
+            "process still alive 2s after SIGTERM with HERMES_KANBAN_TASK set "
+            "(dispatcher would keep extending claim) — fix regressed",
         )
     finally:
         _cleanup(proc)

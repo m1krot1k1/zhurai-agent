@@ -4,7 +4,6 @@ The server now uses uvicorn.Server directly (not uvicorn.run) so we stub
 Config + Server + asyncio.run to capture kwargs without starting an event loop.
 """
 
-import asyncio
 import contextlib
 
 import uvicorn
@@ -14,7 +13,8 @@ from hermes_cli import web_server
 
 def _stub_uvicorn(monkeypatch):
     """Replace uvicorn.Config/Server with fakes so start_server returns
-    immediately.  Returns a dict with captured Config kwargs."""
+    immediately.  Returns a dict with captured Config kwargs.
+    """
     captured: dict = {}
 
     class _FakeConfig:
@@ -67,7 +67,8 @@ def _stub_uvicorn(monkeypatch):
 
 def test_start_server_enables_ws_ping_for_half_open_detection(monkeypatch):
     """WS ping must be configured so half-open connections (reverse-proxy 524,
-    dropped tunnels) raise WebSocketDisconnect into the reaping path (#32377)."""
+    dropped tunnels) raise WebSocketDisconnect into the reaping path (#32377).
+    """
     captured = _stub_uvicorn(monkeypatch)
 
     # Loopback bind => no auth gate, so this reaches the Config constructor.

@@ -1,5 +1,4 @@
-"""
-Backup and import commands for hermes CLI.
+"""Backup and import commands for hermes CLI.
 
 `hermes backup` creates a zip archive of the entire ~/.hermes/ directory
 (excluding the hermes-agent repo and transient files).
@@ -17,11 +16,15 @@ import sys
 import tempfile
 import time
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from hermes_constants import get_default_hermes_root, get_hermes_home, display_hermes_home
+from hermes_constants import (
+    display_hermes_home,
+    get_default_hermes_root,
+    get_hermes_home,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +135,7 @@ _SECRET_FILE_NAMES = {".env", "auth.json", "state.db"}
 _EXTERNAL_PREFIX = "_external/"
 
 
-def _collect_memory_provider_external_paths() -> List[Path]:
+def _collect_memory_provider_external_paths() -> list[Path]:
     """Return existing absolute paths the active memory provider stores
     outside HERMES_HOME, resolved from config only (no network, no init).
 
@@ -166,7 +169,7 @@ def _collect_memory_provider_external_paths() -> List[Path]:
         logger.warning("backup_paths() failed for memory provider %r: %s", active, exc)
         return []
 
-    out: List[Path] = []
+    out: list[Path] = []
     seen: set = set()
     for raw in declared:
         try:
@@ -186,10 +189,11 @@ def _collect_memory_provider_external_paths() -> List[Path]:
     return out
 
 
-def _iter_external_files(base: Path) -> List[Path]:
+def _iter_external_files(base: Path) -> list[Path]:
     """Yield regular files under *base* (a file or a directory), skipping
-    symlinks, caches, and pyc files. *base* itself may be a file."""
-    files: List[Path] = []
+    symlinks, caches, and pyc files. *base* itself may be a file.
+    """
+    files: list[Path] = []
     if base.is_file() and not base.is_symlink():
         files.append(base)
         return files
@@ -327,14 +331,13 @@ def run_backup(args) -> None:
         # Prune excluded directories in-place so os.walk doesn't descend
         # ``hermes-agent`` is only pruned at the root level; nested dirs
         # with the same name (e.g. in skills/) must be preserved.
-        is_root = rel_dir == Path(".")
+        is_root = rel_dir == Path()
         orig_dirnames = dirnames[:]
         dirnames[:] = [
             d for d in dirnames
             if d not in _EXCLUDED_DIRS or (d == "hermes-agent" and not is_root)
         ]
-        for removed in set(orig_dirnames) - set(dirnames):
-            skipped_dirs.add(str(rel_dir / removed))
+        skipped_dirs.update(str(rel_dir / removed) for removed in set(orig_dirnames) - set(dirnames))
 
         for fname in filenames:
             fpath = dp / fname
@@ -391,7 +394,7 @@ def run_backup(args) -> None:
                     # default (/tmp) may be a small tmpfs that cannot hold
                     # large databases, causing silent backup incompleteness.
                     with tempfile.NamedTemporaryFile(
-                        suffix=".db", delete=False, dir=str(out_path.parent)
+                        suffix=".db", delete=False, dir=str(out_path.parent),
                     ) as tmp:
                         tmp_db = Path(tmp.name)
                     if _safe_copy_db(abs_path, tmp_db):
@@ -438,19 +441,19 @@ def run_backup(args) -> None:
     if external_to_add:
         print(
             f"\n  Included {len(external_to_add)} memory-provider file(s) "
-            f"stored outside {display_hermes_home()}."
+            f"stored outside {display_hermes_home()}.",
         )
 
     if skipped_external:
         print(
             f"\n  Skipped {len(skipped_external)} memory-provider path(s) "
-            f"outside your home directory (not portable):"
+            f"outside your home directory (not portable):",
         )
         for p in sorted(skipped_external)[:10]:
             print(f"    {p}")
 
     if skipped_dirs:
-        print(f"\n  Excluded directories:")
+        print("\n  Excluded directories:")
         for d in sorted(skipped_dirs):
             print(f"    {d}/")
 
@@ -596,12 +599,12 @@ def run_import(args) -> None:
                     continue
                 try:
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    with zf.open(member) as src, open(target, "wb") as dst:
+                    with zf.open(member) as src, Path(target).open("wb") as dst:
                         dst.write(src.read())
                     # External provider configs commonly hold credentials.
                     if target.suffix in {".json", ".env", ".conf"} or target.name in _SECRET_FILE_NAMES:
                         try:
-                            os.chmod(target, 0o600)
+                            Path(target).chmod(0o600)
                         except OSError:
                             pass
                     restored += 1
@@ -642,10 +645,10 @@ def run_import(args) -> None:
 
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with zf.open(member) as src, open(target, "wb") as dst:
+                with zf.open(member) as src, Path(target).open("wb") as dst:
                     dst.write(src.read())
                 if target.name in _SECRET_FILE_NAMES:
-                    os.chmod(target, 0o600)
+                    Path(target).chmod(0o600)
                 restored += 1
             except (PermissionError, OSError) as exc:
                 errors.append(f"  {rel}: {exc}")
@@ -663,7 +666,7 @@ def run_import(args) -> None:
         if restored_external:
             print(
                 f"\n  Restored {restored_external} memory-provider file(s) to "
-                f"their original location(s) outside {display_hermes_home()}."
+                f"their original location(s) outside {display_hermes_home()}.",
             )
 
         if errors:
@@ -676,7 +679,7 @@ def run_import(args) -> None:
         if skipped_runtime:
             print(
                 f"\n  Preserved {len(skipped_runtime)} runtime state "
-                f"file(s) (kept this machine's, not the backup's):"
+                f"file(s) (kept this machine's, not the backup's):",
             )
             for rel in sorted(skipped_runtime)[:10]:
                 print(f"    {rel}")
@@ -689,8 +692,10 @@ def run_import(args) -> None:
         if profiles_dir.is_dir():
             try:
                 from hermes_cli.profiles import (
-                    create_wrapper_script, check_alias_collision,
-                    _is_wrapper_dir_in_path, _get_wrapper_dir,
+                    _get_wrapper_dir,
+                    _is_wrapper_dir_in_path,
+                    check_alias_collision,
+                    create_wrapper_script,
                 )
                 for entry in sorted(profiles_dir.iterdir()):
                     if not entry.is_dir():
@@ -716,13 +721,13 @@ def run_import(args) -> None:
                         print(f"  Profile aliases skipped:  {', '.join(skipped)}")
                     if not _is_wrapper_dir_in_path():
                         print(f"\n  Note: {_get_wrapper_dir()} is not in your PATH.")
-                        print('  Add to your shell config (~/.bashrc or ~/.zshrc):')
+                        print("  Add to your shell config (~/.bashrc or ~/.zshrc):")
                         print('    export PATH="$HOME/.local/bin:$PATH"')
             except ImportError:
                 # hermes_cli.profiles might not be available (fresh install)
                 if any(profiles_dir.iterdir()):
-                    print(f"\n  Profiles detected but aliases could not be created.")
-                    print(f"  Run: hermes profile list  (after installing hermes)")
+                    print("\n  Profiles detected but aliases could not be created.")
+                    print("  Run: hermes profile list  (after installing hermes)")
 
         # Guidance
         print()
@@ -772,16 +777,16 @@ _QUICK_SNAPSHOTS_DIR = "state-snapshots"
 _QUICK_DEFAULT_KEEP = 20
 
 
-def _quick_snapshot_root(hermes_home: Optional[Path] = None) -> Path:
+def _quick_snapshot_root(hermes_home: Path | None = None) -> Path:
     home = hermes_home or get_hermes_home()
     return home / _QUICK_SNAPSHOTS_DIR
 
 
 def create_quick_snapshot(
-    label: Optional[str] = None,
-    hermes_home: Optional[Path] = None,
-    keep: Optional[int] = None,
-) -> Optional[str]:
+    label: str | None = None,
+    hermes_home: Path | None = None,
+    keep: int | None = None,
+) -> str | None:
     """Create a quick state snapshot of critical files.
 
     Copies STATE_FILES to a timestamped directory under state-snapshots/.
@@ -789,16 +794,17 @@ def create_quick_snapshot(
 
     Returns:
         Snapshot ID (timestamp-based), or None if no files found.
+
     """
     home = hermes_home or get_hermes_home()
     root = _quick_snapshot_root(home)
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     snap_id = f"{ts}-{label}" if label else ts
     snap_dir = root / snap_id
     snap_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest: Dict[str, int] = {}  # rel_path -> file size
+    manifest: dict[str, int] = {}  # rel_path -> file size
 
     for rel in _QUICK_STATE_FILES:
         src = home / rel
@@ -851,7 +857,7 @@ def create_quick_snapshot(
         "total_size": sum(manifest.values()),
         "files": manifest,
     }
-    with open(snap_dir / "manifest.json", "w", encoding="utf-8") as f:
+    with Path(snap_dir / "manifest.json").open("w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
     # Auto-prune. Defaults preserve historical manual /snapshot behavior; callers
@@ -865,8 +871,8 @@ def create_quick_snapshot(
 
 def list_quick_snapshots(
     limit: int = 20,
-    hermes_home: Optional[Path] = None,
-) -> List[Dict[str, Any]]:
+    hermes_home: Path | None = None,
+) -> list[dict[str, Any]]:
     """List existing quick state snapshots, most recent first."""
     root = _quick_snapshot_root(hermes_home)
     if not root.exists():
@@ -879,7 +885,7 @@ def list_quick_snapshots(
         manifest_path = d / "manifest.json"
         if manifest_path.exists():
             try:
-                with open(manifest_path, encoding="utf-8") as f:
+                with Path(manifest_path).open(encoding="utf-8") as f:
                     results.append(json.load(f))
             except (json.JSONDecodeError, OSError):
                 results.append({"id": d.name, "file_count": 0, "total_size": 0})
@@ -891,7 +897,7 @@ def list_quick_snapshots(
 
 def restore_quick_snapshot(
     snapshot_id: str,
-    hermes_home: Optional[Path] = None,
+    hermes_home: Path | None = None,
 ) -> bool:
     """Restore state from a quick snapshot.
 
@@ -923,7 +929,7 @@ def restore_quick_snapshot(
     if not manifest_path.exists():
         return False
 
-    with open(manifest_path, encoding="utf-8") as f:
+    with Path(manifest_path).open(encoding="utf-8") as f:
         meta = json.load(f)
 
     restored = 0
@@ -970,7 +976,7 @@ def restore_quick_snapshot(
 _CRON_JOBS_REL = "cron/jobs.json"
 
 
-def _count_cron_jobs(path: Path) -> Optional[int]:
+def _count_cron_jobs(path: Path) -> int | None:
     """Return the number of cron jobs stored in ``path``.
 
     The canonical on-disk shape is ``{"jobs": [...]}`` (see ``cron/jobs.py``).
@@ -981,11 +987,12 @@ def _count_cron_jobs(path: Path) -> Optional[int]:
         the file is missing or cannot be parsed. ``None`` means "unknown" —
         callers must not treat it as "zero jobs", because acting on an
         unreadable file could mask a real corruption the user needs to see.
+
     """
     if not path.is_file():
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
         return None
@@ -999,8 +1006,8 @@ def _count_cron_jobs(path: Path) -> Optional[int]:
 
 def restore_cron_jobs_if_emptied(
     snapshot_id: str,
-    hermes_home: Optional[Path] = None,
-) -> Optional[Dict[str, Any]]:
+    hermes_home: Path | None = None,
+) -> dict[str, Any] | None:
     """Safety net for silent cron-job loss across ``hermes update``.
 
     Config-version migrations have been observed to leave ``cron/jobs.json``
@@ -1027,6 +1034,7 @@ def restore_cron_jobs_if_emptied(
         ``None`` when no action was taken (the common, healthy path). On a
         successful restore, a dict ``{"restored": True, "job_count": N,
         "snapshot_id": ...}`` so the caller can warn the user.
+
     """
     if not snapshot_id:
         return None
@@ -1051,7 +1059,7 @@ def restore_cron_jobs_if_emptied(
         shutil.copy2(snap_path, live_path)
     except (OSError, PermissionError) as exc:
         logger.error(
-            "Cron jobs were emptied during update but auto-restore failed: %s", exc
+            "Cron jobs were emptied during update but auto-restore failed: %s", exc,
         )
         return None
 
@@ -1088,7 +1096,7 @@ def _prune_quick_snapshots(root: Path, keep: int = _QUICK_DEFAULT_KEEP) -> int:
 
 def prune_quick_snapshots(
     keep: int = _QUICK_DEFAULT_KEEP,
-    hermes_home: Optional[Path] = None,
+    hermes_home: Path | None = None,
 ) -> int:
     """Manually prune quick snapshots. Returns count deleted."""
     return _prune_quick_snapshots(_quick_snapshot_root(hermes_home), keep=keep)
@@ -1111,7 +1119,7 @@ def run_quick_backup(args) -> None:
 # Shared full-zip backup helper
 # ---------------------------------------------------------------------------
 
-def _write_full_zip_backup(out_path: Path, hermes_root: Path) -> Optional[Path]:
+def _write_full_zip_backup(out_path: Path, hermes_root: Path) -> Path | None:
     """Write a full zip snapshot of ``hermes_root`` to ``out_path``.
 
     Uses the same exclusion rules and SQLite safe-copy as :func:`run_backup`.
@@ -1153,7 +1161,7 @@ def _write_full_zip_backup(out_path: Path, hermes_root: Path) -> Optional[Path]:
                         # default (/tmp) may be a small tmpfs that cannot hold
                         # large databases, causing silent backup incompleteness.
                         with tempfile.NamedTemporaryFile(
-                            suffix=".db", delete=False, dir=str(out_path.parent)
+                            suffix=".db", delete=False, dir=str(out_path.parent),
                         ) as tmp:
                             tmp_db = Path(tmp.name)
                         try:
@@ -1187,7 +1195,7 @@ _PRE_UPDATE_PREFIX = "pre-update-"
 _PRE_UPDATE_DEFAULT_KEEP = 5
 
 
-def _pre_update_backup_dir(hermes_home: Optional[Path] = None) -> Path:
+def _pre_update_backup_dir(hermes_home: Path | None = None) -> Path:
     home = hermes_home or get_hermes_home()
     return home / _PRE_UPDATE_BACKUPS_DIR
 
@@ -1230,9 +1238,9 @@ def _prune_pre_update_backups(backup_dir: Path, keep: int) -> int:
 
 
 def create_pre_update_backup(
-    hermes_home: Optional[Path] = None,
+    hermes_home: Path | None = None,
     keep: int = _PRE_UPDATE_DEFAULT_KEEP,
-) -> Optional[Path]:
+) -> Path | None:
     """Create a full zip backup of HERMES_HOME under ``backups/``.
 
     Mirrors :func:`run_backup` (same exclusion rules, same SQLite safe-copy)
@@ -1302,9 +1310,9 @@ def _prune_pre_migration_backups(backup_dir: Path, keep: int) -> int:
 
 
 def create_pre_migration_backup(
-    hermes_home: Optional[Path] = None,
+    hermes_home: Path | None = None,
     keep: int = _PRE_MIGRATION_DEFAULT_KEEP,
-) -> Optional[Path]:
+) -> Path | None:
     """Create a full zip backup of HERMES_HOME under ``backups/`` before a
     ``hermes claw migrate`` apply.
 

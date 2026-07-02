@@ -17,7 +17,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
-
 class TestCompressionBoundaryHook:
     def _make_agent(self, session_db):
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}):
@@ -147,7 +146,6 @@ class TestCompressionBoundaryHook:
             def _raise_on_compression(*args, **kwargs):
                 if kwargs.get("boundary_reason") == "compression":
                     raise RuntimeError("plugin exploded")
-                return None
             compressor.on_session_start.side_effect = _raise_on_compression
             agent.context_compressor = compressor
 
@@ -155,7 +153,7 @@ class TestCompressionBoundaryHook:
 
             # Must not raise
             compressed, _prompt = agent._compress_context(
-                [{"role": "user", "content": "m"}], "sys", approx_tokens=100
+                [{"role": "user", "content": "m"}], "sys", approx_tokens=100,
             )
             assert compressed
             assert agent.session_id != original_sid
@@ -199,7 +197,7 @@ class TestSessionCompressEvent:
         with tempfile.TemporaryDirectory() as tmpdir:
             db = SessionDB(db_path=Path(tmpdir) / "test.db")
             agent = self._make_agent(
-                db, event_callback=lambda et, ctx: events.append((et, ctx))
+                db, event_callback=lambda et, ctx: events.append((et, ctx)),
             )
             original_sid = agent.session_id
             agent.context_compressor = self._stub_compressor()
@@ -226,7 +224,7 @@ class TestSessionCompressEvent:
             agent = self._make_agent(db, event_callback=None)
             agent.context_compressor = self._stub_compressor()
             compressed, _ = agent._compress_context(
-                [{"role": "user", "content": "m"}], "sys", approx_tokens=100
+                [{"role": "user", "content": "m"}], "sys", approx_tokens=100,
             )
             assert compressed
 
@@ -243,7 +241,7 @@ class TestSessionCompressEvent:
             agent.context_compressor = self._stub_compressor()
 
             compressed, _ = agent._compress_context(
-                [{"role": "user", "content": "m"}], "sys", approx_tokens=100
+                [{"role": "user", "content": "m"}], "sys", approx_tokens=100,
             )
             assert compressed
             assert agent.session_id != original_sid

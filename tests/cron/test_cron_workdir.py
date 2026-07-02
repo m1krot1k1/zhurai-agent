@@ -17,7 +17,7 @@ import json
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_cron_dir(tmp_path, monkeypatch):
     """Isolate cron job storage into a temp dir so tests don't stomp on real jobs."""
     monkeypatch.setattr("cron.jobs.CRON_DIR", tmp_path / "cron")
@@ -113,7 +113,7 @@ class TestUpdateJobWorkdir:
     def test_clear_workdir_with_none(self, tmp_cron_dir):
         from cron.jobs import create_job, get_job, update_job
         job = create_job(
-            prompt="x", schedule="every 1h", workdir=str(tmp_cron_dir)
+            prompt="x", schedule="every 1h", workdir=str(tmp_cron_dir),
         )
         update_job(job["id"], {"workdir": None})
         assert get_job(job["id"])["workdir"] is None
@@ -121,7 +121,7 @@ class TestUpdateJobWorkdir:
     def test_clear_workdir_with_empty_string(self, tmp_cron_dir):
         from cron.jobs import create_job, get_job, update_job
         job = create_job(
-            prompt="x", schedule="every 1h", workdir=str(tmp_cron_dir)
+            prompt="x", schedule="every 1h", workdir=str(tmp_cron_dir),
         )
         update_job(job["id"], {"workdir": ""})
         assert get_job(job["id"])["workdir"] is None
@@ -147,7 +147,7 @@ class TestCronjobToolWorkdir:
                 prompt="hi",
                 schedule="every 1h",
                 workdir=str(tmp_cron_dir),
-            )
+            ),
         )
         assert result["success"] is True
         assert result["job"]["workdir"] == str(tmp_cron_dir.resolve())
@@ -160,7 +160,7 @@ class TestCronjobToolWorkdir:
                 action="create",
                 prompt="hi",
                 schedule="every 1h",
-            )
+            ),
         )
         assert result["success"] is True
         # _format_job omits the field when unset — reduces noise in agent output.
@@ -175,12 +175,12 @@ class TestCronjobToolWorkdir:
                 prompt="hi",
                 schedule="every 1h",
                 workdir=str(tmp_cron_dir),
-            )
+            ),
         )
         job_id = created["job_id"]
 
         updated = json.loads(
-            cronjob(action="update", job_id=job_id, workdir="")
+            cronjob(action="update", job_id=job_id, workdir=""),
         )
         assert updated["success"] is True
         assert "workdir" not in updated["job"]
@@ -197,8 +197,7 @@ class TestCronjobToolWorkdir:
 # ---------------------------------------------------------------------------
 
 class TestTickWorkdirPartition:
-    """
-    tick() must run workdir jobs sequentially (outside the ThreadPoolExecutor)
+    """tick() must run workdir jobs sequentially (outside the ThreadPoolExecutor)
     because run_job mutates os.environ["TERMINAL_CWD"], which is process-global.
     We verify the partition without booting the real scheduler by patching the
     pieces tick() calls.
@@ -230,7 +229,7 @@ class TestTickWorkdirPartition:
         monkeypatch.setattr(sched, "save_job_output", lambda _jid, _o: None)
         monkeypatch.setattr(sched, "mark_job_run", lambda *_a, **_kw: None)
         monkeypatch.setattr(
-            sched, "_deliver_result", lambda *_a, **_kw: None
+            sched, "_deliver_result", lambda *_a, **_kw: None,
         )
 
         n = sched.tick(verbose=False)
@@ -257,8 +256,7 @@ class TestTickWorkdirPartition:
 # ---------------------------------------------------------------------------
 
 class TestRunJobTerminalCwd:
-    """
-    run_job sets TERMINAL_CWD + flips skip_context_files=False when workdir
+    """run_job sets TERMINAL_CWD + flips skip_context_files=False when workdir
     is set, and restores the prior TERMINAL_CWD in finally — even on error.
     We stub AIAgent so no real API call happens.
     """
@@ -268,6 +266,7 @@ class TestRunJobTerminalCwd:
         """Patch enough of run_job's deps that it executes without real creds."""
         import os
         import sys
+
         import cron.scheduler as sched
 
         class FakeAgent:
@@ -275,12 +274,12 @@ class TestRunJobTerminalCwd:
                 observed["skip_context_files"] = kwargs.get("skip_context_files")
                 observed["load_soul_identity"] = kwargs.get("load_soul_identity")
                 observed["terminal_cwd_during_init"] = os.environ.get(
-                    "TERMINAL_CWD", "_UNSET_"
+                    "TERMINAL_CWD", "_UNSET_",
                 )
 
             def run_conversation(self, *_a, **_kw):
                 observed["terminal_cwd_during_run"] = os.environ.get(
-                    "TERMINAL_CWD", "_UNSET_"
+                    "TERMINAL_CWD", "_UNSET_",
                 )
                 return {"final_response": "done", "messages": []}
 
@@ -319,9 +318,10 @@ class TestRunJobTerminalCwd:
         monkeypatch.setattr(dotenv, "load_dotenv", lambda *_a, **_kw: True)
 
     def test_workdir_sets_and_restores_terminal_cwd(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         import os
+
         import cron.scheduler as sched
 
         # Make sure the test's TERMINAL_CWD starts at a known non-workdir value.
@@ -361,6 +361,7 @@ class TestRunJobTerminalCwd:
         check it's unchanged by run_job.
         """
         import os
+
         import cron.scheduler as sched
 
         # Pin TERMINAL_CWD to a sentinel via monkeypatch so we control both

@@ -10,15 +10,13 @@ import asyncio
 import json
 import threading
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 import websockets
 from websockets.asyncio.server import serve
 
 from tools import browser_cdp_tool
-
 
 # ---------------------------------------------------------------------------
 # In-process CDP mock server
@@ -34,8 +32,8 @@ class _CDPServer:
     """
 
     def __init__(self) -> None:
-        self._handlers: Dict[str, Any] = {}
-        self._responses: List[Dict[str, Any]] = []
+        self._handlers: dict[str, Any] = {}
+        self._responses: list[dict[str, Any]] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server: Any = None
         self._thread: threading.Thread | None = None
@@ -120,7 +118,7 @@ class _CDPServer:
         if self._thread:
             self._thread.join(timeout=3.0)
 
-    def received(self) -> List[Dict[str, Any]]:
+    def received(self) -> list[dict[str, Any]]:
         return list(self._responses)
 
 
@@ -135,7 +133,7 @@ def cdp_server(monkeypatch):
     server = _CDPServer()
     ws_url = server.start()
     monkeypatch.setattr(
-        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: ws_url
+        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: ws_url,
     )
     try:
         yield server
@@ -163,10 +161,10 @@ def test_non_string_method_returns_error():
 
 def test_non_dict_params_returns_error(monkeypatch):
     monkeypatch.setattr(
-        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: "ws://localhost:9999"
+        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: "ws://localhost:9999",
     )
     result = json.loads(
-        browser_cdp_tool.browser_cdp(method="Target.getTargets", params="not-a-dict")  # type: ignore[arg-type]
+        browser_cdp_tool.browser_cdp(method="Target.getTargets", params="not-a-dict"),  # type: ignore[arg-type]
     )
     assert "error" in result
     assert "object" in result["error"].lower() or "dict" in result["error"].lower()
@@ -187,7 +185,7 @@ def test_no_endpoint_returns_helpful_error(monkeypatch):
 
 def test_non_ws_endpoint_returns_error(monkeypatch):
     monkeypatch.setattr(
-        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: "http://localhost:9222"
+        browser_cdp_tool, "_resolve_cdp_endpoint", lambda: "http://localhost:9222",
     )
     result = json.loads(browser_cdp_tool.browser_cdp(method="Target.getTargets"))
     assert "error" in result
@@ -213,7 +211,7 @@ def test_browser_level_success(cdp_server):
             "targetInfos": [
                 {"targetId": "A", "type": "page", "title": "Tab 1", "url": "about:blank"},
                 {"targetId": "B", "type": "page", "title": "Tab 2", "url": "https://a.test"},
-            ]
+            ],
         },
     )
     result = json.loads(browser_cdp_tool.browser_cdp(method="Target.getTargets"))
@@ -255,7 +253,7 @@ def test_target_attach_then_call(cdp_server):
             method="Runtime.evaluate",
             params={"expression": "document.title", "returnByValue": True},
             target_id="tab-A",
-        )
+        ),
     )
     assert result["success"] is True
     assert result["target_id"] == "tab-A"
@@ -278,7 +276,7 @@ def test_target_attach_then_call(cdp_server):
 def test_cdp_method_error_returns_tool_error(cdp_server):
     # No handler registered -> server returns CDP error
     result = json.loads(
-        browser_cdp_tool.browser_cdp(method="NonExistent.method")
+        browser_cdp_tool.browser_cdp(method="NonExistent.method"),
     )
     assert "error" in result
     assert "CDP error" in result["error"]
@@ -292,7 +290,7 @@ def test_attach_failure_returns_tool_error(cdp_server):
             method="Runtime.evaluate",
             params={"expression": "1+1"},
             target_id="missing",
-        )
+        ),
     )
     assert "error" in result
     assert "Target.attachToTarget" in result["error"]
@@ -312,8 +310,8 @@ def test_timeout_when_server_never_replies(cdp_server):
     cdp_server.on("Page.slowMethod", slow)
     result = json.loads(
         browser_cdp_tool.browser_cdp(
-            method="Page.slowMethod", timeout=0.5
-        )
+            method="Page.slowMethod", timeout=0.5,
+        ),
     )
     assert "error" in result
     assert "tim" in result["error"].lower()
@@ -328,7 +326,7 @@ def test_timeout_clamped_above_max(cdp_server):
     cdp_server.on("Browser.getVersion", lambda p, s: {"product": "ok"})
     # timeout=10_000 should be clamped to 300 but still succeed
     result = json.loads(
-        browser_cdp_tool.browser_cdp(method="Browser.getVersion", timeout=10_000)
+        browser_cdp_tool.browser_cdp(method="Browser.getVersion", timeout=10_000),
     )
     assert result["success"] is True
 
@@ -336,7 +334,7 @@ def test_timeout_clamped_above_max(cdp_server):
 def test_invalid_timeout_falls_back_to_default(cdp_server):
     cdp_server.on("Browser.getVersion", lambda p, s: {"product": "ok"})
     result = json.loads(
-        browser_cdp_tool.browser_cdp(method="Browser.getVersion", timeout="nope")  # type: ignore[arg-type]
+        browser_cdp_tool.browser_cdp(method="Browser.getVersion", timeout="nope"),  # type: ignore[arg-type]
     )
     assert result["success"] is True
 
@@ -366,7 +364,7 @@ def test_dispatch_through_registry(cdp_server):
 
     cdp_server.on("Target.getTargets", lambda p, s: {"targetInfos": []})
     raw = registry.dispatch(
-        "browser_cdp", {"method": "Target.getTargets"}, task_id="t1"
+        "browser_cdp", {"method": "Target.getTargets"}, task_id="t1",
     )
     result = json.loads(raw)
     assert result["success"] is True
@@ -380,7 +378,8 @@ def test_dispatch_through_registry(cdp_server):
 
 def test_check_fn_false_when_no_cdp_url(monkeypatch):
     """Gate closes when no CDP URL is set — even if the browser toolset is
-    otherwise configured."""
+    otherwise configured.
+    """
     import tools.browser_tool as bt
 
     monkeypatch.setattr(bt, "check_browser_requirements", lambda: True)
@@ -394,18 +393,19 @@ def test_check_fn_true_when_cdp_url_set(monkeypatch):
 
     monkeypatch.setattr(bt, "check_browser_requirements", lambda: True)
     monkeypatch.setattr(
-        bt, "_get_cdp_override", lambda: "ws://localhost:9222/devtools/browser/x"
+        bt, "_get_cdp_override", lambda: "ws://localhost:9222/devtools/browser/x",
     )
     assert browser_cdp_tool._browser_cdp_check() is True
 
 
 def test_check_fn_false_when_browser_requirements_fail(monkeypatch):
     """Even with a CDP URL, gate closes if the overall browser toolset is
-    unavailable (e.g. agent-browser not installed)."""
+    unavailable (e.g. agent-browser not installed).
+    """
     import tools.browser_tool as bt
 
     monkeypatch.setattr(bt, "check_browser_requirements", lambda: False)
     monkeypatch.setattr(
-        bt, "_get_cdp_override", lambda: "ws://localhost:9222/devtools/browser/x"
+        bt, "_get_cdp_override", lambda: "ws://localhost:9222/devtools/browser/x",
     )
     assert browser_cdp_tool._browser_cdp_check() is False

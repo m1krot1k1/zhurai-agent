@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
@@ -57,7 +56,8 @@ def _make_empty_chunk(model=None, usage=None):
 
 class TestStreamingAccumulator:
     """Verify that _interruptible_streaming_api_call accumulates content
-    and tool calls into a response matching the non-streaming shape."""
+    and tool calls into a response matching the non-streaming shape.
+    """
 
     @patch("run_agent.AIAgent._create_request_openai_client")
     @patch("run_agent.AIAgent._close_request_openai_client")
@@ -103,13 +103,13 @@ class TestStreamingAccumulator:
 
         chunks = [
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_123", name="terminal")
+                _make_tool_call_delta(index=0, tc_id="call_123", name="terminal"),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, arguments='{"command":')
+                _make_tool_call_delta(index=0, arguments='{"command":'),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, arguments=' "ls"}')
+                _make_tool_call_delta(index=0, arguments=' "ls"}'),
             ]),
             _make_stream_chunk(finish_reason="tool_calls"),
         ]
@@ -150,13 +150,13 @@ class TestStreamingAccumulator:
 
         chunks = [
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file")
+                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file"),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file", arguments='{"path":')
+                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file", arguments='{"path":'),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file", arguments=' "x.py"}')
+                _make_tool_call_delta(index=0, tc_id="call_nim", name="read_file", arguments=' "x.py"}'),
             ]),
             _make_stream_chunk(finish_reason="tool_calls"),
         ]
@@ -198,13 +198,13 @@ class TestStreamingAccumulator:
                     name="cronjob",
                     model_extra={
                         "extra_content": {
-                            "google": {"thought_signature": "sig-123"}
-                        }
+                            "google": {"thought_signature": "sig-123"},
+                        },
                     },
-                )
+                ),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, arguments='{"task": "deep index on ."}')
+                _make_tool_call_delta(index=0, arguments='{"task": "deep index on ."}'),
             ]),
             _make_stream_chunk(finish_reason="tool_calls"),
         ]
@@ -229,7 +229,7 @@ class TestStreamingAccumulator:
         tc = response.choices[0].message.tool_calls
         assert tc is not None
         assert tc[0].extra_content == {
-            "google": {"thought_signature": "sig-123"}
+            "google": {"thought_signature": "sig-123"},
         }
 
     @patch("run_agent.AIAgent._create_request_openai_client")
@@ -241,10 +241,10 @@ class TestStreamingAccumulator:
         chunks = [
             _make_stream_chunk(content="Let me check"),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_456", name="web_search")
+                _make_tool_call_delta(index=0, tc_id="call_456", name="web_search"),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, arguments='{"query": "test"}')
+                _make_tool_call_delta(index=0, arguments='{"query": "test"}'),
             ]),
             _make_stream_chunk(finish_reason="tool_calls"),
         ]
@@ -341,7 +341,7 @@ class TestStreamingCallbacks:
         agent._interrupt_requested = False
 
         agent._interruptible_streaming_api_call(
-            {}, on_first_delta=lambda: first_delta_calls.append(True)
+            {}, on_first_delta=lambda: first_delta_calls.append(True),
         )
 
         assert len(first_delta_calls) == 1
@@ -388,10 +388,10 @@ class TestStreamingCallbacks:
 
         chunks = [
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_789", name="terminal")
+                _make_tool_call_delta(index=0, tc_id="call_789", name="terminal"),
             ]),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, arguments='{"command": "ls"}')
+                _make_tool_call_delta(index=0, arguments='{"command": "ls"}'),
             ]),
             _make_stream_chunk(finish_reason="tool_calls"),
         ]
@@ -427,7 +427,7 @@ class TestStreamingCallbacks:
         chunks = [
             _make_stream_chunk(content="thinking..."),
             _make_stream_chunk(tool_calls=[
-                _make_tool_call_delta(index=0, tc_id="call_abc", name="read_file")
+                _make_tool_call_delta(index=0, tc_id="call_abc", name="read_file"),
             ]),
             _make_stream_chunk(content=" more text"),
             _make_stream_chunk(finish_reason="tool_calls"),
@@ -484,7 +484,7 @@ class TestStreamingFallback:
 
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = Exception(
-            "Streaming is not supported for this model"
+            "Streaming is not supported for this model",
         )
         mock_create.return_value = mock_client
 
@@ -513,7 +513,7 @@ class TestStreamingFallback:
 
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = Exception(
-            "Connection reset by peer"
+            "Connection reset by peer",
         )
         mock_create.return_value = mock_client
 
@@ -559,8 +559,9 @@ class TestStreamingFallback:
     @patch("run_agent.AIAgent._close_request_openai_client")
     def test_exhausted_transient_stream_error_propagates(self, mock_close, mock_create):
         """Transient stream errors retry first, then propagate after retries exhausted."""
-        from run_agent import AIAgent
         import httpx
+
+        from run_agent import AIAgent
 
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = httpx.ConnectError("socket closed")
@@ -594,12 +595,13 @@ class TestStreamingFallback:
         this.  It should be retried at the streaming level, same as httpx connection
         errors, then propagate to the main retry loop after exhaustion.
         """
-        from run_agent import AIAgent
         import httpx
 
         # Create an APIError that mimics what the OpenAI SDK raises from SSE error events.
         # Key: no status_code attribute (unlike APIStatusError which has one).
         from openai import APIError as OAIAPIError
+
+        from run_agent import AIAgent
         sse_error = OAIAPIError(
             message="Network connection lost.",
             request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
@@ -633,10 +635,10 @@ class TestStreamingFallback:
     @patch("run_agent.AIAgent._close_request_openai_client")
     def test_sse_non_connection_error_propagates_immediately(self, mock_close, mock_create):
         """SSE errors that aren't connection-related propagate immediately (no stream retry)."""
-        from run_agent import AIAgent
         import httpx
-
         from openai import APIError as OAIAPIError
+
+        from run_agent import AIAgent
         sse_error = OAIAPIError(
             message="Invalid model configuration.",
             request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
@@ -795,6 +797,7 @@ class TestCodexStreamCallbacks:
         class _FakeCreateStream:
             def __iter__(self_inner):
                 return iter(events)
+
             def close(self_inner):
                 return None
 
@@ -833,6 +836,7 @@ class TestCodexStreamCallbacks:
         class _FakeCreateStream:
             def __iter__(self_inner):
                 return iter(events)
+
             def close(self_inner):
                 return None
 
@@ -852,8 +856,9 @@ class TestCodexStreamCallbacks:
         raises ``httpx.RemoteProtocolError``, we retry once (matching the
         old behavior on the helper) and re-raise on the second failure.
         """
-        from run_agent import AIAgent
         import httpx
+
+        from run_agent import AIAgent
 
         agent = AIAgent(
             api_key="test-key",
@@ -871,7 +876,7 @@ class TestCodexStreamCallbacks:
         def _create_side_effect(**kwargs):
             call_count["n"] += 1
             raise httpx.RemoteProtocolError(
-                "peer closed connection without sending complete message body"
+                "peer closed connection without sending complete message body",
             )
 
         mock_client = MagicMock()
@@ -908,7 +913,7 @@ class TestCodexStreamCallbacks:
                     output=[SimpleNamespace(
                         type="message",
                         content=[SimpleNamespace(type="output_text", text="Hello")],
-                    )]
+                    )],
                 ),
             ),
         ]
@@ -1059,7 +1064,7 @@ class TestAnthropicStreamCallbacks:
 
         agent._anthropic_client = MagicMock()
         agent._anthropic_client.messages.stream.side_effect = ValueError(
-            "invalid local request shape"
+            "invalid local request shape",
         )
 
         with pytest.raises(ValueError, match="invalid local request shape"):
@@ -1090,7 +1095,8 @@ class TestPartialToolCallWarning:
     def test_partial_tool_call_surfaces_warning(self, mock_close, mock_create):
         """Stream with text + partial tool-call name + mid-stream error
         produces a stub whose content contains the user-visible warning
-        and whose tool_calls is None."""
+        and whose tool_calls is None.
+        """
         from run_agent import AIAgent
 
         class _StallError(RuntimeError):
@@ -1157,7 +1163,8 @@ class TestPartialToolCallWarning:
     @patch("run_agent.AIAgent._close_request_openai_client")
     def test_partial_text_only_no_warning(self, mock_close, mock_create):
         """Text-only partial stream (no tool call mid-flight) keeps the
-        pre-fix behaviour: bare recovered text, no warning noise."""
+        pre-fix behaviour: bare recovered text, no warning noise.
+        """
         from run_agent import AIAgent
 
         class _StallError(RuntimeError):
@@ -1221,9 +1228,11 @@ class TestSilentRetryMidToolCall:
     ):
         """First attempt: text + partial tool-call + connection drop.
         Second attempt: text + complete tool-call.  Response should contain
-        the recovered tool call; no warning stub should be returned."""
-        from run_agent import AIAgent
+        the recovered tool call; no warning stub should be returned.
+        """
         import httpx as _httpx
+
+        from run_agent import AIAgent
 
         attempts = {"n": 0}
 
@@ -1316,9 +1325,11 @@ class TestSilentRetryMidToolCall:
     ):
         """When all retry attempts fail with connection errors, fall back
         to the original stub-with-warning behaviour so the user isn't left
-        with zero signal."""
-        from run_agent import AIAgent
+        with zero signal.
+        """
         import httpx as _httpx
+
+        from run_agent import AIAgent
 
         def _always_fails():
             yield _make_stream_chunk(content="Let me write the audit: ")
@@ -1371,9 +1382,11 @@ class TestSilentRetryMidToolCall:
     ):
         """Text-only stall (no tool call in flight) must NOT trigger silent
         retry — that's the case where the user saw the model's text reply
-        and retrying would duplicate it with no benefit."""
-        from run_agent import AIAgent
+        and retrying would duplicate it with no benefit.
+        """
         import httpx as _httpx
+
+        from run_agent import AIAgent
 
         attempts = {"n": 0}
 
@@ -1439,7 +1452,7 @@ def _valid_acp_response():
                     role="assistant",
                 ),
                 finish_reason="stop",
-            )
+            ),
         ],
         usage=SimpleNamespace(prompt_tokens=5, completion_tokens=3),
         model="claude-opus-4.7",
@@ -1449,7 +1462,8 @@ def _valid_acp_response():
 def _make_acp_agent(provider="copilot-acp", base_url="acp://copilot"):
     """Create an AIAgent configured for copilot-acp with a stream consumer
     so _has_stream_consumers() returns True (ensuring the test exercises the
-    ACP exclusion, not the no-consumer branch)."""
+    ACP exclusion, not the no-consumer branch).
+    """
     from run_agent import AIAgent
     agent = AIAgent(
         api_key="test-acp-key",
@@ -1478,7 +1492,7 @@ class TestCopilotACPStreamingDecision:
     @patch("run_agent.check_toolset_requirements", return_value={})
     @patch("agent.copilot_acp_client.CopilotACPClient")
     def test_provider_name_triggers_non_streaming(
-        self, mock_acp_cls, _mock_check, _mock_tools
+        self, mock_acp_cls, _mock_check, _mock_tools,
     ):
         """provider='copilot-acp' → non-streaming path."""
         mock_acp_cls.return_value = MagicMock()
@@ -1491,9 +1505,7 @@ class TestCopilotACPStreamingDecision:
         ):
             # Verify the decision logic correctly disables streaming
             _use_streaming = True
-            if getattr(agent, "_disable_streaming", False):
-                _use_streaming = False
-            elif (
+            if getattr(agent, "_disable_streaming", False) or (
                 agent.provider == "copilot-acp"
                 or str(agent.base_url or "").lower().startswith("acp://copilot")
                 or str(agent.base_url or "").lower().startswith("acp+tcp://")
@@ -1509,7 +1521,7 @@ class TestCopilotACPStreamingDecision:
     @patch("run_agent.check_toolset_requirements", return_value={})
     @patch("agent.copilot_acp_client.CopilotACPClient")
     def test_acp_base_url_triggers_non_streaming(
-        self, mock_acp_cls, _mock_check, _mock_tools
+        self, mock_acp_cls, _mock_check, _mock_tools,
     ):
         """base_url='acp://copilot' → non-streaming even without provider name."""
         mock_acp_cls.return_value = MagicMock()
@@ -1530,7 +1542,7 @@ class TestCopilotACPStreamingDecision:
     @patch("run_agent.check_toolset_requirements", return_value={})
     @patch("agent.copilot_acp_client.CopilotACPClient")
     def test_acp_tcp_url_triggers_non_streaming(
-        self, mock_acp_cls, _mock_check, _mock_tools
+        self, mock_acp_cls, _mock_check, _mock_tools,
     ):
         """base_url='acp+tcp://...' → non-streaming."""
         mock_acp_cls.return_value = MagicMock()
@@ -1563,9 +1575,7 @@ class TestCopilotACPStreamingDecision:
         agent.api_mode = "chat_completions"
 
         _use_streaming = True
-        if getattr(agent, "_disable_streaming", False):
-            _use_streaming = False
-        elif (
+        if getattr(agent, "_disable_streaming", False) or (
             agent.provider == "copilot-acp"
             or str(agent.base_url or "").lower().startswith("acp://copilot")
             or str(agent.base_url or "").lower().startswith("acp+tcp://")
@@ -1578,7 +1588,8 @@ class TestCopilotACPStreamingDecision:
 class TestBedrockIamStreamingFallback:
     """bedrock_converse streaming branch: IAM denial of
     InvokeModelWithResponseStream falls back to converse() inline and sets
-    _disable_streaming for the rest of the session."""
+    _disable_streaming for the rest of the session.
+    """
 
     def _make_bedrock_agent(self):
         from run_agent import AIAgent
@@ -1610,7 +1621,7 @@ class TestBedrockIamStreamingFallback:
                         "User is not authorized to perform: "
                         "bedrock:InvokeModelWithResponseStream"
                     ),
-                }
+                },
             },
             operation_name="ConverseStream",
         )
@@ -1625,7 +1636,7 @@ class TestBedrockIamStreamingFallback:
             return_value=client,
         ):
             response = agent._interruptible_streaming_api_call(
-                {"modelId": agent.model, "messages": []}
+                {"modelId": agent.model, "messages": []},
             )
 
         client.converse.assert_called_once()
@@ -1641,7 +1652,7 @@ class TestBedrockIamStreamingFallback:
         client = MagicMock()
         client.converse_stream.side_effect = ClientError(
             error_response={
-                "Error": {"Code": "ThrottlingException", "Message": "slow down"}
+                "Error": {"Code": "ThrottlingException", "Message": "slow down"},
             },
             operation_name="ConverseStream",
         )
@@ -1649,11 +1660,10 @@ class TestBedrockIamStreamingFallback:
         with patch(
             "agent.bedrock_adapter._get_bedrock_runtime_client",
             return_value=client,
-        ):
-            with pytest.raises(ClientError):
-                agent._interruptible_streaming_api_call(
-                    {"modelId": agent.model, "messages": []}
-                )
+        ), pytest.raises(ClientError):
+            agent._interruptible_streaming_api_call(
+                {"modelId": agent.model, "messages": []},
+            )
 
         client.converse.assert_not_called()
         assert getattr(agent, "_disable_streaming", False) is False

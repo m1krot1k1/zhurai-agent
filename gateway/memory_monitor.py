@@ -36,20 +36,19 @@ import os
 import sys
 import threading
 import time
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 _BYTES_TO_MB = 1024 * 1024
 
-_monitor_thread: Optional[threading.Thread] = None
-_stop_event: Optional[threading.Event] = None
-_start_time: Optional[float] = None
+_monitor_thread: threading.Thread | None = None
+_stop_event: threading.Event | None = None
+_start_time: float | None = None
 _interval_seconds: float = 300.0  # 5 minutes
 _lock = threading.Lock()
 
 
-def _get_rss_mb() -> Optional[int]:
+def _get_rss_mb() -> int | None:
     """Return current process resident set size in MB, or None if unavailable.
 
     Tries ``resource.getrusage`` first (Linux/macOS, no extra deps), then
@@ -91,6 +90,7 @@ def log_memory_usage(prefix: str = "") -> None:
     prefix
         Optional extra tag inserted after ``[MEMORY]`` — e.g.
         ``"baseline"``, ``"shutdown"``.
+
     """
     rss = _get_rss_mb()
     uptime = int(time.monotonic() - _start_time) if _start_time else 0
@@ -154,6 +154,7 @@ def start_memory_monitoring(interval_seconds: float = 300.0) -> bool:
     bool
         True if a fresh monitor thread was started, False if one was
         already running or if memory introspection isn't available.
+
     """
     global _monitor_thread, _stop_event, _start_time, _interval_seconds
 

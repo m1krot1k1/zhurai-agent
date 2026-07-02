@@ -3,8 +3,8 @@
 import json
 from unittest.mock import MagicMock, patch
 
-
 from tools.browser_camofox import (
+    _rewrite_loopback_url_for_camofox,
     camofox_back,
     camofox_click,
     camofox_close,
@@ -18,9 +18,7 @@ from tools.browser_camofox import (
     camofox_vision,
     check_camofox_available,
     is_camofox_mode,
-    _rewrite_loopback_url_for_camofox,
 )
-
 
 # ---------------------------------------------------------------------------
 # Configuration detection
@@ -200,7 +198,7 @@ class TestCamofoxSnapshot:
 
         # Return snapshot
         mock_get.return_value = _mock_response(json_data={
-            "snapshot": "- heading \"Test\" [e1]\n- button \"Submit\" [e2]",
+            "snapshot": '- heading "Test" [e1]\n- button "Submit" [e2]',
             "refsCount": 2,
         })
         result = json.loads(camofox_snapshot(task_id="t3"))
@@ -424,5 +422,3 @@ class TestBrowserToolRouting:
         monkeypatch.setenv("CAMOFOX_URL", "http://localhost:9377")
         from tools.browser_tool import check_browser_requirements
         assert check_browser_requirements() is True
-
-

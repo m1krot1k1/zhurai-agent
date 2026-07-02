@@ -130,7 +130,8 @@ async def test_internal_event_does_not_interrupt_busy_session() -> None:
 @pytest.mark.asyncio
 async def test_non_internal_event_still_interrupts() -> None:
     """Regression-guard the other direction: a real user message in interrupt
-    mode with no subagents still interrupts (behaviour unchanged)."""
+    mode with no subagents still interrupts (behaviour unchanged).
+    """
     runner = _make_runner()
     runner._busy_input_mode = "interrupt"
     adapter = _make_adapter()

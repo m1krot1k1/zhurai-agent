@@ -16,9 +16,9 @@ argparse → cmd_chat → cli.main() → HermesCLI → AIAgent call chain.
 
 from __future__ import annotations
 
+import importlib
 import os
 import textwrap
-import importlib
 
 import pytest
 
@@ -55,7 +55,7 @@ class TestIgnoreUserConfigEnvGate:
               provider: openrouter
             agent:
               system_prompt: "from user config"
-            """
+            """,
         ).lstrip()
         (tmp_path / "config.yaml").write_text(config_yaml)
 
@@ -238,6 +238,7 @@ class TestArgparseFlagsRegistered:
 
         # And the cmd_chat env-var wiring must be present
         import inspect
+
         import hermes_cli.main as hm
         src = inspect.getsource(hm)
         assert "HERMES_IGNORE_USER_CONFIG" in src

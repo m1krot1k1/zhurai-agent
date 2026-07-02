@@ -9,20 +9,20 @@ import yaml
 
 from hermes_cli.config import (
     DEFAULT_CONFIG,
+    _sanitize_env_lines,
     check_config_version,
-    get_hermes_home,
     ensure_hermes_home,
     get_compatible_custom_providers,
+    get_hermes_home,
     load_config,
     load_env,
     migrate_config,
     remove_env_value,
+    sanitize_env_file,
     save_config,
     save_env_value,
     save_env_value_secure,
-    sanitize_env_file,
     write_platform_config_field,
-    _sanitize_env_lines,
 )
 
 
@@ -143,6 +143,7 @@ class TestLoadConfigParseFailure:
 
     def test_rewarns_after_file_edit(self, tmp_path, capsys):
         import time
+
         from hermes_cli import config as cfg_mod
         cfg_mod._CONFIG_PARSE_WARNED.clear()
 
@@ -186,7 +187,8 @@ class TestLoadConfigParseFailure:
 
     def test_backup_skips_when_same_size_bak_exists(self, tmp_path, capsys):
         """Don't churn backups: if a corrupt backup of the same size already
-        exists (same corruption already preserved), skip making another."""
+        exists (same corruption already preserved), skip making another.
+        """
         from hermes_cli import config as cfg_mod
         cfg_mod._CONFIG_PARSE_WARNED.clear()
 
@@ -205,7 +207,8 @@ class TestLoadConfigParseFailure:
 
     def test_corrupt_symlink_config_not_backed_up(self, tmp_path):
         """Symlinked config.yaml is not copied (mirrors Gemini #21541 lstat
-        guard) — avoids clobbering whatever the symlink points at."""
+        guard) — avoids clobbering whatever the symlink points at.
+        """
         import sys as _sys
         if _sys.platform == "win32":
             pytest.skip("symlink creation requires privileges on Windows")
@@ -322,7 +325,7 @@ class TestSaveEnvValueSecure:
 
         env_path = tmp_path / ".env"
         env_path.write_text("EXISTING=value\n")
-        os.chmod(env_path, 0o640)
+        Path(env_path).chmod(0o640)
 
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             save_env_value("TENOR_API_KEY", "sk-test-secret")
@@ -385,7 +388,7 @@ class TestRemoveEnvValue:
 
         env_path = tmp_path / ".env"
         env_path.write_text("KEEP=value\nDROP=gone\n")
-        os.chmod(env_path, 0o640)
+        Path(env_path).chmod(0o640)
 
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path), "DROP": "gone"}):
             removed = remove_env_value("DROP")
@@ -449,7 +452,7 @@ class TestSaveConfigAtomicity:
 
             # Read raw YAML to verify it's valid and correct
             config_path = tmp_path / "config.yaml"
-            with open(config_path) as f:
+            with Path(config_path).open() as f:
                 raw = yaml.safe_load(f)
             assert raw["model"] == "test/atomic-model"
             assert raw["agent"]["max_turns"] == 77
@@ -542,7 +545,7 @@ class TestSanitizeEnvLines:
         env_file = tmp_path / ".env"
         env_file.write_text(
             "ANTHROPIC_API_KEY=sk-antOPENAI_BASE_URL=https://api.openai.com/v1\n"
-            "FAL_KEY=existing\n"
+            "FAL_KEY=existing\n",
         )
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             save_env_value("MESSAGING_CWD", "/tmp")
@@ -560,7 +563,7 @@ class TestSanitizeEnvLines:
         env_file = tmp_path / ".env"
         env_file.write_text(
             "FAL_KEY=good\n"
-            "OPENROUTER_API_KEY=valFIRECRAWL_API_KEY=val2\n"
+            "OPENROUTER_API_KEY=valFIRECRAWL_API_KEY=val2\n",
         )
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             fixes = sanitize_env_file()
@@ -632,8 +635,8 @@ class TestConfigMigrationSecretPrompts:
 
         monkeypatch.setattr(cfg_mod, "sanitize_env_file", lambda: 0)
         monkeypatch.setattr(cfg_mod, "check_config_version", lambda: (999, 999))
-        monkeypatch.setattr(cfg_mod, "get_missing_config_fields", lambda: [])
-        monkeypatch.setattr(cfg_mod, "get_missing_skill_config_vars", lambda: [])
+        monkeypatch.setattr(cfg_mod, "get_missing_config_fields", list)
+        monkeypatch.setattr(cfg_mod, "get_missing_skill_config_vars", list)
         monkeypatch.setattr(
             cfg_mod,
             "get_missing_env_vars",
@@ -643,11 +646,12 @@ class TestConfigMigrationSecretPrompts:
                     "description": "Test key",
                     "prompt": "Test API key",
                     "password": True,
-                }
+                },
             ]
             if required_only
             else [],
         )
+
         def fake_masked_secret_prompt(prompt):
             saved["prompt"] = prompt
             return "secret"
@@ -740,12 +744,12 @@ class TestCustomProviderCompatibility:
                             "api_key": "test-key",
                             "api_mode": "codex_responses",
                             "model": "gpt-5-mini",
-                        }
+                        },
                     ],
                     "fallback_providers": [
-                        {"provider": "openai-direct", "model": "gpt-5-mini"}
+                        {"provider": "openai-direct", "model": "gpt-5-mini"},
                     ],
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -788,7 +792,7 @@ class TestCustomProviderCompatibility:
                             "rate_limit_delay": 0.25,
                             "discover_models": False,
                             "extra_body": {
-                                "chat_template_kwargs": {"enable_thinking": False}
+                                "chat_template_kwargs": {"enable_thinking": False},
                             },
                         },
                         {
@@ -797,7 +801,7 @@ class TestCustomProviderCompatibility:
                             "models": ["alpha", "beta"],
                         },
                     ],
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -818,7 +822,7 @@ class TestCustomProviderCompatibility:
         assert provider["rate_limit_delay"] == 0.25
         assert provider["discover_models"] is False
         assert provider["extra_body"] == {
-            "chat_template_kwargs": {"enable_thinking": False}
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         assert raw["providers"]["list-models"]["models"] == {
             "alpha": {},
@@ -833,7 +837,8 @@ class TestCustomProviderCompatibility:
 
     def test_providers_dict_resolves_at_runtime(self, tmp_path):
         """After migration deleted custom_providers, get_compatible_custom_providers
-        still finds entries from the providers dict."""
+        still finds entries from the providers dict.
+        """
         config_path = tmp_path / "config.yaml"
         config_path.write_text(
             yaml.safe_dump(
@@ -846,9 +851,9 @@ class TestCustomProviderCompatibility:
                             "default_model": "gpt-5-mini",
                             "name": "OpenAI Direct",
                             "transport": "codex_responses",
-                        }
+                        },
                     },
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -875,9 +880,9 @@ class TestCustomProviderCompatibility:
                             "api": "https://api.example.com/v1",
                             "url": "https://url.example.com/v1",
                             "base_url": "https://base.example.com/v1",
-                        }
+                        },
                     },
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -890,7 +895,7 @@ class TestCustomProviderCompatibility:
                 "name": "My Provider",
                 "base_url": "https://base.example.com/v1",
                 "provider_key": "my-provider",
-            }
+            },
         ]
 
     def test_dedup_across_legacy_and_providers(self, tmp_path):
@@ -905,16 +910,16 @@ class TestCustomProviderCompatibility:
                             "name": "OpenAI Direct",
                             "base_url": "https://api.openai.com/v1",
                             "api_key": "legacy-key",
-                        }
+                        },
                     ],
                     "providers": {
                         "openai-direct": {
                             "api": "https://api.openai.com/v1",
                             "api_key": "new-key",
                             "name": "OpenAI Direct",
-                        }
+                        },
                     },
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -938,7 +943,7 @@ class TestCustomProviderCompatibility:
                         {"name": "Ollama Cloud", "base_url": "https://ollama.com/v1", "model": "glm-5.1"},
                         {"name": "Ollama Cloud", "base_url": "https://ollama.com/v1", "model": "kimi-k2.5"},
                     ],
-                }
+                },
             ),
             encoding="utf-8",
         )
@@ -981,7 +986,8 @@ class TestCliRefreshIntervalConfig:
         """cli_refresh_interval defaults to 1.0 so the idle status-bar
         clock keeps ticking and the bottom chrome stays alive during
         idle (#45592). Users on emulators where the periodic redraw
-        fights auto-scroll can set it to 0 (#48309)."""
+        fights auto-scroll can set it to 0 (#48309).
+        """
         assert DEFAULT_CONFIG["display"]["cli_refresh_interval"] == 1.0
 
 
@@ -1064,7 +1070,8 @@ class TestEnvWriteDenylist:
     )
     def test_denylisted_keys_rejected(self, denied_key):
         """Each denylisted name raises ``ValueError`` and never reaches
-        the on-disk ``.env`` file."""
+        the on-disk ``.env`` file.
+        """
         with pytest.raises(ValueError, match="denylist"):
             save_env_value(denied_key, "anything")
 
@@ -1086,7 +1093,8 @@ class TestEnvWriteDenylist:
         location names (HOME/PROFILE/CONFIG/ENV) are. Integration
         credentials following the ``HERMES_*`` convention must keep
         working or we'd regress every provider setup wizard that
-        currently writes one of these (auth.py, Spotify, Langfuse, …)."""
+        currently writes one of these (auth.py, Spotify, Langfuse, …).
+        """
         save_env_value(allowed_key, "test-value-123")
         env = load_env()
         assert env[allowed_key] == "test-value-123"
@@ -1100,14 +1108,16 @@ class TestEnvWriteDenylist:
     def test_arbitrary_user_key_still_works(self):
         """Plugin / user-defined env vars (anything outside the
         denylist and outside ``HERMES_*``) keep working. The denylist
-        is narrow on purpose."""
+        is narrow on purpose.
+        """
         save_env_value("MY_PLUGIN_TOKEN", "plugin-secret-123")
         env = load_env()
         assert env["MY_PLUGIN_TOKEN"] == "plugin-secret-123"
 
     def test_save_env_value_secure_inherits_denylist(self):
         """The ``_secure`` variant goes through ``save_env_value`` so
-        it inherits the gate — verify, don't assume."""
+        it inherits the gate — verify, don't assume.
+        """
         with pytest.raises(ValueError, match="denylist"):
             save_env_value_secure("LD_PRELOAD", "/tmp/evil.so")
 
@@ -1115,7 +1125,8 @@ class TestEnvWriteDenylist:
         """The gate is on *write*. If ``.env`` already contains
         ``LD_PRELOAD`` (set out-of-band by the operator before this
         change shipped, or hand-edited), we don't blow up — we just
-        refuse to add or update it via the API."""
+        refuse to add or update it via the API.
+        """
         env_path = tmp_path / ".env"
         env_path.write_text("LD_PRELOAD=/something/legit.so\n")
 

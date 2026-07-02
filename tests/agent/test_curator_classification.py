@@ -14,7 +14,7 @@ which misled users into thinking consolidated skills had been pruned.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -30,11 +30,12 @@ def curator_env(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     import importlib
+
     import hermes_constants
     importlib.reload(hermes_constants)
     from agent import curator
     importlib.reload(curator)
-    yield curator
+    return curator
 
 
 def test_classify_consolidated_via_write_file_evidence(curator_env):
@@ -240,7 +241,7 @@ def test_classify_no_false_positive_short_name_in_file_path(curator_env):
         ],
     )
     assert result["consolidated"] == [], (
-        f"Short name 'api' should NOT match file_path 'references/api-design.md'"
+        "Short name 'api' should NOT match file_path 'references/api-design.md'"
     )
     assert len(result["pruned"]) == 1
     assert result["pruned"][0]["name"] == "api"
@@ -266,7 +267,7 @@ def test_classify_no_false_positive_short_name_in_content(curator_env):
         ],
     )
     assert result["consolidated"] == [], (
-        f"Short name 'test' should NOT match 'latest' via word boundary"
+        "Short name 'test' should NOT match 'latest' via word boundary"
     )
     assert len(result["pruned"]) == 1
 
@@ -290,7 +291,7 @@ def test_classify_still_matches_exact_word_in_content(curator_env):
         ],
     )
     assert len(result["consolidated"]) == 1, (
-        f"'api' should match as a standalone word in content"
+        "'api' should match as a standalone word in content"
     )
     assert result["consolidated"][0]["into"] == "gateway"
 
@@ -298,7 +299,7 @@ def test_classify_still_matches_exact_word_in_content(curator_env):
 def test_report_md_splits_consolidated_and_pruned_sections(curator_env):
     """End-to-end: REPORT.md shows both sections distinctly."""
     curator = curator_env
-    start = datetime.now(timezone.utc)
+    start = datetime.now(UTC)
 
     before = [
         {"name": "absorbed-skill", "state": "active", "pinned": False},
@@ -562,9 +563,9 @@ def test_reconcile_model_prunes_with_reason(curator_env):
 def test_reconcile_model_block_visible_in_full_report(curator_env):
     """End-to-end: LLM final response with the YAML block → reasons in REPORT.md."""
     import json as _json
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt
 
-    start = _dt.now(_tz.utc)
+    start = _dt.now(UTC)
     before = [
         {"name": "anthropic-api", "state": "active", "pinned": False},
         {"name": "stale-thing", "state": "stale", "pinned": False},
@@ -694,7 +695,7 @@ def test_extract_absorbed_into_ignores_non_delete_actions(curator_env):
 
 
 def test_extract_absorbed_into_accepts_dict_arguments(curator_env):
-    """arguments can arrive as a dict (defensive path) — still works."""
+    """Arguments can arrive as a dict (defensive path) — still works."""
     declarations = curator_env._extract_absorbed_into_declarations([
         {
             "name": "skill_manage",
@@ -791,7 +792,8 @@ def test_reconcile_absorbed_into_empty_is_explicit_prune(curator_env):
 def test_reconcile_absorbed_into_nonexistent_target_falls_through(curator_env):
     """If the declared umbrella doesn't exist in destinations, fall through to
     heuristic/YAML logic. Shouldn't happen in practice (the tool validates at
-    delete time) but the reconciler is defensive."""
+    delete time) but the reconciler is defensive.
+    """
     out = curator_env._reconcile_classification(
         removed=["thing"],
         heuristic={
@@ -811,7 +813,8 @@ def test_reconcile_absorbed_into_nonexistent_target_falls_through(curator_env):
 
 def test_reconcile_declaration_preserves_yaml_reason(curator_env):
     """When the model both declared absorbed_into AND emitted YAML with reason,
-    the reason carries through so REPORT.md still has it."""
+    the reason carries through so REPORT.md still has it.
+    """
     out = curator_env._reconcile_classification(
         removed=["narrow"],
         heuristic={"consolidated": [], "pruned": []},

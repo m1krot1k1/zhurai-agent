@@ -18,7 +18,7 @@ class TestResolveDisplaySetting:
                 "platforms": {
                     "telegram": {"tool_progress": "verbose"},
                 },
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "tool_progress") == "verbose"
 
@@ -30,7 +30,7 @@ class TestResolveDisplaySetting:
             "display": {
                 "tool_progress": "new",
                 "platforms": {},
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "tool_progress") == "new"
 
@@ -73,7 +73,7 @@ class TestResolveDisplaySetting:
                 "platforms": {
                     "slack": {"tool_progress": "off"},
                 },
-            }
+            },
         }
         assert resolve_display_setting(config, "slack", "tool_progress") == "off"
         assert resolve_display_setting(config, "telegram", "tool_progress") == "all"
@@ -97,7 +97,7 @@ class TestBackwardCompat:
                     "signal": "off",
                     "telegram": "verbose",
                 },
-            }
+            },
         }
         assert resolve_display_setting(config, "signal", "tool_progress") == "off"
         assert resolve_display_setting(config, "telegram", "tool_progress") == "verbose"
@@ -111,7 +111,7 @@ class TestBackwardCompat:
                 "tool_progress": "all",
                 "tool_progress_overrides": {"telegram": "verbose"},
                 "platforms": {"telegram": {"tool_progress": "new"}},
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "tool_progress") == "new"
 
@@ -122,7 +122,7 @@ class TestBackwardCompat:
         config = {
             "display": {
                 "tool_progress_overrides": {"telegram": "verbose"},
-            }
+            },
         }
         # show_reasoning should NOT read from tool_progress_overrides
         assert resolve_display_setting(config, "telegram", "show_reasoning") is False
@@ -243,7 +243,8 @@ class TestPlatformDefaults:
 
     def test_telegram_mobile_chatter_defaults(self):
         """Telegram keeps real mid-turn signal (interim commentary + heartbeats)
-        but skips the verbose busy-ack iteration counter by default."""
+        but skips the verbose busy-ack iteration counter by default.
+        """
         from gateway.display_config import resolve_display_setting
 
         # Real model voice — keep on. Without this, Telegram users see
@@ -263,7 +264,8 @@ class TestPlatformDefaults:
 
     def test_telegram_mobile_chatter_can_opt_in(self):
         """Per-platform config can re-enable Telegram busy-ack detail
-        and re-disable the kept-on defaults."""
+        and re-disable the kept-on defaults.
+        """
         from gateway.display_config import resolve_display_setting
 
         config = {
@@ -273,9 +275,9 @@ class TestPlatformDefaults:
                         "interim_assistant_messages": False,
                         "long_running_notifications": False,
                         "busy_ack_detail": "on",
-                    }
-                }
-            }
+                    },
+                },
+            },
         }
         assert resolve_display_setting(config, "telegram", "interim_assistant_messages") is False
         assert resolve_display_setting(config, "telegram", "long_running_notifications") is False
@@ -308,6 +310,7 @@ class TestConfigMigration:
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         # Re-import to pick up the new HERMES_HOME
         import importlib
+
         import hermes_cli.config as cfg_mod
         importlib.reload(cfg_mod)
 
@@ -334,6 +337,7 @@ class TestConfigMigration:
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         import importlib
+
         import hermes_cli.config as cfg_mod
         importlib.reload(cfg_mod)
 
@@ -375,7 +379,7 @@ class TestStreamingPerPlatform:
         config = {
             "display": {
                 "platforms": {"telegram": {"streaming": False}},
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "streaming") is False
 
@@ -386,7 +390,7 @@ class TestStreamingPerPlatform:
         config = {
             "display": {
                 "platforms": {"email": {"streaming": True}},
-            }
+            },
         }
         assert resolve_display_setting(config, "email", "streaming") is True
 
@@ -423,7 +427,7 @@ class TestCleanupProgress:
                 "platforms": {
                     "telegram": {"cleanup_progress": True},
                 },
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "cleanup_progress") is True
         assert resolve_display_setting(config, "discord", "cleanup_progress") is False
@@ -435,7 +439,7 @@ class TestCleanupProgress:
         config = {
             "display": {
                 "platforms": {"telegram": {"cleanup_progress": "off"}},
-            }
+            },
         }
         assert resolve_display_setting(config, "telegram", "cleanup_progress") is False
 
@@ -447,7 +451,7 @@ class TestCleanupProgress:
             config = {
                 "display": {
                     "platforms": {"telegram": {"cleanup_progress": val}},
-                }
+                },
             }
             assert resolve_display_setting(config, "telegram", "cleanup_progress") is True, val
 
@@ -480,7 +484,7 @@ class TestToolProgressGrouping:
             "display": {
                 "tool_progress_grouping": "accumulate",
                 "platforms": {"discord": {"tool_progress_grouping": "separate"}},
-            }
+            },
         }
         assert (
             resolve_display_setting(config, "discord", "tool_progress_grouping")

@@ -1,12 +1,12 @@
 """Tests for the platform adapter registry and dynamic Platform enum."""
 
 import os
-import pytest
 from unittest.mock import MagicMock
 
-from gateway.platform_registry import PlatformRegistry, PlatformEntry
-from gateway.config import Platform, GatewayConfig
+import pytest
 
+from gateway.config import GatewayConfig, Platform
+from gateway.platform_registry import PlatformEntry, PlatformRegistry
 
 # ── Platform enum dynamic members ─────────────────────────────────────────
 
@@ -212,7 +212,7 @@ class TestGatewayConfigPluginPlatform:
             "platforms": {
                 "telegram": {"enabled": True, "token": "test-token"},
                 "irc": {"enabled": True, "extra": {"server": "irc.libera.chat"}},
-            }
+            },
         }
         cfg = GatewayConfig.from_dict(data)
         platform_values = {p.value for p in cfg.platforms}
@@ -237,7 +237,7 @@ class TestGatewayConfigPluginPlatform:
             data = {
                 "platforms": {
                     "testplat": {"enabled": True, "extra": {"token": "abc"}},
-                }
+                },
             }
             cfg = GatewayConfig.from_dict(data)
             connected = cfg.get_connected_platforms()
@@ -251,7 +251,7 @@ class TestGatewayConfigPluginPlatform:
         data = {
             "platforms": {
                 "unknown_plugin": {"enabled": True, "extra": {"token": "abc"}},
-            }
+            },
         }
         cfg = GatewayConfig.from_dict(data)
         connected = cfg.get_connected_platforms()
@@ -275,7 +275,7 @@ class TestGatewayConfigPluginPlatform:
             data = {
                 "platforms": {
                     "badconfig": {"enabled": True, "extra": {}},
-                }
+                },
             }
             cfg = GatewayConfig.from_dict(data)
             connected = cfg.get_connected_platforms()
@@ -352,14 +352,14 @@ class TestPlatformsMerge:
     """Test get_all_platforms() merges with registry."""
 
     def test_get_all_platforms_includes_builtins(self):
-        from hermes_cli.platforms import get_all_platforms, PLATFORMS
+        from hermes_cli.platforms import PLATFORMS, get_all_platforms
         merged = get_all_platforms()
         for key in PLATFORMS:
             assert key in merged
 
     def test_get_all_platforms_includes_plugin(self):
-        from hermes_cli.platforms import get_all_platforms
         from gateway.platform_registry import platform_registry as _reg
+        from hermes_cli.platforms import get_all_platforms
 
         _reg.register(PlatformEntry(
             name="testmerge",
@@ -377,8 +377,8 @@ class TestPlatformsMerge:
             _reg.unregister("testmerge")
 
     def test_platform_label_plugin_fallback(self):
-        from hermes_cli.platforms import platform_label
         from gateway.platform_registry import platform_registry as _reg
+        from hermes_cli.platforms import platform_label
 
         _reg.register(PlatformEntry(
             name="labeltest",
@@ -462,7 +462,6 @@ class TestApplyYamlConfigFnDispatch:
         def _hook(yaml_cfg, platform_cfg):
             if "flag" in platform_cfg and not os.getenv(env_var):
                 os.environ[env_var] = str(platform_cfg["flag"]).lower()
-            return None
 
         reg = self._register_hook("myhookplat", _hook)
         try:
@@ -505,7 +504,7 @@ class TestApplyYamlConfigFnDispatch:
             reg.unregister("myextraplat")
 
     def test_hook_receives_full_yaml_and_platform_subdict(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Hook receives both the full yaml_cfg and its own platform sub-dict."""
         captured: dict = {}
@@ -513,7 +512,6 @@ class TestApplyYamlConfigFnDispatch:
         def _hook(yaml_cfg, platform_cfg):
             captured["yaml_cfg"] = yaml_cfg
             captured["platform_cfg"] = platform_cfg
-            return None
 
         reg = self._register_hook("mycaptureplat", _hook)
         try:
@@ -545,7 +543,6 @@ class TestApplyYamlConfigFnDispatch:
 
         def _good_hook(yaml_cfg, platform_cfg):
             good_called["count"] += 1
-            return None
 
         from gateway.platform_registry import platform_registry as _reg
         _reg.register(PlatformEntry(
@@ -582,14 +579,13 @@ class TestApplyYamlConfigFnDispatch:
             _reg.unregister("mygoodplat")
 
     def test_hook_skipped_when_platform_section_missing(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Hook is NOT called when the platform's YAML section is absent."""
         called = {"count": 0}
 
         def _hook(yaml_cfg, platform_cfg):
             called["count"] += 1
-            return None
 
         reg = self._register_hook("myabsentplat", _hook)
         try:
@@ -604,14 +600,13 @@ class TestApplyYamlConfigFnDispatch:
             reg.unregister("myabsentplat")
 
     def test_hook_skipped_when_platform_section_not_dict(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Hook is NOT called when the platform's YAML section isn't a dict."""
         called = {"count": 0}
 
         def _hook(yaml_cfg, platform_cfg):
             called["count"] += 1
-            return None
 
         reg = self._register_hook("mybadshapeplat", _hook)
         try:
@@ -628,7 +623,7 @@ class TestApplyYamlConfigFnDispatch:
             reg.unregister("mybadshapeplat")
 
     def test_env_var_takes_precedence_when_hook_uses_getenv_guard(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """The standard `not os.getenv(...)` guard preserves env > YAML."""
         env_var = "MYPRECPLAT_FLAG"
@@ -637,7 +632,6 @@ class TestApplyYamlConfigFnDispatch:
         def _hook(yaml_cfg, platform_cfg):
             if "flag" in platform_cfg and not os.getenv(env_var):
                 os.environ[env_var] = str(platform_cfg["flag"]).lower()
-            return None
 
         reg = self._register_hook("myprecplat", _hook)
         try:
@@ -674,7 +668,8 @@ class TestPluginPlatformSharedKeyBridge:
 
     def test_shared_keys_bridged_for_plugin_platform(self, tmp_path, monkeypatch):
         """A plugin platform's ``require_mention``/``dm_policy``/etc. flow into
-        ``PlatformConfig.extra`` without the plugin needing its own bridge."""
+        ``PlatformConfig.extra`` without the plugin needing its own bridge.
+        """
         from gateway.platform_registry import platform_registry as _reg
 
         _reg.register(PlatformEntry(
@@ -690,12 +685,12 @@ class TestPluginPlatformSharedKeyBridge:
                 "mysharedplat:\n"
                 "  require_mention: true\n"
                 "  dm_policy: allow\n"
-                "  reply_prefix: \"→ \"\n"
-                "  allow_from: [\"alice\", \"bob\"]\n",
+                '  reply_prefix: "→ "\n'
+                '  allow_from: ["alice", "bob"]\n',
             )
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("mysharedplat")
@@ -728,7 +723,7 @@ class TestPluginEnablementGate:
         return hermes_home
 
     def test_plugin_with_is_connected_false_is_NOT_enabled(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """check_fn=True + is_connected=False must NOT enable the platform.
 
@@ -751,7 +746,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("myunconfiguredplat")
@@ -764,7 +759,7 @@ class TestPluginEnablementGate:
             _reg.unregister("myunconfiguredplat")
 
     def test_plugin_with_is_connected_true_is_enabled(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """check_fn=True + is_connected=True still enables the platform."""
         from gateway.platform_registry import platform_registry as _reg
@@ -781,7 +776,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("myconfiguredplat")
@@ -791,7 +786,7 @@ class TestPluginEnablementGate:
             _reg.unregister("myconfiguredplat")
 
     def test_plugin_without_is_connected_falls_back_to_check_fn(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Legacy plugins that don't register is_connected keep working.
 
@@ -813,7 +808,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("mylegacyplat")
@@ -846,7 +841,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("mybadprobeplat")
@@ -856,7 +851,7 @@ class TestPluginEnablementGate:
             _reg.unregister("mybadprobeplat")
 
     def test_yaml_enabled_true_overrides_is_connected_false(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Explicit YAML ``enabled: true`` wins over is_connected=False.
 
@@ -883,7 +878,7 @@ class TestPluginEnablementGate:
             )
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("myexplicitplat")
@@ -932,7 +927,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("myextrasplat")
@@ -950,7 +945,7 @@ class TestPluginEnablementGate:
             _reg.unregister("myextrasplat")
 
     def test_is_connected_failed_gate_does_not_leak_extras(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """When the gate rejects, env-seeded extras must NOT leak onto
         ``config.platforms``.  A rejected plugin should be invisible, not
@@ -971,7 +966,7 @@ class TestPluginEnablementGate:
             home = self._write_config(tmp_path)
             monkeypatch.setenv("HERMES_HOME", str(home))
 
-            from gateway.config import load_gateway_config, Platform
+            from gateway.config import Platform, load_gateway_config
             cfg = load_gateway_config()
 
             plat = Platform("myrejectedplat")

@@ -171,6 +171,7 @@ def resolve_display_setting(
     Returns
     -------
     The resolved value, or *fallback* if nothing is configured.
+
     """
     display_cfg = user_config.get("display") or {}
 

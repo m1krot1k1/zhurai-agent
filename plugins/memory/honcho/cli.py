@@ -10,9 +10,15 @@ import os
 import sys
 from pathlib import Path
 
-from hermes_constants import get_hermes_home
-from plugins.memory.honcho.client import _host_block, profile_host_key, resolve_active_host, resolve_config_path, HOST
 from hermes_cli.config import cfg_get
+from hermes_constants import get_hermes_home
+from plugins.memory.honcho.client import (
+    HOST,
+    _host_block,
+    profile_host_key,
+    resolve_active_host,
+    resolve_config_path,
+)
 
 
 def clone_honcho_for_profile(profile_name: str) -> bool:
@@ -321,7 +327,7 @@ _IDENTITY_MAPPING_KEYS = (
 
 
 def _resolve_effective_identity_mapping(
-    cfg: dict, hermes_host: dict
+    cfg: dict, hermes_host: dict,
 ) -> tuple[bool, dict, str, bool, bool]:
     """Resolve the effective identity-mapping state for the active host.
 
@@ -408,7 +414,8 @@ def _gateway_platforms() -> list[str] | None:
 
 def _collect_operator_aliases(existing: dict, peer_target: str) -> dict:
     """Prompt for the operator's per-platform runtime IDs, aliasing each to
-    ``peer_target``.  Existing entries are preserved."""
+    ``peer_target``.  Existing entries are preserved.
+    """
     aliases = dict(existing)
     print(f"\n  Add runtime IDs that should alias to peer '{peer_target}'.")
     print("  Leave blank to skip a platform.  Existing aliases are preserved.")
@@ -425,10 +432,11 @@ def _collect_operator_aliases(existing: dict, peer_target: str) -> dict:
 
 
 def _apply_runtime_prefix(
-    hermes_host: dict, current_prefix: str, prefix_from_root: bool, label: str
+    hermes_host: dict, current_prefix: str, prefix_from_root: bool, label: str,
 ) -> None:
     """Write a host-level runtimePeerPrefix only when it diverges from an
-    inherited root value; otherwise let the root cascade stand."""
+    inherited root value; otherwise let the root cascade stand.
+    """
     new_prefix = _prompt(label, default=current_prefix or "").strip()
     if new_prefix and not (prefix_from_root and new_prefix == current_prefix):
         hermes_host["runtimePeerPrefix"] = new_prefix
@@ -440,8 +448,8 @@ def _echo_identity_mapping(hermes_host: dict) -> None:
     prefix = hermes_host.get("runtimePeerPrefix")
     print("  resolved →")
     print(f"    pinUserPeer       = {bool(hermes_host.get('pinUserPeer'))}")
-    print(f"    userPeerAliases   = {aliases if aliases else '{}'}")
-    print(f"    runtimePeerPrefix = {prefix if prefix else '(none)'}")
+    print(f"    userPeerAliases   = {aliases or '{}'}")
+    print(f"    runtimePeerPrefix = {prefix or '(none)'}")
 
 
 def _configure_raw_identity_mapping(
@@ -526,10 +534,9 @@ def _ensure_sdk_installed() -> bool:
     if result.returncode == 0:
         print("  Installed.\n")
         return True
-    else:
-        print(f"  Install failed:\n{result.stderr.strip()}")
-        print("  Run manually: pip install 'honcho-ai>=2.0.1'\n")
-        return False
+    print(f"  Install failed:\n{result.stderr.strip()}")
+    print("  Run manually: pip install 'honcho-ai>=2.0.1'\n")
+    return False
 
 
 def cmd_setup(args) -> None:
@@ -594,11 +601,11 @@ def cmd_setup(args) -> None:
         )
         print(
             "\n  Local Honcho auth (JWT signed with the server's "
-            "AUTH_JWT_SECRET)."
+            "AUTH_JWT_SECRET).",
         )
         print(
             "  Leave blank if your server runs with AUTH_USE_AUTH=false. "
-            f"Current: {masked}"
+            f"Current: {masked}",
         )
         new_local_key = _prompt(
             "Local JWT / bearer token (blank to skip / keep current)",
@@ -614,11 +621,11 @@ def cmd_setup(args) -> None:
             if top_key:
                 print(
                     "\n  Top-level API key present in config (kept for "
-                    "cloud/hybrid use)."
+                    "cloud/hybrid use).",
                 )
                 print(
                     "  Local connections will skip auth automatically "
-                    "until a local JWT is set above."
+                    "until a local JWT is set above.",
                 )
             else:
                 print("\n  No local JWT set. Local no-auth ready.")
@@ -771,7 +778,7 @@ def cmd_setup(args) -> None:
             print(
                 f"\n  ⚠ Un-pinning will orphan memory accumulated under peer\n"
                 f"    '{peer_target}'.  Existing gateway users resolve to fresh,\n"
-                f"    empty peers."
+                f"    empty peers.",
             )
             confirm = _prompt(
                 "  Pool my own memory instead (alias my IDs to peerName)? (Y/n)",
@@ -946,7 +953,11 @@ def cmd_setup(args) -> None:
     # --- Test connection ---
     print("  Testing connection... ", end="", flush=True)
     try:
-        from plugins.memory.honcho.client import HonchoClientConfig, get_honcho_client, reset_honcho_client
+        from plugins.memory.honcho.client import (
+            HonchoClientConfig,
+            get_honcho_client,
+            reset_honcho_client,
+        )
         reset_honcho_client()
         hcfg = HonchoClientConfig.from_global_config(host=_host_key())
         get_honcho_client(hcfg)
@@ -1092,7 +1103,7 @@ def cmd_status(args) -> None:
     if write_path != active_path:
         print(f"  Write to:       {write_path}  (profile-local)")
     if active_path == global_path:
-        print(f"  Fallback:       (none — using global ~/.honcho/config.json)")
+        print("  Fallback:       (none — using global ~/.honcho/config.json)")
     elif global_path.exists():
         print(f"  Fallback:       {global_path}  (exists, cross-app interop)")
 
@@ -1152,7 +1163,7 @@ def _show_peer_cards(hcfg, client) -> None:
         if ai_text:
             # Truncate to first 200 chars
             display = ai_text[:200] + ("..." if len(ai_text) > 200 else "")
-            print(f"\n  AI peer representation:")
+            print("\n  AI peer representation:")
             print(f"    {display}")
 
         if not card and not ai_text:
@@ -1186,7 +1197,7 @@ def _cmd_status_all() -> None:
         marker = " *" if name == active else ""
         print(f"  {name + marker:<14} {host:<22} {enabled_str:<9} {recall:<9} {write}")
 
-    print(f"\n  * active profile\n")
+    print("\n  * active profile\n")
 
 
 def cmd_peers(args) -> None:
@@ -1239,7 +1250,7 @@ def cmd_map(args) -> None:
         return
 
     import re
-    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '-', session_name).strip('-')
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "-", session_name).strip("-")
     if sanitized != session_name:
         print(f"  Session name sanitized to: {sanitized}")
         session_name = sanitized
@@ -1265,8 +1276,8 @@ def cmd_peer(args) -> None:
         # Show current values
         hosts = cfg.get("hosts", {})
         hermes = hosts.get(_host_key(), {})
-        user = hermes.get('peerName') or cfg.get('peerName') or '(not set)'
-        ai = hermes.get('aiPeer') or cfg.get('aiPeer') or _host_key()
+        user = hermes.get("peerName") or cfg.get("peerName") or "(not set)"
+        ai = hermes.get("aiPeer") or cfg.get("aiPeer") or _host_key()
         lvl = hermes.get("dialecticReasoningLevel") or cfg.get("dialecticReasoningLevel") or "low"
         max_chars = hermes.get("dialecticMaxChars") or cfg.get("dialecticMaxChars") or 600
         print("\nHoncho peers\n" + "─" * 40)
@@ -1326,7 +1337,7 @@ def cmd_mode(args) -> None:
         for m, desc in MODES.items():
             marker = " <-" if m == current else ""
             print(f"  {m:<10}  {desc}{marker}")
-        print(f"\n  Set with: hermes honcho mode [hybrid|context|tools]\n")
+        print("\n  Set with: hermes honcho mode [hybrid|context|tools]\n")
         return
 
     if mode_arg not in MODES:
@@ -1361,7 +1372,7 @@ def cmd_strategy(args) -> None:
         for s, desc in STRATEGIES.items():
             marker = " <-" if s == current else ""
             print(f"  {s:<15}  {desc}{marker}")
-        print(f"\n  Set with: hermes honcho strategy [per-session|per-directory|per-repo|global]\n")
+        print("\n  Set with: hermes honcho strategy [per-session|per-directory|per-repo|global]\n")
         return
 
     if strat_arg not in STRATEGIES:
@@ -1396,7 +1407,7 @@ def cmd_tokens(args) -> None:
         print()
         print(f"  Dialectic   {d_chars} chars, reasoning: {d_level}")
         print("    AI-to-AI inference. Hermes asks Honcho's AI peer a question")
-        print("    (e.g. \"what were we working on?\") and Honcho runs its own model")
+        print('    (e.g. "what were we working on?") and Honcho runs its own model')
         print("    to synthesize an answer. Used for first-turn session continuity.")
         print("    Level controls how much reasoning Honcho spends on the answer.")
         print("\n  Set with: hermes honcho tokens [--context N] [--dialectic N]\n")
@@ -1735,9 +1746,7 @@ def honcho_command(args) -> None:
         from hermes_cli.memory_setup import cmd_setup_provider
         cmd_setup_provider("honcho")
         return
-    elif sub is None:
-        cmd_status(args)
-    elif sub == "status":
+    if sub is None or sub == "status":
         cmd_status(args)
     elif sub == "peers":
         cmd_peers(args)
@@ -1774,7 +1783,6 @@ def register_cli(subparser) -> None:
     Called by the plugin CLI registration system during argparse setup.
     The *subparser* is the parser for ``hermes honcho``.
     """
-
     subparser.add_argument(
         "--target-profile", metavar="NAME", dest="target_profile",
         help="Target a specific profile's Honcho config without switching",

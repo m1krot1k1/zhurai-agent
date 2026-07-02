@@ -1,10 +1,11 @@
 """Tests for Signal messenger platform adapter."""
 import asyncio
 import base64
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from urllib.parse import quote
+
+import pytest
 
 from gateway.config import Platform, PlatformConfig
 
@@ -12,7 +13,8 @@ from gateway.config import Platform, PlatformConfig
 @pytest.fixture(autouse=True)
 def _reset_signal_scheduler():
     """The attachment scheduler is process-wide; drop it between tests
-    so a fresh token bucket greets each case."""
+    so a fresh token bucket greets each case.
+    """
     from gateway.platforms.signal_rate_limit import _reset_scheduler
     _reset_scheduler()
     yield
@@ -81,6 +83,7 @@ class TestSignalConfigLoading:
 # ---------------------------------------------------------------------------
 # Adapter Init & Helpers
 # ---------------------------------------------------------------------------
+
 
 class TestSignalAdapterInit:
     def test_init_parses_config(self, monkeypatch):
@@ -196,7 +199,7 @@ class TestSignalHelpers:
         begins with the ADTS sync word ends up in ``cache_audio_from_bytes``,
         which the remux step then converts to MP4 container.
         """
-        from gateway.platforms.signal import _is_audio_ext, _guess_extension
+        from gateway.platforms.signal import _guess_extension, _is_audio_ext
         ext = _guess_extension(b"\xff\xf1" + b"\x00" * 200)
         assert ext == ".aac"
         assert _is_audio_ext(ext) is True
@@ -212,6 +215,7 @@ class TestSignalHelpers:
         import shutil
         import subprocess
         import tempfile
+
         from gateway.platforms.signal import _remux_aac_to_m4a
 
         ffmpeg = shutil.which("ffmpeg")
@@ -232,12 +236,10 @@ class TestSignalHelpers:
             if gen.returncode != 0:
                 import pytest
                 pytest.skip("ffmpeg could not produce an ADTS AAC sample")
-            with open(adts_path, "rb") as f:
-                aac_data = f.read()
+            aac_data = Path(adts_path).read_bytes()
         finally:
             try:
-                import os
-                os.unlink(adts_path)
+                Path(adts_path).unlink()
             except OSError:
                 pass
 
@@ -456,8 +458,8 @@ class TestSignalPhoneRedaction:
 class TestSignalAuthorization:
     def test_signal_in_allowlist_maps(self):
         """Signal should be in the platform auth maps."""
-        from gateway.run import GatewayRunner
         from gateway.config import GatewayConfig
+        from gateway.run import GatewayRunner
 
         gw = GatewayRunner.__new__(GatewayRunner)
         gw.config = GatewayConfig()
@@ -520,7 +522,7 @@ class TestSignalSendImageFile:
         img_path.write_bytes(b"\xff\xd8" + b"\x00" * 100)
 
         result = await adapter.send_image_file(
-            chat_id="group:abc123==", image_path=str(img_path), caption="Here's the chart"
+            chat_id="group:abc123==", image_path=str(img_path), caption="Here's the chart",
         )
 
         assert result.success is True
@@ -839,7 +841,7 @@ class TestSignalMediaExtraction:
         """BasePlatformAdapter.extract_media should find MEDIA: image paths."""
         from gateway.platforms.base import BasePlatformAdapter
         media, cleaned = BasePlatformAdapter.extract_media(
-            "Here's the chart.\nMEDIA:/tmp/price_graph.png"
+            "Here's the chart.\nMEDIA:/tmp/price_graph.png",
         )
         assert len(media) == 1
         assert media[0][0] == "/tmp/price_graph.png"
@@ -849,7 +851,7 @@ class TestSignalMediaExtraction:
         """BasePlatformAdapter.extract_media should find MEDIA: audio paths."""
         from gateway.platforms.base import BasePlatformAdapter
         media, cleaned = BasePlatformAdapter.extract_media(
-            "[[audio_as_voice]]\nMEDIA:/tmp/reply.ogg"
+            "[[audio_as_voice]]\nMEDIA:/tmp/reply.ogg",
         )
         assert len(media) == 1
         assert media[0][0] == "/tmp/reply.ogg"
@@ -887,7 +889,7 @@ def _make_dm_envelope(sender: str, attachments: list, text: str = "") -> dict:
                 "viewOnce": False,
                 "attachments": attachments,
             },
-        }
+        },
     }
 
 
@@ -1001,7 +1003,8 @@ class TestSignalInboundMessageTypeClassification:
     @pytest.mark.asyncio
     async def test_unknown_mime_attachment_falls_back_to_document(self, monkeypatch):
         """Unknown/exotic MIME types fall through to DOCUMENT (catch-all),
-        matching the WhatsApp/Slack/BlueBubbles classification pattern."""
+        matching the WhatsApp/Slack/BlueBubbles classification pattern.
+        """
         from gateway.platforms.base import MessageType
 
         event = await self._dispatch_single_attachment(
@@ -1118,9 +1121,9 @@ class TestSignalSendResultValidation:
             "results": [
                 {
                     "recipientAddress": {"number": "+155****4567"},
-                    "type": "SUCCESS"
-                }
-            ]
+                    "type": "SUCCESS",
+                },
+            ],
         })
         adapter._rpc = mock_rpc
         adapter._stop_typing_indicator = AsyncMock()
@@ -1136,9 +1139,9 @@ class TestSignalSendResultValidation:
             "results": [
                 {
                     "recipientAddress": {"number": "+155****4567"},
-                    "type": "UNREGISTERED_FAILURE"
-                }
-            ]
+                    "type": "UNREGISTERED_FAILURE",
+                },
+            ],
         })
         adapter._rpc = mock_rpc
         adapter._stop_typing_indicator = AsyncMock()
@@ -1156,9 +1159,9 @@ class TestSignalSendResultValidation:
                 {
                     "recipientAddress": {"number": "+155****4567"},
                     "success": False,
-                    "failure": "Some connection error"
-                }
-            ]
+                    "failure": "Some connection error",
+                },
+            ],
         })
         adapter._rpc = mock_rpc
         adapter._stop_typing_indicator = AsyncMock()
@@ -1181,11 +1184,11 @@ class TestSignalSendResultValidation:
                     {
                         "recipientAddress": {"number": "+155****4567"},
                         "type": "RATE_LIMIT_FAILURE",
-                        "retryAfterSeconds": 15
-                    }
-                ]
+                        "retryAfterSeconds": 15,
+                    },
+                ],
             },
-            "id": "1"
+            "id": "1",
         }
         mock_client.post = AsyncMock(return_value=mock_response)
         adapter.client = mock_client
@@ -1204,7 +1207,8 @@ class TestSignalSendResultValidation:
 
 class TestSignalStopTyping:
     """Signal must expose a public stop_typing() so base adapter's
-    _keep_typing finally block can clean up platform-level typing tasks."""
+    _keep_typing finally block can clean up platform-level typing tasks.
+    """
 
     @pytest.mark.asyncio
     async def test_stop_typing_calls_private_method(self, monkeypatch):
@@ -1234,14 +1238,13 @@ class TestSignalTypingBackoff:
 
     @pytest.mark.asyncio
     async def test_first_failure_logs_at_warning_subsequent_at_debug(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         adapter = _make_signal_adapter(monkeypatch)
         calls = []
 
         async def _fake_rpc(method, params, rpc_id=None, *, log_failures=True):
             calls.append({"log_failures": log_failures})
-            return None  # simulate NETWORK_FAILURE
 
         adapter._rpc = _fake_rpc
 
@@ -1254,14 +1257,13 @@ class TestSignalTypingBackoff:
 
     @pytest.mark.asyncio
     async def test_three_consecutive_failures_trigger_cooldown(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         adapter = _make_signal_adapter(monkeypatch)
         call_count = {"n": 0}
 
         async def _fake_rpc(method, params, rpc_id=None, *, log_failures=True):
             call_count["n"] += 1
-            return None
 
         adapter._rpc = _fake_rpc
 
@@ -1285,7 +1287,6 @@ class TestSignalTypingBackoff:
 
         async def _fake_rpc(method, params, rpc_id=None, *, log_failures=True):
             call_log.append(params.get("recipient") or params.get("groupId"))
-            return None
 
         adapter._rpc = _fake_rpc
 
@@ -1303,7 +1304,7 @@ class TestSignalTypingBackoff:
 
     @pytest.mark.asyncio
     async def test_success_resets_failure_counter_and_cooldown(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         adapter = _make_signal_adapter(monkeypatch)
         result_queue = [None, None, {"timestamp": 12345}]
@@ -1325,7 +1326,6 @@ class TestSignalTypingBackoff:
         # Next failure after recovery logs at WARNING again (fresh counter).
         async def _fail(method, params, rpc_id=None, *, log_failures=True):
             call_log.append(log_failures)
-            return None
 
         adapter._rpc = _fail
         await adapter.send_typing("+155****4567")
@@ -1333,7 +1333,7 @@ class TestSignalTypingBackoff:
 
     @pytest.mark.asyncio
     async def test_stop_typing_indicator_clears_backoff_state(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         adapter = _make_signal_adapter(monkeypatch)
 
@@ -1441,7 +1441,7 @@ class TestSignalStopTypingExplicitRPC:
         # silently keep the chat in cooldown forever.
         adapter = _make_signal_adapter(monkeypatch)
         adapter._resolve_recipient = AsyncMock(
-            side_effect=RuntimeError("recipient resolution failed")
+            side_effect=RuntimeError("recipient resolution failed"),
         )
 
         captured = []
@@ -1494,7 +1494,7 @@ class TestSignalQuoteExtraction:
                         "author": "other-author",
                     },
                 },
-            }
+            },
         })
 
         event = captured["event"]
@@ -1529,7 +1529,7 @@ class TestSignalQuoteExtraction:
                         "author": "other-author",
                     },
                 },
-            }
+            },
         })
 
         event = captured["event"]
@@ -1562,7 +1562,7 @@ class TestSignalQuoteExtraction:
                         "author": "bot-author",
                     },
                 },
-            }
+            },
         })
 
         event = captured["event"]
@@ -1583,7 +1583,8 @@ class TestSignalQuoteExtraction:
     def test_sent_message_timestamps_evicts_oldest_first(self, monkeypatch):
         """Over the cap, the OLDEST quote-cache timestamp is dropped (FIFO),
         not an arbitrary one — so a recent reply-to-own-message is still
-        detected after a burst of sends."""
+        detected after a burst of sends.
+        """
         adapter = _make_signal_adapter(monkeypatch)
         adapter._max_sent_message_timestamps = 3
         for ts in (1, 2, 3):
@@ -1617,7 +1618,7 @@ class TestSignalQuoteExtraction:
                 "dataMessage": {
                     "message": "plain message",
                 },
-            }
+            },
         })
 
         event = captured["event"]
@@ -1648,7 +1649,7 @@ class TestSignalQuoteExtraction:
                         "author": "+15550002222",
                     },
                 },
-            }
+            },
         })
 
         event = captured["event"]
@@ -1658,6 +1659,7 @@ class TestSignalQuoteExtraction:
 # ---------------------------------------------------------------------------
 # _rpc rate-limit detection
 # ---------------------------------------------------------------------------
+
 
 class _FakeHttpResponse:
     """Minimal stand-in for httpx.Response — only what _rpc touches."""
@@ -1736,9 +1738,11 @@ class TestSignalRpcRateLimit:
     async def test_raises_with_retry_after_from_v0_14_3_payload(self, monkeypatch):
         """signal-cli ≥ v0.14.3 surfaces server Retry-After under
         ``error.data.response.results[*].retryAfterSeconds`` — _rpc
-        carries that value through SignalRateLimitError.retry_after."""
+        carries that value through SignalRateLimitError.retry_after.
+        """
         from gateway.platforms.signal_rate_limit import (
-            SignalRateLimitError, SIGNAL_RPC_ERROR_RATELIMIT,
+            SIGNAL_RPC_ERROR_RATELIMIT,
+            SignalRateLimitError,
         )
 
         adapter = _make_signal_adapter(monkeypatch)
@@ -1752,7 +1756,7 @@ class TestSignalRpcRateLimit:
                         "results": [
                             {"type": "RATE_LIMIT_FAILURE", "retryAfterSeconds": 90},
                         ],
-                    }
+                    },
                 },
             },
         })
@@ -1783,7 +1787,8 @@ class TestSignalRpcRateLimit:
         AttachmentInvalidException → UnexpectedErrorException (code
         -32603), with the libsignal-net 'Retry after N seconds'
         message embedded. _rpc must still detect this as rate-limit
-        AND parse the seconds out of the message."""
+        AND parse the seconds out of the message.
+        """
         from gateway.platforms.signal import SignalRateLimitError
 
         adapter = _make_signal_adapter(monkeypatch)
@@ -1848,7 +1853,8 @@ def _patch_scheduler_sleep(monkeypatch, capture: list):
     """Capture sleeps inside the scheduler so tests don't actually wait.
     Zero-second sleeps (e.g. event-loop yields from mock RPCs) are
     delegated to the real asyncio.sleep so they don't pollute the
-    capture list."""
+    capture list.
+    """
     _real_sleep = asyncio.sleep
     offset = [0.0]
 
@@ -1860,10 +1866,10 @@ def _patch_scheduler_sleep(monkeypatch, capture: list):
             await _real_sleep(0)
 
     monkeypatch.setattr(
-        "gateway.platforms.signal_rate_limit.asyncio.sleep", fake_sleep
+        "gateway.platforms.signal_rate_limit.asyncio.sleep", fake_sleep,
     )
     monkeypatch.setattr(
-        "gateway.platforms.signal_rate_limit.time.monotonic", lambda: offset[0]
+        "gateway.platforms.signal_rate_limit.time.monotonic", lambda: offset[0],
     )
 
 
@@ -1924,7 +1930,7 @@ class TestSignalSendMultipleImages:
         good = _make_image_files(tmp_path, 2, prefix="ok")
         bad = [(f"file://{tmp_path}/missing.png", "")]
         await adapter.send_multiple_images(
-            chat_id="+155****4567", images=good[:1] + bad + good[1:]
+            chat_id="+155****4567", images=good[:1] + bad + good[1:],
         )
 
         assert len(captured) == 1
@@ -1935,7 +1941,8 @@ class TestSignalSendMultipleImages:
         """Server says retry_after=27 per token. After feedback, the
         scheduler's refill_rate becomes 1/27. Re-acquiring n=3 tokens
         therefore waits 3 × 27 = 81s — pulled from the server's
-        authoritative rate, not a `× 32` defensive multiplier."""
+        authoritative rate, not a `× 32` defensive multiplier.
+        """
         from gateway.platforms.signal import SignalRateLimitError
 
         adapter = _make_signal_adapter(monkeypatch)
@@ -1957,11 +1964,12 @@ class TestSignalSendMultipleImages:
 
     @pytest.mark.asyncio
     async def test_429_without_retry_after_uses_default_rate(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """signal-cli < v0.14.3 doesn't surface Retry-After. The
         scheduler keeps its default refill rate (1 token / 4s), so a
-        retry of n=3 waits 12s."""
+        retry of n=3 waits 12s.
+        """
         from gateway.platforms.signal_rate_limit import (
             SIGNAL_RATE_LIMIT_DEFAULT_RETRY_AFTER,
             SignalRateLimitError,
@@ -1985,16 +1993,17 @@ class TestSignalSendMultipleImages:
 
         assert len(captured) == 2
         assert sleep_calls == [
-            pytest.approx(3 * SIGNAL_RATE_LIMIT_DEFAULT_RETRY_AFTER, abs=1.0)
+            pytest.approx(3 * SIGNAL_RATE_LIMIT_DEFAULT_RETRY_AFTER, abs=1.0),
         ]
 
     @pytest.mark.asyncio
     async def test_rate_limit_exhaust_continues_to_next_batch(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """Both attempts on batch 0 fail; batch 1 still gets a chance.
         The scheduler's natural pacing on the next acquire stands in for
-        the old explicit cooldown."""
+        the old explicit cooldown.
+        """
         from gateway.platforms.signal import SignalRateLimitError
 
         adapter = _make_signal_adapter(monkeypatch)
@@ -2018,15 +2027,16 @@ class TestSignalSendMultipleImages:
 
     @pytest.mark.asyncio
     async def test_full_batch_emits_pacing_notice_for_followup(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """Two full batches of 32. Batch 1 needs 14 more tokens than the
         18 remaining after batch 0, so the scheduler sleeps 56s —
-        crossing the 10s user-facing pacing-notice threshold."""
+        crossing the 10s user-facing pacing-notice threshold.
+        """
         from gateway.platforms.signal import SIGNAL_MAX_ATTACHMENTS_PER_MSG
         from gateway.platforms.signal_rate_limit import (
             SIGNAL_RATE_LIMIT_BUCKET_CAPACITY,
-            SIGNAL_RATE_LIMIT_DEFAULT_RETRY_AFTER
+            SIGNAL_RATE_LIMIT_DEFAULT_RETRY_AFTER,
         )
 
         adapter = _make_signal_adapter(monkeypatch)
@@ -2057,10 +2067,11 @@ class TestSignalSendMultipleImages:
 
     @pytest.mark.asyncio
     async def test_short_followup_wait_skips_pacing_notice(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """Batch 1 only needs 1 token but 18 remain after batch 0
-        (50 capacity − 32 batch 0). No wait, no pacing notice."""
+        (50 capacity − 32 batch 0). No wait, no pacing notice.
+        """
         adapter = _make_signal_adapter(monkeypatch)
         mock_rpc, captured = _stub_rpc_responses([
             {"timestamp": 1}, {"timestamp": 2},
@@ -2082,7 +2093,8 @@ class TestSignalSendMultipleImages:
     @pytest.mark.asyncio
     async def test_single_batch_send_does_not_pace(self, monkeypatch, tmp_path):
         """A single-batch send (≤32 attachments) leaves the scheduler
-        with tokens to spare — no follow-up acquire, no sleep."""
+        with tokens to spare — no follow-up acquire, no sleep.
+        """
         adapter = _make_signal_adapter(monkeypatch)
         mock_rpc, captured = _stub_rpc_responses([{"timestamp": 1}])
         adapter._rpc = mock_rpc
@@ -2103,8 +2115,8 @@ class TestSignalRateLimitDetection:
 
     def test_detect_typed_code(self):
         from gateway.platforms.signal_rate_limit import (
-            _is_signal_rate_limit_error,
             SIGNAL_RPC_ERROR_RATELIMIT,
+            _is_signal_rate_limit_error,
         )
         err = {"code": SIGNAL_RPC_ERROR_RATELIMIT, "message": "any text"}
         assert _is_signal_rate_limit_error(err) is True
@@ -2131,7 +2143,7 @@ class TestSignalRateLimitDetection:
                         {"type": "RATE_LIMIT_FAILURE", "retryAfterSeconds": 30},
                         {"type": "RATE_LIMIT_FAILURE", "retryAfterSeconds": 45},
                     ],
-                }
+                },
             },
         }
         assert _extract_retry_after_seconds(err) == 45.0
@@ -2145,7 +2157,8 @@ class TestSignalRateLimitDetection:
     def test_detect_retry_later_exception_substring(self):
         """libsignal-net's RetryLaterException leaks through as
         AttachmentInvalidException → UnexpectedErrorException when the
-        rate-limit fires inside attachment upload. Detect it by substring."""
+        rate-limit fires inside attachment upload. Detect it by substring.
+        """
         from gateway.platforms.signal import _is_signal_rate_limit_error
         err = {
             "code": -32603,
@@ -2159,7 +2172,8 @@ class TestSignalRateLimitDetection:
 
     def test_extract_retry_after_parses_message_string(self):
         """When the structured field is missing, parse the seconds out
-        of the human 'Retry after N seconds' substring."""
+        of the human 'Retry after N seconds' substring.
+        """
         from gateway.platforms.signal import _extract_retry_after_seconds
         err = {
             "code": -32603,
@@ -2202,7 +2216,8 @@ class TestSignalContentlessEnvelope:
     @pytest.mark.asyncio
     async def test_skips_profile_key_update_no_message_field(self, monkeypatch):
         """Profile key updates may carry a dataMessage without 'message' field.
-        Must be skipped to avoid triggering agent turns for metadata."""
+        Must be skipped to avoid triggering agent turns for metadata.
+        """
         adapter = _make_signal_adapter(monkeypatch)
         captured = {}
 
@@ -2222,7 +2237,7 @@ class TestSignalContentlessEnvelope:
                     # No "message" field — profile key update metadata only
                     "profileKey": "some-profile-key-data",
                 },
-            }
+            },
         })
 
         assert "event" not in captured, "Profile key update should be skipped"
@@ -2247,7 +2262,7 @@ class TestSignalContentlessEnvelope:
                 "dataMessage": {
                     "message": "",
                 },
-            }
+            },
         })
 
         assert "event" not in captured, "Empty message should be skipped"
@@ -2272,7 +2287,7 @@ class TestSignalContentlessEnvelope:
                 "dataMessage": {
                     "message": "   \n\t  ",
                 },
-            }
+            },
         })
 
         assert "event" not in captured, "Whitespace-only message should be skipped"
@@ -2304,7 +2319,7 @@ class TestSignalContentlessEnvelope:
                         "message": "",  # No text
                         "attachments": [{"id": "att-123", "size": 200}],
                     },
-                }
+                },
             })
 
         assert "event" in captured, "Message with attachment should NOT be skipped"
@@ -2330,7 +2345,7 @@ class TestSignalContentlessEnvelope:
                 "dataMessage": {
                     "message": "hello world",
                 },
-            }
+            },
         })
 
         assert "event" in captured, "Normal message should NOT be skipped"
@@ -2372,9 +2387,9 @@ class TestSignalSyncMessageHandling:
                         "destination": "+155****4567",
                         "timestamp": 2000000000,
                         "message": "note to self: buy milk",
-                    }
+                    },
                 },
-            }
+            },
         })
 
         assert "event" in captured, "Note to Self must reach handle_message"
@@ -2403,9 +2418,9 @@ class TestSignalSyncMessageHandling:
                         "destination": "+155****4567",
                         "timestamp": 3000000000,
                         "message": "this is the bot's own reply echo",
-                    }
+                    },
                 },
-            }
+            },
         })
 
         assert called == [], "Echo of bot's own reply must be suppressed"
@@ -2417,9 +2432,10 @@ class TestSignalSyncMessageHandling:
         """User sends a message in a group from their primary phone; the
         linked device receives it as a sync-sent with destination=None and
         a groupInfo block. It must be treated as inbound so the agent can
-        respond in groups when the user is the only human participant."""
+        respond in groups when the user is the only human participant.
+        """
         adapter = _make_signal_adapter(
-            monkeypatch, account="+155****4567", group_allowed="abc123=="
+            monkeypatch, account="+155****4567", group_allowed="abc123==",
         )
         captured = {}
 
@@ -2443,9 +2459,9 @@ class TestSignalSyncMessageHandling:
                             "groupId": "abc123==",
                             "type": "DELIVER",
                         },
-                    }
+                    },
                 },
-            }
+            },
         })
 
         assert "event" in captured, "Group sync-sent must reach handle_message"
@@ -2475,9 +2491,9 @@ class TestSignalSyncMessageHandling:
                         "timestamp": 5000000000,
                         "message": "bot's own group reply",
                         "groupInfo": {"groupId": "abc123==", "type": "DELIVER"},
-                    }
+                    },
                 },
-            }
+            },
         })
 
         assert called == [], "Group echo of bot's own reply must be suppressed"
@@ -2486,7 +2502,8 @@ class TestSignalSyncMessageHandling:
     @pytest.mark.asyncio
     async def test_unrelated_sync_message_still_dropped(self, monkeypatch):
         """Read receipts / typing sync events have no sentMessage at all,
-        or a sentMessage with non-self destination — must keep being filtered."""
+        or a sentMessage with non-self destination — must keep being filtered.
+        """
         adapter = _make_signal_adapter(monkeypatch, account="+155****4567")
         called = []
 
@@ -2501,7 +2518,7 @@ class TestSignalSyncMessageHandling:
                 "sourceNumber": "+155****4567",
                 "timestamp": 6000000000,
                 "syncMessage": {"readMessages": [{"sender": "+155****9999"}]},
-            }
+            },
         })
         # sentMessage to a different contact (not self, not a group)
         await adapter._handle_envelope({
@@ -2514,9 +2531,9 @@ class TestSignalSyncMessageHandling:
                         "destination": "+155****9999",
                         "timestamp": 6000000001,
                         "message": "outbound DM to someone else",
-                    }
+                    },
                 },
-            }
+            },
         })
 
         assert called == [], "Non-promotable sync messages must be filtered"

@@ -1,16 +1,17 @@
 """Tests for agent/context_compressor.py — compression logic, thresholds, truncation fallback."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from agent.context_compressor import (
-    ContextCompressor,
     HISTORICAL_TASK_HEADING,
     SUMMARY_PREFIX,
+    ContextCompressor,
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def compressor():
     """Create a ContextCompressor with mocked dependencies."""
     with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -40,7 +41,6 @@ class TestShouldCompress:
     def test_explicit_tokens(self, compressor):
         assert compressor.should_compress(prompt_tokens=90000) is True
         assert compressor.should_compress(prompt_tokens=50000) is False
-
 
 
 class TestUpdateFromResponse:
@@ -90,7 +90,8 @@ class TestPreflightDeferral:
         """#36718: right after a compaction, last_real_prompt_tokens still holds
         the stale pre-compression value (above threshold). The awaiting flag
         must force deferral so preflight doesn't fire a SECOND compaction before
-        real post-compaction usage arrives."""
+        real post-compaction usage arrives.
+        """
         compressor.threshold_tokens = 85_000
         # Stale pre-compression value — would hit the `>= threshold => False`
         # short-circuit and defeat deferral without the flag guard.
@@ -100,14 +101,14 @@ class TestPreflightDeferral:
 
     def test_resumes_normal_deferral_after_flag_cleared(self, compressor):
         """Once update_from_response() clears the flag, the normal baseline/
-        growth deferral logic governs again (no permanent deferral)."""
+        growth deferral logic governs again (no permanent deferral).
+        """
         compressor.threshold_tokens = 85_000
         compressor.last_real_prompt_tokens = 120_000
         compressor.awaiting_real_usage_after_compression = False
         # Stale-high real prompt with the flag cleared => the >= threshold
         # short-circuit applies => no deferral.
         assert compressor.should_defer_preflight_to_real_usage(95_000) is False
-
 
 
 class TestCompress:
@@ -231,7 +232,8 @@ class TestCompress:
         the floored threshold used to equal the whole window, so
         auto-compression could never fire. It now triggers at 85% of the
         window — high enough not to waste the small budget, below 100% so it
-        actually fires."""
+        actually fires.
+        """
         from agent.context_compressor import MINIMUM_CONTEXT_LENGTH
         t = ContextCompressor._compute_threshold_tokens(MINIMUM_CONTEXT_LENGTH, 0.50)
         assert t < MINIMUM_CONTEXT_LENGTH
@@ -253,7 +255,8 @@ class TestCompress:
     def test_minimum_ctx_model_can_actually_compress(self):
         """End-to-end: a model at exactly the minimum context length must have
         should_compress() fire below its window (at the 85% trigger), not only
-        at 100%."""
+        at 100%.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=64000):
             c = ContextCompressor(model="small-64k", quiet_mode=True)
             c.context_length = 64000
@@ -268,7 +271,8 @@ class TestCompress:
         """#43547: the provider reserves max_tokens out of the window, so the
         threshold must be based on (context_length - max_tokens), not the full
         window. A 200K model reserving 65536 output tokens has a ~134K input
-        budget; at 50% that's ~67K, NOT 100K."""
+        budget; at 50% that's ~67K, NOT 100K.
+        """
         # No reservation (provider default) → full-window behavior, unchanged.
         assert ContextCompressor._compute_threshold_tokens(200000, 0.50) == 100000
         assert ContextCompressor._compute_threshold_tokens(200000, 0.50, None) == 100000
@@ -278,7 +282,8 @@ class TestCompress:
     def test_max_tokens_reservation_with_small_window_floors(self):
         """With a large reservation on a smaller window the effective budget
         can drop near/below the minimum floor — the degenerate-window guard
-        then triggers at 85% of the EFFECTIVE budget, never the raw window."""
+        then triggers at 85% of the EFFECTIVE budget, never the raw window.
+        """
         # 128K window, 65536 reserved → effective 62464 (< MINIMUM 64000).
         # Floor (64000) >= effective window (62464) → 85% of effective.
         t = ContextCompressor._compute_threshold_tokens(128000, 0.50, 65536)
@@ -288,7 +293,8 @@ class TestCompress:
     def test_max_tokens_exceeding_window_falls_back_to_full(self):
         """Pathological: max_tokens >= context_length would make the effective
         budget <= 0; fall back to the full window rather than produce a
-        non-positive threshold."""
+        non-positive threshold.
+        """
         t = ContextCompressor._compute_threshold_tokens(64000, 0.50, 70000)
         # effective_window <= 0 → fall back to full context (64000) → 85% guard.
         assert t == 54400  # 85% of 64000, same as no-reservation small-ctx case
@@ -299,7 +305,8 @@ class TestCompress:
         threshold arithmetic never raises. Guards the path where a mocked
         parent agent forwards a MagicMock max_tokens into a child
         ContextCompressor (regression for the delegate-test TypeError:
-        '<=' not supported between MagicMock and int)."""
+        '<=' not supported between MagicMock and int).
+        """
         from unittest.mock import MagicMock
         assert ContextCompressor._coerce_max_tokens(None) is None
         assert ContextCompressor._coerce_max_tokens(0) is None
@@ -343,7 +350,8 @@ class TestCompress:
         the FIRST compaction but DECAY afterwards, so the same early user
         messages don't get re-copied verbatim into every child session and
         fossilize (grow immortal) across a long, repeatedly-compressed
-        session. The system prompt is always protected separately."""
+        session. The system prompt is always protected separately.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
             c = ContextCompressor(model="test", quiet_mode=True, protect_first_n=3)
 
@@ -364,7 +372,8 @@ class TestCompress:
 
     def test_protect_first_n_decays_when_previous_summary_exists(self):
         """Even if compression_count was reset, an existing handoff summary
-        means the early turns are already captured — decay still applies."""
+        means the early turns are already captured — decay still applies.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
             c = ContextCompressor(model="test", quiet_mode=True, protect_first_n=3)
         c.compression_count = 0
@@ -386,7 +395,7 @@ class TestGenerateSummaryNoneContent:
         messages = [
             {"role": "user", "content": "do something"},
             {"role": "assistant", "content": None, "tool_calls": [
-                {"function": {"name": "search"}}
+                {"function": {"name": "search"}},
             ]},
             {"role": "tool", "content": "result"},
             {"role": "assistant", "content": None},
@@ -438,7 +447,8 @@ class TestNonStringContent:
         null/empty content) must NOT be stored as a prefix-only summary that
         silently wipes the compacted turns. It is treated as a summary failure
         and routed through cooldown so the turns are dropped without a summary
-        rather than replaced by an empty one."""
+        rather than replaced by an empty one.
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = None
@@ -462,7 +472,8 @@ class TestNonStringContent:
 
     def test_empty_string_content_treated_as_failure(self):
         """An empty-string (or whitespace-only) ``content`` is handled the same
-        as ``None`` — failure, not an empty summary (#11978)."""
+        as ``None`` — failure, not an empty summary (#11978).
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "   \n  "
@@ -483,7 +494,8 @@ class TestNonStringContent:
     def test_empty_content_falls_back_to_main_model(self):
         """When the auxiliary summary model returns empty content and a distinct
         main model is configured, compression falls back to the main model
-        before entering cooldown (#11978 glm-5.1 → glm-5 path)."""
+        before entering cooldown (#11978 glm-5.1 → glm-5 path).
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = ""
@@ -622,7 +634,7 @@ class TestAuthFailureAborts:
     def _auth_err(self, status=401):
         err = Exception(
             f"Error code: {status} - "
-            "{'status': 401, 'message': 'Your API key is invalid, blocked or out of funds.'}"
+            "{'status': 401, 'message': 'Your API key is invalid, blocked or out of funds.'}",
         )
         err.status_code = status
         return err
@@ -644,7 +656,8 @@ class TestAuthFailureAborts:
 
     def test_compress_aborts_on_auth_failure_despite_flag_false(self):
         """abort_on_summary_failure=False (the default), but a 401 must still
-        abort: messages returned unchanged, _last_compress_aborted=True."""
+        abort: messages returned unchanged, _last_compress_aborted=True.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
             c = ContextCompressor(
                 model="test",
@@ -667,7 +680,8 @@ class TestAuthFailureAborts:
     def test_non_auth_failure_still_uses_fallback_path(self):
         """A generic (non-auth) failure with abort_on_summary_failure=False
         keeps the historical behavior: insert a static fallback + drop the
-        middle window (does NOT abort)."""
+        middle window (does NOT abort).
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
             c = ContextCompressor(
                 model="test",
@@ -686,7 +700,8 @@ class TestAuthFailureAborts:
     def test_aux_model_auth_failure_recovers_on_main_no_abort(self):
         """A 401 from a DISTINCT auxiliary summary_model retries on the main
         model; if main succeeds, the auth flag is cleared and compression is
-        NOT aborted (the aux creds were the only broken thing)."""
+        NOT aborted (the aux creds were the only broken thing).
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main model"
@@ -711,7 +726,8 @@ class TestSummaryFallbackToMainModel:
     call fails, the compressor should retry once on the main model before
     giving up — losing N turns of context is almost always worse than one
     extra summary attempt.  Covers both the fast-path (explicit
-    model-not-found errors) and the unknown-error best-effort retry."""
+    model-not-found errors) and the unknown-error best-effort retry.
+    """
 
     def _msgs(self):
         return [
@@ -721,7 +737,8 @@ class TestSummaryFallbackToMainModel:
 
     def test_model_not_found_404_falls_back_to_main_and_succeeds(self):
         """Classic misconfiguration: ``auxiliary.compression.model`` points at
-        a model the main provider doesn't serve → 404 → retry on main."""
+        a model the main provider doesn't serve → 404 → retry on main.
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main model"
@@ -759,7 +776,8 @@ class TestSummaryFallbackToMainModel:
     def test_unknown_error_falls_back_to_main_and_succeeds(self):
         """Errors that don't match the 404/503/model_not_found fast-path
         (400s, provider-specific 'no route', aggregator rejections) should
-        ALSO trigger a best-effort retry on main before entering cooldown."""
+        ALSO trigger a best-effort retry on main before entering cooldown.
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main model"
@@ -794,7 +812,8 @@ class TestSummaryFallbackToMainModel:
 
     def test_no_fallback_when_summary_model_equals_main_model(self):
         """If the aux model IS the main model, there's nowhere to fall back
-        to — go straight to cooldown, don't loop retrying the same call."""
+        to — go straight to cooldown, don't loop retrying the same call.
+        """
         err = Exception("500 internal error")
 
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -818,7 +837,8 @@ class TestSummaryFallbackToMainModel:
 
     def test_fallback_only_happens_once_per_compressor(self):
         """If the retry-on-main ALSO fails, don't loop forever — enter
-        cooldown like the normal failure path."""
+        cooldown like the normal failure path.
+        """
         err1 = Exception("400 aux model rejected")
         err2 = Exception("500 main model also exploded")
 
@@ -844,7 +864,8 @@ class TestSummaryFallbackToMainModel:
         """JSONDecodeError from the OpenAI SDK's ``response.json()`` (raised
         when a misconfigured proxy returns HTML/plain-text with
         ``Content-Type: application/json``) should trigger the same
-        retry-on-main path as 404/timeout.  Issue #22244."""
+        retry-on-main path as 404/timeout.  Issue #22244.
+        """
         import json as _json
 
         mock_ok = MagicMock()
@@ -854,7 +875,7 @@ class TestSummaryFallbackToMainModel:
         # Simulate the SDK raising a raw JSONDecodeError with a realistic
         # error message ("Expecting value: line X column Y char Z").
         err_json = _json.JSONDecodeError(
-            "Expecting value", "<!DOCTYPE html><html>...</html>", 0
+            "Expecting value", "<!DOCTYPE html><html>...</html>", 0,
         )
 
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -886,7 +907,8 @@ class TestSummaryFallbackToMainModel:
         ``APIResponseValidationError`` (or similar), ``isinstance`` no longer
         matches but the substring "expecting value" still appears in
         ``str(e)``.  We detect this case by string match and fall back the
-        same way."""
+        same way.
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main model"
@@ -916,7 +938,8 @@ class TestSummaryFallbackToMainModel:
         """When already on the main model (no separate summary_model, or
         fallback already happened), a JSONDecodeError should set the short
         30s cooldown, not the default 60s — provider bodies tend to
-        recover quickly when an upstream proxy comes back online."""
+        recover quickly when an upstream proxy comes back online.
+        """
         import json as _json
 
         err_json = _json.JSONDecodeError("Expecting value", "<html/>", 0)
@@ -959,7 +982,8 @@ class TestStreamingClosedFallback:
 
     def test_incomplete_chunked_read_falls_back_to_main(self):
         """``httpcore.RemoteProtocolError: incomplete chunked read`` triggers
-        the retry-on-main path when ``_is_connection_error`` returns True."""
+        the retry-on-main path when ``_is_connection_error`` returns True.
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main model"
@@ -1017,7 +1041,8 @@ class TestStreamingClosedFallback:
 
     def test_streaming_closed_on_main_uses_short_cooldown(self):
         """When already on the main model, a streaming-closed error should use
-        the 30s cooldown, not the default 60s — these errors are transient."""
+        the 30s cooldown, not the default 60s — these errors are transient.
+        """
         err = Exception("RemoteProtocolError: response ended prematurely")
 
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -1042,7 +1067,8 @@ class TestStreamingClosedFallback:
 
     def test_non_streaming_unknown_error_still_uses_long_cooldown(self):
         """Unclassified errors should retain the 60s default cooldown to
-        prevent hammering a broken provider."""
+        prevent hammering a broken provider.
+        """
         err = Exception("Internal Server Error: something unexpected happened")
 
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -1069,7 +1095,8 @@ class TestAuxModelFallbackSurfacedToCallers:
     expose the aux-model failure via _last_aux_model_failure_{model,error}
     so gateway /compress and CLI callers can warn the user about their
     broken auxiliary.compression.model config — silent recovery would hide
-    a misconfiguration only the user can fix."""
+    a misconfiguration only the user can fix.
+    """
 
     def _make_msgs(self):
         return [
@@ -1119,7 +1146,8 @@ class TestAuxModelFallbackSurfacedToCallers:
 
     def test_compress_clears_aux_failure_fields_at_start_of_next_call(self):
         """A subsequent successful compression must clear the aux-failure
-        fields so the warning doesn't persist forever."""
+        fields so the warning doesn't persist forever.
+        """
         mock_ok = MagicMock()
         mock_ok.choices = [MagicMock()]
         mock_ok.choices[0].message.content = "summary via main"
@@ -1159,7 +1187,8 @@ class TestSummaryFailureTrackingForGatewayWarning:
     """Default behavior (compression.abort_on_summary_failure=False):
     summary-generation failure inserts a static fallback placeholder and
     records dropped count + fallback flag so gateway hygiene & /compress
-    can surface a visible warning."""
+    can surface a visible warning.
+    """
 
     def test_compress_records_fallback_and_dropped_count_on_summary_failure(self):
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
@@ -1207,7 +1236,7 @@ class TestSummaryFailureTrackingForGatewayWarning:
                             "name": "read_file",
                             "arguments": '{"path":"/tmp/project/app.py"}',
                         },
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "call-1", "content": f"read /tmp/project/app.py with token {secret}"},
@@ -1340,7 +1369,8 @@ class TestAbortOnSummaryFailure:
     """Opt-in behavior (compression.abort_on_summary_failure=True):
     summary-generation failure ABORTS compression entirely — returns the
     original messages unchanged and sets _last_compress_aborted=True so
-    gateway hygiene & /compress can surface a visible warning."""
+    gateway hygiene & /compress can surface a visible warning.
+    """
 
     def _make_msgs(self):
         return [
@@ -1405,7 +1435,8 @@ class TestAbortOnSummaryFailure:
     def test_force_true_bypasses_failure_cooldown(self):
         """Manual /compress passes force=True so it can retry immediately
         after an auto-compress abort instead of waiting out the 30-60s
-        cooldown."""
+        cooldown.
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "summary text"
@@ -1542,7 +1573,7 @@ class TestCompressWithClient:
                         "response_item_id": "fc_123",
                         "type": "function",
                         "function": {"name": "search_files", "arguments": "{}"},
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "call_123", "content": "result"},
@@ -1551,7 +1582,7 @@ class TestCompressWithClient:
         sanitized = compressor._sanitize_tool_pairs(msgs)
 
         assert [m.get("tool_call_id") for m in sanitized if m.get("role") == "tool"] == [
-            "call_123"
+            "call_123",
         ]
 
     def test_user_role_summary_carries_end_marker(self):
@@ -1590,7 +1621,7 @@ class TestCompressWithClient:
         assert summary_msg["role"] == "user"
         assert "END OF CONTEXT SUMMARY" in summary_msg["content"]
         assert summary_msg["content"].rstrip().endswith(
-            "respond to the message below, not the summary above ---"
+            "respond to the message below, not the summary above ---",
         )
 
     def test_assistant_role_summary_carries_end_marker(self):
@@ -1632,7 +1663,7 @@ class TestCompressWithClient:
         assert summary_msg["role"] == "assistant"
         assert "END OF CONTEXT SUMMARY" in summary_msg["content"]
         assert summary_msg["content"].rstrip().endswith(
-            "respond to the message below, not the summary above ---"
+            "respond to the message below, not the summary above ---",
         )
 
     def test_summary_role_avoids_consecutive_user_messages(self):
@@ -1703,7 +1734,8 @@ class TestCompressWithClient:
 
     def test_summary_role_flips_to_avoid_tail_collision(self):
         """When summary role collides with the first tail message but flipping
-        doesn't collide with head, the role should be flipped."""
+        doesn't collide with head, the role should be flipped.
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "summary text"
@@ -1733,7 +1765,7 @@ class TestCompressWithClient:
             r1 = result[i - 1].get("role")
             r2 = result[i].get("role")
             if r1 in {"user", "assistant"} and r2 in {"user", "assistant"}:
-                assert r1 != r2, f"consecutive {r1} at indices {i-1},{i}"
+                assert r1 != r2, f"consecutive {r1} at indices {i - 1},{i}"
 
     def test_double_collision_merges_summary_into_tail(self):
         """When neither role avoids collision with both neighbors, the summary
@@ -1774,7 +1806,7 @@ class TestCompressWithClient:
             r1 = result[i - 1].get("role")
             r2 = result[i].get("role")
             if r1 in {"user", "assistant"} and r2 in {"user", "assistant"}:
-                assert r1 != r2, f"consecutive {r1} at indices {i-1},{i}"
+                assert r1 != r2, f"consecutive {r1} at indices {i - 1},{i}"
 
         # The summary text should be merged into the first tail message
         first_tail = [m for m in result if "msg 6" in (m.get("content") or "")]
@@ -1818,7 +1850,8 @@ class TestCompressWithClient:
 
     def test_double_collision_user_head_assistant_tail(self):
         """Reverse double collision: head ends with 'user', tail starts with 'assistant'.
-        summary='assistant' collides with tail, 'user' collides with head → merge."""
+        summary='assistant' collides with tail, 'user' collides with head → merge.
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "summary text"
@@ -1851,7 +1884,7 @@ class TestCompressWithClient:
             r1 = result[i - 1].get("role")
             r2 = result[i].get("role")
             if r1 in {"user", "assistant"} and r2 in {"user", "assistant"}:
-                assert r1 != r2, f"consecutive {r1} at indices {i-1},{i}"
+                assert r1 != r2, f"consecutive {r1} at indices {i - 1},{i}"
 
         # The summary should be merged into the first tail message (assistant at index 5)
         first_tail = [m for m in result if "msg 5" in (m.get("content") or "")]
@@ -1860,7 +1893,8 @@ class TestCompressWithClient:
 
     def test_no_collision_scenarios_still_work(self):
         """Verify that the common no-collision cases (head=assistant/tail=assistant,
-        head=user/tail=user) still produce a standalone summary message."""
+        head=user/tail=user) still produce a standalone summary message.
+        """
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "summary text"
@@ -1999,7 +2033,8 @@ class TestSummaryTargetRatio:
     def test_protect_first_n_override(self):
         """protect_first_n=0 should be honoured — for users who rely on rolling
         compaction and want NOTHING pinned at head except the system prompt
-        (always implicitly protected)."""
+        (always implicitly protected).
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100_000):
             c = ContextCompressor(model="test", quiet_mode=True, protect_first_n=0)
         assert c.protect_first_n == 0
@@ -2011,7 +2046,8 @@ class TestSummaryTargetRatio:
 
         This is the cleanest configuration for long-running rolling-compaction
         sessions — no user/assistant turn gets pinned verbatim forever just
-        because it happened to be early in the session."""
+        because it happened to be early in the session.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100_000):
             c = ContextCompressor(
                 model="test",
@@ -2048,7 +2084,8 @@ class TestSummaryTargetRatio:
         that meant protect_first_n=1 would pin the first user turn of the
         session forever — a user-reported complaint that a week-old
         resolved question kept getting reinserted into every compaction
-        summary."""
+        summary.
+        """
         with patch("agent.context_compressor.get_model_context_length", return_value=100_000):
             c = ContextCompressor(
                 model="test",
@@ -2080,7 +2117,7 @@ class TestTokenBudgetTailProtection:
     blocking compaction.
     """
 
-    @pytest.fixture()
+    @pytest.fixture
     def budget_compressor(self):
         """Compressor with known token budget for tail protection tests."""
         with patch("agent.context_compressor.get_model_context_length", return_value=200_000):
@@ -2096,7 +2133,8 @@ class TestTokenBudgetTailProtection:
     def test_large_tool_outputs_no_longer_block_compaction(self, budget_compressor):
         """The motivating scenario: 20 messages with large tool outputs should
         NOT prevent compaction.  With message-count tail protection they would
-        all be protected, leaving nothing to summarize."""
+        all be protected, leaving nothing to summarize.
+        """
         c = budget_compressor
         messages = [
             {"role": "user", "content": "Start task"},
@@ -2181,7 +2219,8 @@ class TestTokenBudgetTailProtection:
 
     def test_soft_ceiling_allows_oversized_message(self, budget_compressor):
         """The 1.5x soft ceiling allows an oversized message to be included
-        rather than splitting it."""
+        rather than splitting it.
+        """
         c = budget_compressor
         # Set a small budget — 500 tokens
         c.tail_token_budget = 500
@@ -2205,7 +2244,8 @@ class TestTokenBudgetTailProtection:
 
     def test_small_conversation_still_compresses(self, budget_compressor):
         """With the new min of 8 messages (head=2 + 3 + 1 guard + 2 middle),
-        a small but compressible conversation should still compress."""
+        a small but compressible conversation should still compress.
+        """
         c = budget_compressor
         # 9 messages: head(2) + 4 middle + 3 tail = compressible
         messages = []
@@ -2380,10 +2420,11 @@ class TestTokenBudgetTailProtection:
         assert 0 <= cut <= len(messages)
 
     def test_generous_budget_protects_everything_floor_does_not_override(
-        self, budget_compressor
+        self, budget_compressor,
     ):
         """A budget that covers the whole transcript must prune nothing —
-        ``protect_tail_count`` is a minimum floor, not a ceiling."""
+        ``protect_tail_count`` is a minimum floor, not a ceiling.
+        """
         c = budget_compressor
 
         # 100 alternating assistant/tool messages.  Each tool result has
@@ -2480,7 +2521,8 @@ class TestUpdateModelResetsCalibration:
 
     def test_defer_no_longer_suppresses_after_switch(self):
         """The exact #23767 failure: old model's 'it fit' must not defer
-        preflight on the new smaller model."""
+        preflight on the new smaller model.
+        """
         comp = self._comp()
         comp.last_real_prompt_tokens = 50_000
         comp.last_rough_tokens_when_real_prompt_fit = 90_000
@@ -2583,7 +2625,8 @@ class TestTruncateToolCallArgsJson:
 
     def test_pass3_emits_valid_json_for_downstream_provider(self):
         """End-to-end: Pass 3 must never produce the exact failure payload
-        that caused the 400 loop (unterminated string, missing brace)."""
+        that caused the 400 loop (unterminated string, missing brace).
+        """
         import json as _json
         with patch("agent.context_compressor.get_model_context_length", return_value=100000):
             c = ContextCompressor(

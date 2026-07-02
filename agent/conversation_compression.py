@@ -34,7 +34,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 from agent.model_metadata import estimate_request_tokens_rough
 
@@ -128,7 +128,7 @@ def check_compression_model_feasibility(agent: Any) -> None:
             agent._emit_status(msg)
             logger.warning(
                 "No auxiliary LLM provider for compression — "
-                "summaries will be unavailable."
+                "summaries will be unavailable.",
             )
             return
 
@@ -170,7 +170,7 @@ def check_compression_model_feasibility(agent: Any) -> None:
                 f"{MINIMUM_CONTEXT_LENGTH // 1000}K context (set "
                 f"auxiliary.compression.model in config.yaml), or set "
                 f"auxiliary.compression.context_length to override the "
-                f"detected value if it is wrong."
+                f"detected value if it is wrong.",
             )
 
         threshold = agent.context_compressor.threshold_tokens
@@ -256,7 +256,7 @@ def check_compression_model_feasibility(agent: Any) -> None:
         raise
     except Exception as exc:
         logger.debug(
-            "Compression feasibility check failed (non-fatal): %s", exc
+            "Compression feasibility check failed (non-fatal): %s", exc,
         )
 
 
@@ -283,11 +283,11 @@ def compress_context(
     messages: list,
     system_message: str,
     *,
-    approx_tokens: Optional[int] = None,
+    approx_tokens: int | None = None,
     task_id: str = "default",
-    focus_topic: Optional[str] = None,
+    focus_topic: str | None = None,
     force: bool = False,
-) -> Tuple[list, str]:
+) -> tuple[list, str]:
     """Compress conversation context and split the session in SQLite.
 
     Args:
@@ -310,6 +310,7 @@ def compress_context(
         returns the original messages unchanged and the existing system
         prompt — the session is NOT rotated.  Callers should detect the
         no-op via ``len(returned) == len(input)`` and stop the retry loop.
+
     """
     # Lazy feasibility check — run the auxiliary-provider probe + context
     # length lookup just-in-time on the first compression attempt instead of
@@ -370,7 +371,7 @@ def compress_context(
     # we just sit out this round and let the winner finish.
     _lock_db = getattr(agent, "_session_db", None)
     _lock_sid = agent.session_id or ""
-    _lock_holder: Optional[str] = None
+    _lock_holder: str | None = None
     # Probe whether the lock subsystem is actually available on this
     # SessionDB instance.  A process running mismatched module versions
     # (e.g. ``conversation_compression.py`` reloaded after a pull but the
@@ -391,7 +392,7 @@ def compress_context(
         _lock_holder = _compression_lock_holder(agent)
         try:
             _lock_acquired = _lock_db.try_acquire_compression_lock(
-                _lock_sid, _lock_holder
+                _lock_sid, _lock_holder,
             )
         except Exception as _lock_err:
             # Broken/absent lock subsystem (version skew, etc.).  Log once
@@ -426,7 +427,7 @@ def compress_context(
                     agent._emit_warning(
                         "⚠ Skipping concurrent compression — another path "
                         "is already compressing this session. Will retry "
-                        "after it finishes."
+                        "after it finishes.",
                     )
                 except Exception:
                     pass
@@ -474,7 +475,7 @@ def compress_context(
             agent._emit_warning(
                 f"⚠ Compression aborted: {_err}. "
                 "No messages were dropped — conversation continues unchanged. "
-                "Run /compress to retry, or /new to start a fresh session."
+                "Run /compress to retry, or /new to start a fresh session.",
             )
         _existing_sp = getattr(agent, "_cached_system_prompt", None)
         if not _existing_sp:
@@ -488,7 +489,7 @@ def compress_context(
             agent._last_compression_summary_warning = summary_error
             agent._emit_warning(
                 f"⚠ Compression summary failed: {summary_error}. "
-                "Inserted a fallback context marker."
+                "Inserted a fallback context marker.",
             )
     else:
         # No hard failure — but did the configured aux model error out
@@ -505,7 +506,7 @@ def compress_context(
                 agent._emit_warning(
                     f"ℹ Configured compression model '{_aux_fail_model}' failed "
                     f"({_aux_fail_err or 'unknown error'}). Recovered using main model — "
-                    "check auxiliary.compression.model in config.yaml."
+                    "check auxiliary.compression.model in config.yaml.",
                 )
 
     todo_snapshot = agent._todo_store.format_for_injection()
@@ -842,7 +843,7 @@ def try_shrink_image_parts_in_messages(
     # actually brought under the target.
     unshrinkable_oversized = 0
 
-    def _decode_pixels(data_url: str) -> Optional[tuple]:
+    def _decode_pixels(data_url: str) -> tuple | None:
         """Return ``(width, height)`` of a base64 data URL, or None on failure.
 
         Soft-depends on Pillow; returns None (caller falls back to a
@@ -965,7 +966,7 @@ def try_shrink_image_parts_in_messages(
             logger.warning("image-shrink recovery: re-encode failed — %s", exc)
             return None, triggered_by is not None
 
-    def _source_to_data_url(source: Any) -> Optional[str]:
+    def _source_to_data_url(source: Any) -> str | None:
         if not isinstance(source, dict) or source.get("type") != "base64":
             return None
         data = source.get("data")
@@ -1051,7 +1052,7 @@ __all__ = [
     "COMPACTION_STATUS",
     "COMPACTION_STATUS_MARKER",
     "check_compression_model_feasibility",
-    "replay_compression_warning",
     "compress_context",
+    "replay_compression_warning",
     "try_shrink_image_parts_in_messages",
 ]

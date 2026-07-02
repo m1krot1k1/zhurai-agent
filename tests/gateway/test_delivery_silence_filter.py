@@ -14,7 +14,6 @@ from gateway.delivery import (
     _is_silence_narration,
 )
 
-
 # --- Truth table -----------------------------------------------------------
 
 POSITIVE_CASES = [
@@ -110,7 +109,7 @@ async def test_real_message_is_delivered(tmp_path, monkeypatch):
     target = DeliveryTarget.parse("discord:99887766")
 
     result = await router._deliver_to_platform(
-        target, "Silence is golden — here is the plan...", metadata=None
+        target, "Silence is golden — here is the plan...", metadata=None,
     )
 
     assert len(adapter.calls) == 1

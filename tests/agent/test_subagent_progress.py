@@ -1,5 +1,4 @@
-"""
-Tests for subagent progress relay (issue #169).
+"""Tests for subagent progress relay (issue #169).
 
 Verifies that:
 - KawaiiSpinner.print_above() works with and without active spinner
@@ -10,16 +9,17 @@ Verifies that:
 
 import io
 import sys
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from agent.display import KawaiiSpinner
 from tools.delegate_tool import _build_child_progress_callback
 
-
 # =========================================================================
 # KawaiiSpinner.print_above tests
 # =========================================================================
+
 
 class TestPrintAbove:
     """Tests for KawaiiSpinner.print_above method."""
@@ -29,7 +29,7 @@ class TestPrintAbove:
         buf = io.StringIO()
         spinner = KawaiiSpinner("test")
         spinner._out = buf  # Redirect to buffer
-        
+
         spinner.print_above("hello world")
         output = buf.getvalue()
         assert "hello world" in output
@@ -40,7 +40,7 @@ class TestPrintAbove:
         spinner = KawaiiSpinner("test")
         spinner._out = buf
         spinner.running = True  # Pretend spinner is running (don't start thread)
-        
+
         spinner.print_above("tool line")
         output = buf.getvalue()
         assert "tool line" in output
@@ -48,11 +48,12 @@ class TestPrintAbove:
 
     def test_print_above_uses_captured_stdout(self):
         """print_above should use self._out, not sys.stdout.
-        This ensures it works inside redirect_stdout(devnull)."""
+        This ensures it works inside redirect_stdout(devnull).
+        """
         buf = io.StringIO()
         spinner = KawaiiSpinner("test")
         spinner._out = buf
-        
+
         # Simulate redirect_stdout(devnull)
         old_stdout = sys.stdout
         sys.stdout = io.StringIO()
@@ -60,7 +61,7 @@ class TestPrintAbove:
             spinner.print_above("should go to buf")
         finally:
             sys.stdout = old_stdout
-        
+
         assert "should go to buf" in buf.getvalue()
 
 
@@ -76,7 +77,7 @@ class TestBuildChildProgressCallback:
         parent = MagicMock()
         parent._delegate_spinner = None
         parent.tool_progress_callback = None
-        
+
         cb = _build_child_progress_callback(0, "test goal", parent)
         assert cb is None
 
@@ -86,14 +87,14 @@ class TestBuildChildProgressCallback:
         spinner = KawaiiSpinner("delegating")
         spinner._out = buf
         spinner.running = True
-        
+
         parent = MagicMock()
         parent._delegate_spinner = spinner
         parent.tool_progress_callback = None
-        
+
         cb = _build_child_progress_callback(0, "test goal", parent)
         assert cb is not None
-        
+
         cb("tool.started", "web_search", "quantum computing", {})
         output = buf.getvalue()
         assert "web_search" in output
@@ -106,21 +107,22 @@ class TestBuildChildProgressCallback:
         spinner = KawaiiSpinner("delegating")
         spinner._out = buf
         spinner.running = True
-        
+
         parent = MagicMock()
         parent._delegate_spinner = spinner
         parent.tool_progress_callback = None
-        
+
         cb = _build_child_progress_callback(0, "test goal", parent)
         cb("_thinking", "I'll search for papers first")
-        
+
         output = buf.getvalue()
         assert "💭" in output
         assert "search for papers" in output
 
     def test_gateway_batched_progress(self):
         """Gateway path: each tool.started relays a subagent.tool event, and a
-        subagent.progress summary fires once BATCH_SIZE tools accumulate."""
+        subagent.progress summary fires once BATCH_SIZE tools accumulate.
+        """
         parent = MagicMock()
         parent._delegate_spinner = None
         parent_cb = MagicMock()
@@ -184,11 +186,11 @@ class TestBuildChildProgressCallback:
         spinner = KawaiiSpinner("delegating")
         spinner._out = buf
         spinner.running = True
-        
+
         parent = MagicMock()
         parent._delegate_spinner = spinner
         parent.tool_progress_callback = None
-        
+
         # task_index=0 in a batch of 3 → prefix "[1]"
         cb0 = _build_child_progress_callback(0, "test goal", parent, task_count=3)
         cb0("tool.started", "web_search", "test", {})
@@ -209,14 +211,14 @@ class TestBuildChildProgressCallback:
         spinner = KawaiiSpinner("delegating")
         spinner._out = buf
         spinner.running = True
-        
+
         parent = MagicMock()
         parent._delegate_spinner = spinner
         parent.tool_progress_callback = None
-        
+
         cb = _build_child_progress_callback(0, "test goal", parent, task_count=1)
         cb("tool.started", "web_search", "test", {})
-        
+
         output = buf.getvalue()
         assert "[" not in output
 
@@ -238,9 +240,9 @@ class TestThinkingCallback:
         if (content and callback and delegate_depth > 0):
             _think_text = content.strip()
             _think_text = re.sub(
-                r'</?(?:REASONING_SCRATCHPAD|think|reasoning)>', '', _think_text
+                r"</?(?:REASONING_SCRATCHPAD|think|reasoning)>", "", _think_text,
             ).strip()
-            first_line = _think_text.split('\n')[0][:80] if _think_text else ""
+            first_line = _think_text.split("\n")[0][:80] if _think_text else ""
             if first_line:
                 try:
                     callback("_thinking", first_line)
@@ -249,11 +251,12 @@ class TestThinkingCallback:
 
     def test_thinking_callback_fires_on_content(self):
         """tool_progress_callback should receive _thinking event
-        when assistant message has content."""
+        when assistant message has content.
+        """
         calls = []
         self._simulate_thinking_callback(
             "I'll research quantum computing first, then summarize.",
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 1
         assert calls[0][0] == "_thinking"
@@ -264,7 +267,7 @@ class TestThinkingCallback:
         calls = []
         self._simulate_thinking_callback(
             None,
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 0
 
@@ -273,14 +276,15 @@ class TestThinkingCallback:
         calls = []
         self._simulate_thinking_callback(
             "A" * 200 + "\nSecond line should be ignored",
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 1
         assert len(calls[0][1]) == 80
 
     def test_thinking_callback_skipped_for_main_agent(self):
         """Main agent (delegate_depth=0) should NOT fire thinking events.
-        This prevents gateway spam on Telegram/Discord."""
+        This prevents gateway spam on Telegram/Discord.
+        """
         calls = []
         self._simulate_thinking_callback(
             "I'll help you with that request.",
@@ -294,7 +298,7 @@ class TestThinkingCallback:
         calls = []
         self._simulate_thinking_callback(
             "<REASONING_SCRATCHPAD>I need to analyze this carefully</REASONING_SCRATCHPAD>",
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 1
         assert "<REASONING_SCRATCHPAD>" not in calls[0][1]
@@ -305,7 +309,7 @@ class TestThinkingCallback:
         calls = []
         self._simulate_thinking_callback(
             "<think>Let me think about this problem</think>",
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 1
         assert "<think>" not in calls[0][1]
@@ -316,7 +320,7 @@ class TestThinkingCallback:
         calls = []
         self._simulate_thinking_callback(
             "<REASONING_SCRATCHPAD></REASONING_SCRATCHPAD>",
-            lambda name, preview=None: calls.append((name, preview))
+            lambda name, preview=None: calls.append((name, preview)),
         )
         assert len(calls) == 0
 
@@ -330,7 +334,8 @@ class TestBatchFlush:
 
     def test_flush_sends_remaining_batch(self):
         """_flush should send a final subagent.progress summary of any unsent
-        tool names in the batch (less than BATCH_SIZE)."""
+        tool names in the batch (less than BATCH_SIZE).
+        """
         parent = MagicMock()
         parent._delegate_spinner = None
         parent_cb = MagicMock()
@@ -384,4 +389,3 @@ class TestBatchFlush:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

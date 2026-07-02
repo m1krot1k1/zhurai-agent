@@ -7,16 +7,17 @@ Coverage:
   web_search_tool / web_extract_tool — Tavily dispatch paths.
 """
 
+import asyncio
 import json
 import os
-import asyncio
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from tests.tools.conftest import register_all_web_providers
 
-
 # ─── _tavily_request ─────────────────────────────────────────────────────────
+
 
 class TestTavilyRequest:
     """Test suite for the _tavily_request helper."""
@@ -52,7 +53,7 @@ class TestTavilyRequest:
         import httpx as _httpx
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = _httpx.HTTPStatusError(
-            "401 Unauthorized", request=MagicMock(), response=mock_response
+            "401 Unauthorized", request=MagicMock(), response=mock_response,
         )
 
         with patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-bad-key"}):
@@ -73,7 +74,7 @@ class TestNormalizeTavilySearchResults:
             "results": [
                 {"title": "Python Docs", "url": "https://docs.python.org", "content": "Official docs", "score": 0.9},
                 {"title": "Tutorial", "url": "https://example.com", "content": "A tutorial", "score": 0.8},
-            ]
+            ],
         }
         result = _normalize_tavily_search_results(raw)
         assert result["success"] is True
@@ -112,7 +113,7 @@ class TestNormalizeTavilyDocuments:
                 "url": "https://example.com",
                 "title": "Example",
                 "raw_content": "Full page content here",
-            }]
+            }],
         }
         docs = _normalize_tavily_documents(raw)
         assert len(docs) == 1
@@ -177,7 +178,7 @@ class TestWebSearchTavily:
     def test_search_dispatches_to_tavily(self):
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "results": [{"title": "Result", "url": "https://r.com", "content": "desc", "score": 0.9}]
+            "results": [{"title": "Result", "url": "https://r.com", "content": "desc", "score": 0.9}],
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -209,7 +210,7 @@ class TestWebExtractTavily:
     def test_extract_dispatches_to_tavily(self):
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "results": [{"url": "https://example.com", "raw_content": "Extracted content", "title": "Page"}]
+            "results": [{"url": "https://example.com", "raw_content": "Extracted content", "title": "Page"}],
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -219,9 +220,8 @@ class TestWebExtractTavily:
              patch("tools.web_tools.process_content_with_llm", return_value=None):
             from tools.web_tools import web_extract_tool
             result = json.loads(asyncio.get_event_loop().run_until_complete(
-                web_extract_tool(["https://example.com"], use_llm_processing=False)
+                web_extract_tool(["https://example.com"], use_llm_processing=False),
             ))
             assert "results" in result
             assert len(result["results"]) == 1
             assert result["results"][0]["url"] == "https://example.com"
-

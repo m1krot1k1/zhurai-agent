@@ -14,8 +14,8 @@ import yaml
 @pytest.fixture
 def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
     """Isolated default home + one named profile, each with its own .env."""
-    from hermes_constants import get_hermes_home
     from hermes_cli import profiles
+    from hermes_constants import get_hermes_home
 
     default_home = get_hermes_home()
     profiles_root = default_home / "profiles"
@@ -25,7 +25,7 @@ def isolated_profiles(tmp_path, monkeypatch, _isolate_hermes_home):
         (home / "config.yaml").write_text("{}\n", encoding="utf-8")
 
     (default_home / ".env").write_text(
-        "TELEGRAM_BOT_TOKEN=root-token\n", encoding="utf-8"
+        "TELEGRAM_BOT_TOKEN=root-token\n", encoding="utf-8",
     )
     (worker_home / ".env").write_text("", encoding="utf-8")
 
@@ -42,8 +42,8 @@ def client(monkeypatch, isolated_profiles):
         pytest.skip("fastapi/starlette not installed")
 
     import hermes_state
+    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
     from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
     monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
     # The dashboard process's os.environ may carry root-install credentials;
@@ -64,10 +64,10 @@ def _env_field(platform, key):
 
 class TestProfileScopedMessagingReads:
     def test_scoped_read_does_not_show_root_credentials(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         resp = client.get(
-            "/api/messaging/platforms", params={"profile": "worker_alpha"}
+            "/api/messaging/platforms", params={"profile": "worker_alpha"},
         )
         assert resp.status_code == 200
         telegram = _telegram(resp.json())
@@ -77,7 +77,7 @@ class TestProfileScopedMessagingReads:
         assert telegram["configured"] is False
 
     def test_unscoped_read_shows_dashboard_profile_env(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         resp = client.get("/api/messaging/platforms")
         assert resp.status_code == 200
@@ -87,18 +87,18 @@ class TestProfileScopedMessagingReads:
 
     def test_unknown_profile_returns_404(self, client, isolated_profiles):
         resp = client.get(
-            "/api/messaging/platforms", params={"profile": "no_such_profile"}
+            "/api/messaging/platforms", params={"profile": "no_such_profile"},
         )
         assert resp.status_code == 404
 
     def test_scoped_read_returns_profile_path_command_and_startup_failure(
-        self, client, isolated_profiles, monkeypatch
+        self, client, isolated_profiles, monkeypatch,
     ):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         worker_home = isolated_profiles["worker_alpha"]
         (worker_home / ".env").write_text(
-            "TELEGRAM_BOT_TOKEN=worker-token\n", encoding="utf-8"
+            "TELEGRAM_BOT_TOKEN=worker-token\n", encoding="utf-8",
         )
         (worker_home / "config.yaml").write_text(
             yaml.safe_dump({"platforms": {"telegram": {"enabled": True}}}),
@@ -116,7 +116,7 @@ class TestProfileScopedMessagingReads:
         )
 
         resp = client.get(
-            "/api/messaging/platforms", params={"profile": "worker_alpha"}
+            "/api/messaging/platforms", params={"profile": "worker_alpha"},
         )
 
         assert resp.status_code == 200
@@ -135,7 +135,7 @@ class TestProfileScopedMessagingReads:
 
 class TestProfileScopedMessagingWrites:
     def test_scoped_write_lands_in_target_profile_env(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         resp = client.put(
             "/api/messaging/platforms/telegram",
@@ -154,18 +154,18 @@ class TestProfileScopedMessagingWrites:
 
         # The dashboard's own .env must stay untouched — this was the bug.
         root_env = (isolated_profiles["default"] / ".env").read_text(
-            encoding="utf-8"
+            encoding="utf-8",
         )
         assert "worker-token" not in root_env
         assert "TELEGRAM_BOT_TOKEN=root-token" in root_env
 
         # Enablement lands in the target profile's config.yaml.
         worker_cfg = yaml.safe_load(
-            (isolated_profiles["worker_alpha"] / "config.yaml").read_text()
+            (isolated_profiles["worker_alpha"] / "config.yaml").read_text(),
         ) or {}
         assert worker_cfg.get("platforms", {}).get("telegram", {}).get("enabled") is True
         root_cfg = yaml.safe_load(
-            (isolated_profiles["default"] / "config.yaml").read_text()
+            (isolated_profiles["default"] / "config.yaml").read_text(),
         ) or {}
         assert "telegram" not in (root_cfg.get("platforms") or {})
 
@@ -184,7 +184,7 @@ class TestProfileScopedMessagingWrites:
         assert "TELEGRAM_BOT_TOKEN=body-token" in worker_env
 
     def test_scoped_read_after_scoped_write_round_trips(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         client.put(
             "/api/messaging/platforms/telegram",
@@ -192,7 +192,7 @@ class TestProfileScopedMessagingWrites:
             json={"enabled": True, "env": {"TELEGRAM_BOT_TOKEN": "worker-token"}},
         )
         resp = client.get(
-            "/api/messaging/platforms", params={"profile": "worker_alpha"}
+            "/api/messaging/platforms", params={"profile": "worker_alpha"},
         )
         telegram = _telegram(resp.json())
         assert telegram["enabled"] is True
@@ -200,7 +200,7 @@ class TestProfileScopedMessagingWrites:
         assert telegram["configured"] is True
 
     def test_scoped_clear_env_removes_from_target_only(
-        self, client, isolated_profiles
+        self, client, isolated_profiles,
     ):
         client.put(
             "/api/messaging/platforms/telegram",
@@ -218,6 +218,6 @@ class TestProfileScopedMessagingWrites:
         ).read_text(encoding="utf-8")
         assert "worker-token" not in worker_env
         root_env = (isolated_profiles["default"] / ".env").read_text(
-            encoding="utf-8"
+            encoding="utf-8",
         )
         assert "TELEGRAM_BOT_TOKEN=root-token" in root_env

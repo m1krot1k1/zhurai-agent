@@ -3,13 +3,23 @@
 import json
 import logging
 import os
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from cron.scheduler import _resolve_origin, _resolve_delivery_target, _deliver_result, _send_media_via_adapter, run_job, SILENT_MARKER, _build_job_prompt, _resolve_cron_enabled_toolsets, _merge_mcp_into_per_job_toolsets
-from tools.env_passthrough import clear_env_passthrough
+from cron.scheduler import (
+    SILENT_MARKER,
+    _build_job_prompt,
+    _deliver_result,
+    _merge_mcp_into_per_job_toolsets,
+    _resolve_cron_enabled_toolsets,
+    _resolve_delivery_target,
+    _resolve_origin,
+    _send_media_via_adapter,
+    run_job,
+)
 from tools.credential_files import clear_credential_files
+from tools.env_passthrough import clear_env_passthrough
 
 
 class TestPerJobToolsetMcpMerge:
@@ -22,7 +32,7 @@ class TestPerJobToolsetMcpMerge:
             "disabled_one": {"enabled": False},
             "string_enabled": {"enabled": "true"},
             "not_a_dict": "ignored",
-        }
+        },
     }
 
     def _enabled_names(self):
@@ -84,7 +94,7 @@ class TestResolveOrigin:
                 "chat_id": "123456",
                 "chat_name": "Test Chat",
                 "thread_id": "42",
-            }
+            },
         }
         result = _resolve_origin(job)
         assert isinstance(result, dict)
@@ -167,7 +177,7 @@ class TestResolveDeliveryTarget:
         ],
     )
     def test_origin_delivery_without_origin_falls_back_to_supported_home_channels(
-        self, monkeypatch, platform, env_var, chat_id
+        self, monkeypatch, platform, env_var, chat_id,
     ):
         for fallback_env in (
             "MATRIX_HOME_ROOM",
@@ -670,9 +680,11 @@ class TestDeliverResultWrapping:
     def test_live_adapter_sends_media_as_attachments(self, tmp_path, monkeypatch):
         """When a live adapter is available, MEDIA files should be sent as native
         platform attachments (e.g., Discord voice, Telegram audio) rather than
-        as literal 'MEDIA:/path' text."""
-        from gateway.config import Platform
+        as literal 'MEDIA:/path' text.
+        """
         from concurrent.futures import Future
+
+        from gateway.config import Platform
         media_path = self._safe_media_path(tmp_path, monkeypatch, "cron-voice.mp3")
 
         adapter = AsyncMock()
@@ -729,8 +741,9 @@ class TestDeliverResultWrapping:
 
     def test_live_adapter_routes_image_to_send_image_file(self, tmp_path, monkeypatch):
         """Image MEDIA files should be routed to send_image_file, not send_voice."""
-        from gateway.config import Platform
         from concurrent.futures import Future
+
+        from gateway.config import Platform
         media_path = self._safe_media_path(tmp_path, monkeypatch, "chart.png")
 
         adapter = AsyncMock()
@@ -779,8 +792,9 @@ class TestDeliverResultWrapping:
 
     def test_live_adapter_media_only_no_text(self, tmp_path, monkeypatch):
         """When content is ONLY a MEDIA tag with no text, media should still be sent."""
-        from gateway.config import Platform
         from concurrent.futures import Future
+
+        from gateway.config import Platform
         media_path = self._safe_media_path(tmp_path, monkeypatch, "voice.ogg")
 
         adapter = AsyncMock()
@@ -829,9 +843,11 @@ class TestDeliverResultWrapping:
 
     def test_live_adapter_sends_cleaned_text_not_raw(self):
         """The live adapter path must send cleaned text (MEDIA tags stripped),
-        not the raw delivery_content with embedded MEDIA: tags."""
-        from gateway.config import Platform
+        not the raw delivery_content with embedded MEDIA: tags.
+        """
         from concurrent.futures import Future
+
+        from gateway.config import Platform
 
         adapter = AsyncMock()
         adapter.send.return_value = MagicMock(success=True)
@@ -1215,7 +1231,8 @@ class TestRunJobSessionPersistence:
 
     def test_run_job_per_job_toolsets_win_over_platform_config(self, tmp_path):
         """Per-job enabled_toolsets (via cronjob tool) always take precedence
-        over the platform-level ``hermes tools`` config."""
+        over the platform-level ``hermes tools`` config.
+        """
         job = {
             "id": "override-job",
             "name": "test",
@@ -1312,7 +1329,7 @@ class TestRunJobSessionPersistence:
         ],
     )
     def test_run_job_treats_agent_failure_flag_as_failure(
-        self, tmp_path, agent_result, expected_err_substring
+        self, tmp_path, agent_result, expected_err_substring,
     ):
         """Issue #17855: run_conversation returns ``failed=True``/``completed=False``
         when the agent's API call exhausts retries or aborts mid-run. run_job
@@ -1565,7 +1582,7 @@ class TestRunJobSessionPersistence:
                         "platform": get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM") or None,
                         "chat_id": get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID") or None,
                         "thread_id": get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None,
-                    }
+                    },
                 )
                 return {"final_response": "ok"}
 
@@ -1753,7 +1770,7 @@ class TestRunJobConfigEnvVarExpansion:
             "model: primary-model\n"
             "fallback_providers:\n"
             "  - provider: openrouter\n"
-            "    model: ${_HERMES_TEST_CRON_FALLBACK}\n"
+            "    model: ${_HERMES_TEST_CRON_FALLBACK}\n",
         )
         monkeypatch.setenv("_HERMES_TEST_CRON_FALLBACK", "gpt-4o-fallback-test")
 
@@ -2474,9 +2491,10 @@ class TestRunJobWakeGate:
     def test_wake_false_skips_agent_and_returns_silent(self, caplog):
         """When _run_job_script output ends with {wakeAgent: false}, the agent
         is not invoked and run_job returns the SILENT marker so delivery is
-        suppressed."""
+        suppressed.
+        """
+        from cron import scheduler
         from cron.scheduler import SILENT_MARKER
-        import cron.scheduler as scheduler
 
         with patch.object(scheduler, "_run_job_script",
                           return_value=(True, '{"wakeAgent": false}')), \
@@ -2491,13 +2509,14 @@ class TestRunJobWakeGate:
 
     def test_wake_true_runs_agent_with_injected_output(self):
         """When the script returns {wakeAgent: true, data: ...}, the agent is
-        invoked and the data line still shows up in the prompt."""
-        import cron.scheduler as scheduler
+        invoked and the data line still shows up in the prompt.
+        """
+        from cron import scheduler
 
         script_output = '{"wakeAgent": true, "data": {"new": 3}}'
         agent = MagicMock()
         agent.run_conversation = MagicMock(return_value={
-            "final_response": "ok", "messages": []
+            "final_response": "ok", "messages": [],
         })
         with patch.object(scheduler, "_run_job_script",
                           return_value=(True, script_output)), \
@@ -2516,10 +2535,12 @@ class TestRunJobWakeGate:
     def test_script_runs_only_once_on_wake(self):
         """Wake-true path must not re-run the script inside _build_job_prompt
         (script would execute twice otherwise, wasting work and risking
-        double-side-effects)."""
-        import cron.scheduler as scheduler
+        double-side-effects).
+        """
+        from cron import scheduler
 
         call_count = 0
+
         def _script_stub(path):
             nonlocal call_count
             call_count += 1
@@ -2527,7 +2548,7 @@ class TestRunJobWakeGate:
 
         agent = MagicMock()
         agent.run_conversation = MagicMock(return_value={
-            "final_response": "ok", "messages": []
+            "final_response": "ok", "messages": [],
         })
         with patch.object(scheduler, "_run_job_script", side_effect=_script_stub), \
              patch("run_agent.AIAgent", return_value=agent):
@@ -2537,14 +2558,15 @@ class TestRunJobWakeGate:
 
     def test_script_failure_does_not_trigger_gate(self):
         """If _run_job_script returns success=False, the gate is NOT evaluated
-        and the agent still runs (the failure is reported as context)."""
-        import cron.scheduler as scheduler
+        and the agent still runs (the failure is reported as context).
+        """
+        from cron import scheduler
 
         # Malicious or broken script whose stderr happens to contain the
         # gate JSON — we must NOT honor it because ran_ok is False.
         agent = MagicMock()
         agent.run_conversation = MagicMock(return_value={
-            "final_response": "ok", "messages": []
+            "final_response": "ok", "messages": [],
         })
         with patch.object(scheduler, "_run_job_script",
                           return_value=(False, '{"wakeAgent": false}')), \
@@ -2555,11 +2577,11 @@ class TestRunJobWakeGate:
 
     def test_no_script_path_runs_agent_normally(self):
         """Regression: jobs without a script still work."""
-        import cron.scheduler as scheduler
+        from cron import scheduler
 
         agent = MagicMock()
         agent.run_conversation = MagicMock(return_value={
-            "final_response": "ok", "messages": []
+            "final_response": "ok", "messages": [],
         })
         job = self._make_job(script=None)
         job.pop("script", None)
@@ -2774,7 +2796,7 @@ class TestParallelTick:
         def mock_run_job(job):
             origin = job.get("origin", {})
             # run_job sets ContextVars — verify each job sees its own
-            from gateway.session_context import set_session_vars, clear_session_vars
+            from gateway.session_context import clear_session_vars, set_session_vars
             tokens = set_session_vars(
                 platform=origin.get("platform", ""),
                 chat_id=str(origin.get("chat_id", "")),
@@ -2853,9 +2875,11 @@ class TestDeliverResultTimeoutCancelsFuture:
         """End-to-end: live adapter confirmation times out past the 60s budget.
         The fix (#38922) treats the send as already-dispatched/delivered and
         does NOT run the standalone fallback — otherwise the message is sent
-        twice."""
-        from gateway.config import Platform
+        twice.
+        """
         from concurrent.futures import Future
+
+        from gateway.config import Platform
 
         # Live adapter whose send() coroutine never resolves within the budget
         adapter = AsyncMock()
@@ -2920,9 +2944,11 @@ class TestDeliverResultTimeoutCancelsFuture:
         returns True — nothing was sent, so _deliver_result MUST fall through
         to the standalone path rather than silently dropping the message.
         This is the inverse of the assume-delivered case and guards against the
-        wedged-loop silent drop."""
-        from gateway.config import Platform
+        wedged-loop silent drop.
+        """
         from concurrent.futures import Future
+
+        from gateway.config import Platform
 
         adapter = AsyncMock()
         adapter.send.return_value = MagicMock(success=True)
@@ -2978,9 +3004,11 @@ class TestDeliverResultTimeoutCancelsFuture:
         must fall through to the standalone path so the message is still
         delivered.  Guards the `except Exception: raise` branch — the bug class
         where broadening the timeout handler to swallow all exceptions would
-        silently drop messages."""
-        from gateway.config import Platform
+        silently drop messages.
+        """
         from concurrent.futures import Future
+
+        from gateway.config import Platform
 
         adapter = AsyncMock()
         adapter.send.return_value = MagicMock(success=True)
@@ -3031,9 +3059,10 @@ class TestDeliverResultTimeoutCancelsFuture:
         DeliveryRouter, which applies the same three-mode routing as live
         messages.
         """
+        from concurrent.futures import Future
+
         from gateway.config import Platform
         from gateway.platforms.base import SendResult
-        from concurrent.futures import Future
 
         send_result = SendResult(success=True, message_id="42")
         adapter = MagicMock()
@@ -3088,10 +3117,12 @@ class TestDeliverResultTimeoutCancelsFuture:
         """#22773 (media): MEDIA attachments to a private DM topic must also be
         routed via ``direct_messages_topic_id``, not a bare ``message_thread_id``
         — the media path previously used the bare thread_id and landed
-        attachments in the General lane."""
+        attachments in the General lane.
+        """
+        from concurrent.futures import Future
+
         from gateway.config import Platform
         from gateway.platforms.base import SendResult
-        from concurrent.futures import Future
 
         media_root = tmp_path / "media-cache"
         media_file = media_root / "chart.png"
@@ -3152,10 +3183,12 @@ class TestDeliverResultTimeoutCancelsFuture:
         back to the base chat (raw_response thread_fallback), the scheduler must
         record the "delivered without thread_id" delivery error.  Regression
         coverage for the thread_fallback-recording branch (kept distinct from
-        the #22773 routing fix)."""
+        the #22773 routing fix).
+        """
+        from concurrent.futures import Future
+
         from gateway.config import Platform
         from gateway.platforms.base import SendResult
-        from concurrent.futures import Future
 
         send_result = SendResult(
             success=True,
@@ -3224,8 +3257,9 @@ class TestDeliverResultLiveAdapterUnconfirmed:
     """
 
     def _run(self, send_value):
-        from gateway.config import Platform
         from concurrent.futures import Future
+
+        from gateway.config import Platform
 
         adapter = AsyncMock()
         adapter.send.return_value = send_value
@@ -3267,7 +3301,8 @@ class TestDeliverResultLiveAdapterUnconfirmed:
 
     def test_none_result_falls_through_to_standalone(self):
         """send() returning None must trigger the standalone fallback, not a
-        silent "delivered" log."""
+        silent "delivered" log.
+        """
         result, standalone_send = self._run(None)
         assert result is None, f"standalone should have delivered, got: {result!r}"
         standalone_send.assert_awaited_once()
@@ -3275,7 +3310,8 @@ class TestDeliverResultLiveAdapterUnconfirmed:
     def test_result_missing_success_attr_falls_through(self):
         """A result object with no ``success`` attribute is a contract
         violation and must NOT be counted as delivered (it defaulted to True
-        before the fix)."""
+        before the fix).
+        """
         class _NoSuccess:
             pass
 
@@ -3285,7 +3321,8 @@ class TestDeliverResultLiveAdapterUnconfirmed:
 
     def test_confirmed_success_does_not_fall_through(self):
         """A genuine SendResult(success=True) is confirmed — the standalone
-        path must NOT run (no duplicate)."""
+        path must NOT run (no duplicate).
+        """
         result, standalone_send = self._run(MagicMock(success=True, raw_response=None))
         assert result is None
         standalone_send.assert_not_awaited()
@@ -3336,7 +3373,8 @@ class TestSendMediaTimeoutCancelsFuture:
     def test_media_send_timeout_cancels_future_and_continues(self, tmp_path, monkeypatch):
         """End-to-end: _send_media_via_adapter with a future whose .result()
         raises TimeoutError. Assert cancel() fires and the loop proceeds
-        to the next file rather than hanging or crashing."""
+        to the next file rather than hanging or crashing.
+        """
         from concurrent.futures import Future
 
         adapter = MagicMock()
@@ -3413,7 +3451,7 @@ class TestCronDeliveryTargets:
                 return [_Platform(n) for n in names]
 
         monkeypatch.setattr(
-            gateway_config, "load_gateway_config", lambda: _GatewayConfig()
+            gateway_config, "load_gateway_config", lambda: _GatewayConfig(),
         )
 
     def test_lists_configured_platforms_flagging_missing_home_channel(self, monkeypatch):
@@ -3469,12 +3507,14 @@ class TestHomeTargetEnvVarRegistry:
     """Regression: ``_HOME_TARGET_ENV_VARS`` must include every gateway
     platform that supports cron-driven outbound delivery. Missing an
     entry means ``hermes cron create --deliver=<platform>`` silently
-    fails to route through the platform's home channel."""
+    fails to route through the platform's home channel.
+    """
 
     def test_whatsapp_cloud_registered(self):
         """``deliver=whatsapp_cloud`` routes through
         WHATSAPP_CLOUD_HOME_CHANNEL — added alongside the existing
-        ``whatsapp`` Baileys entry."""
+        ``whatsapp`` Baileys entry.
+        """
         from cron.scheduler import _HOME_TARGET_ENV_VARS
 
         assert "whatsapp_cloud" in _HOME_TARGET_ENV_VARS
@@ -3482,7 +3522,8 @@ class TestHomeTargetEnvVarRegistry:
 
     def test_baileys_whatsapp_still_registered(self):
         """Sanity guard: the Cloud addition didn't disturb Baileys
-        whatsapp routing."""
+        whatsapp routing.
+        """
         from cron.scheduler import _HOME_TARGET_ENV_VARS
 
         assert _HOME_TARGET_ENV_VARS.get("whatsapp") == "WHATSAPP_HOME_CHANNEL"

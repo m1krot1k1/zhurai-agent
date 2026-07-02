@@ -48,7 +48,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.web_search_provider import WebSearchProvider
 from tools.website_policy import check_website_access
@@ -70,7 +70,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from firecrawl import Firecrawl as FirecrawlSDK  # noqa: F401 — type hints only
 
-_FIRECRAWL_CLS_CACHE: Optional[type] = None
+_FIRECRAWL_CLS_CACHE: type | None = None
 
 
 def _load_firecrawl_cls() -> type:
@@ -85,7 +85,7 @@ def _load_firecrawl_cls() -> type:
             pass
         except Exception as exc:  # noqa: BLE001 — surface install hint
             raise ImportError(str(exc))
-        from firecrawl import Firecrawl as _cls  # noqa: WPS433 — deliberately lazy
+        from firecrawl import Firecrawl as _cls
 
         _FIRECRAWL_CLS_CACHE = _cls
     return _FIRECRAWL_CLS_CACHE
@@ -119,7 +119,7 @@ Firecrawl = _FirecrawlProxy()
 # :func:`_get_firecrawl_client` below.
 
 
-def _get_direct_firecrawl_config() -> Optional[tuple]:
+def _get_direct_firecrawl_config() -> tuple | None:
     """Return explicit direct Firecrawl kwargs + cache key, or None when unset."""
     api_key = os.getenv("FIRECRAWL_API_KEY", "").strip()
     api_url = os.getenv("FIRECRAWL_API_URL", "").strip().rstrip("/")
@@ -127,7 +127,7 @@ def _get_direct_firecrawl_config() -> Optional[tuple]:
     if not api_key and not api_url:
         return None
 
-    kwargs: Dict[str, str] = {}
+    kwargs: dict[str, str] = {}
     if api_key:
         kwargs["api_key"] = api_key
     if api_url:
@@ -155,7 +155,7 @@ def _is_tool_gateway_ready() -> bool:
     import tools.web_tools as _wt
 
     return _wt.resolve_managed_tool_gateway(
-        "firecrawl", token_reader=_wt._peek_nous_access_token
+        "firecrawl", token_reader=_wt._peek_nous_access_token,
     ) is not None
 
 
@@ -231,12 +231,12 @@ def _get_firecrawl_client() -> Any:
         kwargs, client_config = direct_config
     else:
         managed_gateway = _wt.resolve_managed_tool_gateway(
-            "firecrawl", token_reader=_wt._read_nous_access_token
+            "firecrawl", token_reader=_wt._read_nous_access_token,
         )
         if managed_gateway is None:
             logger.error(
                 "Firecrawl client initialization failed: "
-                "missing direct config and tool-gateway auth."
+                "missing direct config and tool-gateway auth.",
             )
             _raise_web_backend_configuration_error()
 
@@ -302,12 +302,12 @@ def _to_plain_object(value: Any) -> Any:
     return value
 
 
-def _normalize_result_list(values: Any) -> List[Dict[str, Any]]:
+def _normalize_result_list(values: Any) -> list[dict[str, Any]]:
     """Normalize mixed SDK/list payloads into a list of dicts."""
     if not isinstance(values, list):
         return []
 
-    normalized: List[Dict[str, Any]] = []
+    normalized: list[dict[str, Any]] = []
     for item in values:
         plain = _to_plain_object(item)
         if isinstance(plain, dict):
@@ -315,7 +315,7 @@ def _normalize_result_list(values: Any) -> List[Dict[str, Any]]:
     return normalized
 
 
-def _extract_web_search_results(response: Any) -> List[Dict[str, Any]]:
+def _extract_web_search_results(response: Any) -> list[dict[str, Any]]:
     """Extract Firecrawl search results across SDK/direct/gateway response shapes."""
     response_plain = _to_plain_object(response)
 
@@ -346,7 +346,7 @@ def _extract_web_search_results(response: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _extract_scrape_payload(scrape_result: Any) -> Dict[str, Any]:
+def _extract_scrape_payload(scrape_result: Any) -> dict[str, Any]:
     """Normalize Firecrawl scrape payload shape across SDK and gateway variants."""
     result_plain = _to_plain_object(scrape_result)
     if not isinstance(result_plain, dict):
@@ -385,7 +385,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
     def supports_extract(self) -> bool:
         return True
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Execute a Firecrawl search.
 
         Sync; matches the legacy ``_get_firecrawl_client().search(...)``
@@ -417,7 +417,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
             logger.warning("Firecrawl search error: %s", exc)
             return {"success": False, "error": f"Firecrawl search failed: {exc}"}
 
-    async def extract(self, urls: List[str], **kwargs: Any) -> List[Dict[str, Any]]:
+    async def extract(self, urls: list[str], **kwargs: Any) -> list[dict[str, Any]]:
         """Extract content from one or more URLs via Firecrawl.
 
         Async; each URL is scraped in a background thread with a 60s
@@ -438,7 +438,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
             return [{"url": u, "error": "Interrupted", "title": ""} for u in urls]
 
         format = kwargs.get("format")
-        formats: List[str] = []
+        formats: list[str] = []
         if format == "markdown":
             formats = ["markdown"]
         elif format == "html":
@@ -450,7 +450,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
         # module level (lazy-friendly because the website_policy import is
         # cheap) so monkeypatching it in tests works as expected.
 
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for url in urls:
             if _is_interrupted():
@@ -476,7 +476,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                             "rule": blocked["rule"],
                             "source": blocked["source"],
                         },
-                    }
+                    },
                 )
                 continue
 
@@ -491,7 +491,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                         ),
                         timeout=60,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning("Firecrawl scrape timed out for %s", url)
                     results.append(
                         {
@@ -502,7 +502,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                                 "Scrape timed out after 60s — page may be too large "
                                 "or unresponsive. Try browser_navigate instead."
                             ),
-                        }
+                        },
                     )
                     continue
 
@@ -543,7 +543,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                                 "rule": final_blocked["rule"],
                                 "source": final_blocked["source"],
                             },
-                        }
+                        },
                     )
                     continue
 
@@ -560,7 +560,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                         "content": chosen_content,
                         "raw_content": chosen_content,
                         "metadata": metadata,
-                    }
+                    },
                 )
             except Exception as scrape_err:  # noqa: BLE001
                 logger.debug("Firecrawl scrape failed for %s: %s", url, scrape_err)
@@ -571,12 +571,12 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
                         "content": "",
                         "raw_content": "",
                         "error": str(scrape_err),
-                    }
+                    },
                 )
 
         return results
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Firecrawl",
             "badge": "paid · optional gateway",

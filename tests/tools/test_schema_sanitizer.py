@@ -374,7 +374,6 @@ def test_strip_none_returns_zero():
     assert stripped == 0
 
 
-
 def test_strip_responses_format_strips_format_keyword():
     """Responses-format:  keyword should be stripped."""
     from tools.schema_sanitizer import strip_pattern_and_format
@@ -386,10 +385,10 @@ def test_strip_responses_format_strips_format_keyword():
                 "type": "object",
                 "properties": {
                     "ts": {"type": "string", "format": "date-time"},
-                }
+                },
             },
-            "type": "function"
-        }
+            "type": "function",
+        },
     ]
 
     result, stripped = strip_pattern_and_format(tools)
@@ -472,18 +471,18 @@ def test_strip_responses_format_tools():
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "pattern": "^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
-                        }
-                    }
-                }
+                            "pattern": "^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$",
+                        },
+                    },
+                },
             },
-            "type": "function"
-        }
+            "type": "function",
+        },
     ]
 
     result, stripped = strip_pattern_and_format(tools)
     assert stripped == 1, f"Expected 1 pattern stripped, got {stripped}"
-    
+
     # Verify pattern keyword was removed from includeDomains
     domains = result[0]["parameters"]["properties"]["includeDomains"]["items"]
     assert "pattern" not in domains, f"pattern should be stripped: {domains}"
@@ -500,17 +499,17 @@ def test_strip_responses_idempotent():
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "pattern": {"type": "string"}  # This is a property named pattern, NOT schema keyword
-                }
-            }
-        }
+                    "pattern": {"type": "string"},  # This is a property named pattern, NOT schema keyword
+                },
+            },
+        },
     ]
 
     # Pass 1 - property named 'pattern' should NOT be stripped
     result, first = strip_pattern_and_format(tools)
     assert first == 0, f"Expected 0 stripped (property pattern preserved), got {first}"
     assert "pattern" in result[0]["parameters"]["properties"], "property named pattern should survive"
-    
+
     # Pass 2 - idempotent
     _, second = strip_pattern_and_format(tools)
     assert second == 0, f"Expected 0 on second pass, got {second}"
@@ -529,10 +528,10 @@ def test_strip_responses_mixed_formats():
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "pattern": "^[a-z]+$"}
-                    }
-                }
-            }
+                        "query": {"type": "string", "pattern": "^[a-z]+$"},
+                    },
+                },
+            },
         },
         # Responses-format: {"name": "...", "parameters": {...}}
         {
@@ -540,11 +539,11 @@ def test_strip_responses_mixed_formats():
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "tz": {"type": "string", "format": "date-time"}
-                }
+                    "tz": {"type": "string", "format": "date-time"},
+                },
             },
-            "type": "function"
-        }
+            "type": "function",
+        },
     ]
 
     result, stripped = strip_pattern_and_format(tools)
@@ -573,7 +572,7 @@ def test_strip_responses_mixed_formats():
 
 
 def test_strip_slash_enum_removes_huggingface_id_enum():
-    """enum containing HF-style 'owner/name' IDs → stripped."""
+    """Enum containing HF-style 'owner/name' IDs → stripped."""
     tools = [_tool("train", {
         "type": "object",
         "properties": {
@@ -592,7 +591,7 @@ def test_strip_slash_enum_removes_huggingface_id_enum():
 
 
 def test_strip_slash_enum_preserves_slashless_enum():
-    """enum without any '/' → preserved."""
+    """Enum without any '/' → preserved."""
     tools = [_tool("pick", {
         "type": "object",
         "properties": {

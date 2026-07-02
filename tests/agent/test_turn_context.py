@@ -52,7 +52,7 @@ class _FakeAgent:
         self._skip_mcp_refresh = False
         self.compression_enabled = False
         self.context_compressor = types.SimpleNamespace(
-            protect_first_n=2, protect_last_n=2
+            protect_first_n=2, protect_last_n=2,
         )
         self._cached_system_prompt = "SYSTEM"
         self._memory_store = None
@@ -229,7 +229,8 @@ def test_between_turns_refresh_skipped_when_no_servers():
 def test_between_turns_refresh_skipped_when_skip_flag_set():
     """Internal forks (background_review) set _skip_mcp_refresh to keep tools[]
     byte-identical to the parent for cache parity — the hook must honor it even
-    when MCP servers are registered."""
+    when MCP servers are registered.
+    """
     agent = _FakeAgent()
     agent._skip_mcp_refresh = True
     import model_tools
@@ -243,7 +244,8 @@ def test_between_turns_refresh_skipped_when_skip_flag_set():
 
 def test_between_turns_refresh_no_churn_when_unchanged():
     """R2: an unchanged tool set leaves the snapshot object identity intact
-    (no needless swap → nothing for the next request prefix to diff against)."""
+    (no needless swap → nothing for the next request prefix to diff against).
+    """
     agent = _FakeAgent()
     same = [{"type": "function", "function": {"name": "a", "description": "", "parameters": {}}}]
     agent.tools = same
@@ -258,4 +260,3 @@ def test_between_turns_refresh_no_churn_when_unchanged():
         _build(agent)
 
     assert agent.tools is same  # not replaced → no churn
-

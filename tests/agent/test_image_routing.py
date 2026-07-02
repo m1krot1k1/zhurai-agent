@@ -6,7 +6,6 @@ import base64
 from pathlib import Path
 from unittest.mock import patch
 
-
 from agent.image_routing import (
     _coerce_capability_bool,
     _coerce_mode,
@@ -17,7 +16,6 @@ from agent.image_routing import (
     decide_image_input_mode,
     extract_image_refs,
 )
-
 
 # ─── _coerce_mode ────────────────────────────────────────────────────────────
 
@@ -296,7 +294,7 @@ class TestAutoModeRespectsOverride:
 def _png_bytes() -> bytes:
     """Return a tiny valid 1x1 transparent PNG."""
     return base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg=="
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==",
     )
 
 
@@ -358,7 +356,7 @@ class TestBuildNativeContentParts:
         good.write_bytes(_png_bytes())
         missing = tmp_path / "missing.png"  # never created
         parts, skipped = build_native_content_parts(
-            "see attached", [str(good), str(missing)]
+            "see attached", [str(good), str(missing)],
         )
         assert skipped == [str(missing)]
         text_part = next(p for p in parts if p.get("type") == "text")
@@ -456,7 +454,8 @@ class TestLargeImageHandling:
 
 class TestExtractImageRefs:
     """Scan task body / inbound text for image paths and URLs (kanban worker
-    enrichment, issue raised May 2026)."""
+    enrichment, issue raised May 2026).
+    """
 
     def test_empty_or_none_returns_empty(self):
         assert extract_image_refs("") == ([], [])
@@ -578,7 +577,8 @@ class TestExtractImageRefs:
 
 class TestBuildNativeContentPartsURLs:
     """URL pass-through support added so kanban task bodies (and other
-    inbound surfaces) can route remote image URLs straight to the model."""
+    inbound surfaces) can route remote image URLs straight to the model.
+    """
 
     def test_url_only_no_local_paths(self):
         parts, skipped = build_native_content_parts(
@@ -624,7 +624,7 @@ class TestBuildNativeContentPartsURLs:
 
     def test_blank_url_strings_are_dropped(self):
         parts, _ = build_native_content_parts(
-            "x", [], image_urls=["", "  ", "https://example.com/a.png"]
+            "x", [], image_urls=["", "  ", "https://example.com/a.png"],
         )
         image_parts = [p for p in parts if p.get("type") == "image_url"]
         assert len(image_parts) == 1
@@ -632,7 +632,7 @@ class TestBuildNativeContentPartsURLs:
 
     def test_url_only_inserts_default_prompt_when_text_empty(self):
         parts, _ = build_native_content_parts(
-            "", [], image_urls=["https://example.com/a.png"]
+            "", [], image_urls=["https://example.com/a.png"],
         )
         assert parts[0]["type"] == "text"
         assert parts[0]["text"].startswith("What do you see in this image?")

@@ -74,26 +74,28 @@ async def _hold_typing(_chat_id, interval=2.0, metadata=None, stop_event=None):
 
 def _strip_everything(adapter, monkeypatch):
     """Force the extract pipeline to reduce text_content to "" with no
-    attachments — the exact failure mode that made the drop invisible."""
+    attachments — the exact failure mode that made the drop invisible.
+    """
     monkeypatch.setattr(
-        type(adapter), "extract_media", staticmethod(lambda content: ([], content))
+        type(adapter), "extract_media", staticmethod(lambda content: ([], content)),
     )
     monkeypatch.setattr(
-        type(adapter), "extract_images", staticmethod(lambda content: ([], ""))
+        type(adapter), "extract_images", staticmethod(lambda content: ([], "")),
     )
     monkeypatch.setattr(
-        type(adapter), "extract_local_files", staticmethod(lambda content: ([], ""))
+        type(adapter), "extract_local_files", staticmethod(lambda content: ([], "")),
     )
 
 
 @pytest.mark.parametrize("platform", [Platform.DISCORD, Platform.TELEGRAM])
 class TestExtractStripRecoveryAllPlatforms:
     """A non-empty response stripped to empty must be recovered on EVERY
-    platform (the fix de-scopes the recovery from Discord-only)."""
+    platform (the fix de-scopes the recovery from Discord-only).
+    """
 
     @pytest.mark.asyncio
     async def test_response_reduced_to_empty_is_recovered_and_sent(
-        self, platform, monkeypatch, caplog
+        self, platform, monkeypatch, caplog,
     ):
         adapter = _DummyAdapter(platform)
         adapter._keep_typing = _hold_typing
@@ -113,7 +115,7 @@ class TestExtractStripRecoveryAllPlatforms:
         event = _make_event(platform)
         with caplog.at_level(logging.WARNING, logger="gateway.platforms.base"):
             await adapter._process_message_background(
-                event, build_session_key(event.source)
+                event, build_session_key(event.source),
             )
 
         # The response WAS delivered, not silently dropped.
@@ -155,7 +157,8 @@ class TestExtractStripRecoveryAllPlatforms:
     async def test_no_fallback_when_attachment_produced(self, platform, monkeypatch):
         """When an image attachment IS extracted, the empty text_content is
         intentional — recovery must NOT re-send the original markdown and
-        duplicate the attachment's content."""
+        duplicate the attachment's content.
+        """
         adapter = _DummyAdapter(platform)
         adapter._keep_typing = _hold_typing
 
@@ -164,14 +167,14 @@ class TestExtractStripRecoveryAllPlatforms:
 
         adapter.set_message_handler(handler)
         monkeypatch.setattr(
-            type(adapter), "extract_media", staticmethod(lambda content: ([], content))
+            type(adapter), "extract_media", staticmethod(lambda content: ([], content)),
         )
         monkeypatch.setattr(
             type(adapter), "extract_images",
             staticmethod(lambda content: ([("https://example.com/chart.png", "chart")], "")),
         )
         monkeypatch.setattr(
-            type(adapter), "extract_local_files", staticmethod(lambda content: ([], ""))
+            type(adapter), "extract_local_files", staticmethod(lambda content: ([], "")),
         )
         adapter.send_multiple_images = lambda *a, **kw: asyncio.sleep(0, result=None)
 
@@ -206,13 +209,13 @@ class TestRecoveryDoesNotLeakMediaFragments:
         # but force the path to be filtered out (unsafe/nonexistent) so we hit
         # the empty-text + no-attachment recovery branch deterministically.
         monkeypatch.setattr(
-            type(adapter), "filter_media_delivery_paths", staticmethod(lambda m: [])
+            type(adapter), "filter_media_delivery_paths", staticmethod(lambda m: []),
         )
 
         event = _make_event(Platform.DISCORD)
         with caplog.at_level(logging.ERROR, logger="gateway.platforms.base"):
             await adapter._process_message_background(
-                event, build_session_key(event.source)
+                event, build_session_key(event.source),
             )
 
         # No fragment of the media path may reach the user.
@@ -231,7 +234,8 @@ class TestRecoveryDoesNotLeakMediaFragments:
 class TestUnrecoverableDropIsLoud:
     """A non-empty response that produces NOTHING deliverable (sanitizes to
     empty, no attachment) must log a response_delivery_dropped ERROR rather
-    than vanishing silently."""
+    than vanishing silently.
+    """
 
     @pytest.mark.asyncio
     async def test_directive_only_response_logs_dropped(self, monkeypatch, caplog):
@@ -248,7 +252,7 @@ class TestUnrecoverableDropIsLoud:
         event = _make_event(Platform.DISCORD)
         with caplog.at_level(logging.ERROR, logger="gateway.platforms.base"):
             await adapter._process_message_background(
-                event, build_session_key(event.source)
+                event, build_session_key(event.source),
             )
 
         assert adapter.sent == []

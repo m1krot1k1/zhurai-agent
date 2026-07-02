@@ -18,8 +18,8 @@ def _patch_common_status_deps(monkeypatch, status_mod, tmp_path, *, openai_base_
         return ""
 
     monkeypatch.setattr(status_mod, "get_env_value", _get_env_value, raising=False)
-    monkeypatch.setattr(auth_mod, "get_nous_auth_status", lambda: {}, raising=False)
-    monkeypatch.setattr(auth_mod, "get_codex_auth_status", lambda: {}, raising=False)
+    monkeypatch.setattr(auth_mod, "get_nous_auth_status", dict, raising=False)
+    monkeypatch.setattr(auth_mod, "get_codex_auth_status", dict, raising=False)
     monkeypatch.setattr(
         status_mod.subprocess,
         "run",
@@ -129,8 +129,8 @@ def test_show_status_hides_nous_subscription_section_when_feature_flag_is_off(mo
 
 def test_show_status_reports_exhausted_nous_credits(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("hermes_cli.status.managed_nous_tools_enabled", lambda: False)
-    from hermes_cli import status as status_mod
     import hermes_cli.auth as auth_mod
+    from hermes_cli import status as status_mod
 
     _patch_common_status_deps(monkeypatch, status_mod, tmp_path)
     monkeypatch.setattr(
@@ -192,7 +192,7 @@ def test_show_status_reports_empty_lmstudio_listing_as_reachable(monkeypatch, ca
                 "default": "qwen/qwen3-coder-30b",
                 "provider": "lmstudio",
                 "base_url": "http://127.0.0.1:1234/v1",
-            }
+            },
         },
         raising=False,
     )

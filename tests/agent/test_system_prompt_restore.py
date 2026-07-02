@@ -101,11 +101,11 @@ class TestStoredPromptReuse:
             _restore_or_build_system_prompt(agent, None, [{"role": "user", "content": "hi"}])
 
         assert agent._cached_system_prompt.endswith(
-            "Model: openai/gpt-5.5\nProvider: openrouter"
+            "Model: openai/gpt-5.5\nProvider: openrouter",
         )
         agent._build_system_prompt.assert_called_once_with(None)
         db.update_system_prompt.assert_called_once_with(
-            agent.session_id, agent._cached_system_prompt
+            agent.session_id, agent._cached_system_prompt,
         )
         assert any("stale runtime identity" in r.getMessage() for r in caplog.records)
 

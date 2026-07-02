@@ -14,8 +14,6 @@ Two invariants:
 """
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from agent.context_compressor import (
     COMPRESSED_SUMMARY_METADATA_KEY,
     ContextCompressor,
@@ -24,10 +22,10 @@ from agent.context_compressor import (
 
 def _make_compressor():
     with patch(
-        "agent.context_compressor.get_model_context_length", return_value=8000
+        "agent.context_compressor.get_model_context_length", return_value=8000,
     ):
         return ContextCompressor(
-            model="test-model", quiet_mode=True, config_context_length=8000
+            model="test-model", quiet_mode=True, config_context_length=8000,
         )
 
 
@@ -60,10 +58,10 @@ class TestMetadataFlagSet:
 
     def test_helper_detects_flag(self):
         assert ContextCompressor._has_compressed_summary_metadata(
-            {COMPRESSED_SUMMARY_METADATA_KEY: True}
+            {COMPRESSED_SUMMARY_METADATA_KEY: True},
         )
         assert not ContextCompressor._has_compressed_summary_metadata(
-            {"role": "assistant", "content": "hi"}
+            {"role": "assistant", "content": "hi"},
         )
         assert not ContextCompressor._has_compressed_summary_metadata("not a dict")
         assert not ContextCompressor._has_compressed_summary_metadata(None)
@@ -73,7 +71,8 @@ class TestMetadataFlagNeverReachesWire:
     def test_key_is_underscore_prefixed(self):
         """The wire sanitizers strip every top-level message key starting
         with '_'. A bare key would reach strict gateways (Fireworks etc.)
-        and 400 with 'Extra inputs are not permitted'."""
+        and 400 with 'Extra inputs are not permitted'.
+        """
         assert COMPRESSED_SUMMARY_METADATA_KEY.startswith("_")
 
     def test_chat_completions_transport_strips_flag(self):

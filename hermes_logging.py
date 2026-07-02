@@ -32,8 +32,8 @@ import logging
 import os
 import sys
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional, Sequence
 
 # On Windows, stdlib ``RotatingFileHandler`` calls ``os.rename()`` in
 # ``doRollover()`` and fails with ``PermissionError [WinError 32]`` whenever
@@ -58,11 +58,11 @@ from typing import Optional, Sequence
 # module (class declaration, ``isinstance`` checks, docstring) working
 # unchanged. See #44873.
 if sys.platform == "win32":
-    from concurrent_log_handler import (  # noqa: E402
+    from concurrent_log_handler import (
         ConcurrentRotatingFileHandler as RotatingFileHandler,
     )
 else:
-    from logging.handlers import RotatingFileHandler  # noqa: E402
+    from logging.handlers import RotatingFileHandler
 
 
 from hermes_constants import get_config_path, get_hermes_home
@@ -114,6 +114,7 @@ def _safe_stderr():  # type: ignore[return]
         pass
     # Best-effort: if wrapping fails, return the original stream.
     return stream
+
 
 # Third-party loggers that are noisy at DEBUG/INFO level.
 _NOISY_LOGGERS = (
@@ -234,11 +235,11 @@ COMPONENT_PREFIXES = {
 
 def setup_logging(
     *,
-    hermes_home: Optional[Path] = None,
-    log_level: Optional[str] = None,
-    max_size_mb: Optional[int] = None,
-    backup_count: Optional[int] = None,
-    mode: Optional[str] = None,
+    hermes_home: Path | None = None,
+    log_level: str | None = None,
+    max_size_mb: int | None = None,
+    backup_count: int | None = None,
+    mode: str | None = None,
     force: bool = False,
 ) -> Path:
     """Configure the Hermes logging subsystem.
@@ -274,6 +275,7 @@ def setup_logging(
     -------
     Path
         The ``logs/`` directory where files are written.
+
     """
     global _logging_initialized
     home = hermes_home or get_hermes_home()
@@ -419,14 +421,14 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
         super().__init__(*args, **kwargs)
         # Snapshot the inode of the currently open stream so emit() can
         # detect external rotation without an extra fstat per write.
-        self._stat_dev: Optional[int] = None
-        self._stat_ino: Optional[int] = None
+        self._stat_dev: int | None = None
+        self._stat_ino: int | None = None
         self._record_stream_stat()
 
     def _chmod_if_managed(self):
         if self._managed:
             try:
-                os.chmod(self.baseFilename, 0o660)
+                Path(self.baseFilename).chmod(0o660)
             except OSError:
                 pass
 
@@ -490,7 +492,7 @@ class _ManagedRotatingFileHandler(RotatingFileHandler):
     def emit(self, record: logging.LogRecord) -> None:
         # Cheap-ish stat-per-record check; the kernel caches inode metadata
         # so the syscall is sub-microsecond on a hot file.
-        if self.stream is not None or os.path.exists(self.baseFilename):
+        if self.stream is not None or Path(self.baseFilename).exists():
             self._reopen_if_externally_rotated()
         super().emit(record)
 
@@ -515,7 +517,7 @@ def _add_rotating_handler(
     max_bytes: int,
     backup_count: int,
     formatter: logging.Formatter,
-    log_filter: Optional[logging.Filter] = None,
+    log_filter: logging.Filter | None = None,
 ) -> None:
     """Add a ``RotatingFileHandler`` to *logger*, skipping if one already
     exists for the same resolved file path (idempotent).
@@ -525,6 +527,7 @@ def _add_rotating_handler(
     log_filter
         Optional filter to attach to the handler (e.g. ``_ComponentFilter``
         for gateway.log).
+
     """
     resolved = path.resolve()
     for existing in logger.handlers:
@@ -555,7 +558,7 @@ def _read_logging_config():
         import yaml
         config_path = get_config_path()
         if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
+            with Path(config_path).open("r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
             # Managed scope: an administrator can pin logging.* too. Overlay via
             # the shared helper (fail-open) since this reads config.yaml directly.

@@ -1,12 +1,11 @@
-"""
-Status command for hermes CLI.
+"""Status command for hermes CLI.
 
 Shows the status of all Hermes Agent components.
 """
 
 import os
-import sys
 import subprocess  # noqa: F401 — re-exported for tests that monkeypatch status.subprocess to guard against regressions
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
@@ -24,10 +23,12 @@ from hermes_cli.runtime_provider import resolve_requested_provider
 from hermes_constants import OPENROUTER_MODELS_URL
 from tools.tool_backend_helpers import managed_nous_tools_enabled
 
+
 def check_mark(ok: bool) -> str:
     if ok:
         return color("✓", Colors.GREEN)
     return color("✗", Colors.RED)
+
 
 def redact_key(key: str) -> str:
     """Redact an API key for display.
@@ -86,13 +87,15 @@ def _effective_provider_label() -> str:
     return provider_label(effective)
 
 
+from datetime import UTC
+
 from hermes_constants import is_termux as _is_termux
 
 
 def show_status(args):
     """Show status of all Hermes Agent components."""
-    show_all = getattr(args, 'all', False)
-    deep = getattr(args, 'deep', False)
+    show_all = getattr(args, "all", False)
+    deep = getattr(args, "deep", False)
 
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.CYAN))
@@ -181,10 +184,10 @@ def show_status(args):
 
     try:
         from hermes_cli.auth import (
-            get_nous_auth_status,
             get_codex_auth_status,
-            get_qwen_auth_status,
             get_minimax_oauth_auth_status,
+            get_nous_auth_status,
+            get_qwen_auth_status,
         )
         nous_status = get_nous_auth_status()
         codex_status = get_codex_auth_status()
@@ -211,11 +214,11 @@ def show_status(args):
 
     nous_logged_in = bool(
         nous_status.get("logged_in")
-        or (nous_account_info and nous_account_info.logged_in)
+        or (nous_account_info and nous_account_info.logged_in),
     )
     nous_inference_present = bool(
         nous_status.get("inference_credential_present")
-        or (nous_account_info and nous_account_info.inference_credential_present)
+        or (nous_account_info and nous_account_info.inference_credential_present),
     )
     nous_error = nous_status.get("error")
     if nous_logged_in:
@@ -226,7 +229,7 @@ def show_status(args):
         nous_label = "not logged in (run: hermes portal)"
     print(
         f"  {'Nous Portal':<12}  {check_mark(nous_logged_in)} "
-        f"{nous_label}"
+        f"{nous_label}",
     )
     portal_url = nous_status.get("portal_base_url") or "(unknown)"
     inference_url = (
@@ -252,7 +255,7 @@ def show_status(args):
     codex_logged_in = bool(codex_status.get("logged_in"))
     print(
         f"  {'OpenAI Codex':<12}  {check_mark(codex_logged_in)} "
-        f"{'logged in' if codex_logged_in else 'not logged in (run: hermes model)'}"
+        f"{'logged in' if codex_logged_in else 'not logged in (run: hermes model)'}",
     )
     codex_auth_file = codex_status.get("auth_store")
     if codex_auth_file:
@@ -266,22 +269,22 @@ def show_status(args):
     qwen_logged_in = bool(qwen_status.get("logged_in"))
     print(
         f"  {'Qwen OAuth':<12}  {check_mark(qwen_logged_in)} "
-        f"{'logged in' if qwen_logged_in else 'not logged in (run: qwen auth qwen-oauth)'}"
+        f"{'logged in' if qwen_logged_in else 'not logged in (run: qwen auth qwen-oauth)'}",
     )
     qwen_auth_file = qwen_status.get("auth_file")
     if qwen_auth_file:
         print(f"    Auth file:  {qwen_auth_file}")
     qwen_exp = qwen_status.get("expires_at_ms")
     if qwen_exp:
-        from datetime import datetime, timezone
-        print(f"    Access exp: {datetime.fromtimestamp(int(qwen_exp) / 1000, tz=timezone.utc).isoformat()}")
+        from datetime import datetime
+        print(f"    Access exp: {datetime.fromtimestamp(int(qwen_exp) / 1000, tz=UTC).isoformat()}")
     if qwen_status.get("error") and not qwen_logged_in:
         print(f"    Error:      {qwen_status.get('error')}")
 
     minimax_logged_in = bool(minimax_status.get("logged_in"))
     print(
         f"  {'MiniMax OAuth':<12}  {check_mark(minimax_logged_in)} "
-        f"{'logged in' if minimax_logged_in else 'not logged in (run: hermes auth add minimax-oauth)'}"
+        f"{'logged in' if minimax_logged_in else 'not logged in (run: hermes auth add minimax-oauth)'}",
     )
     minimax_region = minimax_status.get("region")
     if minimax_logged_in and minimax_region:
@@ -303,7 +306,7 @@ def show_status(args):
     xai_oauth_logged_in = bool(xai_oauth_status.get("logged_in"))
     print(
         f"  {'xAI OAuth':<12}  {check_mark(xai_oauth_logged_in)} "
-        f"{'logged in' if xai_oauth_logged_in else 'not logged in (run: hermes auth add xai-oauth)'}"
+        f"{'logged in' if xai_oauth_logged_in else 'not logged in (run: hermes auth add xai-oauth)'}",
     )
     xai_auth_file = xai_oauth_status.get("auth_store")
     if xai_auth_file:
@@ -444,18 +447,18 @@ def show_status(args):
     for name, (token_var, home_var) in platforms.items():
         token = os.getenv(token_var, "")
         has_token = bool(token)
-        
+
         home_channel = ""
         if home_var:
             home_channel = os.getenv(home_var, "")
         # Back-compat: QQBot home channel was renamed from QQ_HOME_CHANNEL to QQBOT_HOME_CHANNEL
         if not home_channel and home_var == "QQBOT_HOME_CHANNEL":
             home_channel = os.getenv("QQ_HOME_CHANNEL", "")
-        
+
         status = "configured" if has_token else "not configured"
         if home_channel:
             status += f" (home: {home_channel})"
-        
+
         print(f"  {name:<12}  {check_mark(has_token)} {status}")
 
     # Plugin-registered platforms
@@ -476,7 +479,10 @@ def show_status(args):
     print(color("◆ Gateway Service", Colors.CYAN, Colors.BOLD))
 
     try:
-        from hermes_cli.gateway import get_gateway_runtime_snapshot, _format_gateway_pids
+        from hermes_cli.gateway import (
+            _format_gateway_pids,
+            get_gateway_runtime_snapshot,
+        )
 
         snapshot = get_gateway_runtime_snapshot()
         is_running = snapshot.running
@@ -495,10 +501,10 @@ def show_status(args):
         if _is_termux():
             print(f"  Status:       {color('unknown', Colors.DIM)}")
             print("  Manager:      Termux / manual process")
-        elif sys.platform.startswith('linux'):
+        elif sys.platform.startswith("linux"):
             print(f"  Status:       {color('unknown', Colors.DIM)}")
             print("  Manager:      systemd/manual")
-        elif sys.platform == 'darwin':
+        elif sys.platform == "darwin":
             print(f"  Status:       {color('unknown', Colors.DIM)}")
             print("  Manager:      launchd")
         else:
@@ -515,7 +521,7 @@ def show_status(args):
     if jobs_file.exists():
         import json
         try:
-            with open(jobs_file, encoding="utf-8") as f:
+            with Path(jobs_file).open(encoding="utf-8") as f:
                 data = json.load(f)
                 jobs = data.get("jobs", [])
                 enabled_jobs = [j for j in jobs if j.get("enabled", True)]
@@ -535,7 +541,7 @@ def show_status(args):
     if sessions_file.exists():
         import json
         try:
-            with open(sessions_file, encoding="utf-8") as f:
+            with Path(sessions_file).open(encoding="utf-8") as f:
                 data = json.load(f)
                 print(f"  Active:       {len(data)} session(s)")
         except Exception:
@@ -549,7 +555,7 @@ def show_status(args):
     if deep:
         print()
         print(color("◆ Deep Checks", Colors.CYAN, Colors.BOLD))
-        
+
         # Check OpenRouter connectivity
         openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
         if openrouter_key:
@@ -558,19 +564,19 @@ def show_status(args):
                 response = httpx.get(
                     OPENROUTER_MODELS_URL,
                     headers={"Authorization": f"Bearer {openrouter_key}"},
-                    timeout=10
+                    timeout=10,
                 )
                 ok = response.status_code == 200
                 print(f"  OpenRouter:   {check_mark(ok)} {'reachable' if ok else f'error ({response.status_code})'}")
             except Exception as e:
                 print(f"  OpenRouter:   {check_mark(False)} error: {e}")
-        
+
         # Check gateway port
         try:
             import socket
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(1)
-            result = sock.connect_ex(('127.0.0.1', 18789))
+            result = sock.connect_ex(("127.0.0.1", 18789))
             sock.close()
             # Port in use = gateway likely running
             port_in_use = result == 0

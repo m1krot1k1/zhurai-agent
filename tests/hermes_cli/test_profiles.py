@@ -5,46 +5,46 @@ management, export/import, renaming, alias collision checks, profile isolation,
 and shell completion generation.
 """
 
-import json
 import io
+import json
 import tarfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 
+from hermes_cli.config import DEFAULT_CONFIG
 from hermes_cli.profiles import (
-    normalize_profile_name,
-    validate_profile_name,
-    get_profile_dir,
+    NO_BUNDLED_SKILLS_MARKER,
+    _get_default_hermes_home,
+    _get_profiles_root,
+    backfill_profile_envs,
+    check_alias_collision,
     create_profile,
     delete_profile,
-    list_profiles,
-    set_active_profile,
+    export_profile,
     get_active_profile,
     get_active_profile_name,
-    resolve_profile_env,
-    check_alias_collision,
-    rename_profile,
-    export_profile,
-    import_profile,
-    _get_profiles_root,
-    _get_default_hermes_home,
-    seed_profile_skills,
+    get_profile_dir,
     has_bundled_skills_opt_out,
-    NO_BUNDLED_SKILLS_MARKER,
-    backfill_profile_envs,
+    import_profile,
+    list_profiles,
+    normalize_profile_name,
     profiles_to_serve,
+    rename_profile,
+    resolve_profile_env,
+    seed_profile_skills,
+    set_active_profile,
+    validate_profile_name,
 )
-from hermes_cli.config import DEFAULT_CONFIG
-
 
 # ---------------------------------------------------------------------------
 # Shared fixture: redirect Path.home() and HERMES_HOME for profile tests
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
+
+@pytest.fixture
 def profile_env(tmp_path, monkeypatch):
     """Set up an isolated environment for profile tests.
 
@@ -121,7 +121,8 @@ class TestValidateProfileName:
     def test_reserved_names_rejected(self, name):
         """Reserved names collide with the Hermes install itself or with
         common system binaries — reject them at validate time so
-        create/install/rename all share one gate."""
+        create/install/rename all share one gate.
+        """
         with pytest.raises(ValueError, match="reserved"):
             validate_profile_name(name)
 
@@ -165,7 +166,8 @@ class TestCreateProfile:
     def test_seeds_placeholder_env_file(self, profile_env):
         """Fresh profiles get their own .env (owner-only) so channel/env
         writes are profile-scoped from day one instead of falling through
-        to the shell environment / root install."""
+        to the shell environment / root install.
+        """
         import stat
         profile_dir = create_profile("coder", no_alias=True)
         env_path = profile_dir / ".env"
@@ -426,7 +428,8 @@ class TestNoSkillsOptOut:
 
     def test_seed_profile_skills_respects_marker(self, profile_env):
         """seed_profile_skills() must no-op on opted-out profiles even when
-        called directly (e.g. by `hermes update`'s all-profile sync loop)."""
+        called directly (e.g. by `hermes update`'s all-profile sync loop).
+        """
         profile_dir = create_profile("orchestrator", no_alias=True, no_skills=True)
 
         # Call seed_profile_skills() directly — it should NOT invoke subprocess,
@@ -442,7 +445,8 @@ class TestNoSkillsOptOut:
     def test_default_profile_gets_skills_seeded(self, profile_env, monkeypatch):
         """Sanity: without --no-skills, seed_profile_skills() runs the real
         subprocess path. Mock the subprocess so the test is hermetic, and
-        just confirm the marker is NOT checked in the non-opt-out case."""
+        just confirm the marker is NOT checked in the non-opt-out case.
+        """
         import subprocess as _sp
 
         profile_dir = create_profile("coder", no_alias=True)
@@ -456,7 +460,7 @@ class TestNoSkillsOptOut:
         def fake_run(*args, **kwargs):
             calls.append(args)
             return _sp.CompletedProcess(
-                args=args, returncode=0, stdout='{"copied": ["x"]}', stderr=""
+                args=args, returncode=0, stdout='{"copied": ["x"]}', stderr="",
             )
 
         monkeypatch.setattr("subprocess.run", fake_run)
@@ -478,7 +482,7 @@ class TestNoSkillsOptOut:
         monkeypatch.setattr(
             "subprocess.run",
             lambda *a, **kw: (called.append(a), _sp.CompletedProcess(
-                args=a, returncode=0, stdout='{"copied": []}', stderr=""
+                args=a, returncode=0, stdout='{"copied": []}', stderr="",
             ))[1],
         )
         r1 = seed_profile_skills(profile_dir, quiet=True)
@@ -500,7 +504,8 @@ class TestNoSkillsOptOut:
 class TestBackfillProfileEnvs:
     """Tests for backfill_profile_envs() — the `hermes update` pass that
     gives pre-#44792 profiles (created before .env seeding) their own
-    .env, copied from the default install so credentials don't break."""
+    .env, copied from the default install so credentials don't break.
+    """
 
     def test_copies_default_env_into_envless_profiles(self, profile_env):
         import stat
@@ -882,7 +887,7 @@ class TestFindAliasForProfile:
         from hermes_cli.profiles import _get_wrapper_dir, find_alias_for_profile
         wrapper_dir = _get_wrapper_dir()
         wrapper_dir.mkdir(parents=True, exist_ok=True)
-        (wrapper_dir / "pip").write_text("#!/bin/sh\nexec python -m pip \"$@\"\n")
+        (wrapper_dir / "pip").write_text('#!/bin/sh\nexec python -m pip "$@"\n')
         assert find_alias_for_profile("steve") is None
 
     def test_custom_alias_on_windows(self, profile_env, monkeypatch):
@@ -943,8 +948,8 @@ class TestRenameProfile:
                     "aiPeer": "ssi_health",
                     "workspace": "hermes",
                     "enabled": True,
-                }
-            }
+                },
+            },
         }))
 
         with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
@@ -961,8 +966,8 @@ class TestRenameProfile:
         honcho_path = tmp_path / ".hermes" / "honcho.json"
         honcho_path.write_text(json.dumps({
             "hosts": {
-                "hermes.ssi_health": {"workspace": "hermes", "enabled": True}
-            }
+                "hermes.ssi_health": {"workspace": "hermes", "enabled": True},
+            },
         }))
 
         with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
@@ -981,7 +986,7 @@ class TestRenameProfile:
             "hosts": {
                 "hermes.ssi_health": {"aiPeer": "ssi_health"},
                 "hermes_heimdall": {"aiPeer": "heimdall"},
-            }
+            },
         }))
 
         with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"):
@@ -1063,7 +1068,7 @@ class TestExportImport:
             import_profile(str(archive_path), name="coder")
 
     def test_import_with_explicit_name_does_not_mutate_existing_archive_root_profile(
-        self, profile_env, tmp_path
+        self, profile_env, tmp_path,
     ):
         create_profile("victim", no_alias=True)
         victim_dir = get_profile_dir("victim")
@@ -1084,7 +1089,7 @@ class TestExportImport:
         assert (victim_dir / "marker.txt").read_text() == "original"
 
     def test_import_rejects_archive_with_multiple_top_level_directories(
-        self, profile_env, tmp_path
+        self, profile_env, tmp_path,
     ):
         archive_path = tmp_path / "export" / "multi-root.tar.gz"
         archive_path.parent.mkdir(parents=True, exist_ok=True)

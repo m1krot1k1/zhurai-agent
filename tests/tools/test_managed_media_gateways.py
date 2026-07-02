@@ -7,7 +7,6 @@ import pytest
 
 from hermes_cli.nous_account import NousPortalAccountInfo
 
-
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 
 
@@ -49,7 +48,8 @@ def _restore_tool_and_agent_modules():
 @pytest.fixture(autouse=True)
 def _enable_managed_nous_tools(monkeypatch):
     """Patch the source modules so managed_nous_tools_enabled() returns True
-    even after tool modules are dynamically reloaded."""
+    even after tool modules are dynamically reloaded.
+    """
     monkeypatch.setattr(
         "hermes_cli.nous_account.get_nous_portal_account_info",
         lambda: NousPortalAccountInfo(
@@ -71,8 +71,8 @@ def _install_fake_tools_package():
             session_id="debug-session",
             log_call=lambda *a, **k: None,
             save=lambda: None,
-            get_session_info=lambda: {},
-        )
+            get_session_info=dict,
+        ),
     )
     sys.modules["tools.managed_tool_gateway"] = _load_tool_module(
         "tools.managed_tool_gateway",
@@ -154,10 +154,10 @@ def _install_fake_openai_module(captured, transcription_response=None):
 
             self.audio = types.SimpleNamespace(
                 speech=types.SimpleNamespace(
-                    create=create_speech
+                    create=create_speech,
                 ),
                 transcriptions=types.SimpleNamespace(
-                    create=create_transcription
+                    create=create_transcription,
                 ),
             )
 
@@ -186,7 +186,7 @@ def test_managed_fal_submit_uses_gateway_origin_and_nous_token(monkeypatch):
         "image_generation_tool.py",
     )
     monkeypatch.setattr(image_generation_tool.uuid, "uuid4", lambda: "fal-submit-123")
-    
+
     image_generation_tool._submit_fal_request(
         "fal-ai/flux-2-pro",
         {"prompt": "test prompt", "num_images": 1},
@@ -404,6 +404,7 @@ def test_video_gen_direct_mode_when_fal_key_set(monkeypatch):
         direct_captured["arguments"] = arguments
         direct_captured["headers"] = headers
         # Return a mock handle
+
         class FakeHandle:
             def get(self):
                 return {"video": {"url": "https://fal.media/result.mp4"}}
@@ -445,7 +446,7 @@ def test_video_gen_gateway_4xx_raises_actionable_valueerror(monkeypatch):
     original_retry = sys.modules["fal_client"].client._maybe_retry_request
 
     def raising_retry(client, method, url, json=None, timeout=None, headers=None):
-        raise GatewayRejectError()
+        raise GatewayRejectError
 
     sys.modules["fal_client"].client._maybe_retry_request = raising_retry
 

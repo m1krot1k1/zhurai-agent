@@ -15,9 +15,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tools.environments.local import (
-    LocalEnvironment,
     _HERMES_PROVIDER_ENV_BLOCKLIST,
     _HERMES_PROVIDER_ENV_FORCE_PREFIX,
+    LocalEnvironment,
 )
 
 
@@ -36,7 +36,8 @@ def _make_fake_popen(captured: dict):
 
 def _run_with_env(extra_os_env=None, self_env=None):
     """Execute a command via LocalEnvironment with mocked Popen
-    and return the env dict passed to the subprocess."""
+    and return the env dict passed to the subprocess.
+    """
     captured = {}
     fake_interrupt = threading.Event()
     test_environ = {
@@ -77,7 +78,8 @@ class TestProviderEnvBlocklist:
 
     def test_registry_derived_vars_are_stripped(self):
         """Vars from the provider registry (ANTHROPIC_TOKEN, ZAI_API_KEY, etc.)
-        must also be blocked — not just the hand-written extras."""
+        must also be blocked — not just the hand-written extras.
+        """
         registry_vars = {
             "ANTHROPIC_TOKEN": "ant-tok",
             "CLAUDE_CODE_OAUTH_TOKEN": "cc-tok",
@@ -255,7 +257,8 @@ class TestBlocklistCoverage:
 
     def test_registry_vars_are_in_blocklist(self):
         """Every api_key_env_var and base_url_env_var from PROVIDER_REGISTRY
-        must appear in the blocklist — ensures no drift."""
+        must appear in the blocklist — ensures no drift.
+        """
         from hermes_cli.auth import PROVIDER_REGISTRY
 
         for pconfig in PROVIDER_REGISTRY.values():
@@ -272,7 +275,8 @@ class TestBlocklistCoverage:
     def test_bedrock_bearer_token_is_in_blocklist(self):
         """auth_type='aws_sdk' providers contribute their Hermes-managed
         inference token (the Bedrock bearer) to the blocklist, keyed off
-        auth_type so any future SDK-cred provider is covered automatically."""
+        auth_type so any future SDK-cred provider is covered automatically.
+        """
         assert "AWS_BEARER_TOKEN_BEDROCK" in _HERMES_PROVIDER_ENV_BLOCKLIST
 
     def test_general_aws_chain_not_in_blocklist(self):
@@ -301,7 +305,8 @@ class TestBlocklistCoverage:
 
     def test_extra_auth_vars_covered(self):
         """Non-registry auth vars (ANTHROPIC_TOKEN, CLAUDE_CODE_OAUTH_TOKEN)
-        must also be in the blocklist."""
+        must also be in the blocklist.
+        """
         extras = {"ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"}
         assert extras.issubset(_HERMES_PROVIDER_ENV_BLOCKLIST)
 
@@ -386,7 +391,8 @@ class TestSanePathIncludesHomebrew:
         """These tests assert the sane-path merge in isolation. Disable the
         hermes-install-dir prepend (a separate concern, covered by
         TestHermesBinDirOnPath) so a real ``hermes`` on the test runner's PATH
-        doesn't shift the asserted PATH layout."""
+        doesn't shift the asserted PATH layout.
+        """
         from tools.environments import local as local_mod
         saved = local_mod._HERMES_BIN_DIR
         local_mod._HERMES_BIN_DIR = None  # resolved -> no dir to inject
@@ -413,7 +419,7 @@ class TestSanePathIncludesHomebrew:
             assert entry in path_entries
 
     def test_make_run_env_fills_missing_homebrew_when_usr_bin_present(self):
-        """macOS launchd PATH can include /usr/bin while missing Homebrew."""
+        """MacOS launchd PATH can include /usr/bin while missing Homebrew."""
         from tools.environments.local import _make_run_env
         launchd_env = {"PATH": "/usr/local/bin:/usr/bin:/bin"}
         with patch.dict(os.environ, launchd_env, clear=True):

@@ -1,5 +1,4 @@
-"""
-Channel directory -- cached map of reachable channels/contacts per platform.
+"""Channel directory -- cached map of reachable channels/contacts per platform.
 
 Built on gateway startup, refreshed periodically (every 5 min), and saved to
 ~/.hermes/channel_directory.json.  The send_message tool reads this file for
@@ -8,8 +7,9 @@ action="list" and for resolving human-friendly channel names to numeric IDs.
 
 import json
 import logging
+import pathlib
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from hermes_cli.config import get_hermes_home
 from utils import atomic_json_write
@@ -26,18 +26,18 @@ DIRECTORY_PATH = get_hermes_home() / "channel_directory.json"
 CHANNEL_ALIASES_PATH = get_hermes_home() / "channel_aliases.json"
 
 
-def _load_channel_aliases() -> Dict[str, Dict[str, str]]:
+def _load_channel_aliases() -> dict[str, dict[str, str]]:
     if not CHANNEL_ALIASES_PATH.exists():
         return {}
     try:
-        with open(CHANNEL_ALIASES_PATH, encoding="utf-8") as f:
+        with pathlib.Path(CHANNEL_ALIASES_PATH).open(encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
 
 
-def _apply_channel_aliases(platforms: Dict[str, Any]) -> None:
+def _apply_channel_aliases(platforms: dict[str, Any]) -> None:
     """Overlay friendly names onto directory entries by chat_id.
 
     Renames matching entries in place; injects a placeholder entry for an
@@ -74,7 +74,7 @@ def _normalize_channel_query(value: str) -> str:
     return value.lstrip("#").strip().lower()
 
 
-def _channel_target_name(platform_name: str, channel: Dict[str, Any]) -> str:
+def _channel_target_name(platform_name: str, channel: dict[str, Any]) -> str:
     """Return the human-facing target label shown to users for a channel entry."""
     name = channel["name"]
     if platform_name == "discord" and channel.get("guild"):
@@ -84,7 +84,7 @@ def _channel_target_name(platform_name: str, channel: Dict[str, Any]) -> str:
     return name
 
 
-def _session_entry_id(origin: Dict[str, Any]) -> Optional[str]:
+def _session_entry_id(origin: dict[str, Any]) -> str | None:
     chat_id = origin.get("chat_id")
     if not chat_id:
         return None
@@ -94,7 +94,7 @@ def _session_entry_id(origin: Dict[str, Any]) -> Optional[str]:
     return str(chat_id)
 
 
-def _session_entry_name(origin: Dict[str, Any]) -> str:
+def _session_entry_name(origin: dict[str, Any]) -> str:
     base_name = origin.get("chat_name") or origin.get("user_name") or str(origin.get("chat_id"))
     thread_id = origin.get("thread_id")
     if not thread_id:
@@ -108,15 +108,14 @@ def _session_entry_name(origin: Dict[str, Any]) -> str:
 # Build / refresh
 # ---------------------------------------------------------------------------
 
-async def build_channel_directory(adapters: Dict[Any, Any]) -> Dict[str, Any]:
-    """
-    Build a channel directory from connected platform adapters and session data.
+async def build_channel_directory(adapters: dict[Any, Any]) -> dict[str, Any]:
+    """Build a channel directory from connected platform adapters and session data.
 
     Returns the directory dict and writes it to DIRECTORY_PATH.
     """
     from gateway.config import Platform
 
-    platforms: Dict[str, List[Dict[str, str]]] = {}
+    platforms: dict[str, list[dict[str, str]]] = {}
 
     for platform, adapter in adapters.items():
         try:
@@ -163,7 +162,7 @@ async def build_channel_directory(adapters: Dict[Any, Any]) -> Dict[str, Any]:
     return directory
 
 
-def _build_discord(adapter) -> List[Dict[str, str]]:
+def _build_discord(adapter) -> list[dict[str, str]]:
     """Enumerate all text channels and forum channels the Discord bot can see."""
     channels = []
     client = getattr(adapter, "_client", None)
@@ -200,7 +199,7 @@ def _build_discord(adapter) -> List[Dict[str, str]]:
     return channels
 
 
-async def _build_slack(adapter) -> List[Dict[str, Any]]:
+async def _build_slack(adapter) -> list[dict[str, Any]]:
     """List Slack channels the bot has joined across all workspaces.
 
     Uses ``users.conversations`` against each workspace's web client. Pulls
@@ -212,12 +211,12 @@ async def _build_slack(adapter) -> List[Dict[str, Any]]:
     if not team_clients:
         return _build_from_sessions("slack")
 
-    channels: List[Dict[str, Any]] = []
+    channels: list[dict[str, Any]] = []
     seen_ids: set = set()
 
     for team_id, client in team_clients.items():
         try:
-            cursor: Optional[str] = None
+            cursor: str | None = None
             for _page in range(20):  # safety cap on pagination
                 response = await client.users_conversations(
                     types="public_channel,private_channel",
@@ -262,7 +261,7 @@ async def _build_slack(adapter) -> List[Dict[str, Any]]:
     return channels
 
 
-def _build_from_sessions(platform_name: str) -> List[Dict[str, str]]:
+def _build_from_sessions(platform_name: str) -> list[dict[str, str]]:
     """Pull known channels/contacts from sessions.json origin data."""
     sessions_path = get_hermes_home() / "sessions" / "sessions.json"
     if not sessions_path.exists():
@@ -270,7 +269,7 @@ def _build_from_sessions(platform_name: str) -> List[Dict[str, str]]:
 
     entries = []
     try:
-        with open(sessions_path, encoding="utf-8") as f:
+        with pathlib.Path(sessions_path).open(encoding="utf-8") as f:
             data = json.load(f)
 
         seen_ids = set()
@@ -298,14 +297,14 @@ def _build_from_sessions(platform_name: str) -> List[Dict[str, str]]:
 # Read / resolve
 # ---------------------------------------------------------------------------
 
-def load_directory() -> Dict[str, Any]:
+def load_directory() -> dict[str, Any]:
     """Load the cached channel directory from disk."""
     if not DIRECTORY_PATH.exists():
         base = {"updated_at": None, "platforms": {}}
         _apply_channel_aliases(base["platforms"])
         return base
     try:
-        with open(DIRECTORY_PATH, encoding="utf-8") as f:
+        with pathlib.Path(DIRECTORY_PATH).open(encoding="utf-8") as f:
             data = json.load(f)
         # Re-apply aliases on read so friendly names take effect immediately,
         # even between timed rebuilds and for brand-new alias entries.
@@ -317,7 +316,7 @@ def load_directory() -> Dict[str, Any]:
         return base
 
 
-def lookup_channel_type(platform_name: str, chat_id: str) -> Optional[str]:
+def lookup_channel_type(platform_name: str, chat_id: str) -> str | None:
     """Return the channel ``type`` string (e.g. ``"channel"``, ``"forum"``) for *chat_id*, or *None* if unknown."""
     directory = load_directory()
     for ch in directory.get("platforms", {}).get(platform_name, []):
@@ -326,9 +325,8 @@ def lookup_channel_type(platform_name: str, chat_id: str) -> Optional[str]:
     return None
 
 
-def resolve_channel_name(platform_name: str, name: str) -> Optional[str]:
-    """
-    Resolve a human-friendly channel name to a numeric ID.
+def resolve_channel_name(platform_name: str, name: str) -> str | None:
+    """Resolve a human-friendly channel name to a numeric ID.
 
     Matching strategy (case-insensitive, first match wins):
     - Discord: "bot-home", "#bot-home", "GuildName/bot-home"
@@ -389,8 +387,8 @@ def format_directory_for_display() -> str:
 
         # Group Discord channels by guild
         if plat_name == "discord":
-            guilds: Dict[str, List] = {}
-            dms: List = []
+            guilds: dict[str, list] = {}
+            dms: list = []
             for ch in channels:
                 guild = ch.get("guild")
                 if guild:

@@ -23,7 +23,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 # Default minimum codex version we test against. The PR sets this from the
 # `codex --version` parsed at install time; bumping is a one-line change here.
@@ -36,7 +36,7 @@ class CodexAppServerError(RuntimeError):
 
     code: int
     message: str
-    data: Optional[Any] = None
+    data: Any | None = None
 
     def __str__(self) -> str:  # pragma: no cover - trivial
         return f"codex app-server error {self.code}: {self.message}"
@@ -69,9 +69,9 @@ class CodexAppServerClient:
     def __init__(
         self,
         codex_bin: str = "codex",
-        codex_home: Optional[str] = None,
-        extra_args: Optional[list[str]] = None,
-        env: Optional[dict[str, str]] = None,
+        codex_home: str | None = None,
+        extra_args: list[str] | None = None,
+        env: dict[str, str] | None = None,
     ) -> None:
         self._codex_bin = codex_bin
         spawn_env = os.environ.copy()
@@ -107,7 +107,7 @@ class CodexAppServerClient:
                     f'sandbox_workspace_write.writable_roots=["{kanban_root}"]',
                     "-c",
                     "sandbox_workspace_write.network_access=false",
-                ]
+                ],
             )
 
         cmd = [codex_bin, "app-server"] + app_server_args
@@ -144,11 +144,12 @@ class CodexAppServerClient:
         client_name: str = "hermes",
         client_title: str = "Hermes Agent",
         client_version: str = "0.1",
-        capabilities: Optional[dict] = None,
+        capabilities: dict | None = None,
         timeout: float = 10.0,
     ) -> dict:
         """Send `initialize` + `initialized` handshake. Returns the server's
-        InitializeResponse (userAgent, codexHome, platformFamily, platformOs)."""
+        InitializeResponse (userAgent, codexHome, platformFamily, platformOs).
+        """
         if self._initialized:
             raise RuntimeError("already initialized")
         params = {
@@ -184,10 +185,10 @@ class CodexAppServerClient:
             except Exception:
                 pass
 
-    def __enter__(self) -> "CodexAppServerClient":
+    def __enter__(self) -> CodexAppServerClient:
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         self.close()
 
     # ---------- send/receive ----------
@@ -195,11 +196,12 @@ class CodexAppServerClient:
     def request(
         self,
         method: str,
-        params: Optional[dict] = None,
+        params: dict | None = None,
         timeout: float = 30.0,
     ) -> dict:
         """Send a JSON-RPC request and block on the response. Returns `result`,
-        raises CodexAppServerError on `error`."""
+        raises CodexAppServerError on `error`.
+        """
         rid = self._take_id()
         q: queue.Queue = queue.Queue(maxsize=1)
         with self._pending_lock:
@@ -211,7 +213,7 @@ class CodexAppServerClient:
             with self._pending_lock:
                 self._pending.pop(rid, None)
             raise TimeoutError(
-                f"codex app-server method {method!r} timed out after {timeout}s"
+                f"codex app-server method {method!r} timed out after {timeout}s",
             )
         if "error" in msg:
             err = msg["error"]
@@ -222,7 +224,7 @@ class CodexAppServerClient:
             )
         return msg.get("result", {})
 
-    def notify(self, method: str, params: Optional[dict] = None) -> None:
+    def notify(self, method: str, params: dict | None = None) -> None:
         """Send a JSON-RPC notification (no id, no response expected)."""
         self._send({"method": method, "params": params or {}})
 
@@ -231,7 +233,7 @@ class CodexAppServerClient:
         self._send({"id": request_id, "result": result})
 
     def respond_error(
-        self, request_id: Any, code: int, message: str, data: Optional[Any] = None
+        self, request_id: Any, code: int, message: str, data: Any | None = None,
     ) -> None:
         """Reply to a server-initiated request with an error."""
         err: dict[str, Any] = {"code": code, "message": message}
@@ -239,11 +241,12 @@ class CodexAppServerClient:
             err["data"] = data
         self._send({"id": request_id, "error": err})
 
-    def take_notification(self, timeout: float = 0.0) -> Optional[dict]:
+    def take_notification(self, timeout: float = 0.0) -> dict | None:
         """Pop the next streaming notification, or return None on timeout.
 
         timeout=0.0 means non-blocking. Use small positive timeouts inside the
-        AIAgent turn loop to interleave reads with interrupt checks."""
+        AIAgent turn loop to interleave reads with interrupt checks.
+        """
         try:
             if timeout <= 0:
                 return self._notifications.get_nowait()
@@ -251,7 +254,7 @@ class CodexAppServerClient:
         except queue.Empty:
             return None
 
-    def take_server_request(self, timeout: float = 0.0) -> Optional[dict]:
+    def take_server_request(self, timeout: float = 0.0) -> dict | None:
         """Pop the next server-initiated request (e.g. exec/applyPatch approval)."""
         try:
             if timeout <= 0:
@@ -290,7 +293,7 @@ class CodexAppServerClient:
             self._proc.stdin.flush()
         except (BrokenPipeError, ValueError) as exc:
             raise RuntimeError(
-                f"codex app-server stdin closed unexpectedly: {exc}"
+                f"codex app-server stdin closed unexpectedly: {exc}",
             ) from exc
 
     def _read_stdout(self) -> None:
@@ -310,7 +313,7 @@ class CodexAppServerClient:
                     # on stderr. Surface it via stderr buffer for diagnostics.
                     with self._stderr_lock:
                         self._stderr_lines.append(
-                            f"<non-json on stdout> {line[:200]!r}"
+                            f"<non-json on stdout> {line[:200]!r}",
                         )
                     continue
                 self._dispatch(msg)
@@ -346,7 +349,7 @@ class CodexAppServerClient:
                     break
                 with self._stderr_lock:
                     self._stderr_lines.append(
-                        line.decode("utf-8", "replace").rstrip()
+                        line.decode("utf-8", "replace").rstrip(),
                     )
                     # Bound memory: keep last 500 lines.
                     if len(self._stderr_lines) > 500:
@@ -355,7 +358,7 @@ class CodexAppServerClient:
             pass
 
 
-def parse_codex_version(output: str) -> Optional[tuple[int, int, int]]:
+def parse_codex_version(output: str) -> tuple[int, int, int] | None:
     """Parse `codex --version` output. Returns (major, minor, patch) or None."""
     # Output format: "codex-cli 0.130.0" possibly followed by metadata.
     import re
@@ -367,11 +370,12 @@ def parse_codex_version(output: str) -> Optional[tuple[int, int, int]]:
 
 
 def check_codex_binary(
-    codex_bin: str = "codex", min_version: tuple[int, int, int] = MIN_CODEX_VERSION
+    codex_bin: str = "codex", min_version: tuple[int, int, int] = MIN_CODEX_VERSION,
 ) -> tuple[bool, str]:
     """Verify codex CLI is installed and meets minimum version.
 
-    Returns (ok, message). Used by setup wizard and runtime startup."""
+    Returns (ok, message). Used by setup wizard and runtime startup.
+    """
     try:
         proc = subprocess.run(
             [codex_bin, "--version"],

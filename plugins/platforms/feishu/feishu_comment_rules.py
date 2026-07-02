@@ -1,5 +1,4 @@
-"""
-Feishu document comment access-control rules.
+"""Feishu document comment access-control rules.
 
 3-tier rule resolution: exact doc > wildcard "*" > top-level > code defaults.
 Each field (enabled/policy/allow_from) falls back independently.
@@ -14,7 +13,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from hermes_constants import get_hermes_home
 
@@ -42,23 +41,26 @@ _VALID_POLICIES = ("allowlist", "pairing")
 @dataclass(frozen=True)
 class CommentDocumentRule:
     """Per-document rule.  ``None`` means 'inherit from lower tier'."""
-    enabled: Optional[bool] = None
-    policy: Optional[str] = None
-    allow_from: Optional[frozenset] = None
+
+    enabled: bool | None = None
+    policy: str | None = None
+    allow_from: frozenset | None = None
 
 
 @dataclass(frozen=True)
 class CommentsConfig:
     """Top-level comment access config."""
+
     enabled: bool = True
     policy: str = "pairing"
     allow_from: frozenset = field(default_factory=frozenset)
-    documents: Dict[str, CommentDocumentRule] = field(default_factory=dict)
+    documents: dict[str, CommentDocumentRule] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ResolvedCommentRule:
     """Fully resolved rule after field-by-field fallback."""
+
     enabled: bool
     policy: str
     allow_from: frozenset
@@ -75,7 +77,7 @@ class _MtimeCache:
     def __init__(self, path: Path):
         self._path = path
         self._mtime: float = 0.0
-        self._data: Optional[dict] = None
+        self._data: dict | None = None
 
     def load(self) -> dict:
         try:
@@ -90,7 +92,7 @@ class _MtimeCache:
             return self._data
 
         try:
-            with open(self._path, "r", encoding="utf-8") as f:
+            with Path(self._path).open("r", encoding="utf-8") as f:
                 data = json.load(f)
             if not isinstance(data, dict):
                 data = {}
@@ -111,7 +113,7 @@ _pairing_cache = _MtimeCache(PAIRING_FILE)
 # Config parsing
 # ---------------------------------------------------------------------------
 
-def _parse_frozenset(raw: Any) -> Optional[frozenset]:
+def _parse_frozenset(raw: Any) -> frozenset | None:
     """Parse a list of strings into a frozenset; return None if key absent."""
     if raw is None:
         return None
@@ -139,7 +141,7 @@ def load_config() -> CommentsConfig:
     if not raw:
         return CommentsConfig()
 
-    documents: Dict[str, CommentDocumentRule] = {}
+    documents: dict[str, CommentDocumentRule] = {}
     raw_docs = raw.get("documents", {})
     if isinstance(raw_docs, dict):
         for key, rule_raw in raw_docs.items():
@@ -235,7 +237,7 @@ def _load_pairing_approved() -> set:
 def _save_pairing(data: dict) -> None:
     PAIRING_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = PAIRING_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
+    with Path(tmp).open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     tmp.replace(PAIRING_FILE)
     # Invalidate cache so next load picks up change
@@ -271,7 +273,7 @@ def pairing_remove(user_open_id: str) -> bool:
     return True
 
 
-def pairing_list() -> Dict[str, Any]:
+def pairing_list() -> dict[str, Any]:
     """Return the approved dict  {user_open_id: {approved_at: ...}}."""
     data = _pairing_cache.load()
     approved = data.get("approved", {})
@@ -302,7 +304,7 @@ def _print_status() -> None:
     print(f"Pairing file: {PAIRING_FILE}")
     print(f"  exists: {PAIRING_FILE.exists()}")
     print()
-    print(f"Top-level:")
+    print("Top-level:")
     print(f"  enabled:    {cfg.enabled}")
     print(f"  policy:     {cfg.policy}")
     print(f"  allow_from: {sorted(cfg.allow_from) if cfg.allow_from else '[]'}")
@@ -339,7 +341,7 @@ def _do_check(doc_key: str, user_open_id: str) -> None:
     allowed = is_user_allowed(rule, user_open_id)
     print(f"Document:     {doc_key}")
     print(f"User:         {user_open_id}")
-    print(f"Resolved rule:")
+    print("Resolved rule:")
     print(f"  enabled:      {rule.enabled}")
     print(f"  policy:       {rule.policy}")
     print(f"  allow_from:   {sorted(rule.allow_from) if rule.allow_from else '[]'}")

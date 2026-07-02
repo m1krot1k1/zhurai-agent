@@ -6,7 +6,6 @@ applied in BOTH places or the interactive CLI/TUI surface (skin, display prefs)
 silently ignores administrator-pinned values while `hermes config`/`doctor`
 honor them. This locks the cli.py path.
 """
-import importlib
 
 import pytest
 
@@ -59,7 +58,7 @@ def test_cli_config_managed_leaf_preserves_user_siblings(homes):
     """Managed display.skin must not wipe a user's other display.* prefs."""
     home, managed = homes
     (home / "config.yaml").write_text(
-        "display:\n  skin: user_skin\n  show_reasoning: true\n", encoding="utf-8"
+        "display:\n  skin: user_skin\n  show_reasoning: true\n", encoding="utf-8",
     )
     (managed / "config.yaml").write_text("display:\n  skin: charizard\n", encoding="utf-8")
     from hermes_cli import managed_scope

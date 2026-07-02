@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -33,7 +33,9 @@ sys.path.insert(0, REPO_ROOT)
 # Ensure HERMES_HOME is set for imports that touch it at module level.
 os.environ.setdefault("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
 
-from hermes_cli.models import OPENROUTER_MODELS, _PROVIDER_MODELS  # noqa: E402
+import pathlib
+
+from hermes_cli.models import _PROVIDER_MODELS, OPENROUTER_MODELS  # noqa: E402
 
 OUTPUT_PATH = os.path.join(REPO_ROOT, "website", "static", "api", "model-catalog.json")
 CATALOG_VERSION = 1
@@ -42,7 +44,7 @@ CATALOG_VERSION = 1
 def build_catalog() -> dict:
     return {
         "version": CATALOG_VERSION,
-        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
             "source": "hermes-agent repo",
             "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog",
@@ -80,8 +82,8 @@ def build_catalog() -> dict:
 
 def main() -> int:
     catalog = build_catalog()
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as fh:
+    pathlib.Path(os.path.dirname(OUTPUT_PATH)).mkdir(exist_ok=True, parents=True)
+    with pathlib.Path(OUTPUT_PATH).open("w", encoding="utf-8") as fh:
         json.dump(catalog, fh, indent=2)
         fh.write("\n")
 

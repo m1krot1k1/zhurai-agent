@@ -62,14 +62,18 @@ class TestExchangeCopilotToken:
 
     @patch("urllib.request.urlopen")
     def test_refreshes_expired_cache(self, mock_urlopen):
-        from hermes_cli.copilot_auth import exchange_copilot_token, _jwt_cache, _token_fingerprint
+        from hermes_cli.copilot_auth import (
+            _jwt_cache,
+            _token_fingerprint,
+            exchange_copilot_token,
+        )
 
         # Seed cache with expired entry
         fp = _token_fingerprint("gho_test123")
         _jwt_cache[fp] = ("old_token", time.time() - 10)
 
         mock_urlopen.return_value = self._mock_urlopen(
-            token="new_token", expires_at=time.time() + 1800
+            token="new_token", expires_at=time.time() + 1800,
         )
         api_token, _ = exchange_copilot_token("gho_test123")
 

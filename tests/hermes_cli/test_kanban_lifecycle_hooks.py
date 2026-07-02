@@ -38,7 +38,7 @@ def captured_hooks(monkeypatch):
     saved = {k: list(v) for k, v in mgr._hooks.items()}
     for hook in ("kanban_task_claimed", "kanban_task_completed", "kanban_task_blocked"):
         mgr._hooks.setdefault(hook, []).append(
-            lambda _h=hook, **kw: events.append((_h, kw))
+            lambda _h=hook, **kw: events.append((_h, kw)),
         )
     try:
         yield events

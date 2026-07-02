@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from agent.web_search_provider import WebSearchProvider
 
@@ -77,11 +77,11 @@ def _get_sync_client() -> Any:
     if not api_key:
         raise ValueError(
             "PARALLEL_API_KEY environment variable not set. "
-            "Get your API key at https://parallel.ai"
+            "Get your API key at https://parallel.ai",
         )
 
     _ensure_parallel_sdk_installed()
-    from parallel import Parallel  # noqa: WPS433 — deliberately lazy
+    from parallel import Parallel
 
     client = Parallel(api_key=api_key)
     _wt._parallel_client = client
@@ -103,11 +103,11 @@ def _get_async_client() -> Any:
     if not api_key:
         raise ValueError(
             "PARALLEL_API_KEY environment variable not set. "
-            "Get your API key at https://parallel.ai"
+            "Get your API key at https://parallel.ai",
         )
 
     _ensure_parallel_sdk_installed()
-    from parallel import AsyncParallel  # noqa: WPS433 — deliberately lazy
+    from parallel import AsyncParallel
 
     client = AsyncParallel(api_key=api_key)
     _wt._async_parallel_client = client
@@ -161,7 +161,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
     def supports_extract(self) -> bool:
         return True
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Execute a Parallel search (sync).
 
         Uses the ``beta.search`` endpoint with the configured mode
@@ -176,7 +176,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
 
             mode = _resolve_search_mode()
             logger.info(
-                "Parallel search: '%s' (mode=%s, limit=%d)", query, mode, limit
+                "Parallel search: '%s' (mode=%s, limit=%d)", query, mode, limit,
             )
             response = _get_sync_client().beta.search(
                 search_queries=[query],
@@ -194,7 +194,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
                         "title": result.title or "",
                         "description": " ".join(excerpts) if excerpts else "",
                         "position": i + 1,
-                    }
+                    },
                 )
 
             return {"success": True, "data": {"web": web_results}}
@@ -210,8 +210,8 @@ class ParallelWebSearchProvider(WebSearchProvider):
             return {"success": False, "error": f"Parallel search failed: {exc}"}
 
     async def extract(
-        self, urls: List[str], **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+        self, urls: list[str], **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         """Extract content from one or more URLs via the async SDK.
 
         Returns the legacy list-of-results shape that
@@ -233,7 +233,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
                 full_content=True,
             )
 
-            results: List[Dict[str, Any]] = []
+            results: list[dict[str, Any]] = []
             for result in response.results or []:
                 content = result.full_content or ""
                 if not content:
@@ -247,7 +247,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
                         "content": content,
                         "raw_content": content,
                         "metadata": {"sourceURL": url, "title": title},
-                    }
+                    },
                 )
 
             for error in response.errors or []:
@@ -258,7 +258,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
                         "content": "",
                         "error": error.content or error.error_type or "extraction failed",
                         "metadata": {"sourceURL": error.url or ""},
-                    }
+                    },
                 )
 
             return results
@@ -276,7 +276,7 @@ class ParallelWebSearchProvider(WebSearchProvider):
                 for u in urls
             ]
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Parallel",
             "badge": "paid",

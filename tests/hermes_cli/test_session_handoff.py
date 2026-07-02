@@ -42,7 +42,7 @@ class TestHandoffStateDB:
     def test_columns_exist(self, db):
         db._conn.execute(
             "SELECT handoff_state, handoff_platform, handoff_error "
-            "FROM sessions LIMIT 0"
+            "FROM sessions LIMIT 0",
         )
 
     def test_request_handoff_marks_pending(self, db):
@@ -195,7 +195,7 @@ class TestHandoffCommandRegistration:
 
     def test_command_is_cli_only(self):
         """`/handoff` is initiated from the CLI; gateway shouldn't expose it."""
-        from hermes_cli.commands import resolve_command, GATEWAY_KNOWN_COMMANDS
+        from hermes_cli.commands import GATEWAY_KNOWN_COMMANDS, resolve_command
         cmd = resolve_command("handoff")
         assert cmd is not None
         assert cmd.cli_only is True

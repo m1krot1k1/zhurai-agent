@@ -1,24 +1,28 @@
 """Tests for the hermes_cli models module."""
 
 import io
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from hermes_cli.nous_account import NousPortalAccountInfo
+import hermes_cli.models as _models_mod
 from hermes_cli.models import (
-    OPENROUTER_MODELS, fetch_openrouter_models, model_ids, detect_provider_for_model,
-    is_nous_free_tier, partition_nous_models_by_tier,
-    check_nous_free_tier, _FREE_TIER_CACHE_TTL,
+    _FREE_TIER_CACHE_TTL,
+    OPENROUTER_MODELS,
+    check_nous_free_tier,
+    detect_provider_for_model,
+    fetch_openrouter_models,
+    is_nous_free_tier,
+    model_ids,
+    partition_nous_models_by_tier,
     union_with_portal_free_recommendations,
     union_with_portal_paid_recommendations,
 )
-import hermes_cli.models as _models_mod
+from hermes_cli.nous_account import NousPortalAccountInfo
 
 LIVE_OPENROUTER_MODELS = [
     ("anthropic/claude-opus-4.6", "recommended"),
     ("qwen/qwen3.7-max", ""),
     ("nvidia/nemotron-3-super-120b-a12b:free", "free"),
 ]
-
 
 
 class TestModelIds:
@@ -44,9 +48,6 @@ class TestModelIds:
         with patch("hermes_cli.models.fetch_openrouter_models", return_value=LIVE_OPENROUTER_MODELS):
             ids = model_ids()
         assert len(ids) == len(set(ids)), "Duplicate model IDs found"
-
-
-
 
 
 class TestOpenRouterModels:
@@ -244,7 +245,8 @@ class TestFetchOpenRouterModels:
 
     def test_empty_api_response_falls_back(self, monkeypatch):
         """Empty data array from OpenRouter API must fall back to curated
-        models rather than returning an empty picker."""
+        models rather than returning an empty picker.
+        """
         class _Resp:
             def __enter__(self): return self
             def __exit__(self, exc_type, exc, tb): return False
@@ -261,11 +263,12 @@ class TestFetchOpenRouterModels:
     def test_malformed_json_response_falls_back(self, monkeypatch):
         """Malformed (non-JSON) response from OpenRouter must fall back to
         curated manifest — JSONDecodeError inside the try block is caught
-        by the same except Exception handler."""
+        by the same except Exception handler.
+        """
         class _Resp:
             def __enter__(self): return self
             def __exit__(self, exc_type, exc, tb): return False
-            def read(self): return b'not json at all'
+            def read(self): return b"not json at all"
 
         monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
         with patch("hermes_cli.model_catalog.get_curated_openrouter_models", return_value=None):
@@ -277,7 +280,8 @@ class TestFetchOpenRouterModels:
 
     def test_timeout_falls_back(self, monkeypatch):
         """Network timeout during OpenRouter fetch must not propagate
-        to the picker — falls back to curated."""
+        to the picker — falls back to curated.
+        """
         monkeypatch.setattr(_models_mod, "_openrouter_catalog_cache", None)
         with patch("hermes_cli.model_catalog.get_curated_openrouter_models", return_value=None):
             with patch("hermes_cli.models.urllib.request.urlopen", side_effect=TimeoutError("timed out")):
@@ -288,10 +292,12 @@ class TestFetchOpenRouterModels:
 
     def test_duplicate_ids_in_api_response_deduplicated(self, monkeypatch):
         """Duplicate model IDs in the API response must be deduplicated
-        (last wins in live_by_id dict) — no crash, no duplicate entries."""
+        (last wins in live_by_id dict) — no crash, no duplicate entries.
+        """
         class _Resp:
             def __enter__(self): return self
             def __exit__(self, exc_type, exc, tb): return False
+
             def read(self):
                 return (
                     b'{"data":['
@@ -318,13 +324,13 @@ class TestOpenRouterToolSupportHelper:
     def test_tools_in_supported_parameters(self):
         from hermes_cli.models import _openrouter_model_supports_tools
         assert _openrouter_model_supports_tools(
-            {"id": "x", "supported_parameters": ["temperature", "tools"]}
+            {"id": "x", "supported_parameters": ["temperature", "tools"]},
         ) is True
 
     def test_tools_missing_from_supported_parameters(self):
         from hermes_cli.models import _openrouter_model_supports_tools
         assert _openrouter_model_supports_tools(
-            {"id": "x", "supported_parameters": ["temperature", "response_format"]}
+            {"id": "x", "supported_parameters": ["temperature", "response_format"]},
         ) is False
 
     def test_supported_parameters_absent_is_permissive(self):
@@ -340,7 +346,7 @@ class TestOpenRouterToolSupportHelper:
         """Malformed (non-list) value → allow rather than silently drop."""
         from hermes_cli.models import _openrouter_model_supports_tools
         assert _openrouter_model_supports_tools(
-            {"id": "x", "supported_parameters": "tools,temperature"}
+            {"id": "x", "supported_parameters": "tools,temperature"},
         ) is True
 
     def test_non_dict_item_is_permissive(self):
@@ -352,7 +358,7 @@ class TestOpenRouterToolSupportHelper:
         """Explicit empty list → no tools → drop."""
         from hermes_cli.models import _openrouter_model_supports_tools
         assert _openrouter_model_supports_tools(
-            {"id": "x", "supported_parameters": []}
+            {"id": "x", "supported_parameters": []},
         ) is False
 
 
@@ -443,7 +449,7 @@ class TestDetectProviderForModel:
         with patch("hermes_cli.models.fetch_openrouter_models", return_value=LIVE_OPENROUTER_MODELS):
             result = detect_provider_for_model("claude-opus-4-6", "openai-codex")
         assert result is not None
-        assert result[0] not in {"nous",}  # nous has claude models but shouldn't be suggested
+        assert result[0] not in {"nous"}  # nous has claude models but shouldn't be suggested
 
 
 class TestIsNousFreeTier:
@@ -521,7 +527,7 @@ class TestPartitionNousModelsByTier:
     def test_all_free_models(self):
         """When all models are free, free-tier users can select all."""
         models = ["xiaomi/mimo-v2-pro", "xiaomi/mimo-v2-omni"]
-        pricing = {m: self._FREE for m in models}
+        pricing = dict.fromkeys(models, self._FREE)
         sel, unav = partition_nous_models_by_tier(models, pricing, free_tier=True)
         assert sel == models
         assert unav == []
@@ -529,7 +535,7 @@ class TestPartitionNousModelsByTier:
     def test_all_paid_models(self):
         """When all models are paid, free-tier users have none selectable."""
         models = ["anthropic/claude-opus-4.6", "openai/gpt-5.4"]
-        pricing = {m: self._PAID for m in models}
+        pricing = dict.fromkeys(models, self._PAID)
         sel, unav = partition_nous_models_by_tier(models, pricing, free_tier=True)
         assert sel == []
         assert unav == models
@@ -650,7 +656,7 @@ class TestUnionWithPortalFreeRecommendations:
                     {"displayName": "no-modelName"},
                     {"modelName": ""},
                     {"modelName": "qwen/qwen3.6-plus"},
-                ]
+                ],
             },
         ):
             ids, p = union_with_portal_free_recommendations(curated, pricing, "")
@@ -776,7 +782,7 @@ class TestUnionWithPortalPaidRecommendations:
                     {"displayName": "no-modelName"},
                     {"modelName": ""},
                     {"modelName": "openai/gpt-5.4"},
-                ]
+                ],
             },
         ):
             ids, p = union_with_portal_paid_recommendations(curated, pricing, "")

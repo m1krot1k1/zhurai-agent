@@ -5,11 +5,9 @@ the `else` clause of the attachment content-type loop that was added
 to download, cache, and optionally inject text from non-image/audio files.
 """
 
-import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,10 +15,10 @@ import pytest
 from gateway.config import PlatformConfig
 from gateway.platforms.base import MessageType
 
-
 # ---------------------------------------------------------------------------
 # Discord mock setup (copied from test_discord_free_response.py)
 # ---------------------------------------------------------------------------
+
 
 def _ensure_discord_mock():
     """Install a mock discord module when discord.py isn't available."""
@@ -57,13 +55,15 @@ def _ensure_discord_mock():
 
 _ensure_discord_mock()
 
+import pathlib
+
 import plugins.platforms.discord.adapter as discord_platform  # noqa: E402
 from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fake channel / thread types
 # ---------------------------------------------------------------------------
+
 
 class FakeDMChannel:
     def __init__(self, channel_id: int = 1):
@@ -89,7 +89,7 @@ class FakeThread:
 def _redirect_cache(tmp_path, monkeypatch):
     """Point document cache to tmp_path so tests never write to ~/.hermes."""
     monkeypatch.setattr(
-        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache"
+        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache",
     )
 
 
@@ -112,7 +112,7 @@ def adapter(monkeypatch):
 def make_attachment(
     *,
     filename: str,
-    content_type: Optional[str],
+    content_type: str | None,
     size: int = 1024,
     url: str = "https://cdn.discordapp.com/attachments/fake/file",
 ) -> SimpleNamespace:
@@ -131,7 +131,7 @@ def make_message(attachments: list, content: str = "") -> SimpleNamespace:
         attachments=attachments,
         mentions=[],
         reference=None,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         channel=FakeDMChannel(),
         author=SimpleNamespace(id=42, display_name="Tester", name="Tester"),
     )
@@ -171,7 +171,7 @@ class TestIncomingDocumentHandling:
         event = adapter.handle_message.call_args[0][0]
         assert event.message_type == MessageType.DOCUMENT
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert event.media_types == ["application/pdf"]
         assert "[Content of" not in (event.text or "")
 
@@ -235,7 +235,7 @@ class TestIncomingDocumentHandling:
                 filename="huge.pdf",
                 content_type="application/pdf",
                 size=33 * 1024 * 1024,
-            )
+            ),
         ])
         await adapter._handle_message(msg)
 
@@ -252,7 +252,7 @@ class TestIncomingDocumentHandling:
                 filename="bugreport.zip",
                 content_type="application/zip",
                 size=25 * 1024 * 1024,
-            )
+            ),
         ])
 
         with _mock_aiohttp_download(b"PK\x03\x04test"):
@@ -266,7 +266,7 @@ class TestIncomingDocumentHandling:
     async def test_zip_document_cached(self, adapter):
         """A .zip file should be cached as a supported document."""
         msg = make_message([
-            make_attachment(filename="archive.zip", content_type="application/zip")
+            make_attachment(filename="archive.zip", content_type="application/zip"),
         ])
 
         with _mock_aiohttp_download(b"PK\x03\x04test"):
@@ -291,7 +291,7 @@ class TestIncomingDocumentHandling:
 
         with patch("aiohttp.ClientSession", return_value=session):
             msg = make_message([
-                make_attachment(filename="report.pdf", content_type="application/pdf")
+                make_attachment(filename="report.pdf", content_type="application/pdf"),
             ])
             await adapter._handle_message(msg)
 
@@ -314,7 +314,7 @@ class TestIncomingDocumentHandling:
 
         event = adapter.handle_message.call_args[0][0]
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         assert "[Content of" not in (event.text or "")
 
     @pytest.mark.asyncio
@@ -376,7 +376,7 @@ class TestIncomingDocumentHandling:
             return_value="/tmp/cached_image.png",
         ):
             msg = make_message([
-                make_attachment(filename="photo.png", content_type="image/png")
+                make_attachment(filename="photo.png", content_type="image/png"),
             ])
             await adapter._handle_message(msg)
 
@@ -401,13 +401,13 @@ class TestAllowAnyAttachment:
         """Default: unknown extension is cached, not dropped."""
         with _mock_aiohttp_download(b"\x00\x01\x02 binary payload"):
             msg = make_message([
-                make_attachment(filename="weird.xyz", content_type="application/x-custom")
+                make_attachment(filename="weird.xyz", content_type="application/x-custom"),
             ])
             await adapter._handle_message(msg)
 
         event = adapter.handle_message.call_args[0][0]
         assert len(event.media_urls) == 1
-        assert os.path.exists(event.media_urls[0])
+        assert pathlib.Path(event.media_urls[0]).exists()
         # Falls back to the source content_type when we have one.
         assert event.media_types == ["application/x-custom"]
         assert event.message_type == MessageType.DOCUMENT
@@ -421,7 +421,7 @@ class TestAllowAnyAttachment:
         html = b"<html><body>hi</body></html>"
         with _mock_aiohttp_download(html):
             msg = make_message([
-                make_attachment(filename="page.html", content_type="text/html")
+                make_attachment(filename="page.html", content_type="text/html"),
             ])
             await adapter._handle_message(msg)
 
@@ -435,7 +435,7 @@ class TestAllowAnyAttachment:
         """No content_type from discord: MIME falls back to octet-stream."""
         with _mock_aiohttp_download(b"\x00raw bytes\x01"):
             msg = make_message([
-                make_attachment(filename="mystery.bin", content_type=None)
+                make_attachment(filename="mystery.bin", content_type=None),
             ])
             await adapter._handle_message(msg)
 
@@ -453,7 +453,7 @@ class TestAllowAnyAttachment:
                 filename="too_big.xyz",
                 content_type="application/x-custom",
                 size=2048,
-            )
+            ),
         ])
         await adapter._handle_message(msg)
 
@@ -472,7 +472,7 @@ class TestAllowAnyAttachment:
                     filename="huge.xyz",
                     content_type="application/x-custom",
                     size=64 * 1024 * 1024,
-                )
+                ),
             ])
             await adapter._handle_message(msg)
 
@@ -510,4 +510,3 @@ class TestAllowAnyAttachment:
         """Garbage in max_attachment_bytes config falls back to 32 MiB."""
         adapter.config.extra["max_attachment_bytes"] = "not-a-number"
         assert adapter._discord_max_attachment_bytes() == 32 * 1024 * 1024
-

@@ -18,7 +18,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get_json  # noqa: E402
+from _http import get_json
 
 WP_OPENSEARCH = "https://en.wikipedia.org/w/api.php"
 WP_SUMMARY = "https://en.wikipedia.org/api/rest_v1/page/summary/"
@@ -61,7 +61,7 @@ def _wp_search(query: str, limit: int) -> list[dict]:
                 "title": title,
                 "description": descs[i] if i < len(descs) else "",
                 "url": urls[i] if i < len(urls) else "",
-            }
+            },
         )
     return out
 
@@ -131,7 +131,7 @@ def _wd_lookup_by_qid(qid: str) -> dict:
                 m = re.search(r"[+-]?(\d{4})-(\d{2})-(\d{2})", raw)
                 if m:
                     facts.setdefault(slot, []).append(
-                        f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+                        f"{m.group(1)}-{m.group(2)}-{m.group(3)}",
                     )
             elif vtype == "string":
                 facts.setdefault(slot, []).append(str(value))
@@ -228,11 +228,11 @@ def fetch(query: str, limit: int, no_wikidata: bool, out_path: str) -> int:
                 "date_of_birth": "; ".join(facts.get("date_of_birth", []))[:10] if facts.get("date_of_birth") else "",
                 "place_of_birth": "; ".join(facts.get("place_of_birth", [])),
                 "summary": (summary.get("extract") or "").replace("\n", " ")[:1000],
-            }
+            },
         )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)

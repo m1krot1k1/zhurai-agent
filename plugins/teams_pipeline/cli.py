@@ -6,12 +6,12 @@ import argparse
 import asyncio
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from hermes_constants import display_hermes_home
 from gateway.config import Platform, load_gateway_config
+from hermes_constants import display_hermes_home
 from plugins.teams_pipeline.meetings import (
     enrich_meeting_with_call_record,
     fetch_preferred_transcript_text,
@@ -20,12 +20,18 @@ from plugins.teams_pipeline.meetings import (
 )
 from plugins.teams_pipeline.models import GraphSubscription
 from plugins.teams_pipeline.pipeline import TeamsMeetingPipeline
-from plugins.teams_pipeline.store import TeamsPipelineStore, resolve_teams_pipeline_store_path
+from plugins.teams_pipeline.store import (
+    TeamsPipelineStore,
+    resolve_teams_pipeline_store_path,
+)
 from plugins.teams_pipeline.subscriptions import (
     build_graph_client,
     maintain_graph_subscriptions,
 )
-from tools.microsoft_graph_auth import MicrosoftGraphConfigError, MicrosoftGraphTokenProvider
+from tools.microsoft_graph_auth import (
+    MicrosoftGraphConfigError,
+    MicrosoftGraphTokenProvider,
+)
 
 
 def register_cli(subparser: argparse.ArgumentParser) -> None:
@@ -93,7 +99,7 @@ def teams_pipeline_command(args: argparse.Namespace) -> int:
     if not action:
         print(
             "Usage: hermes teams-pipeline "
-            "{list|show|run|fetch|subscriptions|subscribe|renew-subscription|delete-subscription|maintain-subscriptions|token-health|validate}"
+            "{list|show|run|fetch|subscriptions|subscribe|renew-subscription|delete-subscription|maintain-subscriptions|token-health|validate}",
         )
         return 2
 
@@ -150,8 +156,8 @@ def _graph_setup_hint() -> str:
 
 
 def _iso_utc_timestamp(hours_from_now: int) -> str:
-    return (datetime.now(timezone.utc) + timedelta(hours=hours_from_now)).replace(
-        microsecond=0
+    return (datetime.now(UTC) + timedelta(hours=hours_from_now)).replace(
+        microsecond=0,
     ).isoformat().replace("+00:00", "Z")
 
 
@@ -220,12 +226,12 @@ def _validate_configuration_snapshot(store: TeamsPipelineStore) -> dict[str, Any
     elif teams_mode == "graph":
         missing: list[str] = []
         has_graph_delivery_token = bool(
-            (teams_config.token if teams_config else "") or teams_extra.get("access_token")
+            (teams_config.token if teams_config else "") or teams_extra.get("access_token"),
         )
         has_graph_app_credentials = all(graph.values())
         if not has_graph_delivery_token and not has_graph_app_credentials:
             missing.append(
-                "TEAMS_GRAPH_ACCESS_TOKEN or complete MSGRAPH_* app credentials"
+                "TEAMS_GRAPH_ACCESS_TOKEN or complete MSGRAPH_* app credentials",
             )
         if not teams_extra.get("team_id"):
             missing.append("TEAMS_TEAM_ID")
@@ -319,12 +325,12 @@ def _cmd_fetch(args) -> None:
             meeting_id=meeting_id,
             join_web_url=join_web_url,
             tenant_id=tenant_id,
-        )
+        ),
     )
     transcript_artifact, transcript_text = _run_async(fetch_preferred_transcript_text(client, meeting_ref))
     recordings = _run_async(list_recording_artifacts(client, meeting_ref))
     call_record = _run_async(
-        enrich_meeting_with_call_record(client, meeting_ref, call_record_id=call_record_id)
+        enrich_meeting_with_call_record(client, meeting_ref, call_record_id=call_record_id),
     )
     print(
         json.dumps(
@@ -339,7 +345,7 @@ def _cmd_fetch(args) -> None:
             },
             indent=2,
             sort_keys=True,
-        )
+        ),
     )
 
 
@@ -407,7 +413,7 @@ def _cmd_renew_subscription(args) -> None:
         build_graph_client().patch_json(
             f"/subscriptions/{subscription_id}",
             json_body={"expirationDateTime": expiration},
-        )
+        ),
     )
     merged = {"id": subscription_id, **(result or {}), "expirationDateTime": expiration}
     _sync_subscription_record(store, merged, status="active", renewed=True)
@@ -435,7 +441,7 @@ def _cmd_maintain_subscriptions(args) -> None:
             extend_hours=int(getattr(args, "extend_hours", 24) or 24),
             dry_run=bool(getattr(args, "dry_run", False)),
             client_state=str(getattr(args, "client_state", "") or "").strip() or None,
-        )
+        ),
     )
     print(json.dumps(result, indent=2, sort_keys=True))
 

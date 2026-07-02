@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get, get_json  # noqa: E402
+from _http import get, get_json
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 COLUMNS = [
@@ -40,7 +40,7 @@ def _ua() -> str:
     if not ua:
         raise SystemExit(
             "SEC requires a User-Agent with contact info. "
-            "Set SEC_USER_AGENT='Your Name your@email'."
+            "Set SEC_USER_AGENT='Your Name your@email'.",
         )
     return ua
 
@@ -80,7 +80,7 @@ def fetch(
             # and tell the user clearly.
             print(f"SEC EDGAR: {e}", file=sys.stderr)
             Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-            with open(out_path, "w", newline="", encoding="utf-8") as fh:
+            with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
                 csv.DictWriter(fh, fieldnames=COLUMNS).writeheader()
             return 0
         if resolved_name:
@@ -135,11 +135,11 @@ def fetch(
                 "primary_document": pdoc,
                 "filing_url": filing_url,
                 "reporting_period": period[i] if i < len(period) else "",
-            }
+            },
         )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)

@@ -95,6 +95,7 @@ class OSSBackend(Mem0Backend):
 
     def __init__(self, oss_config: dict):
         import os
+
         from mem0 import Memory
 
         vector_store = dict(oss_config["vector_store"])
@@ -180,7 +181,7 @@ class OSSBackend(Mem0Backend):
                         row = cur.fetchone()
                         if row and row[0] > 0 and row[0] != expected_dims:
                             cur.execute(pgsql.SQL("DROP TABLE IF EXISTS {}").format(
-                                pgsql.Identifier(collection_name)
+                                pgsql.Identifier(collection_name),
                             ))
                     finally:
                         cur.close()

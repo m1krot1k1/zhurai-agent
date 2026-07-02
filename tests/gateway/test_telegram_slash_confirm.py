@@ -34,8 +34,8 @@ def _ensure_telegram_mock():
 
 _ensure_telegram_mock()
 
-from plugins.platforms.telegram.adapter import TelegramAdapter
 from gateway.config import PlatformConfig
+from plugins.platforms.telegram.adapter import TelegramAdapter
 
 
 def _make_adapter():
@@ -52,7 +52,8 @@ class TestSendSlashConfirm:
     async def test_uses_markdown_v2_and_escapes_special_chars(self):
         """send_slash_confirm must pass preview through format_message and use
         MARKDOWN_V2 — so commands with underscores, dots, or brackets don't
-        raise BadRequest: Can't parse entities."""
+        raise BadRequest: Can't parse entities.
+        """
         adapter = _make_adapter()
         sent = {}
 
@@ -80,7 +81,7 @@ class TestSendSlashConfirm:
     async def test_stores_slash_confirm_state(self):
         adapter = _make_adapter()
         adapter._bot.send_message = AsyncMock(
-            return_value=SimpleNamespace(message_id=8)
+            return_value=SimpleNamespace(message_id=8),
         )
 
         await adapter.send_slash_confirm(

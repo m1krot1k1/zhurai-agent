@@ -35,6 +35,8 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from cron.scheduler_provider import CronScheduler
+
 logger = logging.getLogger(__name__)
 
 _CRON_PLUGINS_DIR = Path(__file__).parent
@@ -44,7 +46,7 @@ _CRON_PLUGINS_DIR = Path(__file__).parent
 _USER_NAMESPACE = "_hermes_user_cron"
 
 
-def _register_synthetic_package(name: str, search_locations: List[str]) -> None:
+def _register_synthetic_package(name: str, search_locations: list[str]) -> None:
     """Register an empty package shell in sys.modules.
 
     User-installed providers import as ``_hermes_user_cron.<name>``, a dotted
@@ -66,7 +68,7 @@ def _register_synthetic_package(name: str, search_locations: List[str]) -> None:
 # Directory helpers
 # ---------------------------------------------------------------------------
 
-def _get_user_plugins_dir() -> Optional[Path]:
+def _get_user_plugins_dir() -> Path | None:
     """Return ``$HERMES_HOME/plugins/`` or None if unavailable."""
     try:
         from hermes_constants import get_hermes_home
@@ -92,14 +94,14 @@ def _is_cron_provider_dir(path: Path) -> bool:
         return False
 
 
-def _iter_provider_dirs() -> List[Tuple[str, Path]]:
+def _iter_provider_dirs() -> list[tuple[str, Path]]:
     """Yield ``(name, path)`` for all discovered provider directories.
 
     Scans bundled first, then user-installed. Bundled takes precedence on
     name collisions (first-seen wins via ``seen`` set).
     """
     seen: set = set()
-    dirs: List[Tuple[str, Path]] = []
+    dirs: list[tuple[str, Path]] = []
 
     # 1. Bundled providers (plugins/cron/<name>/)
     if _CRON_PLUGINS_DIR.is_dir():
@@ -126,7 +128,7 @@ def _iter_provider_dirs() -> List[Tuple[str, Path]]:
     return dirs
 
 
-def find_provider_dir(name: str) -> Optional[Path]:
+def find_provider_dir(name: str) -> Path | None:
     """Resolve a provider name to its directory.
 
     Checks bundled first, then user-installed.
@@ -148,7 +150,7 @@ def find_provider_dir(name: str) -> Optional[Path]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def discover_cron_schedulers() -> List[Tuple[str, str, bool]]:
+def discover_cron_schedulers() -> list[tuple[str, str, bool]]:
     """Scan bundled and user-installed directories for available providers.
 
     Returns list of (name, description, is_available) tuples. May be empty —
@@ -165,7 +167,7 @@ def discover_cron_schedulers() -> List[Tuple[str, str, bool]]:
         if yaml_file.exists():
             try:
                 import yaml
-                with open(yaml_file, encoding="utf-8-sig") as f:
+                with Path(yaml_file).open(encoding="utf-8-sig") as f:
                     meta = yaml.safe_load(f) or {}
                 desc = meta.get("description", "")
             except Exception:
@@ -187,7 +189,7 @@ def discover_cron_schedulers() -> List[Tuple[str, str, bool]]:
     return results
 
 
-def load_cron_scheduler(name: str) -> Optional["CronScheduler"]:  # noqa: F821
+def load_cron_scheduler(name: str) -> CronScheduler | None:
     """Load and return a CronScheduler instance by name.
 
     Checks both bundled (``plugins/cron/<name>/``) and user-installed
@@ -212,7 +214,7 @@ def load_cron_scheduler(name: str) -> Optional["CronScheduler"]:  # noqa: F821
         return None
 
 
-def _load_provider_from_dir(provider_dir: Path) -> Optional["CronScheduler"]:  # noqa: F821
+def _load_provider_from_dir(provider_dir: Path) -> CronScheduler | None:
     """Import a provider module and extract the CronScheduler instance.
 
     The module must have either:
@@ -245,7 +247,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["CronScheduler"]:  #
                 if parent_init.exists():
                     spec = importlib.util.spec_from_file_location(
                         parent, str(parent_init),
-                        submodule_search_locations=[str(parent_path)]
+                        submodule_search_locations=[str(parent_path)],
                     )
                     if spec:
                         parent_mod = importlib.util.module_from_spec(spec)
@@ -263,7 +265,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["CronScheduler"]:  #
         # Now load the provider module
         spec = importlib.util.spec_from_file_location(
             module_name, str(init_file),
-            submodule_search_locations=[str(provider_dir)]
+            submodule_search_locations=[str(provider_dir)],
         )
         if not spec:
             return None
@@ -280,7 +282,7 @@ def _load_provider_from_dir(provider_dir: Path) -> Optional["CronScheduler"]:  #
             full_sub_name = f"{module_name}.{sub_name}"
             if full_sub_name not in sys.modules:
                 sub_spec = importlib.util.spec_from_file_location(
-                    full_sub_name, str(sub_file)
+                    full_sub_name, str(sub_file),
                 )
                 if sub_spec:
                     sub_mod = importlib.util.module_from_spec(sub_spec)

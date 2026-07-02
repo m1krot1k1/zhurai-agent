@@ -1,5 +1,4 @@
-"""
-Web Search Provider ABC
+"""Web Search Provider ABC
 =======================
 
 Defines the pluggable-backend interface for web search and content extraction.
@@ -52,8 +51,7 @@ On failure (either capability)::
 from __future__ import annotations
 
 import abc
-from typing import Any, Dict, List
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # ABC
@@ -113,7 +111,7 @@ class WebSearchProvider(abc.ABC):
         """
         return False
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Execute a web search.
 
         Override when :meth:`supports_search` returns True. The default
@@ -121,10 +119,10 @@ class WebSearchProvider(abc.ABC):
         :meth:`supports_search` before calling.
         """
         raise NotImplementedError(
-            f"{self.name} does not support search (override supports_search)"
+            f"{self.name} does not support search (override supports_search)",
         )
 
-    def extract(self, urls: List[str], **kwargs: Any) -> Any:
+    def extract(self, urls: list[str], **kwargs: Any) -> Any:
         """Extract content from one or more URLs.
 
         Override when :meth:`supports_extract` returns True. The default
@@ -154,10 +152,10 @@ class WebSearchProvider(abc.ABC):
         ``max_chars``) — implementations should ignore unknown keys.
         """
         raise NotImplementedError(
-            f"{self.name} does not support extract (override supports_extract)"
+            f"{self.name} does not support extract (override supports_extract)",
         )
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         """Return provider metadata for the ``hermes tools`` picker.
 
         Used by ``hermes_cli/tools_config.py`` to inject this provider as a

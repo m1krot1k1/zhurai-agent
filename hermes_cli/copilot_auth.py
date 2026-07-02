@@ -25,7 +25,6 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ def resolve_copilot_token() -> tuple[str, str]:
             valid, msg = validate_copilot_token(val)
             if not valid:
                 logger.warning(
-                    "Token from %s is not supported: %s", env_var, msg
+                    "Token from %s is not supported: %s", env_var, msg,
                 )
                 continue
             return val, env_var
@@ -88,7 +87,7 @@ def resolve_copilot_token() -> tuple[str, str]:
         valid, msg = validate_copilot_token(token)
         if not valid:
             raise ValueError(
-                f"Token from `gh auth token` is a classic PAT (ghp_*). {msg}"
+                f"Token from `gh auth token` is a classic PAT (ghp_*). {msg}",
             )
         return token, "gh auth token"
 
@@ -110,13 +109,13 @@ def _gh_cli_candidates() -> list[str]:
     ):
         if candidate in candidates:
             continue
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        if Path(candidate).is_file() and os.access(candidate, os.X_OK):
             candidates.append(candidate)
 
     return candidates
 
 
-def _try_gh_cli_token() -> Optional[str]:
+def _try_gh_cli_token() -> str | None:
     """Return a token from ``gh auth token`` when the GitHub CLI is available.
 
     When COPILOT_GH_HOST is set, passes ``--hostname`` so gh returns the
@@ -156,7 +155,7 @@ def copilot_device_code_login(
     *,
     host: str = "github.com",
     timeout_seconds: float = 300,
-) -> Optional[str]:
+) -> str | None:
     """Run the GitHub OAuth device code flow for Copilot.
 
     Prints instructions for the user, polls for completion, and returns
@@ -164,8 +163,8 @@ def copilot_device_code_login(
 
     This replicates the flow used by opencode and the Copilot CLI.
     """
-    import urllib.request
     import urllib.parse
+    import urllib.request
 
     domain = host.rstrip("/")
     device_code_url = f"https://{domain}/login/device/code"
@@ -248,7 +247,7 @@ def copilot_device_code_login(
         if error == "authorization_pending":
             print(".", end="", flush=True)
             continue
-        elif error == "slow_down":
+        if error == "slow_down":
             # RFC 8628: add 5 seconds to polling interval
             server_interval = result.get("interval")
             if isinstance(server_interval, (int, float)) and server_interval > 0:
@@ -257,15 +256,15 @@ def copilot_device_code_login(
                 interval += 5
             print(".", end="", flush=True)
             continue
-        elif error == "expired_token":
+        if error == "expired_token":
             print()
             print("  ✗ Device code expired. Please try again.")
             return None
-        elif error == "access_denied":
+        if error == "access_denied":
             print()
             print("  ✗ Authorization was denied.")
             return None
-        elif error:
+        if error:
             print()
             print(f"  ✗ Authorization failed: {error}")
             return None

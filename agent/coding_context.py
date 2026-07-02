@@ -58,7 +58,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("hermes.coding_context")
 
@@ -132,7 +132,7 @@ _EDIT_FORMAT_GUIDANCE: dict[str, tuple[tuple[str, ...], str]] = {
 }
 
 
-def _model_family(model: Optional[str]) -> Optional[str]:
+def _model_family(model: str | None) -> str | None:
     """Classify a model id into an edit-format family key, or ``None``.
 
     Used to steer the coding posture toward the edit tool format a model was
@@ -148,7 +148,7 @@ def _model_family(model: Optional[str]) -> Optional[str]:
     return None
 
 
-def _edit_format_line(model: Optional[str]) -> str:
+def _edit_format_line(model: str | None) -> str:
     """The edit-format guidance line for this model's family (``""`` if none)."""
     family = _model_family(model)
     if family is None:
@@ -234,9 +234,9 @@ class ContextProfile:
     """
 
     name: str
-    toolset: Optional[str] = None
+    toolset: str | None = None
     guidance: str = ""
-    model_hint: Optional[str] = None
+    model_hint: str | None = None
     memory_policy: str = "default"
     compact_skill_categories: tuple[str, ...] = ()
 
@@ -278,7 +278,7 @@ def get_profile(name: str) -> ContextProfile:
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 
-def _coding_mode(config: Optional[dict[str, Any]]) -> str:
+def _coding_mode(config: dict[str, Any] | None) -> str:
     """Return the normalized ``agent.coding_context`` mode (auto/focus/on/off)."""
     if config is None:
         try:
@@ -298,7 +298,7 @@ def _coding_mode(config: Optional[dict[str, Any]]) -> str:
     return "auto"
 
 
-def _resolve_cwd(cwd: Optional[str | Path]) -> Path:
+def _resolve_cwd(cwd: str | Path | None) -> Path:
     if cwd:
         return Path(cwd).expanduser()
     try:
@@ -309,7 +309,7 @@ def _resolve_cwd(cwd: Optional[str | Path]) -> Path:
         return Path(os.getcwd())
 
 
-def _git_root(cwd: Path) -> Optional[Path]:
+def _git_root(cwd: Path) -> Path | None:
     current = cwd.resolve()
     for parent in [current, *current.parents]:
         if (parent / ".git").exists():
@@ -317,14 +317,14 @@ def _git_root(cwd: Path) -> Optional[Path]:
     return None
 
 
-def _home() -> Optional[Path]:
+def _home() -> Path | None:
     try:
         return Path.home().resolve()
     except (OSError, RuntimeError):
         return None
 
 
-def _marker_root(cwd: Path) -> Optional[Path]:
+def _marker_root(cwd: Path) -> Path | None:
     """Nearest ancestor that looks like a project root, or ``None``.
 
     Walks up at most a few levels so a manifest in the workspace root counts
@@ -397,7 +397,7 @@ class RuntimeMode:
     # The model id this session runs (e.g. "anthropic/claude-opus-4.8"). Used
     # only to steer edit-format guidance toward the model's family — see
     # ``_edit_format_line``. Fixed for the session, so cache-safe.
-    model: Optional[str] = None
+    model: str | None = None
 
     @property
     def kind(self) -> str:
@@ -407,7 +407,7 @@ class RuntimeMode:
     def is_coding(self) -> bool:
         return self.profile.name == CODING_PROFILE.name
 
-    def toolset_selection(self, config: Optional[dict[str, Any]] = None) -> Optional[list[str]]:
+    def toolset_selection(self, config: dict[str, Any] | None = None) -> list[str] | None:
         """Toolset list for this posture, or ``None`` to keep the platform default.
 
         Non-``None`` only under the opt-in ``focus`` mode. The default posture
@@ -471,10 +471,10 @@ class RuntimeMode:
 
 def resolve_runtime_mode(
     *,
-    platform: Optional[str] = None,
-    cwd: Optional[str | Path] = None,
-    config: Optional[dict[str, Any]] = None,
-    model: Optional[str] = None,
+    platform: str | None = None,
+    cwd: str | Path | None = None,
+    config: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> RuntimeMode:
     """Resolve the operating posture once. Cheap — a handful of ``stat`` calls.
 
@@ -488,7 +488,7 @@ def resolve_runtime_mode(
     resolved_cwd = _resolve_cwd(cwd)
     mode = _coding_mode(config)
     name = _detect_profile_name(
-        mode, (platform or "").strip().lower(), str(resolved_cwd)
+        mode, (platform or "").strip().lower(), str(resolved_cwd),
     )
     return RuntimeMode(
         profile=get_profile(name),
@@ -504,9 +504,9 @@ def resolve_runtime_mode(
 
 def is_coding_context(
     *,
-    platform: Optional[str] = None,
-    cwd: Optional[str | Path] = None,
-    config: Optional[dict[str, Any]] = None,
+    platform: str | None = None,
+    cwd: str | Path | None = None,
+    config: dict[str, Any] | None = None,
 ) -> bool:
     """Whether Hermes should operate in its coding posture right now."""
     return resolve_runtime_mode(platform=platform, cwd=cwd, config=config).is_coding
@@ -514,41 +514,41 @@ def is_coding_context(
 
 def coding_selection(
     *,
-    platform: Optional[str] = None,
-    cwd: Optional[str | Path] = None,
-    config: Optional[dict[str, Any]] = None,
-) -> Optional[list[str]]:
+    platform: str | None = None,
+    cwd: str | Path | None = None,
+    config: dict[str, Any] | None = None,
+) -> list[str] | None:
     """Toolset selection for the coding posture.
 
     ``None`` unless the user opted into ``focus`` mode AND the posture is
     active — the default coding posture never overrides configured toolsets.
     """
     return resolve_runtime_mode(
-        platform=platform, cwd=cwd, config=config
+        platform=platform, cwd=cwd, config=config,
     ).toolset_selection(config)
 
 
 def coding_system_blocks(
     *,
-    platform: Optional[str] = None,
-    cwd: Optional[str | Path] = None,
-    config: Optional[dict[str, Any]] = None,
-    model: Optional[str] = None,
+    platform: str | None = None,
+    cwd: str | Path | None = None,
+    config: dict[str, Any] | None = None,
+    model: str | None = None,
 ) -> list[str]:
     """Stable system-prompt blocks for the current posture (empty when general).
 
     ``model`` steers the brief's edit-format nudge toward the model's family.
     """
     return resolve_runtime_mode(
-        platform=platform, cwd=cwd, config=config, model=model
+        platform=platform, cwd=cwd, config=config, model=model,
     ).system_blocks()
 
 
 def coding_compact_skill_categories(
     *,
-    platform: Optional[str] = None,
-    cwd: Optional[str | Path] = None,
-    config: Optional[dict[str, Any]] = None,
+    platform: str | None = None,
+    cwd: str | Path | None = None,
+    config: dict[str, Any] | None = None,
 ) -> frozenset[str]:
     """Skill categories the active posture demotes to names-only in the index.
 
@@ -559,11 +559,11 @@ def coding_compact_skill_categories(
     dropped.
     """
     return resolve_runtime_mode(
-        platform=platform, cwd=cwd, config=config
+        platform=platform, cwd=cwd, config=config,
     ).compact_skill_categories()
 
 
-def _enabled_mcp_servers(config: Optional[dict[str, Any]]) -> list[str]:
+def _enabled_mcp_servers(config: dict[str, Any] | None) -> list[str]:
     """Names of MCP servers the user has enabled — kept in the coding posture.
 
     MCP servers (figma, browser, tophat, …) are explicitly configured and part
@@ -659,7 +659,7 @@ def detect_project_facts(root: Path) -> ProjectFacts:
     """
     manifests = [m for m in _PROJECT_MARKERS if m not in _CONTEXT_FILES and (root / m).is_file()]
     package_managers = list(
-        dict.fromkeys(pm for lock, pm in (*_PY_LOCKFILES, *_JS_LOCKFILES) if (root / lock).is_file())
+        dict.fromkeys(pm for lock, pm in (*_PY_LOCKFILES, *_JS_LOCKFILES) if (root / lock).is_file()),
     )
 
     verify: list[str] = []
@@ -713,7 +713,7 @@ def _project_facts(root: Path) -> list[str]:
     return facts
 
 
-def project_facts_for(cwd: Optional[str | Path] = None) -> Optional[dict[str, Any]]:
+def project_facts_for(cwd: str | Path | None = None) -> dict[str, Any] | None:
     """Structured project facts for ``cwd`` — ``None`` outside a workspace.
 
     Same detection the system-prompt snapshot uses (git root, else marker root),
@@ -735,7 +735,7 @@ def project_facts_for(cwd: Optional[str | Path] = None) -> Optional[dict[str, An
     }
 
 
-def build_coding_workspace_block(cwd: Optional[str | Path] = None) -> str:
+def build_coding_workspace_block(cwd: str | Path | None = None) -> str:
     """Workspace snapshot for the system prompt (empty outside a workspace).
 
     Git state (branch/status/commits) when the cwd is in a repo, plus detected

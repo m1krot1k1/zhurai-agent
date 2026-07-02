@@ -32,6 +32,7 @@ def skills_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(home))
     # Force skill_usage module to re-resolve paths per test
     import importlib
+
     import tools.skill_usage as mod
     importlib.reload(mod)
     monkeypatch.setattr(mod, "_prune_builtins_enabled", lambda: False)
@@ -77,7 +78,7 @@ def test_save_and_load_roundtrip(skills_home):
 
 
 def test_save_is_atomic_no_partial_tmp_files(skills_home):
-    from tools.skill_usage import save_usage, _usage_file
+    from tools.skill_usage import _usage_file, save_usage
     save_usage({"x": {"use_count": 1}})
     skills_dir = _usage_file().parent
     # No leftover tempfile
@@ -105,7 +106,7 @@ def test_get_record_backfills_missing_keys(skills_home):
 
 
 def test_load_usage_handles_corrupt_file(skills_home):
-    from tools.skill_usage import load_usage, _usage_file
+    from tools.skill_usage import _usage_file, load_usage
     _usage_file().write_text("{ not json }", encoding="utf-8")
     assert load_usage() == {}
 
@@ -146,7 +147,7 @@ def test_bump_on_empty_name_is_noop(skills_home):
 
 
 def test_bumps_do_not_corrupt_other_skills(skills_home):
-    from tools.skill_usage import bump_view, bump_use, get_record
+    from tools.skill_usage import bump_use, bump_view, get_record
     bump_view("skill-a")
     bump_use("skill-b")
     bump_view("skill-a")
@@ -184,13 +185,13 @@ def test_concurrent_bump_view_preserves_all_updates(skills_home):
 # ---------------------------------------------------------------------------
 
 def test_set_state_active(skills_home):
-    from tools.skill_usage import set_state, get_record, STATE_ACTIVE
+    from tools.skill_usage import STATE_ACTIVE, get_record, set_state
     set_state("x", STATE_ACTIVE)
     assert get_record("x")["state"] == "active"
 
 
 def test_set_state_archived_records_timestamp(skills_home):
-    from tools.skill_usage import set_state, get_record, STATE_ARCHIVED
+    from tools.skill_usage import STATE_ARCHIVED, get_record, set_state
     set_state("x", STATE_ARCHIVED)
     rec = get_record("x")
     assert rec["state"] == "archived"
@@ -198,7 +199,7 @@ def test_set_state_archived_records_timestamp(skills_home):
 
 
 def test_set_state_invalid_is_noop(skills_home):
-    from tools.skill_usage import set_state, get_record
+    from tools.skill_usage import get_record, set_state
     set_state("x", "bogus")
     # No record created for invalid state
     rec = get_record("x")
@@ -206,7 +207,7 @@ def test_set_state_invalid_is_noop(skills_home):
 
 
 def test_restoring_from_archive_clears_timestamp(skills_home):
-    from tools.skill_usage import set_state, get_record, STATE_ARCHIVED, STATE_ACTIVE
+    from tools.skill_usage import STATE_ACTIVE, STATE_ARCHIVED, get_record, set_state
     set_state("x", STATE_ARCHIVED)
     assert get_record("x")["archived_at"] is not None
     set_state("x", STATE_ACTIVE)
@@ -214,7 +215,7 @@ def test_restoring_from_archive_clears_timestamp(skills_home):
 
 
 def test_set_pinned(skills_home):
-    from tools.skill_usage import set_pinned, get_record
+    from tools.skill_usage import get_record, set_pinned
     set_pinned("x", True)
     assert get_record("x")["pinned"] is True
     set_pinned("x", False)
@@ -297,9 +298,9 @@ description: test skill
                     "getnote": {
                         "source": "taps/main",
                         "install_path": "productivity/getnote",
-                    }
+                    },
                 },
-            }
+            },
         ),
         encoding="utf-8",
     )
@@ -392,7 +393,7 @@ def test_archive_missing_skill_returns_error(skills_home):
 
 
 def test_restore_skill_moves_back(skills_home):
-    from tools.skill_usage import archive_skill, restore_skill, get_record
+    from tools.skill_usage import archive_skill, get_record, restore_skill
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "temp-skill")
     archive_skill("temp-skill")
@@ -407,8 +408,9 @@ def test_restore_skill_moves_back(skills_home):
 def test_restore_skill_finds_nested_archive_subdir(skills_home):
     """Skills archived under nested category subdirs (e.g.
     .archive/<category>/<skill>/) — left behind by older archive layouts or
-    external imports — must still be restorable by name."""
-    from tools.skill_usage import restore_skill, get_record
+    external imports — must still be restorable by name.
+    """
+    from tools.skill_usage import get_record, restore_skill
     skills_dir = skills_home / "skills"
     nested = skills_dir / ".archive" / "openclaw-imports" / "nested-skill"
     nested.mkdir(parents=True)
@@ -425,7 +427,8 @@ def test_restore_skill_finds_nested_archive_subdir(skills_home):
 
 def test_restore_skill_finds_nested_timestamped_prefix(skills_home):
     """Prefix-match path (timestamped dupes) must also descend into nested
-    archive subdirs, not just .archive/ top-level."""
+    archive subdirs, not just .archive/ top-level.
+    """
     from tools.skill_usage import restore_skill
     skills_dir = skills_home / "skills"
     nested = skills_dir / ".archive" / "imports" / "dup-skill-20260101000000"
@@ -461,9 +464,13 @@ def test_restore_does_not_pull_unrelated_sibling_out_of_archive(skills_home):
     ``archive_skill`` writes on a collision (``-YYYYMMDDHHMMSS``). A bare
     ``startswith(f"{name}-")`` also matches sibling skills, so restoring
     ``git`` would rip an archived ``git-helpers`` out of the archive, rename
-    it to ``git``, and report success — destroying the sibling's only copy."""
+    it to ``git``, and report success — destroying the sibling's only copy.
+    """
     from tools.skill_usage import (
-        archive_skill, restore_skill, list_archived_skill_names, mark_agent_created,
+        archive_skill,
+        list_archived_skill_names,
+        mark_agent_created,
+        restore_skill,
     )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "git-helpers")
@@ -485,7 +492,8 @@ def test_restore_does_not_pull_unrelated_sibling_out_of_archive(skills_home):
 def test_restore_still_matches_timestamped_duplicate(skills_home):
     """The fix must not over-narrow: a real collision dupe written by
     ``archive_skill`` (``<name>-YYYYMMDDHHMMSS``) is still restorable by name
-    when no bare ``<name>`` entry exists."""
+    when no bare ``<name>`` entry exists.
+    """
     from tools.skill_usage import restore_skill
     skills_dir = skills_home / "skills"
     dupe = skills_dir / ".archive" / "report-tool-20260101000000"
@@ -501,7 +509,8 @@ def test_restore_still_matches_timestamped_duplicate(skills_home):
 
 def test_restore_prefers_timestamped_dupe_over_unrelated_sibling(skills_home):
     """With both a real timestamped duplicate and an unrelated sibling present,
-    restoring the bare name picks the duplicate and leaves the sibling alone."""
+    restoring the bare name picks the duplicate and leaves the sibling alone.
+    """
     from tools.skill_usage import restore_skill
     archive = skills_home / "skills" / ".archive"
 
@@ -545,7 +554,11 @@ def test_agent_created_report_includes_marked_skills_with_defaults(skills_home):
 
 
 def test_manual_skill_with_usage_is_not_curator_managed(skills_home):
-    from tools.skill_usage import agent_created_report, bump_view, list_agent_created_skill_names
+    from tools.skill_usage import (
+        agent_created_report,
+        bump_view,
+        list_agent_created_skill_names,
+    )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "manual-skill")
 
@@ -575,7 +588,7 @@ def test_agent_created_report_excludes_bundled_and_hub(skills_home):
 
 
 def test_agent_created_report_derives_activity_from_view_and_patch(skills_home, monkeypatch):
-    import tools.skill_usage as skill_usage
+    from tools import skill_usage
 
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "mine")
@@ -602,9 +615,12 @@ def test_agent_created_report_derives_activity_from_view_and_patch(skills_home, 
 
 def test_bump_view_tracks_bundled_skill(skills_home):
     """Telemetry IS recorded for bundled skills (observability), but the record
-    must NOT make the skill a curation candidate by itself."""
+    must NOT make the skill a curation candidate by itself.
+    """
     from tools.skill_usage import (
-        bump_view, load_usage, list_agent_created_skill_names,
+        bump_view,
+        list_agent_created_skill_names,
+        load_usage,
     )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "ship-bundled")
@@ -622,7 +638,9 @@ def test_bump_view_tracks_bundled_skill(skills_home):
 
 def test_bump_patch_tracks_hub_skill(skills_home):
     from tools.skill_usage import (
-        bump_patch, load_usage, list_agent_created_skill_names,
+        bump_patch,
+        list_agent_created_skill_names,
+        load_usage,
     )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "from-hub")
@@ -658,7 +676,7 @@ def test_bump_use_tracks_hub_skill(skills_home):
 
 def test_set_state_no_op_for_bundled_skill(skills_home):
     """State transitions on bundled skills must not land in the sidecar."""
-    from tools.skill_usage import set_state, load_usage, STATE_ARCHIVED
+    from tools.skill_usage import STATE_ARCHIVED, load_usage, set_state
     skills_dir = skills_home / "skills"
     (skills_dir / ".bundled_manifest").write_text(
         "locked:abc\n", encoding="utf-8",
@@ -694,8 +712,16 @@ def test_end_to_end_telemetry_tracked_but_lifecycle_refused(skills_home):
       lands and the directories stay on disk.
     """
     from tools.skill_usage import (
-        bump_view, bump_use, bump_patch, set_state, set_pinned,
-        archive_skill, load_usage, STATE_ACTIVE, STATE_STALE, STATE_ARCHIVED,
+        STATE_ACTIVE,
+        STATE_ARCHIVED,
+        STATE_STALE,
+        archive_skill,
+        bump_patch,
+        bump_use,
+        bump_view,
+        load_usage,
+        set_pinned,
+        set_state,
     )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "bundled-one")
@@ -719,7 +745,7 @@ def test_end_to_end_telemetry_tracked_but_lifecycle_refused(skills_home):
         set_state(name, STATE_ARCHIVED)
         set_pinned(name, True)
         ok, _msg = archive_skill(name)
-        assert not ok, f"archive_skill(\"{name}\") should refuse"
+        assert not ok, f'archive_skill("{name}") should refuse'
 
     data = load_usage()
     # Telemetry landed for both.
@@ -746,9 +772,12 @@ def test_end_to_end_telemetry_tracked_but_lifecycle_refused(skills_home):
 
 def test_usage_report_covers_all_provenance(skills_home):
     """usage_report() surfaces every skill with provenance, unlike the
-    curator-scoped agent_created_report()."""
+    curator-scoped agent_created_report().
+    """
     from tools.skill_usage import (
-        bump_use, usage_report, mark_agent_created,
+        bump_use,
+        mark_agent_created,
+        usage_report,
     )
     skills_dir = skills_home / "skills"
     _write_skill(skills_dir, "bundled-one")

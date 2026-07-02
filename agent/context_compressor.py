@@ -21,14 +21,18 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from agent.auxiliary_client import call_llm, _is_connection_error, aux_interrupt_protection
+from agent.auxiliary_client import (
+    _is_connection_error,
+    aux_interrupt_protection,
+    call_llm,
+)
 from agent.context_engine import ContextEngine
 from agent.model_metadata import (
     MINIMUM_CONTEXT_LENGTH,
-    get_model_context_length,
     estimate_messages_tokens_rough,
+    get_model_context_length,
 )
 from agent.redact import redact_sensitive_text
 
@@ -418,7 +422,7 @@ def _strip_images_from_content(content: Any) -> Any:
     if not any(_is_image_part(p) for p in content):
         return content
 
-    new_parts: List[Any] = []
+    new_parts: list[Any] = []
     for p in content:
         if _is_image_part(p):
             new_parts.append({
@@ -430,7 +434,7 @@ def _strip_images_from_content(content: Any) -> Any:
     return new_parts
 
 
-def _strip_historical_media(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _strip_historical_media(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Replace image parts in older messages with placeholder text.
 
     The anchor is the *last* user message that has any image content. Every
@@ -470,7 +474,7 @@ def _strip_historical_media(messages: List[Dict[str, Any]]) -> List[Dict[str, An
         return messages
 
     changed = False
-    result: List[Dict[str, Any]] = []
+    result: list[dict[str, Any]] = []
     for i, msg in enumerate(messages):
         if i >= anchor or not isinstance(msg, dict):
             result.append(msg)
@@ -643,7 +647,7 @@ class ContextCompressor(ContextEngine):
         self.last_rough_tokens_when_real_prompt_fit = 0
         self.awaiting_real_usage_after_compression = False
 
-    def on_session_end(self, session_id: str, messages: List[Dict[str, Any]]) -> None:
+    def on_session_end(self, session_id: str, messages: list[dict[str, Any]]) -> None:
         """Clear per-session compaction state at a real session boundary.
 
         ``_previous_summary`` is per-session iterative-summary state. It is
@@ -865,12 +869,12 @@ class ContextCompressor(ContextEngine):
         self.summary_model = summary_model_override or ""
 
         # Stores the previous compaction summary for iterative updates
-        self._previous_summary: Optional[str] = None
+        self._previous_summary: str | None = None
         # Anti-thrashing: track whether last compression was effective
         self._last_compression_savings_pct: float = 100.0
         self._ineffective_compression_count: int = 0
         self._summary_failure_cooldown_until: float = 0.0
-        self._last_summary_error: Optional[str] = None
+        self._last_summary_error: str | None = None
         # When summary generation fails and a static fallback is inserted,
         # record how many turns were unrecoverably dropped so callers
         # (gateway hygiene, /compress) can surface a visible warning.
@@ -894,10 +898,10 @@ class ContextCompressor(ContextEngine):
         # retrying on the main model, record the failure so gateway /
         # CLI callers can still warn the user even though compression
         # succeeded.  Silent recovery would hide the broken config.
-        self._last_aux_model_failure_error: Optional[str] = None
-        self._last_aux_model_failure_model: Optional[str] = None
+        self._last_aux_model_failure_error: str | None = None
+        self._last_aux_model_failure_model: str | None = None
 
-    def update_from_response(self, usage: Dict[str, Any]):
+    def update_from_response(self, usage: dict[str, Any]):
         """Update tracked token usage from API response."""
         self.last_prompt_tokens = usage.get("prompt_tokens", 0)
         self.last_completion_tokens = usage.get("completion_tokens", 0)
@@ -980,9 +984,9 @@ class ContextCompressor(ContextEngine):
     # ------------------------------------------------------------------
 
     def _prune_old_tool_results(
-        self, messages: List[Dict[str, Any]], protect_tail_count: int,
+        self, messages: list[dict[str, Any]], protect_tail_count: int,
         protect_tail_tokens: int | None = None,
-    ) -> tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """Replace old tool result contents with informative 1-line summaries.
 
         Instead of a generic placeholder, generates a summary like::
@@ -1009,7 +1013,7 @@ class ContextCompressor(ContextEngine):
         pruned = 0
 
         # Build index: tool_call_id -> (tool_name, arguments_json)
-        call_id_to_tool: Dict[str, tuple] = {}
+        call_id_to_tool: dict[str, tuple] = {}
         for msg in result:
             if msg.get("role") == "assistant":
                 for tc in msg.get("tool_calls") or []:
@@ -1145,7 +1149,7 @@ class ContextCompressor(ContextEngine):
     # Summarization
     # ------------------------------------------------------------------
 
-    def _compute_summary_budget(self, turns_to_summarize: List[Dict[str, Any]]) -> int:
+    def _compute_summary_budget(self, turns_to_summarize: list[dict[str, Any]]) -> int:
         """Scale summary token budget with the amount of content being compressed.
 
         The maximum scales with the model's context window (5% of context,
@@ -1165,7 +1169,7 @@ class ContextCompressor(ContextEngine):
     _TOOL_ARGS_MAX = 1500     # tool call argument chars
     _TOOL_ARGS_HEAD = 1200    # kept from the start of tool args
 
-    def _serialize_for_summary(self, turns: List[Dict[str, Any]]) -> str:
+    def _serialize_for_summary(self, turns: list[dict[str, Any]]) -> str:
         """Serialize conversation turns into labeled text for the summarizer.
 
         Includes tool call arguments and result content (up to
@@ -1223,7 +1227,7 @@ class ContextCompressor(ContextEngine):
 
     def _build_static_fallback_summary(
         self,
-        turns_to_summarize: List[Dict[str, Any]],
+        turns_to_summarize: list[dict[str, Any]],
         reason: str | None = None,
     ) -> str:
         """Build a deterministic handoff when the LLM summarizer is unavailable.
@@ -1315,7 +1319,7 @@ class ContextCompressor(ContextEngine):
                     tool_names.append(name)
                 if tool_names:
                     assistant_actions.append(
-                        "Called tool(s): " + ", ".join(tool_names[:6])
+                        "Called tool(s): " + ", ".join(tool_names[:6]),
                     )
                 elif text:
                     assistant_actions.append(text)
@@ -1323,12 +1327,12 @@ class ContextCompressor(ContextEngine):
                 call_id = str(msg.get("tool_call_id") or "")
                 tool_name, tool_args = call_id_to_tool.get(call_id, ("unknown", ""))
                 tool_actions.append(
-                    _summarize_tool_result(tool_name, tool_args, text or "")
+                    _summarize_tool_result(tool_name, tool_args, text or ""),
                 )
                 if re.search(
                     r"\b(error|failed|exception|traceback|timeout|timed out|fatal)\b",
                     text,
-                    re.I,
+                    re.IGNORECASE,
                 ):
                     blockers.append(text[:500])
 
@@ -1444,9 +1448,9 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
 
     def _generate_summary(
         self,
-        turns_to_summarize: List[Dict[str, Any]],
-        focus_topic: Optional[str] = None,
-    ) -> Optional[str]:
+        turns_to_summarize: list[dict[str, Any]],
+        focus_topic: str | None = None,
+    ) -> str | None:
         """Generate a structured summary of conversation turns.
 
         Uses a structured template (Goal, Progress, Decisions, Resolved/Pending
@@ -1463,6 +1467,7 @@ Summary generation was unavailable, so this is a best-effort deterministic fallb
         Returns None if all attempts fail — the caller should drop
         the middle turns without a summary rather than inject a useless
         placeholder.
+
         """
         now = time.monotonic()
         if now < self._summary_failure_cooldown_until:
@@ -1676,7 +1681,7 @@ This compaction should PRIORITISE preserving all information related to the focu
                 raise RuntimeError(
                     "Context compression LLM returned empty content "
                     f"(provider={self.provider or 'auto'} "
-                    f"model={self.summary_model or self.model})"
+                    f"model={self.summary_model or self.model})",
                 )
             # Redact the summary output as well — the summarizer LLM may
             # ignore prompt instructions and echo back secrets verbatim.
@@ -1878,8 +1883,8 @@ This compaction should PRIORITISE preserving all information related to the focu
     @classmethod
     def _derive_auto_focus_topic(
         cls,
-        messages: List[Dict[str, Any]],
-    ) -> Optional[str]:
+        messages: list[dict[str, Any]],
+    ) -> str | None:
         """Infer a compact focus hint from the most recent real user turns."""
         candidates: list[str] = []
         for idx in range(len(messages) - 1, -1, -1):
@@ -1911,10 +1916,10 @@ This compaction should PRIORITISE preserving all information related to the focu
     @classmethod
     def _find_latest_context_summary(
         cls,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         start: int,
         end: int,
-    ) -> tuple[Optional[int], str]:
+    ) -> tuple[int | None, str]:
         """Find the newest handoff summary inside a compression window."""
         for idx in range(end - 1, start - 1, -1):
             content = messages[idx].get("content")
@@ -1933,7 +1938,7 @@ This compaction should PRIORITISE preserving all information related to the focu
             return tc.get("call_id", "") or tc.get("id", "") or ""
         return getattr(tc, "call_id", "") or getattr(tc, "id", "") or ""
 
-    def _sanitize_tool_pairs(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _sanitize_tool_pairs(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Fix orphaned tool_call / tool_result pairs after compression.
 
         Two failure modes:
@@ -1975,7 +1980,7 @@ This compaction should PRIORITISE preserving all information related to the focu
         # 2. Add stub results for assistant tool_calls whose results were dropped
         missing_results = surviving_call_ids - result_call_ids
         if missing_results:
-            patched: List[Dict[str, Any]] = []
+            patched: list[dict[str, Any]] = []
             for msg in messages:
                 patched.append(msg)
                 if msg.get("role") == "assistant":
@@ -1993,7 +1998,7 @@ This compaction should PRIORITISE preserving all information related to the focu
 
         return messages
 
-    def _align_boundary_forward(self, messages: List[Dict[str, Any]], idx: int) -> int:
+    def _align_boundary_forward(self, messages: list[dict[str, Any]], idx: int) -> int:
         """Push a compress-start boundary forward past any orphan tool results.
 
         If ``messages[idx]`` is a tool result, slide forward until we hit a
@@ -2020,7 +2025,7 @@ This compaction should PRIORITISE preserving all information related to the focu
             return 0
         return self.protect_first_n
 
-    def _protect_head_size(self, messages: List[Dict[str, Any]]) -> int:
+    def _protect_head_size(self, messages: list[dict[str, Any]]) -> int:
         """Total count of head messages to protect.
 
         ``protect_first_n`` is defined as *additional* messages protected
@@ -2045,7 +2050,7 @@ This compaction should PRIORITISE preserving all information related to the focu
             head = 1
         return head + self._effective_protect_first_n()
 
-    def _align_boundary_backward(self, messages: List[Dict[str, Any]], idx: int) -> int:
+    def _align_boundary_backward(self, messages: list[dict[str, Any]], idx: int) -> int:
         """Pull a compress-end boundary backward to avoid splitting a
         tool_call / result group.
 
@@ -2074,7 +2079,7 @@ This compaction should PRIORITISE preserving all information related to the focu
     # ------------------------------------------------------------------
 
     def _find_last_user_message_idx(
-        self, messages: List[Dict[str, Any]], head_end: int
+        self, messages: list[dict[str, Any]], head_end: int,
     ) -> int:
         """Return the index of the last user-role message at or after *head_end*, or -1."""
         for i in range(len(messages) - 1, head_end - 1, -1):
@@ -2083,7 +2088,7 @@ This compaction should PRIORITISE preserving all information related to the focu
         return -1
 
     def _find_last_assistant_message_idx(
-        self, messages: List[Dict[str, Any]], head_end: int
+        self, messages: list[dict[str, Any]], head_end: int,
     ) -> int:
         """Return the index of the last user-visible assistant reply at or
         after *head_end*, or -1.
@@ -2125,7 +2130,7 @@ This compaction should PRIORITISE preserving all information related to the focu
 
     def _ensure_last_assistant_message_in_tail(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         cut_idx: int,
         head_end: int,
     ) -> int:
@@ -2183,7 +2188,7 @@ This compaction should PRIORITISE preserving all information related to the focu
 
     def _ensure_last_user_message_in_tail(
         self,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         cut_idx: int,
         head_end: int,
     ) -> int:
@@ -2229,7 +2234,7 @@ This compaction should PRIORITISE preserving all information related to the focu
         return max(last_user_idx, head_end + 1)
 
     def _find_tail_cut_by_tokens(
-        self, messages: List[Dict[str, Any]], head_end: int,
+        self, messages: list[dict[str, Any]], head_end: int,
         token_budget: int | None = None,
     ) -> int:
         """Walk backward from the end of messages, accumulating tokens until
@@ -2336,7 +2341,7 @@ This compaction should PRIORITISE preserving all information related to the focu
     # ContextEngine: manual /compress preflight
     # ------------------------------------------------------------------
 
-    def has_content_to_compress(self, messages: List[Dict[str, Any]]) -> bool:
+    def has_content_to_compress(self, messages: list[dict[str, Any]]) -> bool:
         """Return True if there is a non-empty middle region to compact.
 
         Overrides the ABC default so the gateway ``/compress`` guard can
@@ -2351,7 +2356,7 @@ This compaction should PRIORITISE preserving all information related to the focu
     # Main compression entry point
     # ------------------------------------------------------------------
 
-    def compress(self, messages: List[Dict[str, Any]], current_tokens: int = None, focus_topic: str = None, force: bool = False) -> List[Dict[str, Any]]:
+    def compress(self, messages: list[dict[str, Any]], current_tokens: int = None, focus_topic: str = None, force: bool = False) -> list[dict[str, Any]]:
         """Compress conversation messages by summarizing middle turns.
 
         Algorithm:
@@ -2372,6 +2377,7 @@ This compaction should PRIORITISE preserving all information related to the focu
             force: If True, clear any active summary-failure cooldown before
                 running so a manual ``/compress`` can retry immediately after
                 an auto-compression abort.  Auto-compress callers pass False.
+
         """
         # Reset per-call summary failure state — callers inspect these fields
         # after compress() returns to decide whether to surface a warning.
@@ -2399,7 +2405,7 @@ This compaction should PRIORITISE preserving all information related to the focu
                 )
             return messages
 
-        display_tokens = current_tokens if current_tokens else self.last_prompt_tokens or estimate_messages_tokens_rough(messages)
+        display_tokens = current_tokens or self.last_prompt_tokens or estimate_messages_tokens_rough(messages)
 
         # Phase 1: Prune old tool results (cheap, no LLM call)
         messages, pruned_count = self._prune_old_tool_results(

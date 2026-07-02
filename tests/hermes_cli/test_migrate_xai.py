@@ -11,10 +11,10 @@ from hermes_cli.xai_retirement import (
     find_retired_xai_refs,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def trap_config(tmp_path: Path) -> Path:
@@ -91,7 +91,7 @@ class TestNoOpPaths:
                     config_path="principal.model",
                     current_model="grok-3",
                     replacement="grok-4.3",
-                )
+                ),
             ])
 
 

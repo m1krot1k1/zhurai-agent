@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +25,19 @@ VALID_RUNTIMES = ("auto", "codex_app_server")
 @dataclass
 class CodexRuntimeStatus:
     """Result of a /codex-runtime invocation. Callers render this however
-    suits their surface (CLI uses Rich panels, gateway sends a text message)."""
+    suits their surface (CLI uses Rich panels, gateway sends a text message).
+    """
 
     success: bool
-    new_value: Optional[str] = None
-    old_value: Optional[str] = None
+    new_value: str | None = None
+    old_value: str | None = None
     message: str = ""
     requires_new_session: bool = False
     codex_binary_ok: bool = True
-    codex_version: Optional[str] = None
+    codex_version: str | None = None
 
 
-def parse_args(arg_string: str) -> tuple[Optional[str], list[str]]:
+def parse_args(arg_string: str) -> tuple[str | None, list[str]]:
     """Parse the slash-command argument string. Returns (value, errors).
 
     No args         → return current state (value=None)
@@ -55,13 +55,14 @@ def parse_args(arg_string: str) -> tuple[Optional[str], list[str]]:
     if raw in VALID_RUNTIMES:
         return raw, []
     return None, [
-        f"Unknown runtime {raw!r}. Use one of: auto, codex_app_server, on, off"
+        f"Unknown runtime {raw!r}. Use one of: auto, codex_app_server, on, off",
     ]
 
 
 def get_current_runtime(config: dict) -> str:
     """Read the current `model.openai_runtime` value from a config dict.
-    Returns 'auto' for unset / empty / unrecognized values."""
+    Returns 'auto' for unset / empty / unrecognized values.
+    """
     if not isinstance(config, dict):
         return "auto"
     model_cfg = config.get("model") or {}
@@ -75,10 +76,11 @@ def get_current_runtime(config: dict) -> str:
 
 def set_runtime(config: dict, new_value: str) -> str:
     """Mutate the config dict in place to persist the new runtime value.
-    Returns the previous value for callers that want to report a delta."""
+    Returns the previous value for callers that want to report a delta.
+    """
     if new_value not in VALID_RUNTIMES:
         raise ValueError(
-            f"invalid runtime {new_value!r}; must be one of {VALID_RUNTIMES}"
+            f"invalid runtime {new_value!r}; must be one of {VALID_RUNTIMES}",
         )
     old = get_current_runtime(config)
     if not isinstance(config.get("model"), dict):
@@ -87,9 +89,10 @@ def set_runtime(config: dict, new_value: str) -> str:
     return old
 
 
-def check_codex_binary_ok() -> tuple[bool, Optional[str]]:
+def check_codex_binary_ok() -> tuple[bool, str | None]:
     """Best-effort verification that codex CLI is installed at acceptable
-    version. Returns (ok, version_or_message)."""
+    version. Returns (ok, version_or_message).
+    """
     try:
         from agent.transports.codex_app_server import check_codex_binary
 
@@ -100,7 +103,7 @@ def check_codex_binary_ok() -> tuple[bool, Optional[str]]:
 
 def apply(
     config: dict,
-    new_value: Optional[str],
+    new_value: str | None,
     *,
     persist_callback=None,
 ) -> CodexRuntimeStatus:
@@ -113,6 +116,7 @@ def apply(
             and persisting it to disk. Skipped when None (used by tests).
 
     Returns: CodexRuntimeStatus describing the outcome.
+
     """
     current = get_current_runtime(config)
 
@@ -120,9 +124,9 @@ def apply(
     # is cheap (~50ms for `codex --version`), but we'd otherwise call it up
     # to 3 times in the enable path (read-only/state, gate, success message).
     # None = not yet checked; (bool, str) = result.
-    _binary_check: Optional[tuple[bool, Optional[str]]] = None
+    _binary_check: tuple[bool, str | None] | None = None
 
-    def _check_binary_cached() -> tuple[bool, Optional[str]]:
+    def _check_binary_cached() -> tuple[bool, str | None]:
         nonlocal _binary_check
         if _binary_check is None:
             _binary_check = check_codex_binary_ok()
@@ -208,37 +212,37 @@ def apply(
             if user_servers:
                 msg_lines.append(
                     f"Migrated {len(user_servers)} MCP server(s): "
-                    f"{', '.join(user_servers)}"
+                    f"{', '.join(user_servers)}",
                 )
             # Native Codex plugin migration (Linear, GitHub, etc.)
             if mig_report.migrated_plugins:
                 msg_lines.append(
                     f"Migrated {len(mig_report.migrated_plugins)} native "
-                    f"Codex plugin(s): {', '.join(mig_report.migrated_plugins)}"
+                    f"Codex plugin(s): {', '.join(mig_report.migrated_plugins)}",
                 )
             elif mig_report.plugin_query_error:
                 msg_lines.append(
                     f"Codex plugin discovery skipped: "
-                    f"{mig_report.plugin_query_error}"
+                    f"{mig_report.plugin_query_error}",
                 )
             # Permissions + Hermes tool callback are always-on production
             # bits the user benefits from knowing about.
             if mig_report.wrote_permissions_default:
                 msg_lines.append(
                     f"Default sandbox: {mig_report.wrote_permissions_default} "
-                    f"(no approval prompt on every write)"
+                    f"(no approval prompt on every write)",
                 )
             if "hermes-tools" in mig_report.migrated:
                 msg_lines.append(
                     "Hermes tool callback registered: codex can now use "
                     "web_search, web_extract, browser_*, vision_analyze, "
                     "image_generate, skill_view, skills_list, text_to_speech, "
-                    "kanban_* (worker + orchestrator) via MCP."
+                    "kanban_* (worker + orchestrator) via MCP.",
                 )
                 msg_lines.append(
                     "  (delegate_task, memory, session_search, todo run "
                     "only on the default Hermes runtime — they need the "
-                    "agent loop context.)"
+                    "agent loop context.)",
                 )
             msg_lines.append(f"  (config: {mig_report.target_path})")
             for err in mig_report.errors:
@@ -248,11 +252,11 @@ def apply(
         msg_lines.append(
             "OpenAI/Codex turns now run through `codex app-server` "
             "(terminal/file ops/patching inside Codex; "
-            "Hermes tools available via MCP callback)."
+            "Hermes tools available via MCP callback).",
         )
         msg_lines.append(
             "Effective on next session — current cached agent keeps "
-            "the prior runtime to preserve prompt cache."
+            "the prior runtime to preserve prompt cache.",
         )
     else:
         msg_lines.append("OpenAI/Codex turns will use the default Hermes runtime.")

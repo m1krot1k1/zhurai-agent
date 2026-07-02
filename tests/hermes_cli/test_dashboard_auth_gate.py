@@ -85,15 +85,15 @@ def test_loopback_host_header_validation_still_enforced(client_loopback):
 
 @pytest.mark.parametrize("host,allow_public,expected", [
     ("127.0.0.1", False, False),
-    ("127.0.0.1", True,  False),
+    ("127.0.0.1", True, False),
     ("localhost", False, False),
-    ("::1",       False, False),
+    ("::1", False, False),
     # --insecure (allow_public=True) NO LONGER bypasses the gate on a public
     # bind (June 2026 hermes-0day hardening). Non-loopback always requires auth.
-    ("0.0.0.0",   True,  True),
-    ("0.0.0.0",   False, True),
+    ("0.0.0.0", True, True),
+    ("0.0.0.0", False, True),
     ("192.168.1.5", False, True),
-    ("10.0.0.1",  True,  True),     # allow_public ignored — LAN IP is public
+    ("10.0.0.1", True, True),     # allow_public ignored — LAN IP is public
     ("100.64.0.1", False, True),    # Tailscale CGNAT — treated as public
     ("hermes-agent-prod-abc.fly.dev", False, True),
 ])
@@ -112,8 +112,8 @@ def _stub_uvicorn_run(monkeypatch):
     returns immediately (rather than blocking on the event loop). Returns the dict
     that will capture the keyword args.
     """
-    import asyncio
     import contextlib
+
     import uvicorn
     captured: dict = {"kwargs": {}}
 
@@ -264,7 +264,8 @@ def test_start_server_surfaces_nous_skip_reason_when_unconfigured(monkeypatch):
     """When the bundled Nous plugin loaded but skipped registration (no
     env vars set), the gate's fail-closed message should surface the
     plugin's LAST_SKIP_REASON so the operator knows the config fix is
-    'set HERMES_DASHBOARD_OAUTH_CLIENT_ID', not 'install a plugin'."""
+    'set HERMES_DASHBOARD_OAUTH_CLIENT_ID', not 'install a plugin'.
+    """
     from hermes_cli.dashboard_auth import clear_providers
     from plugins.dashboard_auth import nous as nous_plugin
 

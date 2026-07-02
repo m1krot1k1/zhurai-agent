@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Set
 
 from hermes_cli.config import get_env_value, load_config
 from hermes_cli.nous_account import (
@@ -13,17 +13,15 @@ from hermes_cli.nous_account import (
     get_nous_portal_account_info,
 )
 from tools.managed_tool_gateway import is_managed_tool_gateway_ready
-from utils import is_truthy_value
 from tools.tool_backend_helpers import (
     fal_key_is_configured,
     has_direct_modal_credentials,
-    managed_nous_tools_enabled,
     normalize_browser_cloud_provider,
     normalize_modal_mode,
     resolve_modal_backend_state,
     resolve_openai_audio_api_key,
 )
-
+from utils import is_truthy_value
 
 _DEFAULT_PLATFORM_TOOLSETS = {
     "cli": "hermes-cli",
@@ -34,7 +32,7 @@ _DEFAULT_PLATFORM_TOOLSETS = {
 # `hermes tools` picker scope its entitlement gate to the selected backend, so a
 # free-tool-pool user is allowed image gen but denied video gen at select time —
 # consistent with the per-category feature gates in get_nous_subscription_features.
-MANAGED_FEATURE_COVERAGE_CATEGORY: Dict[str, str] = {
+MANAGED_FEATURE_COVERAGE_CATEGORY: dict[str, str] = {
     "web": "firecrawl",
     "image_gen": "fal",
     "video_gen": "fal-video",
@@ -73,8 +71,8 @@ class NousSubscriptionFeatures:
     subscribed: bool
     nous_auth_present: bool
     provider_is_nous: bool
-    features: Dict[str, NousFeatureState]
-    account_info: Optional[NousPortalAccountInfo] = None
+    features: dict[str, NousFeatureState]
+    account_info: NousPortalAccountInfo | None = None
 
     @property
     def web(self) -> NousFeatureState:
@@ -110,7 +108,7 @@ class NousSubscriptionFeatures:
             yield self.features[key]
 
 
-def _model_config_dict(config: Dict[str, object]) -> Dict[str, object]:
+def _model_config_dict(config: dict[str, object]) -> dict[str, object]:
     model_cfg = config.get("model")
     if isinstance(model_cfg, dict):
         return dict(model_cfg)
@@ -119,7 +117,7 @@ def _model_config_dict(config: Dict[str, object]) -> Dict[str, object]:
     return {}
 
 
-def _toolset_enabled(config: Dict[str, object], toolset_key: str) -> bool:
+def _toolset_enabled(config: dict[str, object], toolset_key: str) -> bool:
     from toolsets import resolve_toolset
 
     platform_toolsets = config.get("platform_toolsets")
@@ -141,7 +139,7 @@ def _toolset_enabled(config: Dict[str, object], toolset_key: str) -> bool:
             if default_toolset:
                 toolset_names = [default_toolset]
 
-        available_tools: Set[str] = set()
+        available_tools: set[str] = set()
         for toolset_name in toolset_names:
             if not isinstance(toolset_name, str) or not toolset_name:
                 continue
@@ -283,7 +281,7 @@ def _resolve_browser_feature_state(
                 browser_tool_enabled
                 and browser_local_available
                 and managed_browser_available
-                and not direct_browser_use
+                and not direct_browser_use,
             )
             active = bool(browser_tool_enabled and available)
             return current_provider, available, active, managed
@@ -305,7 +303,7 @@ def _resolve_browser_feature_state(
             browser_tool_enabled
             and browser_local_available
             and managed_browser_available
-            and not direct_browser_use
+            and not direct_browser_use,
         )
         active = bool(browser_tool_enabled and available)
         return "browser-use", available, active, managed
@@ -321,7 +319,7 @@ def _resolve_browser_feature_state(
 
 
 def get_nous_subscription_features(
-    config: Optional[Dict[str, object]] = None,
+    config: dict[str, object] | None = None,
     *,
     force_fresh: bool = False,
 ) -> NousSubscriptionFeatures:
@@ -345,7 +343,7 @@ def get_nous_subscription_features(
     managed_tools_flag = bool(
         account_info
         and account_info.logged_in
-        and account_info.tool_gateway_entitled
+        and account_info.tool_gateway_entitled,
     )
     nous_auth_present = bool(account_info and account_info.logged_in)
 
@@ -379,13 +377,13 @@ def get_nous_subscription_features(
     stt_provider = str(stt_cfg.get("provider") or "local").strip().lower()
     browser_provider_explicit = "cloud_provider" in browser_cfg
     browser_provider = normalize_browser_cloud_provider(
-        browser_cfg.get("cloud_provider") if browser_provider_explicit else None
+        browser_cfg.get("cloud_provider") if browser_provider_explicit else None,
     )
     terminal_backend = (
         str(terminal_cfg.get("backend") or "local").strip().lower()
     )
     modal_mode = normalize_modal_mode(
-        terminal_cfg.get("modal_mode")
+        terminal_cfg.get("modal_mode"),
     )
 
     # use_gateway flags — when True, the user explicitly opted into the
@@ -425,7 +423,7 @@ def get_nous_subscription_features(
     try:
         from tools.transcription_tools import _HAS_FASTER_WHISPER
         local_stt_available = bool(_HAS_FASTER_WHISPER) or bool(
-            get_env_value("HERMES_LOCAL_STT_COMMAND")
+            get_env_value("HERMES_LOCAL_STT_COMMAND"),
         )
     except Exception:
         local_stt_available = bool(get_env_value("HERMES_LOCAL_STT_COMMAND"))
@@ -519,10 +517,10 @@ def get_nous_subscription_features(
             or (web_search_backend == "firecrawl" and direct_firecrawl)
             or (web_search_backend == "parallel" and direct_parallel)
             or (web_search_backend == "tavily" and direct_tavily)
-        )
+        ),
     )
     web_available = bool(
-        managed_web_available or direct_exa or direct_firecrawl or direct_parallel or direct_tavily or direct_searxng
+        managed_web_available or direct_exa or direct_firecrawl or direct_parallel or direct_tavily or direct_searxng,
     )
 
     image_managed = image_tool_enabled and managed_image_available and not direct_fal
@@ -544,7 +542,7 @@ def get_nous_subscription_features(
         tts_current_provider in {"edge", "neutts"}
         or (tts_current_provider == "openai" and (managed_tts_available or direct_openai_tts))
         or (tts_current_provider == "elevenlabs" and direct_elevenlabs)
-        or (tts_current_provider == "mistral" and bool(get_env_value("MISTRAL_API_KEY")))
+        or (tts_current_provider == "mistral" and bool(get_env_value("MISTRAL_API_KEY"))),
     )
     tts_active = bool(tts_tool_enabled and tts_available)
 
@@ -562,7 +560,7 @@ def get_nous_subscription_features(
         (stt_current_provider == "local" and local_stt_available)
         or (stt_current_provider == "openai" and (managed_stt_available or direct_openai_stt))
         or (stt_current_provider == "groq" and direct_groq_stt)
-        or (stt_current_provider == "mistral" and direct_mistral_stt)
+        or (stt_current_provider == "mistral" and direct_mistral_stt),
     )
     stt_active = stt_available
 
@@ -728,13 +726,10 @@ def get_nous_subscription_features(
     )
 
 
-
-
-
 def apply_nous_managed_defaults(
-    config: Dict[str, object],
+    config: dict[str, object],
     *,
-    enabled_toolsets: Optional[Iterable[str]] = None,
+    enabled_toolsets: Iterable[str] | None = None,
     force_fresh: bool = False,
 ) -> set[str]:
     features = get_nous_subscription_features(config, force_fresh=force_fresh)
@@ -857,7 +852,7 @@ _GATEWAY_TOOL_LABELS = {
 }
 
 
-def _get_gateway_direct_credentials() -> Dict[str, bool]:
+def _get_gateway_direct_credentials() -> dict[str, bool]:
     """Return a dict of tool_key -> has_direct_credentials."""
     fal_direct = fal_key_is_configured()
     return {
@@ -866,13 +861,13 @@ def _get_gateway_direct_credentials() -> Dict[str, bool]:
             or get_env_value("FIRECRAWL_API_URL")
             or get_env_value("PARALLEL_API_KEY")
             or get_env_value("TAVILY_API_KEY")
-            or get_env_value("EXA_API_KEY")
+            or get_env_value("EXA_API_KEY"),
         ),
         "image_gen": fal_direct,
         "video_gen": fal_direct,
         "tts": bool(
             resolve_openai_audio_api_key()
-            or get_env_value("ELEVENLABS_API_KEY")
+            or get_env_value("ELEVENLABS_API_KEY"),
         ),
         # STT direct credentials. OpenAI Whisper shares the audio key
         # with TTS via resolve_openai_audio_api_key() — counting it here
@@ -881,11 +876,11 @@ def _get_gateway_direct_credentials() -> Dict[str, bool]:
         "stt": bool(
             resolve_openai_audio_api_key()
             or get_env_value("GROQ_API_KEY")
-            or get_env_value("MISTRAL_API_KEY")
+            or get_env_value("MISTRAL_API_KEY"),
         ),
         "browser": bool(
             get_env_value("BROWSER_USE_API_KEY")
-            or (get_env_value("BROWSERBASE_API_KEY") and get_env_value("BROWSERBASE_PROJECT_ID"))
+            or (get_env_value("BROWSERBASE_API_KEY") and get_env_value("BROWSERBASE_PROJECT_ID")),
         ),
     }
 
@@ -903,7 +898,7 @@ _ALL_GATEWAY_KEYS = ("web", "image_gen", "video_gen", "tts", "stt", "browser")
 
 
 def get_gateway_eligible_tools(
-    config: Optional[Dict[str, object]] = None,
+    config: dict[str, object] | None = None,
     *,
     force_fresh: bool = False,
 ) -> tuple[list[str], list[str], list[str]]:
@@ -957,7 +952,7 @@ def get_gateway_eligible_tools(
         # tool pool that means image but not video; paid users are covered for
         # everything.
         if not account_info.tool_gateway_entitled_for(
-            MANAGED_FEATURE_COVERAGE_CATEGORY[key]
+            MANAGED_FEATURE_COVERAGE_CATEGORY[key],
         ):
             continue
         if opted_in.get(key):
@@ -970,7 +965,7 @@ def get_gateway_eligible_tools(
 
 
 def apply_gateway_defaults(
-    config: Dict[str, object],
+    config: dict[str, object],
     tool_keys: list[str],
 ) -> set[str]:
     """Apply Tool Gateway config for the given tool keys.
@@ -1043,7 +1038,7 @@ def apply_gateway_defaults(
 
 
 def prompt_enable_tool_gateway(
-    config: Dict[str, object],
+    config: dict[str, object],
     *,
     force_fresh: bool = True,
 ) -> set[str]:
@@ -1081,7 +1076,7 @@ def prompt_enable_tool_gateway(
         account_info
         and account_info.paid_service_access is not True
         and account_info.tool_access is not None
-        and account_info.tool_access.enabled
+        and account_info.tool_access.enabled,
     )
     source_label = "free tool pool" if pool_only else "Nous subscription"
 
@@ -1132,7 +1127,7 @@ def prompt_enable_tool_gateway(
 def ensure_nous_portal_access(
     *,
     capability: str = "the Nous Tool Gateway",
-    coverage_category: Optional[str] = None,
+    coverage_category: str | None = None,
 ) -> bool:
     """Make sure the user is entitled to the Nous Tool Gateway, logging in if
     needed.
@@ -1189,7 +1184,7 @@ def ensure_nous_portal_access(
     # guidance, do not enable. coverage_category keeps a pool user who lacks this
     # one category from being told their credits are exhausted.
     message = format_nous_portal_entitlement_message(
-        info, capability=capability, coverage_category=coverage_category
+        info, capability=capability, coverage_category=coverage_category,
     )
     if message:
         for line in message.splitlines():
@@ -1242,7 +1237,7 @@ def _run_nous_portal_login_only(*, capability: str) -> bool:
         if shared:
             try:
                 do_import = input(
-                    "  Found existing Nous OAuth credentials. Import them? [Y/n]: "
+                    "  Found existing Nous OAuth credentials. Import them? [Y/n]: ",
                 ).strip().lower()
             except (EOFError, KeyboardInterrupt):
                 do_import = "y"

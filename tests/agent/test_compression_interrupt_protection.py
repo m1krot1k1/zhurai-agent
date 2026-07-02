@@ -52,7 +52,8 @@ class TestAuxInterruptProtection:
 
 class TestCompressionProtectsSummaryCall:
     """The compressor must wrap its summary call_llm in aux_interrupt_protection
-    so a mid-flight interrupt doesn't abort it (#23975)."""
+    so a mid-flight interrupt doesn't abort it (#23975).
+    """
 
     def test_compressor_call_site_uses_protection(self):
         # The summary call must run inside aux_interrupt_protection. We assert

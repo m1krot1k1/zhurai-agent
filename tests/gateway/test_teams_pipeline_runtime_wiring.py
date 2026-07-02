@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import sys
-from types import ModuleType
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
 from gateway.config import Platform, PlatformConfig
@@ -88,7 +87,7 @@ def test_runtime_config_disables_teams_delivery_without_target():
     gateway_config = SimpleNamespace(
         platforms={
             Platform("teams"): PlatformConfig(enabled=True, extra={}),
-        }
+        },
     )
 
     config = build_pipeline_runtime_config(gateway_config)
@@ -101,8 +100,8 @@ def test_build_pipeline_runtime_only_wires_sender_when_delivery_configured(monke
         config=SimpleNamespace(
             platforms={
                 Platform("teams"): PlatformConfig(enabled=True, extra={}),
-            }
-        )
+            },
+        ),
     )
 
     monkeypatch.setattr(
@@ -135,8 +134,8 @@ def test_build_pipeline_runtime_skips_sender_when_adapter_layer_is_unavailable(m
                         "channel_id": "channel-1",
                     },
                 ),
-            }
-        )
+            },
+        ),
     )
 
     monkeypatch.setattr(
@@ -179,7 +178,7 @@ def test_bind_gateway_runtime_installs_drop_scheduler_on_failure(monkeypatch):
         config=SimpleNamespace(
             platforms={
                 Platform("teams"): PlatformConfig(enabled=True, extra={}),
-            }
+            },
         ),
         _teams_pipeline_runtime=None,
         _teams_pipeline_runtime_error=None,

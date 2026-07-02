@@ -1,7 +1,7 @@
 """Regression tests for gateway /model support of config.yaml custom_providers."""
 
-import yaml
 import pytest
+import yaml
 
 from gateway.config import Platform
 from gateway.platforms.base import MessageEvent, MessageType
@@ -43,9 +43,9 @@ async def test_handle_model_command_lists_saved_custom_provider(tmp_path, monkey
                         "name": "Local (127.0.0.1:4141)",
                         "base_url": "http://127.0.0.1:4141/v1",
                         "model": "rotator-openrouter-coding",
-                    }
+                    },
                 ],
-            }
+            },
         ),
         encoding="utf-8",
     )
@@ -53,7 +53,7 @@ async def test_handle_model_command_lists_saved_custom_provider(tmp_path, monkey
     import gateway.run as gateway_run
 
     monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
-    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", dict)
 
     result = await _make_runner()._handle_model_command(_make_event())
 

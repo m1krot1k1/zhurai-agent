@@ -8,12 +8,12 @@ return content=None, these produce null snapshots or null analysis.
 These tests verify both sites are guarded.
 """
 
+import pathlib
 import types
 from unittest.mock import patch
 
-
-
 # ── helpers ────────────────────────────────────────────────────────────────
+
 
 def _make_response(content):
     """Build a minimal OpenAI-compatible ChatCompletion response stub."""
@@ -89,7 +89,7 @@ class TestBrowserSourceLinesAreGuarded:
     def _read_file() -> str:
         import os
         base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        with open(os.path.join(base, "tools", "browser_tool.py")) as f:
+        with pathlib.Path(os.path.join(base, "tools", "browser_tool.py")).open() as f:
             return f.read()
 
     def test_extract_relevant_content_guarded(self):

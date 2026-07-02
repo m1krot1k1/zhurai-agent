@@ -7,11 +7,11 @@ that can't encode non-ASCII characters in API request payloads.
 import pytest
 
 from run_agent import (
-    _strip_non_ascii,
     _sanitize_messages_non_ascii,
+    _sanitize_messages_surrogates,
     _sanitize_structure_non_ascii,
     _sanitize_tools_non_ascii,
-    _sanitize_messages_surrogates,
+    _strip_non_ascii,
 )
 
 
@@ -53,7 +53,7 @@ class TestSanitizeMessagesNonAscii:
     def test_sanitizes_content_list(self):
         messages = [{
             "role": "user",
-            "content": [{"type": "text", "text": "hello 🤖"}]
+            "content": [{"type": "text", "text": "hello 🤖"}],
         }]
         assert _sanitize_messages_non_ascii(messages) is True
         assert messages[0]["content"][0]["text"] == "hello "
@@ -72,9 +72,9 @@ class TestSanitizeMessagesNonAscii:
                 "type": "function",
                 "function": {
                     "name": "read_file",
-                    "arguments": '{"path": "⚕test.txt"}'
-                }
-            }]
+                    "arguments": '{"path": "⚕test.txt"}',
+                },
+            }],
         }]
         assert _sanitize_messages_non_ascii(messages) is True
         assert messages[0]["tool_calls"][0]["function"]["arguments"] == '{"path": "test.txt"}'
@@ -119,8 +119,8 @@ class TestSurrogateVsAsciiSanitization:
                 "type": "function",
                 "function": {
                     "name": "read\ud800_file",
-                    "arguments": '{"path": "bad\ud800.txt"}'
-                }
+                    "arguments": '{"path": "bad\ud800.txt"}',
+                },
             }],
         }]
         assert _sanitize_messages_surrogates(messages) is True
@@ -185,11 +185,11 @@ class TestSanitizeToolsNonAscii:
                             "path": {
                                 "type": "string",
                                 "description": "File path │ with unicode",
-                            }
+                            },
                         },
                     },
                 },
-            }
+            },
         ]
 
         assert _sanitize_tools_non_ascii(tools) is True
@@ -209,11 +209,11 @@ class TestSanitizeToolsNonAscii:
                             "path": {
                                 "type": "string",
                                 "description": "File path",
-                            }
+                            },
                         },
                     },
                 },
-            }
+            },
         ]
 
         assert _sanitize_tools_non_ascii(tools) is False
@@ -225,7 +225,7 @@ class TestSanitizeStructureNonAscii:
             "default_headers": {
                 "X-Title": "Hermes │ Agent",
                 "User-Agent": "Hermes/1.0 🤖",
-            }
+            },
         }
         assert _sanitize_structure_non_ascii(payload) is True
         assert payload["default_headers"]["X-Title"] == "Hermes  Agent"
@@ -244,6 +244,7 @@ class TestApiKeyClientSync:
     def test_client_api_key_updated_on_sanitize(self):
         """Simulate the recovery path and verify client.api_key is synced."""
         from unittest.mock import MagicMock
+
         from run_agent import AIAgent
 
         agent = AIAgent.__new__(AIAgent)
@@ -358,7 +359,8 @@ class TestApiMessagesAndApiKwargsSanitized:
 
     def test_reasoning_field_in_canonical_messages_is_sanitized(self):
         """The canonical messages list stores reasoning as 'reasoning', not
-        'reasoning_content'.  The extra-fields loop must catch it."""
+        'reasoning_content'.  The extra-fields loop must catch it.
+        """
         messages = [
             {"role": "user", "content": "hello"},
             {

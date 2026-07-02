@@ -7,7 +7,10 @@ from typing import Any
 
 from gateway.config import Platform
 from plugins.teams_pipeline.pipeline import TeamsMeetingPipeline
-from plugins.teams_pipeline.store import TeamsPipelineStore, resolve_teams_pipeline_store_path
+from plugins.teams_pipeline.store import (
+    TeamsPipelineStore,
+    resolve_teams_pipeline_store_path,
+)
 from plugins.teams_pipeline.subscriptions import build_graph_client
 
 logger = logging.getLogger(__name__)
@@ -18,13 +21,13 @@ def _teams_delivery_is_configured(teams_extra: dict[str, Any], teams_delivery: d
         teams_delivery.get("mode")
         or teams_delivery.get("delivery_mode")
         or teams_extra.get("delivery_mode")
-        or ""
+        or "",
     ).strip().lower()
 
     if delivery_mode == "incoming_webhook":
         return bool(
             teams_delivery.get("incoming_webhook_url")
-            or teams_extra.get("incoming_webhook_url")
+            or teams_extra.get("incoming_webhook_url"),
         )
     if delivery_mode == "graph":
         chat_id = teams_delivery.get("chat_id") or teams_extra.get("chat_id")
@@ -42,7 +45,6 @@ def build_pipeline_runtime_config(gateway_config: Any) -> dict[str, Any]:
     Teams delivery continues to source its target details from the existing
     Teams platform config.
     """
-
     teams_config = gateway_config.platforms.get(Platform("teams"))
     teams_extra = dict((teams_config.extra or {}) if teams_config else {})
     pipeline_config = dict(teams_extra.get("meeting_pipeline") or {})
@@ -82,7 +84,7 @@ def build_pipeline_runtime(gateway: Any) -> TeamsMeetingPipeline:
             from plugins.platforms.teams.adapter import TeamsSummaryWriter
         except ImportError:
             logger.debug(
-                "TeamsSummaryWriter unavailable; Teams outbound delivery remains disabled until the adapter layer is present."
+                "TeamsSummaryWriter unavailable; Teams outbound delivery remains disabled until the adapter layer is present.",
             )
         else:
             teams_sender = TeamsSummaryWriter(platform_config=teams_config)
@@ -97,7 +99,6 @@ def build_pipeline_runtime(gateway: Any) -> TeamsMeetingPipeline:
 
 def bind_gateway_runtime(gateway: Any) -> bool:
     """Attach the Teams pipeline runtime to the msgraph webhook adapter."""
-
     adapter = gateway.adapters.get(Platform.MSGRAPH_WEBHOOK)
     if adapter is None:
         return False

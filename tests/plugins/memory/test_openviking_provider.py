@@ -9,8 +9,8 @@ import pytest
 
 import plugins.memory.openviking as openviking_module
 from plugins.memory.openviking import (
-    OpenVikingMemoryProvider,
     _DEFERRED_COMMIT_TIMEOUT,
+    OpenVikingMemoryProvider,
     _VikingClient,
 )
 
@@ -700,7 +700,7 @@ def test_https_local_endpoint_is_not_runtime_autostart_eligible(monkeypatch):
     assert warnings == [
         "Remote OpenViking server at https://localhost:1934 is not reachable; "
         "OpenViking memory disabled for this Hermes run. "
-        "Check the configured endpoint and network connectivity."
+        "Check the configured endpoint and network connectivity.",
     ]
 
 
@@ -732,7 +732,7 @@ def test_runtime_does_not_autostart_when_local_server_reports_unhealthy(monkeypa
     assert provider._client is None
     assert warnings == [
         "OpenViking server at http://localhost:1934 responded but reported unhealthy status. "
-        "OpenViking memory disabled for this Hermes run."
+        "OpenViking memory disabled for this Hermes run.",
     ]
 
 
@@ -944,7 +944,7 @@ def test_runtime_openviking_waiter_warns_when_background_start_times_out(monkeyp
     assert warnings == [
         "Local OpenViking server at http://127.0.0.1:1934 is not reachable. "
         "Tried to start openviking-server, but it did not become reachable "
-        "within 60 seconds. OpenViking memory disabled for this Hermes run."
+        "within 60 seconds. OpenViking memory disabled for this Hermes run.",
     ]
 
 
@@ -1037,7 +1037,7 @@ def test_initialize_emits_cli_warning_when_local_runtime_autostart_fails(monkeyp
     assert warnings == [
         "Local OpenViking server at http://localhost:1934 is not reachable. "
         "openviking-server was not found on PATH. "
-        "OpenViking memory disabled for this Hermes run."
+        "OpenViking memory disabled for this Hermes run.",
     ]
 
 
@@ -1152,7 +1152,7 @@ def test_tool_search_sorts_by_raw_score_across_buckets():
                 {"uri": "viking://skills/1", "score": 0.8999, "abstract": "skill result"},
             ],
             "total": 3,
-        }
+        },
     }
 
     result = json.loads(provider._tool_search({"query": "ranking"}))
@@ -1181,7 +1181,7 @@ def test_tool_search_sorts_missing_raw_score_after_negative_scores():
                 {"uri": "viking://skills/positive", "score": 0.1, "abstract": "positive score"},
             ],
             "total": 3,
-        }
+        },
     }
 
     result = json.loads(provider._tool_search({"query": "ranking"}))
@@ -1199,7 +1199,7 @@ def test_tool_search_sends_limit_not_legacy_top_k():
     provider = OpenVikingMemoryProvider()
     provider._client = MagicMock()
     provider._client.post.return_value = {
-        "result": {"memories": [], "resources": [], "skills": [], "total": 0}
+        "result": {"memories": [], "resources": [], "skills": [], "total": 0},
     }
 
     provider._tool_search({"query": "session switch", "limit": 7})
@@ -1214,7 +1214,7 @@ def test_tool_search_uses_find_for_normal_search():
     provider = OpenVikingMemoryProvider()
     provider._client = MagicMock()
     provider._client.post.return_value = {
-        "result": {"memories": [], "resources": [], "skills": [], "total": 0}
+        "result": {"memories": [], "resources": [], "skills": [], "total": 0},
     }
 
     provider._tool_search({"query": "simple lookup", "mode": "fast"})
@@ -1229,7 +1229,7 @@ def test_tool_search_uses_session_search_for_deep_search():
     provider._client = MagicMock()
     provider._session_id = "session-123"
     provider._client.post.return_value = {
-        "result": {"memories": [], "resources": [], "skills": [], "total": 0}
+        "result": {"memories": [], "resources": [], "skills": [], "total": 0},
     }
 
     provider._tool_search({"query": "connect facts", "mode": "deep"})
@@ -1883,7 +1883,7 @@ def test_validate_openviking_reachability_uses_health_only(monkeypatch):
     monkeypatch.setattr(openviking_module, "_VikingClient", FakeVikingClient)
 
     ok, message = openviking_module._validate_openviking_reachability(
-        "https://openviking.example"
+        "https://openviking.example",
     )
 
     assert ok is True
@@ -1986,7 +1986,7 @@ def test_validate_openviking_setup_values_local_dev_no_key_uses_health_only(monk
     monkeypatch.setattr(openviking_module, "_VikingClient", FakeVikingClient)
 
     ok, message, role = openviking_module._validate_openviking_setup_values(
-        {"endpoint": "localhost", "agent": "hermes"}
+        {"endpoint": "localhost", "agent": "hermes"},
     )
 
     assert ok is True
@@ -2093,6 +2093,7 @@ def test_validate_openviking_identity_value_matches_cli_rules(value, field, ok):
 # on_session_switch — flush + commit + rotate behavior (hermes-agent#28296)
 # ---------------------------------------------------------------------------
 
+
 def _make_provider_with_session(session_id: str, turn_count: int):
     provider = OpenVikingMemoryProvider()
     provider._client = MagicMock()
@@ -2166,7 +2167,8 @@ def test_on_session_switch_clears_stale_prefetch_result():
 
 def test_on_session_switch_waits_for_inflight_sync_thread():
     """In-flight sync_turn write must drain before the commit fires —
-    otherwise the commit can race the last message write."""
+    otherwise the commit can race the last message write.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=2)
 
     join_calls = []
@@ -2222,7 +2224,8 @@ def test_on_session_switch_noop_when_client_missing():
 def test_sync_turn_captures_session_id_before_worker_runs():
     """Worker must use the session id snapshotted at sync_turn() call time, not
     re-read self._session_id later — otherwise a delayed worker can write the
-    previous turn's messages into the rotated-in NEW session."""
+    previous turn's messages into the rotated-in NEW session.
+    """
     import threading
 
     provider = OpenVikingMemoryProvider()
@@ -2277,7 +2280,7 @@ def test_sync_turn_captures_session_id_before_worker_runs():
         "messages": [
             {"role": "user", "parts": [{"type": "text", "text": "u"}]},
             {"role": "assistant", "parts": [{"type": "text", "text": "a"}], "peer_id": "hermes"},
-        ]
+        ],
     }]
 
 
@@ -2321,7 +2324,7 @@ def test_sync_turn_retries_batch_write_with_fresh_client():
             "messages": [
                 {"role": "user", "parts": [{"type": "text", "text": "u"}]},
                 {"role": "assistant", "parts": [{"type": "text", "text": "a"}], "peer_id": "hermes"},
-            ]
+            ],
         },
     )]
 
@@ -2360,7 +2363,7 @@ def test_sync_turn_structured_messages_include_assistant_peer_id():
                     "id": "call-1",
                     "type": "function",
                     "function": {"name": "shell_command", "arguments": json.dumps({"cmd": "pwd"})},
-                }
+                },
             ],
         },
         {"role": "tool", "tool_call_id": "call-1", "name": "shell_command", "content": "ok"},
@@ -2388,12 +2391,12 @@ def test_sync_turn_structured_messages_include_assistant_peer_id():
                             "tool_input": {"cmd": "pwd"},
                             "tool_output": "ok",
                             "tool_status": "completed",
-                        }
+                        },
                     ],
                     "peer_id": "hermes",
                 },
                 {"role": "assistant", "parts": [{"type": "text", "text": "a"}], "peer_id": "hermes"},
-            ]
+            ],
         },
     )]
 
@@ -2413,7 +2416,8 @@ def test_sync_turn_noop_when_session_id_blank():
 def test_on_session_end_marks_session_clean_after_successful_commit():
     """After a successful commit on_session_end must reset _turn_count so a
     subsequent on_session_switch (fired by /new and compression right after
-    commit_memory_session) skips its commit instead of double-committing."""
+    commit_memory_session) skips its commit instead of double-committing.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=3)
 
     provider.on_session_end([])
@@ -2427,7 +2431,8 @@ def test_on_session_end_marks_session_clean_after_successful_commit():
 
 def test_on_session_end_keeps_dirty_when_commit_fails():
     """If the commit fails, leave _turn_count > 0 so on_session_switch retries
-    rather than silently dropping extraction for the old session."""
+    rather than silently dropping extraction for the old session.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=3)
     provider._client.post.side_effect = RuntimeError("commit boom")
 
@@ -2452,7 +2457,8 @@ def test_on_session_end_commits_pending_tokens_without_turn_count():
 def test_end_then_switch_does_not_double_commit():
     """Mirrors the /new and compression call order: commit_memory_session
     (→ on_session_end) immediately followed by on_session_switch. The switch
-    must NOT issue a second commit on the same session id."""
+    must NOT issue a second commit on the same session id.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=2)
 
     provider.on_session_end([])
@@ -2488,7 +2494,8 @@ def test_session_needs_commit_guard_wins_over_stale_turn_count():
     still positive. A racing sync_turn can re-increment _turn_count after the
     commit+reset; without the guard ordering, a follow-up finalizer would
     double-commit the same session. The committed-guard must be checked BEFORE
-    the turn_count>0 shortcut."""
+    the turn_count>0 shortcut.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=5)
     provider._mark_session_committed("old-sid")
 
@@ -2501,7 +2508,8 @@ def test_session_needs_commit_guard_wins_over_stale_turn_count():
 def test_on_session_switch_swallows_commit_failure():
     """Commit-on-switch must not propagate exceptions: a failing commit on the
     old session must still allow the rotate to the new session to complete,
-    otherwise subsequent sync_turn writes would land in the wrong session."""
+    otherwise subsequent sync_turn writes would land in the wrong session.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=2)
     provider._client.post.side_effect = RuntimeError("commit boom")
 
@@ -2533,7 +2541,8 @@ def test_on_session_end_skips_commit_when_sync_worker_outlives_join():
     """If the sync worker is still alive after the 10s join, the commit must
     be skipped — late writes from the worker would otherwise land in an
     already-committed session and never be extracted. Leave _turn_count
-    intact so the session stays marked dirty."""
+    intact so the session stays marked dirty.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=3)
     provider._inflight_writers["old-sid"] = {_HungThread()}
 
@@ -2546,7 +2555,8 @@ def test_on_session_end_skips_commit_when_sync_worker_outlives_join():
 def test_on_session_switch_skips_commit_when_sync_worker_outlives_join():
     """Same hazard on the switch path. Rotation must still proceed (the new
     session needs to start) but the old-session commit is skipped to avoid
-    orphaning the worker's late writes past commit."""
+    orphaning the worker's late writes past commit.
+    """
     provider = _make_provider_with_session("old-sid", turn_count=2)
     provider._inflight_writers["old-sid"] = {_HungThread()}
 
@@ -2592,7 +2602,8 @@ def test_on_session_switch_does_not_block_caller_on_slow_drain():
     writer drain (up to _SESSION_DRAIN_TIMEOUT/_DEFERRED_COMMIT_TIMEOUT) or a
     wedged commit POST must not stall the user-facing command. The rotation is
     cheap and synchronous; the commit is offloaded. Mirrors the #41945
-    'do not block the turn thread' contract."""
+    'do not block the turn thread' contract.
+    """
     import threading
     import time
 
@@ -2635,7 +2646,8 @@ def test_on_session_switch_defers_old_commit_to_finalizer_thread():
     but offloads the old-session drain + commit onto a daemon finalizer so the
     caller's command thread (/new, /branch, /resume) never blocks on the up-to
     -_DEFERRED_COMMIT_TIMEOUT drain or the commit POST. See hermes-agent#28296
-    review (the #41945 'do not block the turn thread' contract)."""
+    review (the #41945 'do not block the turn thread' contract).
+    """
     import threading
 
     provider = _make_provider_with_session("old-sid", turn_count=2)
@@ -2671,7 +2683,8 @@ def test_on_session_switch_defers_old_commit_to_finalizer_thread():
 def test_sync_turn_tracks_writer_under_session_id():
     """Every sync_turn writer must register under its captured sid so the
     drain at end/switch sees it even if a later sync_turn replaces the
-    latest-tracked reference."""
+    latest-tracked reference.
+    """
     import threading
 
     provider = OpenVikingMemoryProvider()
@@ -2764,7 +2777,7 @@ def test_on_memory_write_uses_content_write_independent_of_session_rotation():
     assert captured_payloads[0]["content"] == "remember this"
     assert captured_payloads[0]["mode"] == "create"
     assert captured_payloads[0]["uri"].startswith(
-        "viking://user/peers/hermes/memories/preferences/mem_"
+        "viking://user/peers/hermes/memories/preferences/mem_",
     )
 
 
@@ -2893,7 +2906,7 @@ def test_queue_prefetch_drops_result_when_generation_changed_mid_flight():
                          "abstract": "stale from old session"},
                     ],
                     "resources": [],
-                }
+                },
             }
 
     import plugins.memory.openviking as _mod

@@ -58,9 +58,10 @@ def _ensure_discord_mock():
 
 _ensure_discord_mock()
 
-from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
-from gateway.platforms.base import MessageType  # noqa: E402
+from datetime import UTC
 
+from gateway.platforms.base import MessageType  # noqa: E402
+from plugins.platforms.discord.adapter import DiscordAdapter  # noqa: E402
 
 # Minimal valid image / audio / PDF bytes so the cache_*_from_bytes
 # validators accept them. cache_image_from_bytes runs _looks_like_image()
@@ -181,7 +182,8 @@ class TestCacheDiscordImage:
     async def test_falls_back_to_url_when_bytes_validator_rejects(self):
         """If att.read() returns garbage that cache_image_from_bytes rejects
         (e.g. an HTML error page), fall back to the URL downloader instead
-        of surfacing the validation error to the caller."""
+        of surfacing the validation error to the caller.
+        """
         adapter = _make_adapter()
         att = _make_attachment_with_read(b"<html>forbidden</html>")
 
@@ -267,7 +269,7 @@ class TestCacheDiscordDocument:
         att = _make_attachment_without_read()  # no .read → forces fallback
 
         with patch(
-            "plugins.platforms.discord.adapter.is_safe_url", return_value=False
+            "plugins.platforms.discord.adapter.is_safe_url", return_value=False,
         ) as mock_safe, patch("aiohttp.ClientSession") as mock_session:
             with pytest.raises(ValueError, match="SSRF"):
                 await adapter._cache_discord_document(att, ".pdf")
@@ -295,7 +297,7 @@ class TestCacheDiscordDocument:
         session.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "plugins.platforms.discord.adapter.is_safe_url", return_value=True
+            "plugins.platforms.discord.adapter.is_safe_url", return_value=True,
         ), patch("aiohttp.ClientSession", return_value=session):
             result = await adapter._cache_discord_document(att, ".pdf")
 
@@ -334,7 +336,7 @@ class TestHandleMessageUsesAuthenticatedRead:
                 read=AsyncMock(return_value=_PNG_BYTES),
             )
             # Minimal Discord message stub for _handle_message.
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             class _FakeDMChannel:
                 id = 100
@@ -349,7 +351,7 @@ class TestHandleMessageUsesAuthenticatedRead:
             msg = SimpleNamespace(
                 id=1, content="", attachments=[att], mentions=[],
                 reference=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 channel=chan,
                 author=SimpleNamespace(id=42, display_name="U", name="U"),
             )
@@ -379,7 +381,7 @@ class TestHandleMessageUsesAuthenticatedRead:
                 read=AsyncMock(return_value=_OGG_BYTES),
                 is_voice_message=lambda: True,
             )
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             class _FakeDMChannel:
                 id = 100
@@ -393,7 +395,7 @@ class TestHandleMessageUsesAuthenticatedRead:
             msg = SimpleNamespace(
                 id=1, content="", attachments=[att], mentions=[],
                 reference=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 channel=chan,
                 author=SimpleNamespace(id=42, display_name="U", name="U"),
             )
@@ -423,7 +425,7 @@ class TestHandleMessageUsesAuthenticatedRead:
                 read=AsyncMock(return_value=_OGG_BYTES),
                 is_voice_message=lambda: False,
             )
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             class _FakeDMChannel:
                 id = 100
@@ -437,7 +439,7 @@ class TestHandleMessageUsesAuthenticatedRead:
             msg = SimpleNamespace(
                 id=1, content="", attachments=[att], mentions=[],
                 reference=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
                 channel=chan,
                 author=SimpleNamespace(id=42, display_name="U", name="U"),
             )

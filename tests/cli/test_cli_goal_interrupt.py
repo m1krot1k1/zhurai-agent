@@ -18,7 +18,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ──────────────────────────────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────────────────────────────
@@ -82,7 +81,7 @@ class TestInterruptAutoPause:
         # regressed — fail loudly instead of silently querying a mock.
         with patch("hermes_cli.goals.judge_goal") as judge_mock:
             judge_mock.side_effect = AssertionError(
-                "judge_goal called on an interrupted turn"
+                "judge_goal called on an interrupted turn",
             )
             cli._maybe_continue_goal_after_turn()
 
@@ -126,7 +125,7 @@ class TestEmptyResponseSkip:
 
         with patch("hermes_cli.goals.judge_goal") as judge_mock:
             judge_mock.side_effect = AssertionError(
-                "judge_goal called on an empty response"
+                "judge_goal called on an empty response",
             )
             cli._maybe_continue_goal_after_turn()
 
@@ -145,7 +144,7 @@ class TestEmptyResponseSkip:
 
         with patch("hermes_cli.goals.judge_goal") as judge_mock:
             judge_mock.side_effect = AssertionError(
-                "judge_goal called without an assistant response"
+                "judge_goal called without an assistant response",
             )
             cli._maybe_continue_goal_after_turn()
 
@@ -207,8 +206,9 @@ class TestInterruptFlagLifecycle:
         # We can't run chat() end-to-end here, but we can assert the reset
         # is the first thing after the secret-capture registration by
         # inspecting the source shape.
-        from cli import HermesCLI
         import inspect
+
+        from cli import HermesCLI
 
         src = inspect.getsource(HermesCLI.chat)
         # Look for an explicit reset near the top of chat().

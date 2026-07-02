@@ -24,9 +24,9 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 try:
     from hermes_constants import get_hermes_home
@@ -89,8 +89,8 @@ def _log(message: str) -> None:
     try:
         log_file = get_log_file()
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-        with open(log_file, "a", encoding="utf-8") as f:
+        ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        with Path(log_file).open("a", encoding="utf-8") as f:
             f.write(f"[{ts}] {message}\n")
     except OSError:
         # Never let the audit log break the agent loop.
@@ -101,7 +101,7 @@ def _log(message: str) -> None:
 # tracked.json — atomic read/write, backup scoped to tracked.json only
 # ---------------------------------------------------------------------------
 
-def load_tracked() -> List[Dict[str, Any]]:
+def load_tracked() -> list[dict[str, Any]]:
     """Load tracked.json.  Restores from ``.bak`` on corruption."""
     tf = get_tracked_file()
     tf.parent.mkdir(parents=True, exist_ok=True)
@@ -124,7 +124,7 @@ def load_tracked() -> List[Dict[str, Any]]:
         return []
 
 
-def save_tracked(tracked: List[Dict[str, Any]]) -> None:
+def save_tracked(tracked: list[dict[str, Any]]) -> None:
     """Atomic write: ``.tmp`` → backup old → rename."""
     tf = get_tracked_file()
     tf.parent.mkdir(parents=True, exist_ok=True)
@@ -220,7 +220,7 @@ def track(path_str: str, category: str, silent: bool = False) -> bool:
 
     tracked.append({
         "path": str(path),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "category": category,
         "size": size,
     })
@@ -248,13 +248,13 @@ def forget(path_str: str) -> int:
 # Dry run
 # ---------------------------------------------------------------------------
 
-def dry_run() -> Tuple[List[Dict], List[Dict]]:
+def dry_run() -> tuple[list[dict], list[dict]]:
     """Return (auto_delete_list, needs_prompt_list) without touching files."""
     tracked = load_tracked()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
-    auto: List[Dict] = []
-    prompt: List[Dict] = []
+    auto: list[dict] = []
+    prompt: list[dict] = []
 
     for item in tracked:
         p = Path(item["path"])
@@ -272,17 +272,9 @@ def dry_run() -> Tuple[List[Dict], List[Dict]]:
                 # dry-run output too.
                 continue
 
-        if cat == "test":
+        if cat == "test" or (cat == "temp" and age > 7) or (cat == "cron-output" and age > 14):
             auto.append(item)
-        elif cat == "temp" and age > 7:
-            auto.append(item)
-        elif cat == "cron-output" and age > 14:
-            auto.append(item)
-        elif cat == "research" and age > 30:
-            prompt.append(item)
-        elif cat == "chrome-profile" and age > 14:
-            prompt.append(item)
-        elif size > 500 * 1024 * 1024:
+        elif (cat == "research" and age > 30) or (cat == "chrome-profile" and age > 14) or size > 500 * 1024 * 1024:
             prompt.append(item)
 
     return auto, prompt
@@ -292,18 +284,18 @@ def dry_run() -> Tuple[List[Dict], List[Dict]]:
 # Quick cleanup
 # ---------------------------------------------------------------------------
 
-def quick() -> Dict[str, Any]:
+def quick() -> dict[str, Any]:
     """Safe deterministic cleanup — no prompts.
 
     Returns: ``{"deleted": N, "empty_dirs": N, "freed": bytes,
                "errors": [str, ...]}``.
     """
     tracked = load_tracked()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deleted = 0
     freed = 0
-    new_tracked: List[Dict] = []
-    errors: List[str] = []
+    new_tracked: list[dict] = []
+    errors: list[str] = []
 
     for item in tracked:
         p = Path(item["path"])
@@ -326,7 +318,7 @@ def quick() -> Dict[str, Any]:
             if re_cat != "cron-output":
                 _log(
                     f"SKIP stale cron-output entry: {p} "
-                    f"(re-classified as {re_cat!r})"
+                    f"(re-classified as {re_cat!r})",
                 )
                 # Drop the stale entry — it was misclassified.
                 continue
@@ -365,7 +357,7 @@ def quick() -> Dict[str, Any]:
     # stall the gateway event loop for minutes.
     hermes_home = get_hermes_home()
     empty_removed = 0
-    sweep_stack: List[Tuple[Path, bool]] = []
+    sweep_stack: list[tuple[Path, bool]] = []
     try:
         for top in hermes_home.iterdir():
             if (
@@ -405,7 +397,7 @@ def quick() -> Dict[str, Any]:
     save_tracked(new_tracked)
     _log(
         f"QUICK_SUMMARY: {deleted} files, {empty_removed} dirs, "
-        f"{fmt_size(freed)}"
+        f"{fmt_size(freed)}",
     )
     return {
         "deleted": deleted,
@@ -420,8 +412,8 @@ def quick() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def deep(
-    confirm: Optional[callable] = None,
-) -> Dict[str, Any]:
+    confirm: callable | None = None,
+) -> dict[str, Any]:
     """Deep cleanup.
 
     Runs :func:`quick` first, then asks the *confirm* callable for each
@@ -437,7 +429,7 @@ def deep(
         return {"quick": quick_result, "deep_deleted": 0, "deep_freed": 0}
 
     tracked = load_tracked()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     research, chrome, large = [], [], []
 
     for item in tracked:
@@ -458,7 +450,7 @@ def deep(
     old_research = research[10:]
 
     freed, count = 0, 0
-    to_remove: List[Dict] = []
+    to_remove: list[dict] = []
 
     for group in (old_research, chrome, large):
         for item in group:
@@ -474,7 +466,7 @@ def deep(
                     count += 1
                     _log(
                         f"DELETED: {p} ({item['category']}, "
-                        f"{fmt_size(item['size'])})"
+                        f"{fmt_size(item['size'])})",
                     )
                 except OSError as e:
                     _log(f"ERROR deleting {item['path']}: {e}")
@@ -490,10 +482,10 @@ def deep(
 # Status
 # ---------------------------------------------------------------------------
 
-def status() -> Dict[str, Any]:
+def status() -> dict[str, Any]:
     """Return per-category breakdown and top 10 largest tracked files."""
     tracked = load_tracked()
-    cats: Dict[str, Dict] = {}
+    cats: dict[str, dict] = {}
     for item in tracked:
         c = item["category"]
         cats.setdefault(c, {"count": 0, "size": 0})
@@ -513,7 +505,7 @@ def status() -> Dict[str, Any]:
     }
 
 
-def format_status(s: Dict[str, Any]) -> str:
+def format_status(s: dict[str, Any]) -> str:
     """Human-readable status string (for slash command output)."""
     lines = [f"{'Category':<20} {'Files':>6}  {'Size':>10}", "-" * 40]
     cats = s["categories"]
@@ -541,7 +533,7 @@ _TEST_PATTERNS = ("test_", "tmp_")
 _TEST_SUFFIXES = (".test.py", ".test.js", ".test.ts", ".test.md")
 
 
-def guess_category(path: Path) -> Optional[str]:
+def guess_category(path: Path) -> str | None:
     """Return a category label for *path*, or None if we shouldn't track it.
 
     Used by the ``post_tool_call`` hook to auto-track ephemeral files.

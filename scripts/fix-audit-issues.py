@@ -24,6 +24,7 @@ else:
 
 fixed_files = []
 
+
 # ── 1. Fix duplicate frontmatter in agent .md files ──
 def fix_duplicate_frontmatter(path: Path) -> bool:
     """Remove duplicate YAML frontmatter blocks and ZCode Adaptation duplicates.
@@ -94,6 +95,7 @@ for f in sorted(AGENTS.glob("*.md")):
     if ensure_description_frontmatter(f):
         fixed_files.append(f"agents/{f.name} — added missing description in frontmatter")
 
+
 # ── 4. Fix rules/specialists.mdc count ──
 def fix_specialists_count():
     path = RULES / "specialists.mdc"
@@ -108,7 +110,9 @@ def fix_specialists_count():
             path.write_text(text, encoding="utf-8")
         fixed_files.append(f"rules/specialists.mdc — updated agent count to {actual_count}")
 
+
 fix_specialists_count()
+
 
 # ── 5. Create missing skills/skills-specialist/SKILL.md ──
 def create_missing_skill_skill():
@@ -152,7 +156,9 @@ Ensures consistency with agent definitions in agents/ directory.
             path.write_text(content, encoding="utf-8")
         fixed_files.append("skills/skills-specialist/SKILL.md — created (was missing)")
 
+
 create_missing_skill_skill()
+
 
 # ── 6. Fix docs/skills-index.md — regenerate from disk ──
 def regenerate_skills_index():
@@ -178,7 +184,9 @@ def regenerate_skills_index():
         path.write_text(new_content, encoding="utf-8")
     fixed_files.append(f"docs/skills-index.md — regenerated with {len(skill_files)} skills")
 
+
 regenerate_skills_index()
+
 
 # ── 7. Fix broken path in rules/orchestrator.mdc ──
 def fix_orchestrator_broken_path():
@@ -191,7 +199,9 @@ def fix_orchestrator_broken_path():
             path.write_text(text, encoding="utf-8")
         fixed_files.append("rules/orchestrator.mdc — fixed broken path rules/agents/skills → skills/")
 
+
 fix_orchestrator_broken_path()
+
 
 # ── 8. Fix docs/GLOSSARY.md count ──
 def fix_glossary_counts():
@@ -209,7 +219,9 @@ def fix_glossary_counts():
             path.write_text(text, encoding="utf-8")
         fixed_files.append(f"docs/GLOSSARY.md — updated counts: {coordinators}+{specialists}={actual_agents}")
 
+
 fix_glossary_counts()
+
 
 # ── 9. Fix agents/README.md count ──
 def fix_agents_readme():
@@ -227,7 +239,9 @@ def fix_agents_readme():
             path.write_text(text, encoding="utf-8")
         fixed_files.append(f"agents/README.md — updated counts: {coordinators}+{specialists}={actual_agents}")
 
+
 fix_agents_readme()
+
 
 # ── 10. Fix rules/specialists.mdc agent count in routing table ──
 def fix_routing_table():
@@ -245,7 +259,9 @@ def fix_routing_table():
             path.write_text(text, encoding="utf-8")
         fixed_files.append("rules/specialists.mdc — checked routing table completeness")
 
+
 fix_routing_table()
+
 
 # ── 11. Fix README count in docs/ ──
 def fix_docs_readme_counts():
@@ -262,14 +278,15 @@ def fix_docs_readme_counts():
                 path.write_text(text, encoding="utf-8")
             fixed_files.append(f"{path.relative_to(ROOT)} — fixed agent count")
 
+
 fix_docs_readme_counts()
 
 # ── Summary ──
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 if DRY_RUN:
     print(f"DRY-RUN: {len(fixed_files)} issues would be fixed:")
 else:
     print(f"APPLIED: {len(fixed_files)} fixes written:")
 for f in fixed_files:
     print(f"  ✅ {f}")
-print(f"{'='*60}")
+print(f"{'=' * 60}")

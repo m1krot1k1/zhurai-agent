@@ -10,19 +10,21 @@ ineffective. The fix routes all three walks through
 ``_estimate_msg_budget_tokens``, which counts the full envelope.
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from agent.context_compressor import (
-    ContextCompressor,
     _CHARS_PER_TOKEN,
+    ContextCompressor,
     _estimate_msg_budget_tokens,
 )
 
 
 def _assistant_with_tool_calls(n_calls: int, *, args: str = '{"path":"a"}') -> dict:
     """An assistant turn fanning into ``n_calls`` parallel tool calls with
-    realistic id/name overhead but a small arguments string."""
+    realistic id/name overhead but a small arguments string.
+    """
     return {
         "role": "assistant",
         "content": "",
@@ -74,7 +76,7 @@ class TestToolCallEnvelopeEstimate:
         assert _estimate_msg_budget_tokens(msg) == len("hi") // _CHARS_PER_TOKEN + 10
 
 
-@pytest.fixture()
+@pytest.fixture
 def compressor():
     with patch("agent.context_compressor.get_model_context_length", return_value=100000):
         return ContextCompressor(

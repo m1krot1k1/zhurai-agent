@@ -96,12 +96,12 @@ def test_load_busy_input_mode_prefers_env_then_config_then_default(tmp_path, mon
     assert gateway_run.GatewayRunner._load_busy_input_mode() == "interrupt"
 
     (tmp_path / "config.yaml").write_text(
-        "display:\n  busy_input_mode: queue\n", encoding="utf-8"
+        "display:\n  busy_input_mode: queue\n", encoding="utf-8",
     )
     assert gateway_run.GatewayRunner._load_busy_input_mode() == "queue"
 
     (tmp_path / "config.yaml").write_text(
-        "display:\n  busy_input_mode: steer\n", encoding="utf-8"
+        "display:\n  busy_input_mode: steer\n", encoding="utf-8",
     )
     assert gateway_run.GatewayRunner._load_busy_input_mode() == "steer"
 
@@ -126,7 +126,7 @@ def test_load_busy_text_mode_follows_input_mode_and_honors_legacy(tmp_path, monk
 
     # busy_input_mode=queue propagates to text handling (single source of truth).
     (tmp_path / "config.yaml").write_text(
-        "display:\n  busy_input_mode: queue\n", encoding="utf-8"
+        "display:\n  busy_input_mode: queue\n", encoding="utf-8",
     )
     assert gateway_run.GatewayRunner._load_busy_text_mode() == "queue"
 
@@ -139,7 +139,7 @@ def test_load_busy_text_mode_follows_input_mode_and_honors_legacy(tmp_path, monk
 
     # Legacy env override wins too.
     (tmp_path / "config.yaml").write_text(
-        "display:\n  busy_input_mode: interrupt\n", encoding="utf-8"
+        "display:\n  busy_input_mode: interrupt\n", encoding="utf-8",
     )
     monkeypatch.setenv("HERMES_GATEWAY_BUSY_TEXT_MODE", "queue")
     assert gateway_run.GatewayRunner._load_busy_text_mode() == "queue"
@@ -150,7 +150,7 @@ def test_load_busy_text_mode_follows_input_mode_and_honors_legacy(tmp_path, monk
 
 
 def test_load_restart_drain_timeout_prefers_env_then_config_then_default(
-    tmp_path, monkeypatch, caplog
+    tmp_path, monkeypatch, caplog,
 ):
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
     monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
@@ -161,7 +161,7 @@ def test_load_restart_drain_timeout_prefers_env_then_config_then_default(
     )
 
     (tmp_path / "config.yaml").write_text(
-        "agent:\n  restart_drain_timeout: 12\n", encoding="utf-8"
+        "agent:\n  restart_drain_timeout: 12\n", encoding="utf-8",
     )
     assert gateway_run.GatewayRunner._load_restart_drain_timeout() == 12.0
 
@@ -188,7 +188,7 @@ async def test_request_restart_is_idempotent():
     await first_task
 
     runner.stop.assert_awaited_once_with(
-        restart=True, detached_restart=True, service_restart=False
+        restart=True, detached_restart=True, service_restart=False,
     )
 
 
@@ -266,7 +266,7 @@ async def test_windows_detached_restart_scrubs_gateway_marker(monkeypatch, tmp_p
     monkeypatch.setattr(
         subprocess_compat,
         "windows_detach_popen_kwargs",
-        lambda: {},
+        dict,
     )
 
     def fake_popen(cmd, **kwargs):
@@ -295,7 +295,7 @@ async def test_shutdown_notification_sent_to_active_sessions():
     """Active sessions receive a notification when the gateway starts shutting down."""
     runner, adapter = make_restart_runner()
     source = make_restart_source(chat_id="999", chat_type="dm")
-    session_key = f"agent:main:telegram:dm:999"
+    session_key = "agent:main:telegram:dm:999"
     runner._running_agents[session_key] = MagicMock()
 
     await runner._notify_active_sessions_of_shutdown()
@@ -420,7 +420,7 @@ async def test_shutdown_notification_uses_persisted_origin_for_colon_ids():
             origin=source,
             platform=source.platform,
             chat_type=source.chat_type,
-        )
+        ),
     }
     runner.adapters = {gateway_run.Platform.MATRIX: adapter}
 

@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from gateway.config import Platform, PlatformConfig, HomeChannel
+from gateway.config import HomeChannel, Platform, PlatformConfig
 from plugins.teams_pipeline.models import TeamsMeetingRef, TeamsMeetingSummaryPayload
 from tests.gateway._plugin_adapter_loader import load_plugin_adapter
-
 
 # ---------------------------------------------------------------------------
 # SDK Mock — install in sys.modules before importing the adapter
 # ---------------------------------------------------------------------------
+
 
 def _ensure_teams_mock():
     """Install a teams SDK mock in sys.modules if the real package isn't present."""
@@ -31,7 +31,7 @@ def _ensure_teams_mock():
     microsoft_teams_api_activities_typing = types.ModuleType("microsoft_teams.api.activities.typing")
     microsoft_teams_api_activities_invoke = types.ModuleType("microsoft_teams.api.activities.invoke")
     microsoft_teams_api_activities_invoke_adaptive_card = types.ModuleType(
-        "microsoft_teams.api.activities.invoke.adaptive_card"
+        "microsoft_teams.api.activities.invoke.adaptive_card",
     )
     microsoft_teams_common = types.ModuleType("microsoft_teams.common")
     microsoft_teams_common_http = types.ModuleType("microsoft_teams.common.http")
@@ -132,7 +132,7 @@ def _ensure_teams_mock():
     # HttpResponse TypedDict mock
     HttpResponse = dict
     HttpMethod = str
-    from typing import Callable
+    from collections.abc import Callable
     HttpRouteHandler = Callable
 
     microsoft_teams_apps_http_adapter.HttpRequest = HttpRequest
@@ -174,6 +174,7 @@ _teams_mod.AIOHTTP_AVAILABLE = True
 # Ensure SDK symbols that were None (import failed on Python <3.12) are
 # replaced with the mocked versions so runtime calls don't silently no-op.
 import sys as _sys
+
 _mt = _sys.modules.get("microsoft_teams.api.activities.typing")
 if _mt and _teams_mod.TypingActivityInput is None:
     _teams_mod.TypingActivityInput = _mt.TypingActivityInput
@@ -224,7 +225,7 @@ class TestTeamsRequirements:
             return True
 
         monkeypatch.setattr(
-            "tools.lazy_deps.ensure_and_bind", _fake_ensure_and_bind
+            "tools.lazy_deps.ensure_and_bind", _fake_ensure_and_bind,
         )
         assert check_teams_requirements() is True
         assert called["ensure_and_bind"] == 0
@@ -241,7 +242,7 @@ class TestTeamsRequirements:
             return True
 
         monkeypatch.setattr(
-            "tools.lazy_deps.ensure_and_bind", _fake_ensure_and_bind
+            "tools.lazy_deps.ensure_and_bind", _fake_ensure_and_bind,
         )
         assert check_teams_requirements() is True
         assert seen["feature"] == "platform.teams"
@@ -312,7 +313,7 @@ class TestTeamsAdapterInit:
 
     def test_invalid_port_from_extra_falls_back_to_default(self):
         adapter = TeamsAdapter(
-            _make_config(client_id="id", client_secret="secret", tenant_id="tenant", port="abc")
+            _make_config(client_id="id", client_secret="secret", tenant_id="tenant", port="abc"),
         )
         assert adapter._port == 3978
 
@@ -396,6 +397,7 @@ class TestTeamsInteractiveSetup:
         env_text = (hermes_home / ".env").read_text(encoding="utf-8")
         assert "TEAMS_CLIENT_ID=client-id" in env_text
         assert "TEAMS_TENANT_ID=tenant-id" in env_text
+
 
 class TestTeamsConnect:
     @pytest.mark.anyio
@@ -539,7 +541,7 @@ class TestTeamsSummaryWriter:
     @pytest.mark.anyio
     async def test_graph_delivery_posts_to_channel(self):
         graph_client = SimpleNamespace(
-            post_json=AsyncMock(return_value={"id": "msg-123", "webUrl": "https://teams.example/messages/123"})
+            post_json=AsyncMock(return_value={"id": "msg-123", "webUrl": "https://teams.example/messages/123"}),
         )
         writer = TeamsSummaryWriter(graph_client=graph_client)
         payload = _make_summary_payload()
@@ -753,7 +755,8 @@ class TestTeamsMessageHandling:
 class TestTeamsAttachmentClassification:
     """Document attachments must set MessageType.DOCUMENT so run.py's
     document-context injection surfaces the cached file to the agent
-    (same bug class as Signal/Email/SimpleX, PR #44695)."""
+    (same bug class as Signal/Email/SimpleX, PR #44695).
+    """
 
     def _make_adapter(self):
         adapter = TeamsAdapter(_make_config(
@@ -920,7 +923,8 @@ class _FakeAiohttpResponse:
 
 class _FakeAiohttpSession:
     """Scripted aiohttp.ClientSession with a queue of responses so tests
-    can assert calls in order."""
+    can assert calls in order.
+    """
 
     def __init__(self, scripts):
         self._scripts = list(scripts)
@@ -941,7 +945,8 @@ class _FakeAiohttpSession:
 
 def _install_fake_aiohttp(monkeypatch, session):
     """Replace ``aiohttp`` in ``sys.modules`` so ``import aiohttp as _aiohttp``
-    inside ``_standalone_send`` picks up our fake."""
+    inside ``_standalone_send`` picks up our fake.
+    """
     fake_aiohttp = types.SimpleNamespace(
         ClientSession=lambda timeout=None, **kwargs: session,
         ClientTimeout=lambda total=None: None,
@@ -1074,7 +1079,8 @@ class TestTeamsMediaAttachments:
     """send_video / send_voice / send_document route through the same
     Attachment mechanism as send_image so the gateway's media dispatch
     (run.py) delivers native attachments instead of the base-class text
-    fallback (file path sent as plain text)."""
+    fallback (file path sent as plain text).
+    """
 
     def _make_adapter(self):
         adapter = TeamsAdapter(_make_config(

@@ -1,5 +1,4 @@
-"""
-SQLite-backed fact store with entity resolution and trust scoring.
+"""SQLite-backed fact store with entity resolution and trust scoring.
 Single-user Hermes memory store plugin.
 """
 
@@ -76,17 +75,17 @@ CREATE TABLE IF NOT EXISTS memory_banks (
 """
 
 # Trust adjustment constants
-_HELPFUL_DELTA   =  0.05
+_HELPFUL_DELTA = 0.05
 _UNHELPFUL_DELTA = -0.10
-_TRUST_MIN       =  0.0
-_TRUST_MAX       =  1.0
+_TRUST_MIN = 0.0
+_TRUST_MAX = 1.0
 
 # Entity extraction patterns
-_RE_CAPITALIZED  = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b')
+_RE_CAPITALIZED = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b")
 _RE_DOUBLE_QUOTE = re.compile(r'"([^"]+)"')
 _RE_SINGLE_QUOTE = re.compile(r"'([^']+)'")
-_RE_AKA          = re.compile(
-    r'(\w+(?:\s+\w+)*)\s+(?:aka|also known as)\s+(\w+(?:\s+\w+)*)',
+_RE_AKA = re.compile(
+    r"(\w+(?:\s+\w+)*)\s+(?:aka|also known as)\s+(\w+(?:\s+\w+)*)",
     re.IGNORECASE,
 )
 
@@ -173,7 +172,7 @@ class MemoryStore:
             except sqlite3.IntegrityError:
                 # Duplicate content — return existing id
                 row = self._conn.execute(
-                    "SELECT fact_id FROM facts WHERE content = ?", (content,)
+                    "SELECT fact_id FROM facts WHERE content = ?", (content,),
                 ).fetchone()
                 return int(row["fact_id"])
 
@@ -253,7 +252,7 @@ class MemoryStore:
         """
         with self._lock:
             row = self._conn.execute(
-                "SELECT fact_id, trust_score FROM facts WHERE fact_id = ?", (fact_id,)
+                "SELECT fact_id, trust_score FROM facts WHERE fact_id = ?", (fact_id,),
             ).fetchone()
             if row is None:
                 return False
@@ -285,7 +284,7 @@ class MemoryStore:
             # If content changed, re-extract entities
             if content is not None:
                 self._conn.execute(
-                    "DELETE FROM fact_entities WHERE fact_id = ?", (fact_id,)
+                    "DELETE FROM fact_entities WHERE fact_id = ?", (fact_id,),
                 )
                 for name in self._extract_entities(content):
                     entity_id = self._resolve_entity(name)
@@ -297,7 +296,7 @@ class MemoryStore:
                 self._compute_hrr_vector(fact_id, content)
             # Rebuild bank for relevant category
             cat = category or self._conn.execute(
-                "SELECT category FROM facts WHERE fact_id = ?", (fact_id,)
+                "SELECT category FROM facts WHERE fact_id = ?", (fact_id,),
             ).fetchone()["category"]
             self._rebuild_bank(cat)
 
@@ -307,13 +306,13 @@ class MemoryStore:
         """Delete a fact and its entity links. Returns True if the row existed."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT fact_id, category FROM facts WHERE fact_id = ?", (fact_id,)
+                "SELECT fact_id, category FROM facts WHERE fact_id = ?", (fact_id,),
             ).fetchone()
             if row is None:
                 return False
 
             self._conn.execute(
-                "DELETE FROM fact_entities WHERE fact_id = ?", (fact_id,)
+                "DELETE FROM fact_entities WHERE fact_id = ?", (fact_id,),
             )
             self._conn.execute("DELETE FROM facts WHERE fact_id = ?", (fact_id,))
             self._conn.commit()
@@ -437,7 +436,7 @@ class MemoryStore:
         """
         # Exact name match
         row = self._conn.execute(
-            "SELECT entity_id FROM entities WHERE name LIKE ?", (name,)
+            "SELECT entity_id FROM entities WHERE name LIKE ?", (name,),
         ).fetchone()
         if row is not None:
             return int(row["entity_id"])
@@ -455,7 +454,7 @@ class MemoryStore:
 
         # Create new entity
         cur = self._conn.execute(
-            "INSERT INTO entities (name) VALUES (?)", (name,)
+            "INSERT INTO entities (name) VALUES (?)", (name,),
         )
         self._conn.commit()
         return int(cur.lastrowid)  # type: ignore[return-value]
@@ -546,7 +545,7 @@ class MemoryStore:
                 self.hrr_dim = dim
 
             rows = self._conn.execute(
-                "SELECT fact_id, content, category FROM facts"
+                "SELECT fact_id, content, category FROM facts",
             ).fetchall()
 
             categories: set[str] = set()

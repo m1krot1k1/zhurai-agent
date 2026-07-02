@@ -4,12 +4,11 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-from hermes_cli.profiles import _get_default_hermes_home
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hermes_cli.profiles import _get_default_hermes_home
 from plugins.memory.honcho.client import (
     HonchoClientConfig,
     get_honcho_client,
@@ -90,7 +89,7 @@ class TestFromGlobalConfig:
     def test_missing_config_falls_back_to_env(self, tmp_path):
         with patch.dict(os.environ, {}, clear=True):
             config = HonchoClientConfig.from_global_config(
-                config_path=tmp_path / "nonexistent.json"
+                config_path=tmp_path / "nonexistent.json",
             )
         # Should fall back to from_env
         assert config.enabled is False
@@ -114,8 +113,8 @@ class TestFromGlobalConfig:
                 "hermes": {
                     "workspace": "override-ws",
                     "aiPeer": "override-ai",
-                }
-            }
+                },
+            },
         }))
         # Isolate from real ~/.hermes/honcho.json
         monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
@@ -142,8 +141,8 @@ class TestFromGlobalConfig:
                 "hermes": {
                     "workspace": "host-ws",
                     "aiPeer": "host-ai",
-                }
-            }
+                },
+            },
         }))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
@@ -202,7 +201,7 @@ class TestFromGlobalConfig:
         assert config.context_tokens == 2000
 
     def test_recall_mode_from_config(self, tmp_path):
-        """recallMode is read from config, host block wins."""
+        """RecallMode is read from config, host block wins."""
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({
             "apiKey": "key",
@@ -245,7 +244,7 @@ class TestFromGlobalConfig:
         assert config.enabled is True
 
     def test_base_url_from_config_root(self, tmp_path):
-        """baseUrl in config root is read and takes precedence over env var."""
+        """BaseUrl in config root is read and takes precedence over env var."""
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({"baseUrl": "http://config-host:9000"}))
 
@@ -254,7 +253,7 @@ class TestFromGlobalConfig:
         assert config.base_url == "http://config-host:9000"
 
     def test_base_url_not_read_from_host_block(self, tmp_path):
-        """baseUrl is a root-level connection setting, not overridable per-host (consistent with apiKey)."""
+        """BaseUrl is a root-level connection setting, not overridable per-host (consistent with apiKey)."""
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({
             "baseUrl": "http://root:9000",
@@ -308,17 +307,17 @@ class TestResolveSessionName:
     def test_per_repo_uses_git_root(self):
         config = HonchoClientConfig(session_strategy="per-repo")
         with patch.object(
-            HonchoClientConfig, "_git_repo_name", return_value="hermes-agent"
+            HonchoClientConfig, "_git_repo_name", return_value="hermes-agent",
         ):
             result = config.resolve_session_name("/home/user/hermes-agent/subdir")
         assert result == "hermes-agent"
 
     def test_per_repo_with_peer_prefix(self):
         config = HonchoClientConfig(
-            session_strategy="per-repo", peer_name="eri", session_peer_prefix=True
+            session_strategy="per-repo", peer_name="eri", session_peer_prefix=True,
         )
         with patch.object(
-            HonchoClientConfig, "_git_repo_name", return_value="groudon"
+            HonchoClientConfig, "_git_repo_name", return_value="groudon",
         ):
             result = config.resolve_session_name("/home/user/groudon/src")
         assert result == "eri-groudon"
@@ -326,7 +325,7 @@ class TestResolveSessionName:
     def test_per_repo_falls_back_to_dirname_outside_git(self):
         config = HonchoClientConfig(session_strategy="per-repo")
         with patch.object(
-            HonchoClientConfig, "_git_repo_name", return_value=None
+            HonchoClientConfig, "_git_repo_name", return_value=None,
         ):
             result = config.resolve_session_name("/home/user/not-a-repo")
         assert result == "not-a-repo"
@@ -613,7 +612,7 @@ class TestGetHonchoClient:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_passes_timeout_from_config(self):
         fake_honcho = MagicMock(name="Honcho")
@@ -633,7 +632,7 @@ class TestGetHonchoClient:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_hermes_config_timeout_override_used_when_config_timeout_missing(self):
         fake_honcho = MagicMock(name="Honcho")
@@ -653,7 +652,7 @@ class TestGetHonchoClient:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_defaults_to_30s_when_no_timeout_configured(self):
         from plugins.memory.honcho.client import _DEFAULT_HTTP_TIMEOUT
@@ -675,7 +674,7 @@ class TestGetHonchoClient:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_hermes_request_timeout_alias_used(self):
         fake_honcho = MagicMock(name="Honcho")
@@ -714,7 +713,8 @@ class TestResolveSessionNameGatewayKey:
     def test_gateway_key_not_remapped_by_title(self):
         """A title never remaps a stable identifier — the gateway per-chat key
         wins over the title so a generated title can't split a live conversation
-        onto a new Honcho session."""
+        onto a new Honcho session.
+        """
         config = HonchoClientConfig(session_strategy="per-session")
         result = config.resolve_session_name(
             session_title="my-custom-title",
@@ -922,18 +922,20 @@ class TestDialecticDepthParsing:
 
 class TestGetHonchoClientBaseUrlDoublePrefixFix:
     """Regression tests for #20688 — Honcho SDK double-prefixing of /v3 for
-    self-hosted instances where base_url already contains a version path."""
+    self-hosted instances where base_url already contains a version path.
+    """
 
     def teardown_method(self):
         reset_honcho_client()
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_local_base_url_with_v3_suffix_stripped(self):
         """base_url 'http://localhost:38000/v3' must become 'http://localhost:38000'
-        before passing to the Honcho SDK to avoid double '/v3/v3' prefixing."""
+        before passing to the Honcho SDK to avoid double '/v3/v3' prefixing.
+        """
         fake_honcho = MagicMock(name="Honcho")
         cfg = HonchoClientConfig(
             api_key=None,
@@ -954,7 +956,7 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_local_base_url_without_version_unchanged(self):
         """base_url 'http://localhost:38000' (no version) must be passed unchanged."""
@@ -978,7 +980,7 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_cloud_base_url_without_version_unchanged(self):
         """A cloud base_url with no version segment must pass through untouched."""
@@ -1002,11 +1004,12 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_cloud_base_url_with_version_stripped(self):
         """A version segment double-prefixes regardless of host, so a cloud
-        base_url that ends in '/v3' must also be stripped (the SDK re-adds it)."""
+        base_url that ends in '/v3' must also be stripped (the SDK re-adds it).
+        """
         fake_honcho = MagicMock(name="Honcho")
         cfg = HonchoClientConfig(
             api_key="cloud-key",
@@ -1027,7 +1030,7 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     @pytest.mark.parametrize(
         "raw_url, expected",
@@ -1049,7 +1052,8 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
     def test_self_hosted_base_url_version_stripped(self, raw_url, expected):
         """Non-loopback self-hosted instances (LAN IPs, Tailscale, custom
         domains) must get the same version-segment stripping as localhost.
-        Regression for #20688 recurring on any non-loopback self-host."""
+        Regression for #20688 recurring on any non-loopback self-host.
+        """
         fake_honcho = MagicMock(name="Honcho")
         cfg = HonchoClientConfig(
             api_key="self-host-key",
@@ -1070,7 +1074,7 @@ class TestGetHonchoClientBaseUrlDoublePrefixFix:
 
     @pytest.mark.skipif(
         not importlib.util.find_spec("honcho"),
-        reason="honcho SDK not installed"
+        reason="honcho SDK not installed",
     )
     def test_local_base_url_with_trailing_slash_stripped(self):
         """base_url 'http://127.0.0.1:38000/v3/' must also be cleaned up."""

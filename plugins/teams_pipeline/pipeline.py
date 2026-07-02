@@ -9,9 +9,10 @@ import os
 import shutil
 import tempfile
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any
 
 import httpx
 
@@ -65,10 +66,10 @@ class TeamsPipelineArtifactNotFoundError(TeamsPipelineRetryableError):
     """Raised when meeting artifacts are not yet available."""
 
 
-TranscribeFn = Callable[[str, Optional[str]], dict[str, Any]]
+TranscribeFn = Callable[[str, str | None], dict[str, Any]]
 SummarizeFn = Callable[..., Awaitable[dict[str, Any] | TeamsMeetingSummaryPayload]]
 SinkFn = Callable[
-    [TeamsMeetingSummaryPayload, dict[str, Any], Optional[dict[str, Any]]],
+    [TeamsMeetingSummaryPayload, dict[str, Any], dict[str, Any] | None],
     Awaitable[dict[str, Any]],
 ]
 
@@ -87,12 +88,12 @@ class TeamsPipelineConfig:
     teams_delivery: dict[str, Any] | None = None
 
     @classmethod
-    def from_dict(cls, payload: Optional[dict[str, Any]]) -> "TeamsPipelineConfig":
+    def from_dict(cls, payload: dict[str, Any] | None) -> TeamsPipelineConfig:
         data = dict(payload or {})
         tmp_dir = data.get("tmp_dir") or data.get("tmpDir")
         return cls(
             transcript_preferred=bool(data.get("transcript_preferred", True)),
-            transcript_required=bool(data.get("transcript_required", False)),
+            transcript_required=bool(data.get("transcript_required")),
             transcription_fallback=bool(data.get("transcription_fallback", True)),
             stt_model=data.get("stt_model") or data.get("sttModel"),
             ffmpeg_extract_audio=bool(data.get("ffmpeg_extract_audio", True)),
@@ -116,7 +117,7 @@ class NotionWriter:
         self,
         payload: TeamsMeetingSummaryPayload,
         config: dict[str, Any],
-        existing_record: Optional[dict[str, Any]] = None,
+        existing_record: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not self.api_key:
             raise TeamsPipelineSinkError("NOTION_API_KEY is not configured.")
@@ -162,16 +163,16 @@ class NotionWriter:
 
         properties: dict[str, Any] = {
             title_property: {
-                "title": [{"text": {"content": payload.title or f"Meeting {payload.meeting_ref.meeting_id}"}}]
-            }
+                "title": [{"text": {"content": payload.title or f"Meeting {payload.meeting_ref.meeting_id}"}}],
+            },
         }
         if summary_property:
             properties[summary_property] = {
-                "rich_text": [{"text": {"content": (payload.summary or "")[:1900]}}]
+                "rich_text": [{"text": {"content": (payload.summary or "")[:1900]}}],
             }
         if meeting_id_property:
             properties[meeting_id_property] = {
-                "rich_text": [{"text": {"content": payload.meeting_ref.meeting_id}}]
+                "rich_text": [{"text": {"content": payload.meeting_ref.meeting_id}}],
             }
         return properties
 
@@ -189,14 +190,14 @@ class NotionWriter:
                     "object": "block",
                     "type": "heading_2",
                     "heading_2": {"rich_text": [{"text": {"content": heading}}]},
-                }
+                },
             )
             blocks.append(
                 {
                     "object": "block",
                     "type": "paragraph",
                     "paragraph": {"rich_text": [{"text": {"content": body or "None"}}]},
-                }
+                },
             )
         return blocks
 
@@ -212,7 +213,7 @@ class LinearWriter:
         self,
         payload: TeamsMeetingSummaryPayload,
         config: dict[str, Any],
-        existing_record: Optional[dict[str, Any]] = None,
+        existing_record: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if not self.api_key:
             raise TeamsPipelineSinkError("LINEAR_API_KEY is not configured.")
@@ -276,10 +277,10 @@ class TeamsMeetingPipeline:
         store: TeamsPipelineStore,
         config: TeamsPipelineConfig | dict[str, Any] | None = None,
         transcribe_fn: TranscribeFn = transcribe_audio,
-        summarize_fn: Optional[SummarizeFn] = None,
-        notion_writer: Optional[NotionWriter] = None,
-        linear_writer: Optional[LinearWriter] = None,
-        teams_sender: Optional[SinkFn] = None,
+        summarize_fn: SummarizeFn | None = None,
+        notion_writer: NotionWriter | None = None,
+        linear_writer: LinearWriter | None = None,
+        teams_sender: SinkFn | None = None,
     ) -> None:
         self.graph_client = graph_client
         self.store = store
@@ -353,7 +354,7 @@ class TeamsMeetingPipeline:
             if self.config.transcript_preferred:
                 job = self._persist_job(job, status="fetching_transcript")
                 transcript_artifact, transcript_text = await fetch_preferred_transcript_text(
-                    self.graph_client, resolved_meeting
+                    self.graph_client, resolved_meeting,
                 )
                 if transcript_artifact and transcript_text:
                     artifacts.append(transcript_artifact)
@@ -363,18 +364,18 @@ class TeamsMeetingPipeline:
             if not transcript_text:
                 if self.config.transcript_required:
                     raise TeamsPipelineRetryableError(
-                        f"Transcript unavailable for meeting {resolved_meeting.meeting_id}."
+                        f"Transcript unavailable for meeting {resolved_meeting.meeting_id}.",
                     )
                 if not self.config.transcription_fallback:
                     raise TeamsPipelineArtifactNotFoundError(
                         "No transcript available and transcription fallback disabled "
-                        f"for {resolved_meeting.meeting_id}."
+                        f"for {resolved_meeting.meeting_id}.",
                     )
                 job = self._persist_job(job, status="downloading_recording")
                 recordings = await list_recording_artifacts(self.graph_client, resolved_meeting)
                 if not recordings:
                     raise TeamsPipelineRetryableError(
-                        f"Recording unavailable for meeting {resolved_meeting.meeting_id}."
+                        f"Recording unavailable for meeting {resolved_meeting.meeting_id}.",
                     )
                 recording = recordings[0]
                 artifacts.append(recording)
@@ -482,7 +483,7 @@ class TeamsMeetingPipeline:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             raise TeamsPipelineRetryableError(
-                "Recording fallback requires ffmpeg for audio extraction, but ffmpeg was not found."
+                "Recording fallback requires ffmpeg for audio extraction, but ffmpeg was not found.",
             )
         audio_path = recording_path.with_suffix(".wav")
         proc = await asyncio.create_subprocess_exec(

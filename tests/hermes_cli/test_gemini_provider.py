@@ -1,16 +1,30 @@
 """Tests for Google AI Studio (Gemini) provider integration."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
-from hermes_cli.auth import PROVIDER_REGISTRY, resolve_provider, resolve_api_key_provider_credentials
-from hermes_cli.models import _PROVIDER_MODELS, _PROVIDER_LABELS, _PROVIDER_ALIASES, normalize_provider
-from hermes_cli.model_normalize import normalize_model_for_provider, detect_vendor
 from agent.model_metadata import get_model_context_length
-from agent.models_dev import PROVIDER_TO_MODELS_DEV, list_agentic_models, _NOISE_PATTERNS
-
+from agent.models_dev import (
+    _NOISE_PATTERNS,
+    PROVIDER_TO_MODELS_DEV,
+    list_agentic_models,
+)
+from hermes_cli.auth import (
+    PROVIDER_REGISTRY,
+    resolve_api_key_provider_credentials,
+    resolve_provider,
+)
+from hermes_cli.model_normalize import detect_vendor, normalize_model_for_provider
+from hermes_cli.models import (
+    _PROVIDER_ALIASES,
+    _PROVIDER_LABELS,
+    _PROVIDER_MODELS,
+    normalize_provider,
+)
 
 # ── Provider Registry ──
+
 
 class TestGeminiProviderRegistry:
     def test_gemini_in_registry(self):
@@ -40,6 +54,7 @@ PROVIDER_ENV_VARS = (
     "GLM_API_KEY", "ZAI_API_KEY", "KIMI_API_KEY",
     "MINIMAX_API_KEY", "DEEPSEEK_API_KEY",
 )
+
 
 @pytest.fixture(autouse=True)
 def _clean_provider_env(monkeypatch):
@@ -183,6 +198,7 @@ class TestGeminiAgentInit:
     def test_agent_imports_without_error(self):
         """Verify run_agent.py has no SyntaxError (the critical bug)."""
         import importlib
+
         import run_agent
         importlib.reload(run_agent)
 
@@ -318,8 +334,8 @@ class TestGeminiModelsDev:
                     "gemini-live-2.5-flash": {"tool_call": True},
                     "gemini-2.5-flash-preview-04-17": {"tool_call": True},
                     "gemma-4-31b-it": {"tool_call": True},
-                }
-            }
+                },
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_data):
             result = list_agentic_models("gemini")
@@ -341,8 +357,8 @@ class TestGeminiModelsDev:
                     "gemma-3-27b-it": {},
                     "gemini-1.5-pro": {},
                     "gemini-2.0-flash": {},
-                }
-            }
+                },
+            },
         }
         with patch("agent.models_dev.fetch_models_dev", return_value=mock_data):
             from agent.models_dev import list_provider_models

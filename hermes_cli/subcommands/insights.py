@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_insights_parser(subparsers, *, cmd_insights: Callable) -> None:
@@ -17,9 +17,9 @@ def build_insights_parser(subparsers, *, cmd_insights: Callable) -> None:
         description="Analyze session history to show token usage, costs, tool patterns, and activity trends",
     )
     insights_parser.add_argument(
-        "--days", type=int, default=30, help="Number of days to analyze (default: 30)"
+        "--days", type=int, default=30, help="Number of days to analyze (default: 30)",
     )
     insights_parser.add_argument(
-        "--source", help="Filter by platform (cli, telegram, discord, etc.)"
+        "--source", help="Filter by platform (cli, telegram, discord, etc.)",
     )
     insights_parser.set_defaults(func=cmd_insights)

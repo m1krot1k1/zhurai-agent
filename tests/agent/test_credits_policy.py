@@ -6,16 +6,12 @@ CreditsState is constructed directly (not parsed from headers).
 
 from __future__ import annotations
 
-import pytest
-
 from agent.credits_tracker import (
     CREDITS_NOTICE_KIND,
     CREDITS_RESTORED_TTL_MS,
-    AgentNotice,
     CreditsState,
     evaluate_credits_notices,
 )
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -284,7 +280,7 @@ class TestDepletedFreeModelSuppression:
         assert "credits.depleted" in latch["active"]
         # Same depleted account, but now on a free model → clear, NO "restored"
         to_show, to_clear = evaluate_credits_notices(
-            CreditsState(paid_access=False), latch, model_is_free=True
+            CreditsState(paid_access=False), latch, model_is_free=True,
         )
         assert "credits.depleted" in to_clear
         assert "credits.depleted" not in latch["active"]
@@ -302,22 +298,24 @@ class TestDepletedFreeModelSuppression:
 
     def test_genuine_recovery_on_free_model_no_spurious_restored(self):
         """Recovery observed while suppressed (notice never shown) → nothing to
-        clear, no 'restored' (there was no visible depleted state to restore)."""
+        clear, no 'restored' (there was no visible depleted state to restore).
+        """
         latch = fresh_latch()
         evaluate_credits_notices(CreditsState(paid_access=False), latch, model_is_free=True)
         to_show, to_clear = evaluate_credits_notices(
-            CreditsState(paid_access=True), latch, model_is_free=True
+            CreditsState(paid_access=True), latch, model_is_free=True,
         )
         assert to_clear == []
         assert all(n.key != "credits.restored" for n in to_show)
 
     def test_genuine_recovery_still_emits_restored_when_notice_active(self):
         """paid_access flip back to True with the notice showing → clear + restored
-        (unchanged behaviour, regardless of the model-free flag)."""
+        (unchanged behaviour, regardless of the model-free flag).
+        """
         latch = fresh_latch()
         evaluate_credits_notices(CreditsState(paid_access=False), latch)
         to_show, to_clear = evaluate_credits_notices(
-            CreditsState(paid_access=True), latch, model_is_free=True
+            CreditsState(paid_access=True), latch, model_is_free=True,
         )
         assert "credits.depleted" in to_clear
         restored = [n for n in to_show if n.key == "credits.restored"]
@@ -328,7 +326,7 @@ class TestDepletedFreeModelSuppression:
         latch = fresh_latch()
         evaluate_credits_notices(state_with_fraction(0.10), latch, model_is_free=True)
         to_show, _ = evaluate_credits_notices(
-            state_with_fraction(0.95, paid_access=False), latch, model_is_free=True
+            state_with_fraction(0.95, paid_access=False), latch, model_is_free=True,
         )
         keys = [n.key for n in to_show]
         assert "credits.usage" in keys
@@ -352,8 +350,8 @@ class TestIsFreeTierModel:
         assert is_free_tier_model("Hermes-4-405B") is False
 
     def test_pricing_cache_peek_zero_priced_model(self, monkeypatch):
-        from agent.credits_tracker import is_free_tier_model
         import hermes_cli.models as models_mod
+        from agent.credits_tracker import is_free_tier_model
 
         # The picker keys the cache on the pre-/v1 root (get_pricing_for_provider
         # strips a trailing /v1 before fetch_models_with_pricing).
@@ -364,7 +362,7 @@ class TestIsFreeTierModel:
                 "https://inference-api.nousresearch.com": {
                     "some/zero-priced": {"prompt": "0", "completion": "0"},
                     "some/paid": {"prompt": "0.000001", "completion": "0.000002"},
-                }
+                },
             },
         )
         # The agent holds the /v1-suffixed URL (DEFAULT_NOUS_INFERENCE_URL) —
@@ -377,8 +375,8 @@ class TestIsFreeTierModel:
         assert is_free_tier_model("some/zero-priced", "https://inference-api.nousresearch.com/v1/") is True
 
     def test_cache_miss_is_not_free_and_no_fetch(self, monkeypatch):
-        from agent.credits_tracker import is_free_tier_model
         import hermes_cli.models as models_mod
+        from agent.credits_tracker import is_free_tier_model
 
         monkeypatch.setattr(models_mod, "_pricing_cache", {})
 
@@ -391,8 +389,8 @@ class TestIsFreeTierModel:
         assert is_free_tier_model("some/model", "https://inference-api.nousresearch.com/v1") is False
 
     def test_exception_fails_open_to_false(self, monkeypatch):
-        from agent.credits_tracker import is_free_tier_model
         import hermes_cli.models as models_mod
+        from agent.credits_tracker import is_free_tier_model
 
         class _Exploding:
             def get(self, *_a, **_kw):
@@ -529,7 +527,8 @@ class TestSeverityOrder:
 
 class TestTopUpSuppression:
     """purchased_micros > 0 suppresses the sub-cap usage gauge: the cap is the
-    wrong denominator for an account that can keep spending top-up funds."""
+    wrong denominator for an account that can keep spending top-up funds.
+    """
 
     def test_no_usage_band_with_topup_at_90pct(self):
         latch = fresh_latch()
@@ -559,7 +558,7 @@ class TestTopUpSuppression:
         assert all(n.key != "credits.usage" for n in to_show)
 
     def test_band_resumes_after_topup_spent(self):
-        """purchased back to 0 with usage still in-band → gauge resumes."""
+        """Purchased back to 0 with usage still in-band → gauge resumes."""
         latch = fresh_latch()
         evaluate_credits_notices(state_with_fraction(0.10), latch)
         evaluate_credits_notices(
@@ -574,7 +573,8 @@ class TestTopUpSuppression:
 
     def test_grant_spent_still_fires_with_topup(self):
         """Suppression only affects the gauge — grant_spent (which NEEDS purchased>0)
-        is untouched."""
+        is untouched.
+        """
         latch = fresh_latch()
         s = state_with_fraction(
             1.0,

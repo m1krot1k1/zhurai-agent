@@ -56,7 +56,8 @@ def _read_until(bridge: WinPtyBridge, needle: bytes, timeout: float = 10.0) -> b
 class TestWinPtyBridgeUnavailable:
     """Module-level surface that must stay importable on every OS so the
     web_server platform branch doesn't blow up at import time when pywinpty
-    is missing or the host isn't Windows."""
+    is missing or the host isn't Windows.
+    """
 
     def test_error_is_importable_and_carries_message(self):
         err = PtyUnavailableError("conpty missing")
@@ -198,7 +199,8 @@ class TestWinPtyBridgeResize:
 class TestClampDimension:
     """The clamp helper is the load-bearing piece — the dashboard sends
     untrusted winsize values straight from xterm.js, and pywinpty's
-    setwinsize will happily raise on out-of-range u16 values."""
+    setwinsize will happily raise on out-of-range u16 values.
+    """
 
     def test_clamps_above_max(self):
         from hermes_cli.win_pty_bridge import _MAX_COLS, _MAX_ROWS, _clamp
@@ -231,7 +233,7 @@ class TestClampDimension:
 class TestWinPtyBridgeClose:
     def test_close_is_idempotent(self):
         bridge = WinPtyBridge.spawn(
-            [sys.executable, "-c", "import time; time.sleep(30)"]
+            [sys.executable, "-c", "import time; time.sleep(30)"],
         )
         bridge.close()
         bridge.close()  # must not raise
@@ -239,7 +241,7 @@ class TestWinPtyBridgeClose:
 
     def test_close_terminates_long_running_child(self):
         bridge = WinPtyBridge.spawn(
-            [sys.executable, "-c", "import time; time.sleep(30)"]
+            [sys.executable, "-c", "import time; time.sleep(30)"],
         )
         pid = bridge.pid
         assert bridge.is_alive(), f"child pid {pid} not alive before close"

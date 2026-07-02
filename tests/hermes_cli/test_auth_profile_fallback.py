@@ -26,7 +26,7 @@ def _make_auth_store(pool: dict | None = None, providers: dict | None = None) ->
     return store
 
 
-@pytest.fixture()
+@pytest.fixture
 def profile_env(tmp_path, monkeypatch):
     """Set up a global root + an active profile under Path.home()/.hermes/profiles/coder.
 
@@ -399,7 +399,7 @@ def test_classic_mode_does_not_double_read_same_file(tmp_path, monkeypatch):
         }],
     }))
 
-    from hermes_cli.auth import read_credential_pool, _global_auth_file_path
+    from hermes_cli.auth import _global_auth_file_path, read_credential_pool
 
     # Classic mode: HERMES_HOME is set to a custom path that is NOT under
     # ~/.hermes/profiles/ — get_default_hermes_root() returns HERMES_HOME

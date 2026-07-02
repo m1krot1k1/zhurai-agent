@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 from tools.delegate_tool import (
     _get_subagent_approval_callback,
     _subagent_auto_deny,
-    _subagent_auto_approve,
 )
 
 

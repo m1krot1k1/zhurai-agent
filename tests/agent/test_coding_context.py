@@ -2,8 +2,8 @@
 
 import json
 import os
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -135,7 +135,7 @@ class TestProjectFacts:
     def test_package_json_scripts_surface_verify_commands(self, tmp_path):
         _git_init(tmp_path)
         (tmp_path / "package.json").write_text(
-            json.dumps({"scripts": {"test": "vitest", "lint": "eslint .", "dev": "vite"}})
+            json.dumps({"scripts": {"test": "vitest", "lint": "eslint .", "dev": "vite"}}),
         )
         (tmp_path / "pnpm-lock.yaml").write_text("")
         block = cc.build_coding_workspace_block(tmp_path)
@@ -208,7 +208,7 @@ class TestProjectFacts:
 
     def test_detect_project_facts_structured(self, tmp_path):
         (tmp_path / "package.json").write_text(
-            json.dumps({"scripts": {"test": "vitest", "dev": "vite"}})
+            json.dumps({"scripts": {"test": "vitest", "dev": "vite"}}),
         )
         (tmp_path / "pnpm-lock.yaml").write_text("")
         facts = cc.detect_project_facts(tmp_path)
@@ -222,7 +222,7 @@ class TestProjectFacts:
         # commands the prompt snapshot renders — one detector feeds both.
         _git_init(tmp_path)
         (tmp_path / "package.json").write_text(
-            json.dumps({"scripts": {"test": "vitest", "lint": "eslint ."}})
+            json.dumps({"scripts": {"test": "vitest", "lint": "eslint ."}}),
         )
         (tmp_path / "pnpm-lock.yaml").write_text("")
         facts = cc.project_facts_for(tmp_path)
@@ -441,7 +441,7 @@ class TestProfiles:
         _git_init(tmp_path)
         for raw in ("auto", "on"):
             mode = cc.resolve_runtime_mode(
-                platform="cli", cwd=tmp_path, config={"agent": {"coding_context": raw}}
+                platform="cli", cwd=tmp_path, config={"agent": {"coding_context": raw}},
             )
             assert mode.is_coding is True
             assert mode.compact_skill_categories() == frozenset()

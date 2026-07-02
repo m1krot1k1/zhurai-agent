@@ -39,8 +39,8 @@ LEGACY_LIST_CONFIG = {
             "base_url": MIMO_URL,
             "api_key": MIMO_KEY,
             "api_mode": "chat_completions",
-        }
-    ]
+        },
+    ],
 }
 
 PROVIDERS_DICT_CONFIG = {
@@ -48,8 +48,8 @@ PROVIDERS_DICT_CONFIG = {
         "mimo-v2.5-pro": {
             "api": MIMO_URL,
             "api_key": MIMO_KEY,
-        }
-    }
+        },
+    },
 }
 
 
@@ -88,7 +88,7 @@ class TestRuntimeModelConfigPersistsEntryIdentity:
         assert config["provider"] == "custom:mimo-v2.5-pro"
 
     def test_keeps_bare_custom_when_no_entry_matches(self, monkeypatch):
-        monkeypatch.setattr(rp, "load_config", lambda: {})
+        monkeypatch.setattr(rp, "load_config", dict)
 
         from tui_gateway.server import _runtime_model_config
 
@@ -113,7 +113,8 @@ class TestRuntimeModelConfigPersistsEntryIdentity:
 
 def _make_agent_with_override(override, monkeypatch, config, model_cfg=None):
     """Run _make_agent through the REAL resolve_runtime_provider against a
-    patched config, returning the kwargs AIAgent was constructed with."""
+    patched config, returning the kwargs AIAgent was constructed with.
+    """
     monkeypatch.setattr(rp, "load_config", lambda: config)
     monkeypatch.setattr(rp, "_get_model_config", lambda: model_cfg or {})
     # Keep credential-pool resolution off the developer's real HERMES home.
@@ -137,9 +138,10 @@ def _make_agent_with_override(override, monkeypatch, config, model_cfg=None):
 
 class TestResumeRoundTrip:
     def test_round_trip_restores_entry_credentials(self, monkeypatch):
-        """persist → stored-overrides → _make_agent resolves the entry's
+        """Persist → stored-overrides → _make_agent resolves the entry's
         api_key again (the exact path that raised "No LLM provider
-        configured" before the fix)."""
+        configured" before the fix).
+        """
         monkeypatch.setattr(rp, "load_config", lambda: LEGACY_LIST_CONFIG)
 
         from tui_gateway.server import (
@@ -156,7 +158,7 @@ class TestResumeRoundTrip:
         assert overrides["model_override"]["provider"] == "custom:mimo-v2.5-pro"
 
         kwargs = _make_agent_with_override(
-            overrides["model_override"], monkeypatch, LEGACY_LIST_CONFIG
+            overrides["model_override"], monkeypatch, LEGACY_LIST_CONFIG,
         )
 
         assert kwargs["provider"] == "custom"
@@ -165,7 +167,8 @@ class TestResumeRoundTrip:
 
     def test_legacy_row_with_bare_custom_heals_via_base_url(self, monkeypatch):
         """Rows persisted BEFORE the fix stored provider="custom"; the
-        rebuild must recover the entry identity from the stored base_url."""
+        rebuild must recover the entry identity from the stored base_url.
+        """
         override = {
             "model": "mimo-v2.5-pro",
             "provider": "custom",
@@ -181,7 +184,8 @@ class TestResumeRoundTrip:
     def test_legacy_row_without_matching_entry_keeps_endpoint(self, monkeypatch):
         """No config entry owns the stored URL: the direct-alias branch must
         still receive the base_url so resolution targets the session's
-        endpoint instead of raising auth_unavailable."""
+        endpoint instead of raising auth_unavailable.
+        """
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         override = {
@@ -217,17 +221,18 @@ NAMED_CONFIG = {
             "base_url": MIMO_URL,
             "api_key": MIMO_KEY,
             "api_mode": "chat_completions",
-        }
+        },
     ],
 }
 
 
 class TestBareCustomNoBaseUrlHealsFromConfig:
     """A named custom provider must never escape as bare ``"custom"`` when the
-    config identifies the active entry — even when no base_url survived."""
+    config identifies the active entry — even when no base_url survived.
+    """
 
     def test_canonical_identity_recovers_from_config_when_no_base_url(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         monkeypatch.setattr(rp, "load_config", lambda: NAMED_CONFIG)
         monkeypatch.setattr(rp, "_get_model_config", lambda: NAMED_CONFIG["model"])
@@ -239,11 +244,11 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         )
 
     def test_canonical_identity_returns_none_without_a_real_entry(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         # config.model.provider is bare "custom" and no entry is named → no
         # routable identity to recover; caller keeps its fallback behaviour.
-        monkeypatch.setattr(rp, "load_config", lambda: {})
+        monkeypatch.setattr(rp, "load_config", dict)
         monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "custom"})
         monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
 
@@ -271,7 +276,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         row = {
             "model": "mimo-v2.5-pro",
             "model_config": json.dumps(
-                {"model": "mimo-v2.5-pro", "provider": "custom"}
+                {"model": "mimo-v2.5-pro", "provider": "custom"},
             ),
             "billing_provider": "custom",
         }
@@ -283,9 +288,10 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
     def test_restore_drops_bare_custom_when_config_cannot_heal(self, monkeypatch):
         """No recoverable identity: do NOT restore bare "custom" as a routable
         override — leave it unset so resume falls back to the configured
-        default instead of the broken OpenRouter route."""
-        monkeypatch.setattr(rp, "load_config", lambda: {})
-        monkeypatch.setattr(rp, "_get_model_config", lambda: {})
+        default instead of the broken OpenRouter route.
+        """
+        monkeypatch.setattr(rp, "load_config", dict)
+        monkeypatch.setattr(rp, "_get_model_config", dict)
         monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
 
         from tui_gateway.server import _stored_session_runtime_overrides
@@ -293,7 +299,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         row = {
             "model": "some-model",
             "model_config": json.dumps(
-                {"model": "some-model", "provider": "custom"}
+                {"model": "some-model", "provider": "custom"},
             ),
             "billing_provider": "custom",
         }
@@ -305,7 +311,8 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
     def test_make_agent_heals_bare_custom_no_base_url_end_to_end(self, monkeypatch):
         """The exact failing path: stored override has bare custom + no
         base_url; _make_agent must build the AIAgent with the named entry's
-        endpoint + key, NOT the OpenRouter default with an empty key."""
+        endpoint + key, NOT the OpenRouter default with an empty key.
+        """
         override = {
             "model": "mimo-v2.5-pro",
             "provider": "custom",
@@ -314,7 +321,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         }
 
         kwargs = _make_agent_with_override(
-            override, monkeypatch, NAMED_CONFIG, model_cfg=NAMED_CONFIG["model"]
+            override, monkeypatch, NAMED_CONFIG, model_cfg=NAMED_CONFIG["model"],
         )
 
         assert kwargs["base_url"] == MIMO_URL
@@ -326,7 +333,8 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         write (_ensure_session_db_row, before the agent is built) copies the
         composer override's RESOLVED provider. A named custom provider's
         resolved value is bare "custom" — persisting that verbatim seeds the
-        unresumable row. It must be healed to ``custom:<name>`` here."""
+        unresumable row. It must be healed to ``custom:<name>`` here.
+        """
         monkeypatch.setattr(rp, "load_config", lambda: NAMED_CONFIG)
         monkeypatch.setattr(rp, "_get_model_config", lambda: NAMED_CONFIG["model"])
 
@@ -350,5 +358,3 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
 
         persisted = captured.get("model_config") or {}
         assert persisted.get("provider") == "custom:mimo-v2.5-pro"
-
-

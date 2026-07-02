@@ -5,8 +5,9 @@ import stat
 import sys
 import time
 import types
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import MessageType
@@ -176,7 +177,7 @@ def _make_fake_mautrix():
     mautrix_crypto_store = types.ModuleType("mautrix.crypto.store")
 
     class MemoryCryptoStore:
-        def __init__(self, account_id="", pickle_key=""):  # noqa: S301
+        def __init__(self, account_id="", pickle_key=""):
             self.account_id = account_id
             self.pickle_key = pickle_key
 
@@ -201,7 +202,7 @@ def _make_fake_mautrix():
     class PgCryptoStore:
         upgrade_table = MagicMock()
 
-        def __init__(self, account_id="", pickle_key="", db=None):  # noqa: S301
+        def __init__(self, account_id="", pickle_key="", db=None):
             self.account_id = account_id
             self.pickle_key = pickle_key
             self.db = db
@@ -510,11 +511,11 @@ class TestMatrixDmDetection:
         self.adapter._client.get_state_event = AsyncMock(
             side_effect=lambda room_id, event_type: {"name": "Project Room"}
             if event_type == "m.room.name"
-            else (_ for _ in ()).throw(Exception("no alias"))
+            else (_ for _ in ()).throw(Exception("no alias")),
         )
         self.adapter._client.state_store = MagicMock()
         self.adapter._client.state_store.get_members = AsyncMock(
-            return_value=["@bot:ex.org", "@alice:ex.org"]
+            return_value=["@bot:ex.org", "@alice:ex.org"],
         )
 
         identity = await self.adapter._resolve_room_identity("!project:ex.org")
@@ -533,7 +534,7 @@ class TestMatrixDmDetection:
         self.adapter._client.get_state_event = AsyncMock(
             side_effect=lambda room_id, event_type: {"content": {"name": "Ops Room"}}
             if event_type == "m.room.name"
-            else (_ for _ in ()).throw(Exception("no alias"))
+            else (_ for _ in ()).throw(Exception("no alias")),
         )
         self.adapter._client.state_store = MagicMock()
         self.adapter._client.state_store.get_members = AsyncMock(return_value=["@bot:ex.org", "@alice:ex.org"])
@@ -785,7 +786,8 @@ class TestMatrixBangCommandAlias:
 
     def test_bang_alias_underscore_resolves_to_hyphen_form(self):
         """!set_home must emit a dispatchable token even though set_home is
-        not itself registered — the hyphenated alias set-home is."""
+        not itself registered — the hyphenated alias set-home is.
+        """
         from plugins.platforms.matrix.adapter import _normalize_matrix_bang_command
 
         # set_home (underscore) is NOT a registered command/alias, but
@@ -799,12 +801,13 @@ class TestMatrixBangCommandAlias:
     def test_bang_skill_command_normalizes(self):
         """The get_skill_commands() branch normalizes installed skill
         commands, not just built-in gateway commands. Skill keys are stored
-        slash-prefixed (e.g. "/arxiv"), which the resolver must account for."""
+        slash-prefixed (e.g. "/arxiv"), which the resolver must account for.
+        """
         import agent.skill_commands as skill_commands_mod
 
         fake_skills = {"/arxiv": {}, "/obsidian": {}}
         with patch.object(
-            skill_commands_mod, "get_skill_commands", return_value=fake_skills
+            skill_commands_mod, "get_skill_commands", return_value=fake_skills,
         ):
             from plugins.platforms.matrix.adapter import _normalize_matrix_bang_command
 
@@ -823,9 +826,10 @@ class TestMatrixBangCommandAlias:
     @pytest.mark.asyncio
     async def test_bang_command_in_quoted_reply_normalizes(self):
         """A bang command that follows a Matrix reply-fallback quote is
-        normalized after the quote is stripped, matching /command behavior."""
+        normalized after the quote is stripped, matching /command behavior.
+        """
         captured_event = await self._dispatch_text_reply(
-            "> <@bob:example.org> earlier message\n\n!model"
+            "> <@bob:example.org> earlier message\n\n!model",
         )
 
         assert captured_event is not None
@@ -836,9 +840,10 @@ class TestMatrixBangCommandAlias:
     @pytest.mark.asyncio
     async def test_slash_command_in_quoted_reply_normalizes(self):
         """Sanity: the slash equivalent already works post-strip — the bang
-        form above must reach parity with this."""
+        form above must reach parity with this.
+        """
         captured_event = await self._dispatch_text_reply(
-            "> <@bob:example.org> earlier message\n\n/model"
+            "> <@bob:example.org> earlier message\n\n/model",
         )
 
         assert captured_event is not None
@@ -1097,7 +1102,7 @@ class TestMatrixMarkdownToHtml:
                 "| --- | --- |",
                 "| Apples | 4 |",
                 "| Bread | 1 |",
-            ]
+            ],
         )
 
         result = self.adapter._markdown_to_html(table)
@@ -1272,8 +1277,9 @@ class TestMatrixRequirements:
         a confusing ``No module named 'asyncpg'`` deep in
         ``MatrixAdapter.connect()``.
         """
-        from plugins.platforms.matrix.adapter import _check_e2ee_deps
         import builtins
+
+        from plugins.platforms.matrix.adapter import _check_e2ee_deps
         real_import = builtins.__import__
 
         def _blocking_import(name, *args, **kwargs):
@@ -1290,8 +1296,9 @@ class TestMatrixRequirements:
         Mautrix's ``Database.create("sqlite:///...")`` driver lookup imports
         aiosqlite lazily — without it, connect fails at ``crypto_db.start()``.
         """
-        from plugins.platforms.matrix.adapter import _check_e2ee_deps
         import builtins
+
+        from plugins.platforms.matrix.adapter import _check_e2ee_deps
         real_import = builtins.__import__
 
         def _blocking_import(name, *args, **kwargs):
@@ -1916,7 +1923,7 @@ class TestMatrixSyncLoop:
                     "user_id": "@bot:example.org",
                     "encryption": False,
                 },
-            )
+            ),
         )
         adapter._text_batch_delay_seconds = 0
         adapter._background_read_receipt = MagicMock()
@@ -1945,7 +1952,7 @@ class TestMatrixSyncLoop:
             "next_batch": "s1",
         })
         mock_client.get_account_data = AsyncMock(
-            return_value=MagicMock(content={"@alice:example.org": ["!dm:example.org"]})
+            return_value=MagicMock(content={"@alice:example.org": ["!dm:example.org"]}),
         )
         mock_client.get_state_event = AsyncMock(side_effect=Exception("no state"))
         mock_client.state_store = MagicMock()
@@ -2248,7 +2255,9 @@ class TestMatrixDiagnostics:
         assert diagnostics["media"]["max_media_bytes"] == 123
 
     def test_matrix_recovery_key_is_never_logged(self, caplog, monkeypatch):
-        from plugins.platforms.matrix.adapter import _handle_generated_matrix_recovery_key
+        from plugins.platforms.matrix.adapter import (
+            _handle_generated_matrix_recovery_key,
+        )
 
         secret = "super-secret-generated-recovery-key"
         monkeypatch.delenv("MATRIX_RECOVERY_KEY_OUTPUT_FILE", raising=False)
@@ -2259,7 +2268,9 @@ class TestMatrixDiagnostics:
         assert "will not be logged" in caplog.text
 
     def test_matrix_recovery_key_output_file_is_0600(self, tmp_path, monkeypatch, caplog):
-        from plugins.platforms.matrix.adapter import _handle_generated_matrix_recovery_key
+        from plugins.platforms.matrix.adapter import (
+            _handle_generated_matrix_recovery_key,
+        )
 
         secret = "super-secret-generated-recovery-key"
         output_path = tmp_path / "matrix-recovery-key.txt"
@@ -2442,7 +2453,10 @@ class TestMatrixDiagnostics:
         }
 
     def test_matrix_capability_claims_match_adapter_surfaces(self):
-        from plugins.platforms.matrix.adapter import MatrixAdapter, get_matrix_capabilities
+        from plugins.platforms.matrix.adapter import (
+            MatrixAdapter,
+            get_matrix_capabilities,
+        )
 
         capabilities = get_matrix_capabilities()
         required_methods = {
@@ -2641,7 +2655,7 @@ class TestMatrixEncryptedEventHandler:
         mock_olm = MagicMock()
         mock_olm.load = AsyncMock()
         mock_olm.share_keys = AsyncMock(
-            side_effect=[None, Exception("One time key signed_curve25519:AAAAAQ already exists")]
+            side_effect=[None, Exception("One time key signed_curve25519:AAAAAQ already exists")],
         )
         mock_olm.share_keys_min_trust = None
         mock_olm.send_keys_min_trust = None
@@ -2789,16 +2803,16 @@ class TestMatrixMarkdownHtmlFormatting:
         self.convert = MatrixAdapter._markdown_to_html_fallback
 
     def test_fenced_code_block(self):
-        result = self.convert('```python\ndef hello():\n    pass\n```')
+        result = self.convert("```python\ndef hello():\n    pass\n```")
         assert "<pre><code" in result
         assert "language-python" in result
 
     def test_fenced_code_block_no_lang(self):
-        result = self.convert('```\nsome code\n```')
+        result = self.convert("```\nsome code\n```")
         assert "<pre><code>" in result
 
     def test_code_block_html_escaped(self):
-        result = self.convert('```\n<script>alert(1)</script>\n```')
+        result = self.convert("```\n<script>alert(1)</script>\n```")
         assert "&lt;script&gt;" in result
         assert "<script>" not in result
 
@@ -3028,7 +3042,6 @@ class TestMatrixReactions:
     @pytest.mark.asyncio
     async def test_approval_reaction_cleanup_is_delayed(self):
         """Bot approval reaction redactions should not run inline."""
-
         self.adapter._reaction_redaction_delay_seconds = 0.01
         self.adapter._redact_reaction = AsyncMock(return_value=True)
         prompt = MagicMock()
@@ -3097,7 +3110,7 @@ class TestMatrixReadReceipts:
 
         assert ctx is not None
         self.adapter._background_read_receipt.assert_called_once_with(
-            "!room:ex", "$event1"
+            "!room:ex", "$event1",
         )
 
     @pytest.mark.asyncio
@@ -3110,7 +3123,7 @@ class TestMatrixReadReceipts:
         result = await self.adapter.send_read_receipt("!room:ex", "$event1")
         assert result is True
         mock_client.set_fully_read_marker.assert_awaited_once_with(
-            "!room:ex", "$event1", "$event1"
+            "!room:ex", "$event1", "$event1",
         )
 
     @pytest.mark.asyncio
@@ -3175,7 +3188,7 @@ class TestMatrixImageOnlyMediaNormalization:
         assert captured_event is not None
         assert captured_event.text == ""
         assert captured_event.media_urls == [
-            "https://matrix.example.org/_matrix/media/v3/download/example/30.png"
+            "https://matrix.example.org/_matrix/media/v3/download/example/30.png",
         ]
         assert captured_event.message_type == MessageType.PHOTO
 
@@ -3274,7 +3287,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         with pytest.raises(ValueError, match="exceeds Matrix limit"):
             await self.adapter._download_external_media_with_cap(
-                "https://example.com/image.png"
+                "https://example.com/image.png",
             )
 
     @pytest.mark.asyncio
@@ -3317,7 +3330,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         with pytest.raises(ValueError, match="exceeds Matrix limit"):
             await self.adapter._download_external_media_with_cap(
-                "https://example.com/image.png"
+                "https://example.com/image.png",
             )
 
     @pytest.mark.asyncio
@@ -3357,14 +3370,14 @@ class TestMatrixImageOnlyMediaNormalization:
 
         with pytest.raises(ValueError, match="unsafe redirect"):
             await self.adapter._download_external_media_with_cap(
-                "https://example.com/image.png"
+                "https://example.com/image.png",
             )
 
     @pytest.mark.asyncio
     async def test_external_media_download_rejects_unsafe_initial_url(self):
         with pytest.raises(ValueError, match="unsafe media URL"):
             await self.adapter._download_external_media_with_cap(
-                "file:///etc/passwd"
+                "file:///etc/passwd",
             )
 
     @pytest.mark.asyncio
@@ -3404,7 +3417,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         with pytest.raises(ValueError, match="not an image"):
             await self.adapter._download_external_media_with_cap(
-                "https://example.com/image.png"
+                "https://example.com/image.png",
             )
 
     @pytest.mark.asyncio
@@ -3413,7 +3426,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         signed_url = "https://example.com/image.png?signature=secret-token#frag"
         self.adapter._download_external_media_with_cap = AsyncMock(
-            side_effect=ValueError("download failed")
+            side_effect=ValueError("download failed"),
         )
         self.adapter.send = AsyncMock(return_value=SendResult(success=True))
 
@@ -3429,7 +3442,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         signed_url = "https://example.com/image.png?signature=secret-token"
         self.adapter._download_external_media_with_cap = AsyncMock(
-            side_effect=ValueError("download failed")
+            side_effect=ValueError("download failed"),
         )
         self.adapter.send = AsyncMock(return_value=SendResult(success=True))
 
@@ -3447,7 +3460,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         signed_url = "https://example.com/image.png#fragment-secret"
         self.adapter._download_external_media_with_cap = AsyncMock(
-            side_effect=ValueError("download failed")
+            side_effect=ValueError("download failed"),
         )
         self.adapter.send = AsyncMock(return_value=SendResult(success=True))
 
@@ -3465,7 +3478,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         signed_url = "https://example.com/image.png?signature=secret-token#fragment"
         self.adapter._download_external_media_with_cap = AsyncMock(
-            side_effect=ValueError("download failed")
+            side_effect=ValueError("download failed"),
         )
         self.adapter.send = AsyncMock(return_value=SendResult(success=True))
 
@@ -3488,7 +3501,7 @@ class TestMatrixImageOnlyMediaNormalization:
 
         signed_url = "https://example.com/image.png?signature=secret-token#fragment"
         self.adapter._download_external_media_with_cap = AsyncMock(
-            side_effect=ValueError("download failed")
+            side_effect=ValueError("download failed"),
         )
         self.adapter.send = AsyncMock(return_value=SendResult(success=True))
 
@@ -3557,6 +3570,7 @@ class TestMatrixImageOnlyMediaNormalization:
 # ---------------------------------------------------------------------------
 # Message redaction
 # ---------------------------------------------------------------------------
+
 
 class TestMatrixRedaction:
     def setup_method(self):
@@ -3697,13 +3711,13 @@ class TestMatrixSystemBridgeFilter:
     def test_appservice_underscore_prefix_is_bridge(self):
         # Conventional appservice namespace puppets
         assert self.adapter._is_system_or_bridge_sender(
-            "@_telegram_12345:bridge.example.org"
+            "@_telegram_12345:bridge.example.org",
         ) is True
         assert self.adapter._is_system_or_bridge_sender(
-            "@_discord_999:example.org"
+            "@_discord_999:example.org",
         ) is True
         assert self.adapter._is_system_or_bridge_sender(
-            "@_slackbridge_puppet:example.org"
+            "@_slackbridge_puppet:example.org",
         ) is True
 
     def test_empty_localpart_is_system(self):
@@ -3715,12 +3729,12 @@ class TestMatrixSystemBridgeFilter:
 
     def test_regular_user_is_not_bridge(self):
         assert self.adapter._is_system_or_bridge_sender(
-            "@alice:example.org"
+            "@alice:example.org",
         ) is False
         # A user whose localpart merely CONTAINS an underscore is not a
         # bridge — the convention is a LEADING underscore.
         assert self.adapter._is_system_or_bridge_sender(
-            "@alice_smith:example.org"
+            "@alice_smith:example.org",
         ) is False
 
     def test_bot_account_is_not_bridge(self):
@@ -3728,7 +3742,7 @@ class TestMatrixSystemBridgeFilter:
         # classified as a bridge — that filter is a pairing guard, not
         # a self-filter.
         assert self.adapter._is_system_or_bridge_sender(
-            "@daemon:nerdworks.casa"
+            "@daemon:nerdworks.casa",
         ) is False
 
 
@@ -3964,7 +3978,7 @@ class TestMatrixRequireMention:
         adapter = MatrixAdapter(config)
         adapter._is_dm_room = AsyncMock(return_value=False)
         adapter._resolve_room_identity = AsyncMock(
-            return_value=MagicMock(display_name="Project Room")
+            return_value=MagicMock(display_name="Project Room"),
         )
         adapter._get_display_name = AsyncMock(return_value="Alice")
         adapter._background_read_receipt = MagicMock()
@@ -3989,7 +4003,7 @@ class TestMatrixFreeResponsePolicy:
         self.adapter._free_rooms = {"!free:example.org"}
         self.adapter._is_dm_room = AsyncMock(return_value=False)
         self.adapter._resolve_room_identity = AsyncMock(
-            return_value=MagicMock(display_name="Free Room")
+            return_value=MagicMock(display_name="Free Room"),
         )
         self.adapter._get_display_name = AsyncMock(return_value="Alice")
         self.adapter._background_read_receipt = MagicMock()
@@ -4064,7 +4078,7 @@ class TestMatrixClockSkewWarning:
         with caplog.at_level(logging.WARNING, logger="plugins.platforms.matrix.adapter"):
             for i in range(5):
                 ev = self._mk_event(
-                    sender=f"@alice{i}:example.org", ts_ms=skewed_event_ts_ms
+                    sender=f"@alice{i}:example.org", ts_ms=skewed_event_ts_ms,
                 )
                 await self.adapter._on_room_message(ev)
 
@@ -4103,7 +4117,7 @@ class TestMatrixClockSkewWarning:
         with caplog.at_level(logging.WARNING, logger="plugins.platforms.matrix.adapter"):
             for i in range(5):
                 ev = self._mk_event(
-                    sender=f"@alice{i}:example.org", ts_ms=old_ts_ms
+                    sender=f"@alice{i}:example.org", ts_ms=old_ts_ms,
                 )
                 await self.adapter._on_room_message(ev)
 
@@ -4129,7 +4143,7 @@ class TestMatrixClockSkewWarning:
         with caplog.at_level(logging.WARNING, logger="plugins.platforms.matrix.adapter"):
             for i in range(2):  # only 2 late drops — under the threshold
                 ev = self._mk_event(
-                    sender=f"@alice{i}:example.org", ts_ms=old_ts_ms
+                    sender=f"@alice{i}:example.org", ts_ms=old_ts_ms,
                 )
                 await self.adapter._on_room_message(ev)
 
@@ -4156,7 +4170,7 @@ class TestMatrixClockSkewWarning:
             for i, hrs in enumerate(ages_in_hours):
                 ts_ms = int((self.adapter._startup_ts - hrs * 3600) * 1000)
                 ev = self._mk_event(
-                    sender=f"@alice{i}:example.org", ts_ms=ts_ms
+                    sender=f"@alice{i}:example.org", ts_ms=ts_ms,
                 )
                 await self.adapter._on_room_message(ev)
 
@@ -4273,7 +4287,6 @@ class TestMatrixDmAutoThread:
         assert thread_id is None
 
 
-
 # ---------------------------------------------------------------------------
 # Proxy configuration
 # ---------------------------------------------------------------------------
@@ -4349,8 +4362,8 @@ class TestCreateMatrixSession:
             with patch.dict("sys.modules", {
                 "aiohttp_socks": MagicMock(
                     ProxyConnector=MagicMock(
-                        from_url=MagicMock(return_value=fake_connector)
-                    )
+                        from_url=MagicMock(return_value=fake_connector),
+                    ),
                 ),
             }):
                 from plugins.platforms.matrix.adapter import _create_matrix_session

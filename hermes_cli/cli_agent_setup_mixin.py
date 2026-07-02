@@ -23,16 +23,15 @@ class CLIAgentSetupMixin:
     """Agent construction + session-resume display methods for ``HermesCLI``."""
 
     def _ensure_runtime_credentials(self) -> bool:
-        """
-        Ensure runtime credentials are resolved before agent use.
+        """Ensure runtime credentials are resolved before agent use.
         Re-resolves provider credentials so key rotation and token refresh
         are picked up without restarting the CLI.
         Returns True if credentials are ready, False on auth failure.
         """
         from cli import ChatConsole, _cprint, logger
         from hermes_cli.runtime_provider import (
-            resolve_runtime_provider,
             format_runtime_provider_error,
+            resolve_runtime_provider,
         )
 
         _primary_exc = None
@@ -216,14 +215,23 @@ class CLIAgentSetupMixin:
         return route
 
     def _init_agent(self, *, model_override: str = None, runtime_override: dict = None, request_overrides: dict | None = None) -> bool:
-        """
-        Initialize the agent on first use.
+        """Initialize the agent on first use.
         When resuming a session, restores conversation history from SQLite.
         
         Returns:
             bool: True if successful, False otherwise
+
         """
-        from cli import AIAgent, ChatConsole, _DIM, _RST, _accent_hex, _cprint, _prepare_deferred_agent_startup, logger
+        from cli import (
+            _DIM,
+            _RST,
+            AIAgent,
+            ChatConsole,
+            _accent_hex,
+            _cprint,
+            _prepare_deferred_agent_startup,
+            logger,
+        )
         if self.agent is not None:
             return True
 
@@ -245,7 +253,7 @@ class CLIAgentSetupMixin:
                 self._session_db = SessionDB()
             except Exception as e:
                 logger.warning("SQLite session store not available — session will NOT be indexed: %s", e)
-        
+
         # If resuming, validate the session exists and load its history.
         # _preload_resumed_session() may have already loaded it (called from
         # run() for immediate display).  In that case, conversation_history
@@ -280,7 +288,7 @@ class CLIAgentSetupMixin:
                 ChatConsole().print(
                     f"[dim]Session {_escape(self.session_id)} was compressed into "
                     f"{_escape(resolved_id)}; resuming the descendant with your "
-                    f"transcript.[/dim]"
+                    f"transcript.[/dim]",
                 )
                 self.session_id = resolved_id
                 resolved_meta = self._session_db.get_session(self.session_id)
@@ -306,19 +314,18 @@ class CLIAgentSetupMixin:
                         f"[bold {_accent_hex()}]↻ Resumed session[/] "
                         f"[bold]{_escape(self.session_id)}[/]"
                         f"[bold {_accent_hex()}]{_escape(title_part)}[/] "
-                        f"({msg_count} user message{'s' if msg_count != 1 else ''}, {len(restored)} total messages)"
+                        f"({msg_count} user message{'s' if msg_count != 1 else ''}, {len(restored)} total messages)",
                     )
                 self._restore_session_cwd(session_meta, quiet=_quiet_mode)
+            elif _quiet_mode:
+                print(
+                    f"Session {self.session_id} found but has no messages. Starting fresh.",
+                    file=sys.stderr,
+                )
             else:
-                if _quiet_mode:
-                    print(
-                        f"Session {self.session_id} found but has no messages. Starting fresh.",
-                        file=sys.stderr,
-                    )
-                else:
-                    ChatConsole().print(
-                        f"[bold {_accent_hex()}]Session {_escape(self.session_id)} found but has no messages. Starting fresh.[/]"
-                    )
+                ChatConsole().print(
+                    f"[bold {_accent_hex()}]Session {_escape(self.session_id)} found but has no messages. Starting fresh.[/]",
+                )
             # Re-open the session (clear ended_at so it's active again)
             try:
                 self._session_db._conn.execute(
@@ -328,7 +335,7 @@ class CLIAgentSetupMixin:
                 self._session_db._conn.commit()
             except Exception:
                 pass
-        
+
         try:
             runtime = runtime_override or {
                 "api_key": self.api_key,
@@ -356,7 +363,7 @@ class CLIAgentSetupMixin:
                 verbose_logging=self.verbose,
                 quiet_mode=not self.verbose,
                 tool_progress_mode=getattr(self, "tool_progress_mode", "all"),
-                ephemeral_system_prompt=self.system_prompt if self.system_prompt else None,
+                ephemeral_system_prompt=self.system_prompt or None,
                 prefill_messages=self.prefill_messages or None,
                 reasoning_config=self.reasoning_config,
                 service_tier=self.service_tier,
@@ -459,11 +466,11 @@ class CLIAgentSetupMixin:
         session_meta = self._session_db.get_session(self.session_id)
         if not session_meta:
             self._console_print(
-                f"[bold red]Session not found: {self.session_id}[/]"
+                f"[bold red]Session not found: {self.session_id}[/]",
             )
             self._console_print(
                 "[dim]Use a session ID from a previous CLI run "
-                "(hermes sessions list).[/]"
+                "(hermes sessions list).[/]",
             )
             return False
 
@@ -476,7 +483,7 @@ class CLIAgentSetupMixin:
         if resolved_id and resolved_id != self.session_id:
             self._console_print(
                 f"[dim]Session {self.session_id} was compressed into "
-                f"{resolved_id}; resuming the descendant with your transcript.[/]"
+                f"{resolved_id}; resuming the descendant with your transcript.[/]",
             )
             self.session_id = resolved_id
             resolved_meta = self._session_db.get_session(self.session_id)
@@ -496,14 +503,14 @@ class CLIAgentSetupMixin:
                 f"[{accent_color}]↻ Resumed session [bold]{self.session_id}[/bold]"
                 f"{title_part} "
                 f"({msg_count} user message{'s' if msg_count != 1 else ''}, "
-                f"{len(restored)} total messages)[/]"
+                f"{len(restored)} total messages)[/]",
             )
             self._restore_session_cwd(session_meta)
         else:
             accent_color = _accent_hex()
             self._console_print(
                 f"[{accent_color}]Session {self.session_id} found but has no "
-                f"messages. Starting fresh.[/]"
+                f"messages. Starting fresh.[/]",
             )
             return False
 
@@ -528,7 +535,12 @@ class CLIAgentSetupMixin:
         last ``MAX_DISPLAY_EXCHANGES`` user/assistant exchanges and shows
         an indicator for earlier hidden messages.
         """
-        from cli import CLI_CONFIG, _record_output_history_entry, _strip_reasoning_tags, _suspend_output_history
+        from cli import (
+            CLI_CONFIG,
+            _record_output_history_entry,
+            _strip_reasoning_tags,
+            _suspend_output_history,
+        )
         if not self.conversation_history:
             return
 

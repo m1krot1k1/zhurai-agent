@@ -14,7 +14,6 @@ import sys
 import time
 import urllib.parse
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 
@@ -122,7 +121,7 @@ def generate_username_slug(length: int = 16) -> str:
     return "".join(secrets.choice(_USERNAME_SLUG_ALPHABET) for _ in range(length))
 
 
-def generate_bot_username(profile_name: Optional[str] = None) -> str:
+def generate_bot_username(profile_name: str | None = None) -> str:
     """Generate a secure suggested bot username like ``hermes_<slug>_bot``.
 
     ``profile_name`` is accepted for backward compatibility with the original
@@ -135,8 +134,8 @@ def generate_bot_username(profile_name: Optional[str] = None) -> str:
 
 def generate_deep_link(
     manager_bot: str = DEFAULT_MANAGER_BOT,
-    suggested_username: Optional[str] = None,
-    suggested_name: Optional[str] = None,
+    suggested_username: str | None = None,
+    suggested_name: str | None = None,
 ) -> str:
     """Build a ``t.me/newbot`` deep link for managed bot creation."""
     manager = manager_bot.lstrip("@")
@@ -251,7 +250,7 @@ def poll_for_setup_result(
     pairing: TelegramPairing,
     timeout: float = DEFAULT_POLL_TIMEOUT,
     interval: float = POLL_INTERVAL,
-) -> Optional[TelegramBotSetupResult]:
+) -> TelegramBotSetupResult | None:
     """Poll the pairing API until setup metadata is available or timeout."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -270,7 +269,7 @@ def poll_for_token(
     pairing: TelegramPairing,
     timeout: float = DEFAULT_POLL_TIMEOUT,
     interval: float = POLL_INTERVAL,
-) -> Optional[str]:
+) -> str | None:
     """Poll the pairing API until the bot token is available or timeout."""
     result = poll_for_setup_result(api_url, pairing, timeout=timeout, interval=interval)
     return result.token if result else None
@@ -279,9 +278,9 @@ def poll_for_token(
 def auto_setup_telegram_bot_result(
     api_url: str | None = None,
     manager_bot: str = DEFAULT_MANAGER_BOT,
-    profile_name: Optional[str] = None,
+    profile_name: str | None = None,
     poll_timeout: float = DEFAULT_POLL_TIMEOUT,
-) -> Optional[TelegramBotSetupResult]:
+) -> TelegramBotSetupResult | None:
     """Run the full automatic Telegram bot creation flow."""
     _ = manager_bot, profile_name
     resolved_api_url = _api_url(api_url)
@@ -318,7 +317,7 @@ def auto_setup_telegram_bot_result(
         elapsed = int(time.monotonic() - start)
         remaining = max(0, int(poll_timeout - elapsed))
         sys.stdout.write(
-            f"\r  {char} Waiting for bot creation... ({remaining}s remaining) "
+            f"\r  {char} Waiting for bot creation... ({remaining}s remaining) ",
         )
         sys.stdout.flush()
         idx += 1
@@ -327,7 +326,7 @@ def auto_setup_telegram_bot_result(
             result = poll_pairing_result_once(resolved_api_url, pairing)
             if result:
                 sys.stdout.write(
-                    "\r  ✓ Bot created successfully!                              \n"
+                    "\r  ✓ Bot created successfully!                              \n",
                 )
                 sys.stdout.flush()
                 return result
@@ -345,9 +344,9 @@ def auto_setup_telegram_bot_result(
 def auto_setup_telegram_bot(
     api_url: str | None = None,
     manager_bot: str = DEFAULT_MANAGER_BOT,
-    profile_name: Optional[str] = None,
+    profile_name: str | None = None,
     poll_timeout: float = DEFAULT_POLL_TIMEOUT,
-) -> Optional[str]:
+) -> str | None:
     """Run automatic Telegram bot creation and return only the bot token."""
     result = auto_setup_telegram_bot_result(
         api_url=api_url,

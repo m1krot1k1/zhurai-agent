@@ -6,7 +6,7 @@ import asyncio
 import time
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -39,7 +39,7 @@ def _make_adapter():
             enabled=True,
             token="test-token",
             extra={"homeserver": "https://matrix.example.org", "user_id": "@bot:example.org"},
-        )
+        ),
     )
     adapter._user_id = "@bot:example.org"
     adapter._require_mention = False
@@ -400,7 +400,7 @@ async def test_matrix_resume_allows_same_room_session():
     entry_b = _entry(source_b, "session-b-old", "Project B Plan")
     runner = _make_runner(source_b, [entry_b])
     runner.session_store.get_or_create_session.return_value = _entry(
-        source_b, "session-b-current", "Current Project B"
+        source_b, "session-b-current", "Current Project B",
     )
     runner.session_store.switch_session.return_value = entry_b
     runner._session_db.resolve_session_by_title.return_value = "session-b-old"
@@ -417,13 +417,13 @@ async def test_matrix_resume_quoted_title_same_room():
     entry_b = _entry(source_b, "session-b-old", "Project B Plan")
     runner = _make_runner(source_b, [entry_b])
     runner.session_store.get_or_create_session.return_value = _entry(
-        source_b, "session-b-current", "Current Project B"
+        source_b, "session-b-current", "Current Project B",
     )
     runner.session_store.switch_session.return_value = entry_b
     runner._session_db.resolve_session_by_title.return_value = "session-b-old"
 
     result = await runner._handle_resume_command(
-        _event('/resume "Project B Plan"', source_b)
+        _event('/resume "Project B Plan"', source_b),
     )
 
     assert "Resumed session" in result
@@ -440,7 +440,7 @@ async def test_matrix_resume_quoted_title_cross_room_blocked():
     runner._session_db.resolve_session_by_title.return_value = "session-a"
 
     result = await runner._handle_resume_command(
-        _event('/resume "Project A Plan"', source_b)
+        _event('/resume "Project A Plan"', source_b),
     )
 
     assert "blocked" in result
@@ -453,7 +453,7 @@ async def test_matrix_resume_malformed_quote_returns_helpful_error():
     runner = _make_runner(source_b, [_entry(source_b, "session-b", "Project B Plan")])
 
     result = await runner._handle_resume_command(
-        _event('/resume "Project B Plan', source_b)
+        _event('/resume "Project B Plan', source_b),
     )
 
     assert "Could not parse" in result
@@ -471,7 +471,7 @@ async def test_matrix_resume_cross_room_requires_explicit_flag_and_warns():
     runner._session_db.resolve_session_by_title.return_value = "session-a"
 
     result = await runner._handle_resume_command(
-        _event("/resume --cross-room Project A Plan", source_b)
+        _event("/resume --cross-room Project A Plan", source_b),
     )
 
     assert "Cross-room resume" in result

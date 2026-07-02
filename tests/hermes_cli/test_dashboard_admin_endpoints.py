@@ -16,8 +16,8 @@ def _client():
     except ImportError:
         pytest.skip("fastapi/starlette not installed")
     import hermes_state
+    from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
     from hermes_constants import get_hermes_home
-    from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
     client = TestClient(app)
     client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -36,7 +36,7 @@ class TestMcpEndpoints:
         assert self.client.get("/api/mcp/servers").json()["servers"] == []
 
         r = self.client.post(
-            "/api/mcp/servers", json={"name": "srv1", "url": "https://x/mcp"}
+            "/api/mcp/servers", json={"name": "srv1", "url": "https://x/mcp"},
         )
         assert r.status_code == 200
         assert r.json()["transport"] == "http"
@@ -85,7 +85,7 @@ class TestMcpEndpoints:
         assert srv["enabled"] is False
         # Toggling a missing server is a 404.
         assert self.client.put(
-            "/api/mcp/servers/nope/enabled", json={"enabled": True}
+            "/api/mcp/servers/nope/enabled", json={"enabled": True},
         ).status_code == 404
 
     def test_catalog_lists_entries(self):
@@ -125,7 +125,6 @@ class TestMcpEndpoints:
         assert r.status_code == 404
 
 
-
 class TestCredentialPoolEndpoints:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
@@ -157,7 +156,7 @@ class TestCredentialPoolEndpoints:
 
     def test_empty_body_rejected(self):
         r = self.client.post(
-            "/api/credentials/pool", json={"provider": "", "api_key": ""}
+            "/api/credentials/pool", json={"provider": "", "api_key": ""},
         )
         assert r.status_code == 400
 
@@ -178,7 +177,7 @@ class TestMemoryEndpoints:
         assert r.status_code == 200 and r.json()["active"] == ""
 
         r = self.client.put(
-            "/api/memory/provider", json={"provider": "no-such-provider-xyz"}
+            "/api/memory/provider", json={"provider": "no-such-provider-xyz"},
         )
         assert r.status_code == 400
 
@@ -194,7 +193,7 @@ class TestMemoryEndpoints:
         assert (mem / "MEMORY.md").exists()
 
         assert self.client.post(
-            "/api/memory/reset", json={"target": "bogus"}
+            "/api/memory/reset", json={"target": "bogus"},
         ).status_code == 400
 
 
@@ -207,7 +206,7 @@ class TestPairingEndpoints:
         data = self.client.get("/api/pairing").json()
         assert data == {"pending": [], "approved": []}
         r = self.client.post(
-            "/api/pairing/approve", json={"platform": "telegram", "code": "NOPE99"}
+            "/api/pairing/approve", json={"platform": "telegram", "code": "NOPE99"},
         )
         assert r.status_code == 404
 
@@ -320,8 +319,8 @@ class TestOpsEndpoints:
         cfg = load_config()
         cfg["hooks"] = {
             "pre_tool_call": [
-                {"matcher": "terminal", "command": "/bin/echo hi", "timeout": 5}
-            ]
+                {"matcher": "terminal", "command": "/bin/echo hi", "timeout": 5},
+            ],
         }
         save_config(cfg)
         data = self.client.get("/api/ops/hooks").json()
@@ -348,7 +347,7 @@ class TestOpsEndpoints:
 
         # Unknown event rejected.
         assert self.client.post(
-            "/api/ops/hooks", json={"event": "no_such_event", "command": "/x"}
+            "/api/ops/hooks", json={"event": "no_such_event", "command": "/x"},
         ).status_code == 400
 
         # Delete it.
@@ -381,7 +380,7 @@ class TestSystemStatsEndpoint:
         s = r.json()
         # Identity fields always present (stdlib-sourced).
         for key in ("os", "arch", "hostname", "python_version", "hermes_version"):
-            assert key in s and s[key]
+            assert s.get(key)
         # psutil flag tells the UI whether the richer metrics are populated.
         assert "psutil" in s
 
@@ -449,7 +448,7 @@ class TestSessionManagementEndpoints:
         r = self.client.post("/api/sessions/prune", json={"older_than_days": 9999})
         assert r.status_code == 200 and "removed" in r.json()
         assert self.client.post(
-            "/api/sessions/prune", json={"older_than_days": 0}
+            "/api/sessions/prune", json={"older_than_days": 0},
         ).status_code == 400
 
 
@@ -532,7 +531,7 @@ class TestSkillsHubSourcesEndpoint:
             return srcs
 
         monkeypatch.setattr(
-            "tools.skills_hub.create_source_router", _fake_router
+            "tools.skills_hub.create_source_router", _fake_router,
         )
         r = self.client.get("/api/skills/hub/sources")
         assert r.status_code == 200
@@ -559,7 +558,7 @@ class TestSkillsHubPreviewEndpoint:
 
     def test_preview_returns_skill_md_text(self, monkeypatch):
         monkeypatch.setattr(
-            "tools.skills_hub.create_source_router", lambda: []
+            "tools.skills_hub.create_source_router", list,
         )
         bundle = _FakeBundle("github/owner/repo/x")
         meta = _FakeMeta("github/owner/repo/x")
@@ -568,7 +567,7 @@ class TestSkillsHubPreviewEndpoint:
             lambda ident, sources: (meta, bundle, None),
         )
         r = self.client.get(
-            "/api/skills/hub/preview?identifier=github/owner/repo/x"
+            "/api/skills/hub/preview?identifier=github/owner/repo/x",
         )
         assert r.status_code == 200
         body = r.json()
@@ -580,7 +579,7 @@ class TestSkillsHubPreviewEndpoint:
 
     def test_preview_404_when_unresolved(self, monkeypatch):
         monkeypatch.setattr(
-            "tools.skills_hub.create_source_router", lambda: []
+            "tools.skills_hub.create_source_router", list,
         )
         monkeypatch.setattr(
             "hermes_cli.skills_hub._resolve_source_meta_and_bundle",
@@ -600,10 +599,10 @@ class TestSkillsHubScanEndpoint:
         assert r.status_code == 400
 
     def test_scan_returns_verdict_and_policy(self, monkeypatch):
-        from tools.skills_guard import ScanResult, Finding
+        from tools.skills_guard import Finding, ScanResult
 
         monkeypatch.setattr(
-            "tools.skills_hub.create_source_router", lambda: []
+            "tools.skills_hub.create_source_router", list,
         )
         bundle = _FakeBundle("github/owner/repo/x", trust_level="community")
         monkeypatch.setattr(
@@ -614,7 +613,7 @@ class TestSkillsHubScanEndpoint:
         from pathlib import Path
 
         monkeypatch.setattr(
-            "tools.skills_hub.quarantine_bundle", lambda b: Path("/tmp/_fake_q")
+            "tools.skills_hub.quarantine_bundle", lambda b: Path("/tmp/_fake_q"),
         )
 
         fake_result = ScanResult(
@@ -631,7 +630,7 @@ class TestSkillsHubScanEndpoint:
                     line=10,
                     match="m",
                     description="leaks data",
-                )
+                ),
             ],
             summary="s",
         )
@@ -643,7 +642,7 @@ class TestSkillsHubScanEndpoint:
         monkeypatch.setattr("shutil.rmtree", lambda *a, **k: None)
 
         r = self.client.get(
-            "/api/skills/hub/scan?identifier=github/owner/repo/x"
+            "/api/skills/hub/scan?identifier=github/owner/repo/x",
         )
         assert r.status_code == 200
         body = r.json()
@@ -657,7 +656,7 @@ class TestSkillsHubScanEndpoint:
 
     def test_scan_404_when_no_bundle(self, monkeypatch):
         monkeypatch.setattr(
-            "tools.skills_hub.create_source_router", lambda: []
+            "tools.skills_hub.create_source_router", list,
         )
         monkeypatch.setattr(
             "hermes_cli.skills_hub._resolve_source_meta_and_bundle",
@@ -665,8 +664,6 @@ class TestSkillsHubScanEndpoint:
         )
         r = self.client.get("/api/skills/hub/scan?identifier=nope/x")
         assert r.status_code == 404
-
-
 
 
 class TestWebhookToggleEndpoint:
@@ -685,7 +682,7 @@ class TestWebhookToggleEndpoint:
 
     def test_create_toggle_disable(self):
         r = self.client.post(
-            "/api/webhooks", json={"name": "hook1", "deliver": "log", "events": ["push"]}
+            "/api/webhooks", json={"name": "hook1", "deliver": "log", "events": ["push"]},
         )
         assert r.status_code == 200 and r.json()["enabled"] is True
         r = self.client.put("/api/webhooks/hook1/enabled", json={"enabled": False})
@@ -693,9 +690,8 @@ class TestWebhookToggleEndpoint:
         subs = self.client.get("/api/webhooks").json()["subscriptions"]
         assert subs[0]["enabled"] is False
         assert self.client.put(
-            "/api/webhooks/nope/enabled", json={"enabled": True}
+            "/api/webhooks/nope/enabled", json={"enabled": True},
         ).status_code == 404
-
 
 
 class TestAdminEndpointsAuthGate:
@@ -704,6 +700,7 @@ class TestAdminEndpointsAuthGate:
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
         from starlette.testclient import TestClient
+
         from hermes_cli.web_server import app
 
         # No session header → must be rejected.
@@ -751,7 +748,7 @@ class TestUpdateCheckEndpoint:
 
         monkeypatch.setattr(ws, "detect_install_method", lambda *a, **k: "git")
         # Stub the shared checker so the contract is deterministic (no network).
-        import hermes_cli.banner as banner
+        from hermes_cli import banner
 
         monkeypatch.setattr(banner, "check_for_updates", lambda: 5)
 
@@ -775,7 +772,7 @@ class TestUpdateCheckEndpoint:
 
     def test_up_to_date(self, monkeypatch):
         import hermes_cli.web_server as ws
-        import hermes_cli.banner as banner
+        from hermes_cli import banner
 
         monkeypatch.setattr(ws, "detect_install_method", lambda *a, **k: "git")
         monkeypatch.setattr(banner, "check_for_updates", lambda: 0)
@@ -802,7 +799,7 @@ class TestUpdateCheckEndpoint:
             ws,
             "detect_install_method",
             lambda *a, **k: pytest.fail(
-                "managed runtime update check should not probe install method"
+                "managed runtime update check should not probe install method",
             ),
         )
 
@@ -815,7 +812,7 @@ class TestUpdateCheckEndpoint:
 
     def test_check_failure_is_soft(self, monkeypatch):
         import hermes_cli.web_server as ws
-        import hermes_cli.banner as banner
+        from hermes_cli import banner
 
         monkeypatch.setattr(ws, "detect_install_method", lambda *a, **k: "git")
 
@@ -833,7 +830,7 @@ class TestUpdateCheckEndpoint:
 
     def test_git_behind_includes_commits(self, monkeypatch):
         import hermes_cli.web_server as ws
-        import hermes_cli.banner as banner
+        from hermes_cli import banner
 
         monkeypatch.setattr(ws, "detect_install_method", lambda *a, **k: "git")
         monkeypatch.setattr(banner, "check_for_updates", lambda: 3)
@@ -853,7 +850,7 @@ class TestUpdateCheckEndpoint:
 
     def test_up_to_date_omits_commits(self, monkeypatch):
         import hermes_cli.web_server as ws
-        import hermes_cli.banner as banner
+        from hermes_cli import banner
 
         monkeypatch.setattr(ws, "detect_install_method", lambda *a, **k: "git")
         monkeypatch.setattr(banner, "check_for_updates", lambda: 0)
@@ -865,7 +862,8 @@ class TestUpdateCheckEndpoint:
 
 class TestDebugShareEndpoint:
     """POST /api/ops/debug-share returns the paste URLs synchronously so the
-    dashboard can render them as copyable links (not a backgrounded log tail)."""
+    dashboard can render them as copyable links (not a backgrounded log tail).
+    """
 
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
@@ -905,7 +903,7 @@ class TestDebugShareEndpoint:
         import hermes_cli.debug as dbg
 
         monkeypatch.setattr(
-            dbg, "upload_to_pastebin", lambda c, expiry_days=7: "https://paste.rs/x"
+            dbg, "upload_to_pastebin", lambda c, expiry_days=7: "https://paste.rs/x",
         )
         monkeypatch.setattr(dbg, "_schedule_auto_delete", lambda *a, **k: None)
         monkeypatch.setattr(dbg, "_best_effort_sweep_expired_pastes", lambda: None)
@@ -919,7 +917,7 @@ class TestDebugShareEndpoint:
         import hermes_cli.debug as dbg
 
         monkeypatch.setattr(
-            dbg, "upload_to_pastebin", lambda c, expiry_days=7: "https://paste.rs/x"
+            dbg, "upload_to_pastebin", lambda c, expiry_days=7: "https://paste.rs/x",
         )
         monkeypatch.setattr(dbg, "_schedule_auto_delete", lambda *a, **k: None)
         monkeypatch.setattr(dbg, "_best_effort_sweep_expired_pastes", lambda: None)
@@ -958,7 +956,8 @@ class TestDebugShareEndpoint:
 
 class TestToolsConfigEndpoints:
     """Provider selection, API-key save, and post-setup spawn for toolsets —
-    the dashboard surface that replicates the `hermes tools` configurator."""
+    the dashboard surface that replicates the `hermes tools` configurator.
+    """
 
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
@@ -1001,7 +1000,7 @@ class TestToolsConfigEndpoints:
             pytest.skip("no env-var-bearing web provider in this build")
 
         r = self.client.put(
-            "/api/tools/toolsets/web/env", json={"env": {key: "test-secret-123"}}
+            "/api/tools/toolsets/web/env", json={"env": {key: "test-secret-123"}},
         )
         assert r.status_code == 200, r.text
         body = r.json()
@@ -1029,14 +1028,14 @@ class TestToolsConfigEndpoints:
         if not key:
             pytest.skip("no env-var-bearing web provider in this build")
         r = self.client.put(
-            "/api/tools/toolsets/web/env", json={"env": {key: "   "}}
+            "/api/tools/toolsets/web/env", json={"env": {key: "   "}},
         )
         assert r.status_code == 200
         assert key in r.json()["skipped"]
 
     def test_post_setup_unknown_key_400(self):
         r = self.client.post(
-            "/api/tools/toolsets/browser/post-setup", json={"key": "bogus"}
+            "/api/tools/toolsets/browser/post-setup", json={"key": "bogus"},
         )
         assert r.status_code == 400
 

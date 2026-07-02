@@ -19,7 +19,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # configure_windows_stdio
 # ---------------------------------------------------------------------------
@@ -163,8 +162,9 @@ class TestConfigureWindowsStdio:
 
     def test_reconfigure_stream_handles_missing_method(self, monkeypatch):
         """StringIO-like objects without .reconfigure() must not blow up."""
-        from hermes_cli import stdio
         import io
+
+        from hermes_cli import stdio
 
         buf = io.StringIO()
         # Must not raise
@@ -379,7 +379,7 @@ class TestPidExistsOSErrorWidening:
         # Force the psutil-first branch to miss so we exercise the fallback.
         monkeypatch.setitem(
             __import__("sys").modules, "psutil",
-            type("P", (), {"pid_exists": staticmethod(lambda pid: (_ for _ in ()).throw(ImportError()))})()
+            type("P", (), {"pid_exists": staticmethod(lambda pid: (_ for _ in ()).throw(ImportError()))})(),
         )
         monkeypatch.setattr(status, "_IS_WINDOWS", False)
 
@@ -395,7 +395,7 @@ class TestPidExistsOSErrorWidening:
 
         monkeypatch.setitem(
             __import__("sys").modules, "psutil",
-            type("P", (), {"pid_exists": staticmethod(lambda pid: (_ for _ in ()).throw(ImportError()))})()
+            type("P", (), {"pid_exists": staticmethod(lambda pid: (_ for _ in ()).throw(ImportError()))})(),
         )
         monkeypatch.setattr(status, "_IS_WINDOWS", False)
 
@@ -427,7 +427,7 @@ class TestTzdataDependencyDeclared:
         # specifier in between (==X.Y.Z, >=X.Y.Z,<W, etc.) and either quote
         # style on the marker.
         pattern = re.compile(
-            r'"tzdata[^"]*;\s*sys_platform\s*==\s*[\'"]win32[\'"]\s*"'
+            r'"tzdata[^"]*;\s*sys_platform\s*==\s*[\'"]win32[\'"]\s*"',
         )
         assert pattern.search(source), (
             "tzdata must be a Windows-only dep in pyproject.toml dependencies "
@@ -516,7 +516,7 @@ class TestSubprocessCompatHelpers:
 
     def test_is_windows_matches_sys_platform(self):
         from hermes_cli import _subprocess_compat as sc
-        assert sc.IS_WINDOWS == (sys.platform == "win32")
+        assert (sys.platform == "win32") == sc.IS_WINDOWS
 
     def test_resolve_node_command_returns_absolute_on_posix(self):
         """On Linux, resolve_node_command('sh', ['-c','echo hi']) picks up /bin/sh."""
@@ -532,7 +532,7 @@ class TestSubprocessCompatHelpers:
     def test_resolve_node_command_fallback_when_absent(self):
         from hermes_cli._subprocess_compat import resolve_node_command
         argv = resolve_node_command(
-            "zzz-definitely-not-on-path-xyzzy", ["--help"]
+            "zzz-definitely-not-on-path-xyzzy", ["--help"],
         )
         # Must fall back to the bare name — NOT return None, NOT crash.
         assert argv[0] == "zzz-definitely-not-on-path-xyzzy"
@@ -601,7 +601,7 @@ class TestSubprocessCompatHelpers:
         )
 
     def test_windows_detach_flags_without_breakaway_drops_only_that_bit(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         """Fallback retry payload for restrictive job objects.
 
@@ -666,7 +666,8 @@ class TestTuiGatewayEntrySignalGuards:
 
 class TestKanbanWaitpidWindowsGuard:
     """os.WNOHANG doesn't exist on Windows — the dispatcher tick reap loop
-    must be gated behind ``os.name != "nt"``."""
+    must be gated behind ``os.name != "nt"``.
+    """
 
     def test_source_gates_waitpid_loop(self):
         root = Path(__file__).resolve().parents[2]
@@ -730,7 +731,8 @@ class TestCodeExecutionTransportTcpFallback:
 
 class TestCronSchedulerBashResolution:
     """cron.scheduler must NOT hardcode /bin/bash — .sh scripts need a
-    dynamically-resolved bash so Windows (Git Bash) works."""
+    dynamically-resolved bash so Windows (Git Bash) works.
+    """
 
     def test_source_uses_shutil_which_for_bash(self):
         root = Path(__file__).resolve().parents[2]
@@ -759,7 +761,8 @@ class TestCronSchedulerBashResolution:
 class TestNpmBareSpawnsResolved:
     """Every spawn site that launches ``npm``/``npx`` must resolve via
     shutil.which / hermes_cli._subprocess_compat.resolve_node_command
-    so Windows can execute the .cmd batch shims."""
+    so Windows can execute the .cmd batch shims.
+    """
 
     @pytest.mark.parametrize(
         "relpath",
@@ -806,7 +809,7 @@ class TestNpmBareSpawnsResolved:
                 # Argv forms that START with a bare npm/npx are the bug.
                 raise AssertionError(
                     f"{relpath}: bare {pat!r} still present at offset {idx} — "
-                    f"resolve via shutil.which(...) so Windows can execute .cmd shims"
+                    f"resolve via shutil.which(...) so Windows can execute .cmd shims",
                 )
 
 
@@ -817,12 +820,14 @@ class TestNpmBareSpawnsResolved:
 
 class TestLocalEnvironmentWindowsTempDir:
     """LocalEnvironment.get_temp_dir must return a native Windows path on
-    Windows, NOT the POSIX ``/tmp`` literal (which Python can't open)."""
+    Windows, NOT the POSIX ``/tmp`` literal (which Python can't open).
+    """
 
     def test_posix_path_preserved_on_linux(self):
         """Linux/macOS behaviour MUST be unchanged — return / tmp or
         tempfile.gettempdir()-derived POSIX path.  This is the 'do no harm'
-        test — regressions here break every Unix user's terminal tool."""
+        test — regressions here break every Unix user's terminal tool.
+        """
         from tools.environments.local import LocalEnvironment
 
         env = LocalEnvironment(cwd="/tmp", timeout=10, env={})
@@ -859,7 +864,8 @@ class TestLocalEnvironmentPathInjectionGated:
 
 class TestGitBashPathNormalization:
     """_normalize_git_bash_path should turn /c/Users/... into C:\\Users\\...
-    on Windows and leave paths unchanged on POSIX."""
+    on Windows and leave paths unchanged on POSIX.
+    """
 
     def test_posix_noop(self):
         """Must NOT mutate paths on Linux/macOS."""
@@ -892,7 +898,8 @@ class TestGitBashPathNormalization:
 
 class TestWorktreeSymlinkFallback:
     """.worktreeinclude directory symlinks must fall back to copytree on
-    Windows (where symlink creation requires admin / Dev Mode)."""
+    Windows (where symlink creation requires admin / Dev Mode).
+    """
 
     def test_source_has_symlink_fallback(self):
         root = Path(__file__).resolve().parents[2]
@@ -913,7 +920,8 @@ class TestWorktreeSymlinkFallback:
 class TestGatewayDetachedWatcherWindowsFlags:
     """launch_detached_profile_gateway_restart and the in-gateway update
     launcher must use CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS on
-    Windows, not silent start_new_session=True."""
+    Windows, not silent start_new_session=True.
+    """
 
     def test_hermes_cli_gateway_uses_compat_kwargs(self):
         root = Path(__file__).resolve().parents[2]

@@ -14,13 +14,12 @@ import queue
 import re
 import shlex
 import subprocess
-import sys
 import threading
 import time
 from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,6 @@ _DEPRECATION_MARKERS = (
 
 def _is_gh_copilot_deprecation_message(stderr_text: str) -> bool:
     """True iff stderr looks like the deprecated gh-copilot extension's banner."""
-
     lower = stderr_text.lower()
     if not any(req in lower for req in _DEPRECATION_REQUIRED):
         return False
@@ -127,7 +125,7 @@ def _permission_denied(message_id: Any) -> dict[str, Any]:
         "result": {
             "outcome": {
                 "outcome": "cancelled",
-            }
+            },
         },
     }
 
@@ -163,14 +161,14 @@ def _format_messages_as_prompt(
                     "name": name.strip(),
                     "description": fn.get("description", ""),
                     "parameters": fn.get("parameters", {}),
-                }
+                },
             )
         if tool_specs:
             sections.append(
                 "Available tools (OpenAI function schema). "
                 "When using a tool, emit ONLY <tool_call>{...}</tool_call> with one JSON object "
                 "containing id/type/function{name,arguments}. arguments must be a JSON string.\n"
-                + json.dumps(tool_specs, ensure_ascii=False)
+                + json.dumps(tool_specs, ensure_ascii=False),
             )
 
     if tool_choice is not None:
@@ -256,7 +254,7 @@ def _extract_tool_calls_from_text(text: str) -> tuple[list[SimpleNamespace], str
             fn_args = json.dumps(fn_args, ensure_ascii=False)
         call_id = obj.get("id")
         if not isinstance(call_id, str) or not call_id.strip():
-            call_id = f"acp_call_{len(extracted)+1}"
+            call_id = f"acp_call_{len(extracted) + 1}"
 
         extracted.append(
             SimpleNamespace(
@@ -265,7 +263,7 @@ def _extract_tool_calls_from_text(text: str) -> tuple[list[SimpleNamespace], str
                 response_item_id=None,
                 type="function",
                 function=SimpleNamespace(name=fn_name.strip(), arguments=fn_args),
-            )
+            ),
         )
 
     for m in _TOOL_CALL_BLOCK_RE.finditer(text):
@@ -304,7 +302,6 @@ def _extract_tool_calls_from_text(text: str) -> tuple[list[SimpleNamespace], str
     return extracted, cleaned
 
 
-
 def _ensure_path_within_cwd(path_text: str, cwd: str) -> Path:
     candidate = Path(path_text)
     if not candidate.is_absolute():
@@ -319,7 +316,7 @@ def _ensure_path_within_cwd(path_text: str, cwd: str) -> Path:
 
 
 class _ACPChatCompletions:
-    def __init__(self, client: "CopilotACPClient"):
+    def __init__(self, client: CopilotACPClient):
         self._client = client
 
     def create(self, **kwargs: Any) -> Any:
@@ -327,7 +324,7 @@ class _ACPChatCompletions:
 
 
 class _ACPChatNamespace:
-    def __init__(self, client: "CopilotACPClient"):
+    def __init__(self, client: CopilotACPClient):
         self.completions = _ACPChatCompletions(client)
 
 
@@ -359,7 +356,7 @@ class CopilotACPClient:
             raise ValueError(
                 f"ACP command '{self._acp_command}' is not in the allowed set: "
                 f"{sorted(_ALLOWED_ACP_COMMANDS)}. "
-                "Set _ALLOWED_ACP_COMMANDS in copilot_acp_client.py to extend."
+                "Set _ALLOWED_ACP_COMMANDS in copilot_acp_client.py to extend.",
             )
         self._acp_cwd = str(Path(acp_cwd or os.getcwd()).resolve())
         self.chat = _ACPChatNamespace(self)
@@ -459,7 +456,7 @@ class CopilotACPClient:
         except FileNotFoundError as exc:
             raise RuntimeError(
                 f"Could not start Copilot ACP command '{self._acp_command}'. "
-                "Install GitHub Copilot CLI or set HERMES_COPILOT_ACP_COMMAND/COPILOT_CLI_PATH."
+                "Install GitHub Copilot CLI or set HERMES_COPILOT_ACP_COMMAND/COPILOT_CLI_PATH.",
             ) from exc
 
         if proc.stdin is None or proc.stdout is None:
@@ -531,7 +528,7 @@ class CopilotACPClient:
                 if "error" in msg:
                     err = msg.get("error") or {}
                     raise RuntimeError(
-                        f"Copilot ACP {method} failed: {err.get('message') or err}"
+                        f"Copilot ACP {method} failed: {err.get('message') or err}",
                     )
                 return msg.get("result")
 
@@ -550,7 +547,7 @@ class CopilotACPClient:
                         "  export HERMES_COPILOT_ACP_COMMAND=/path/to/new/copilot\n\n"
                         "Alternative: use the `copilot` provider (no ACP, hits the Copilot API\n"
                         "directly with a Copilot subscription token) via `hermes setup`.\n\n"
-                        f"Original error:\n{stderr_text}"
+                        f"Original error:\n{stderr_text}",
                     )
                 raise RuntimeError(f"Copilot ACP process exited early: {stderr_text}")
             raise TimeoutError(f"Timed out waiting for Copilot ACP response to {method}.")
@@ -564,7 +561,7 @@ class CopilotACPClient:
                         "fs": {
                             "readTextFile": True,
                             "writeTextFile": True,
-                        }
+                        },
                     },
                     "clientInfo": {
                         "name": "hermes-agent",
@@ -594,7 +591,7 @@ class CopilotACPClient:
                         {
                             "type": "text",
                             "text": prompt_text,
-                        }
+                        },
                     ],
                 },
                 text_parts=text_parts,
@@ -672,7 +669,7 @@ class CopilotACPClient:
                 path = _ensure_path_within_cwd(str(params.get("path") or ""), cwd)
                 if is_write_denied(str(path)):
                     raise PermissionError(
-                        f"Write denied: '{path}' is a protected system/credential file."
+                        f"Write denied: '{path}' is a protected system/credential file.",
                     )
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(str(params.get("content") or ""))

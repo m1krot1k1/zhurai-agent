@@ -191,10 +191,11 @@ ALL_TOOL_SCHEMAS = [PROFILE_SCHEMA, SEARCH_SCHEMA, REASONING_SCHEMA, CONTEXT_SCH
 class HonchoMemoryProvider(MemoryProvider):
     """Honcho AI-native memory with dialectic Q&A and persistent user modeling."""
 
-    def backup_paths(self) -> List[str]:
+    def backup_paths(self) -> list[str]:
         """Honcho keeps its peer/session config under ~/.honcho when no
-        profile-local honcho.json exists (see client.resolve_config_path)."""
-        paths: List[str] = []
+        profile-local honcho.json exists (see client.resolve_config_path).
+        """
+        paths: list[str] = []
         try:
             from .client import resolve_global_config_path
             global_cfg = resolve_global_config_path()
@@ -210,14 +211,14 @@ class HonchoMemoryProvider(MemoryProvider):
         self._session_key = ""
         self._prefetch_result = ""
         self._prefetch_lock = threading.Lock()
-        self._prefetch_thread: Optional[threading.Thread] = None
-        self._sync_thread: Optional[threading.Thread] = None
+        self._prefetch_thread: threading.Thread | None = None
+        self._sync_thread: threading.Thread | None = None
 
         # B1: recall_mode — set during initialize from config
         self._recall_mode = "hybrid"  # "context", "tools", or "hybrid"
 
         # Base context cache — refreshed on context_cadence, not frozen
-        self._base_context_cache: Optional[str] = None
+        self._base_context_cache: str | None = None
         self._base_context_lock = threading.Lock()
 
         # B5: Cost-awareness turn counting and cadence
@@ -239,9 +240,9 @@ class HonchoMemoryProvider(MemoryProvider):
 
         # Port #1957: lazy session init for tools-only mode
         self._session_initialized = False
-        self._lazy_init_kwargs: Optional[dict] = None
-        self._lazy_init_session_id: Optional[str] = None
-        self._init_thread: Optional[threading.Thread] = None
+        self._lazy_init_kwargs: dict | None = None
+        self._lazy_init_session_id: str | None = None
+        self._init_thread: threading.Thread | None = None
         self._init_lock = threading.Lock()
         self._init_error = ""
 
@@ -287,6 +288,7 @@ class HonchoMemoryProvider(MemoryProvider):
     def post_setup(self, hermes_home: str, config: dict) -> None:
         """Run the full Honcho setup wizard after provider selection."""
         import types
+
         from plugins.memory.honcho.cli import cmd_setup
         cmd_setup(types.SimpleNamespace())
 
@@ -307,7 +309,10 @@ class HonchoMemoryProvider(MemoryProvider):
                 self._cron_skipped = True
                 return
 
-            from plugins.memory.honcho.client import HonchoClientConfig, get_honcho_client
+            from plugins.memory.honcho.client import (
+                HonchoClientConfig,
+                get_honcho_client,
+            )
             from plugins.memory.honcho.session import HonchoSessionManager
 
             cfg = HonchoClientConfig.from_global_config()
@@ -506,7 +511,7 @@ class HonchoMemoryProvider(MemoryProvider):
 
             self._prefetch_thread_started_at = time.monotonic()
             prewarm_thread = threading.Thread(
-                target=_prewarm_dialectic, daemon=True, name="honcho-prewarm-dialectic"
+                target=_prewarm_dialectic, daemon=True, name="honcho-prewarm-dialectic",
             )
             prewarm_thread.start()
             self._prefetch_thread = prewarm_thread
@@ -597,9 +602,8 @@ class HonchoMemoryProvider(MemoryProvider):
         """
         if self._cron_skipped:
             return ""
-        if not self._manager or not self._session_key:
-            if not self._config:
-                return ""
+        if (not self._manager or not self._session_key) and not self._config:
+            return ""
 
         # ----- B1: adapt text based on recall_mode -----
         if self._recall_mode == "context":
@@ -732,7 +736,7 @@ class HonchoMemoryProvider(MemoryProvider):
 
             self._prefetch_thread_started_at = time.monotonic()
             first_turn_thread = threading.Thread(
-                target=_run_first_turn, daemon=True, name="honcho-prefetch-first"
+                target=_run_first_turn, daemon=True, name="honcho-prefetch-first",
             )
             first_turn_thread.start()
             self._prefetch_thread = first_turn_thread
@@ -862,7 +866,7 @@ class HonchoMemoryProvider(MemoryProvider):
 
         self._prefetch_thread_started_at = time.monotonic()
         prefetch_thread = threading.Thread(
-            target=_run, daemon=True, name="honcho-prefetch"
+            target=_run, daemon=True, name="honcho-prefetch",
         )
         prefetch_thread.start()
         self._prefetch_thread = prefetch_thread
@@ -903,7 +907,8 @@ class HonchoMemoryProvider(MemoryProvider):
 
     def _thread_is_live(self) -> bool:
         """Thread-alive guard that treats threads older than the stale
-        threshold as dead, so a hung Honcho request can't block new fires."""
+        threshold as dead, so a hung Honcho request can't block new fires.
+        """
         if not self._prefetch_thread or not self._prefetch_thread.is_alive():
             return False
         timeout = (self._config.timeout if self._config and self._config.timeout else 8.0)
@@ -1000,7 +1005,7 @@ class HonchoMemoryProvider(MemoryProvider):
                 "context about this user is most relevant to the current "
                 "conversation? Prioritize active context over biographical facts."
             )
-        elif pass_idx == 1:
+        if pass_idx == 1:
             prior = prior_results[-1] if prior_results else ""
             return (
                 f"Given this initial assessment:\n\n{prior}\n\n"
@@ -1009,16 +1014,15 @@ class HonchoMemoryProvider(MemoryProvider):
                 "the user's current state and immediate needs, grounded "
                 "in evidence from recent sessions."
             )
-        else:
-            # pass 2: reconciliation
-            return (
-                f"Prior passes produced:\n\n"
-                f"Pass 1:\n{prior_results[0] if len(prior_results) > 0 else '(empty)'}\n\n"
-                f"Pass 2:\n{prior_results[1] if len(prior_results) > 1 else '(empty)'}\n\n"
-                "Do these assessments cohere? Reconcile any contradictions "
-                "and produce a final, concise synthesis of what matters most "
-                "for the current conversation."
-            )
+        # pass 2: reconciliation
+        return (
+            f"Prior passes produced:\n\n"
+            f"Pass 1:\n{prior_results[0] if len(prior_results) > 0 else '(empty)'}\n\n"
+            f"Pass 2:\n{prior_results[1] if len(prior_results) > 1 else '(empty)'}\n\n"
+            "Do these assessments cohere? Reconcile any contradictions "
+            "and produce a final, concise synthesis of what matters most "
+            "for the current conversation."
+        )
 
     @staticmethod
     def _signal_sufficient(result: str) -> bool:
@@ -1086,8 +1090,8 @@ class HonchoMemoryProvider(MemoryProvider):
     # commands, empty input. Skipping injection here saves tokens and prevents
     # stale user-model context from derailing one-word replies.
     _TRIVIAL_PROMPT_RE = re.compile(
-        r'^(yes|no|ok|okay|sure|thanks|thank you|y|n|yep|nope|yeah|nah|'
-        r'continue|go ahead|do it|proceed|got it|cool|nice|great|done|next|lgtm|k)$',
+        r"^(yes|no|ok|okay|sure|thanks|thank you|y|n|yep|nope|yeah|nah|"
+        r"continue|go ahead|do it|proceed|got it|cool|nice|great|done|next|lgtm|k)$",
         re.IGNORECASE,
     )
 
@@ -1154,7 +1158,7 @@ class HonchoMemoryProvider(MemoryProvider):
 
         return chunks
 
-    def _empty_profile_hint(self, peer: str) -> Dict[str, Any]:
+    def _empty_profile_hint(self, peer: str) -> dict[str, Any]:
         """Build a diagnostic hint when honcho_profile returns an empty card.
 
         A literal "No profile facts available yet." tells the model nothing
@@ -1170,7 +1174,7 @@ class HonchoMemoryProvider(MemoryProvider):
              (honcho-ai server < 3.x)
         """
         cfg = self._config
-        reasons: List[str] = []
+        reasons: list[str] = []
 
         if cfg is not None:
             if peer == "user":
@@ -1182,7 +1186,7 @@ class HonchoMemoryProvider(MemoryProvider):
             if not (observe_me or observe_others):
                 reasons.append(
                     f"observation is disabled for peer '{peer}' "
-                    f"(user_observe_me/ai_observe_me in config)"
+                    f"(user_observe_me/ai_observe_me in config)",
                 )
 
         cadence = getattr(self, "_dialectic_cadence", 1)
@@ -1191,14 +1195,14 @@ class HonchoMemoryProvider(MemoryProvider):
             reasons.append(
                 f"this session has only {turn} turn(s); peer cards accumulate "
                 f"as the dialectic layer reasons over conversation history "
-                f"(cadence every {cadence} turn(s))"
+                f"(cadence every {cadence} turn(s))",
             )
 
         if not reasons:
             reasons.append(
                 "peer card has no facts yet — Honcho's dialectic layer builds "
                 "this over time from observed turns; self-hosted Honcho < 3.x "
-                "does not support peer cards at all"
+                "does not support peer cards at all",
             )
 
         return {
@@ -1243,7 +1247,7 @@ class HonchoMemoryProvider(MemoryProvider):
         if self._sync_thread and self._sync_thread.is_alive():
             self._sync_thread.join(timeout=5.0)
         self._sync_thread = threading.Thread(
-            target=_sync, daemon=True, name="honcho-sync"
+            target=_sync, daemon=True, name="honcho-sync",
         )
         self._sync_thread.start()
 
@@ -1252,7 +1256,7 @@ class HonchoMemoryProvider(MemoryProvider):
         action: str,
         target: str,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Mirror built-in user profile writes as Honcho conclusions.
 
@@ -1280,7 +1284,7 @@ class HonchoMemoryProvider(MemoryProvider):
         t = threading.Thread(target=_write, daemon=True, name="honcho-memwrite")
         t.start()
 
-    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+    def on_session_end(self, messages: list[dict[str, Any]]) -> None:
         """Flush all pending messages to Honcho on session end."""
         if self._cron_skipped:
             return
@@ -1296,7 +1300,7 @@ class HonchoMemoryProvider(MemoryProvider):
         except Exception as e:
             logger.debug("Honcho session-end flush failed: %s", e)
 
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         """Return tool schemas, respecting recall_mode.
 
         B1: context-only mode hides all tools.
@@ -1336,20 +1340,20 @@ class HonchoMemoryProvider(MemoryProvider):
                     return json.dumps(self._empty_profile_hint(peer))
                 return json.dumps({"result": card})
 
-            elif tool_name == "honcho_search":
+            if tool_name == "honcho_search":
                 query = args.get("query", "")
                 if not query:
                     return tool_error("Missing required parameter: query")
                 max_tokens = min(int(args.get("max_tokens", 800)), 2000)
                 peer = args.get("peer", "user")
                 result = self._manager.search_context(
-                    self._session_key, query, max_tokens=max_tokens, peer=peer
+                    self._session_key, query, max_tokens=max_tokens, peer=peer,
                 )
                 if not result:
                     return json.dumps({"result": "No relevant context found."})
                 return json.dumps({"result": result})
 
-            elif tool_name == "honcho_reasoning":
+            if tool_name == "honcho_reasoning":
                 query = args.get("query", "")
                 if not query:
                     return tool_error("Missing required parameter: query")
@@ -1364,7 +1368,7 @@ class HonchoMemoryProvider(MemoryProvider):
                 self._last_dialectic_turn = self._turn_count
                 return json.dumps({"result": result or "No result from Honcho."})
 
-            elif tool_name == "honcho_context":
+            if tool_name == "honcho_context":
                 peer = args.get("peer", "user")
                 ctx = self._manager.get_session_context(self._session_key, peer=peer)
                 if not ctx:
@@ -1385,7 +1389,7 @@ class HonchoMemoryProvider(MemoryProvider):
                     parts.append(f"## Recent messages\n{msg_str}")
                 return json.dumps({"result": "\n\n".join(parts) or "No context available."})
 
-            elif tool_name == "honcho_conclude":
+            if tool_name == "honcho_conclude":
                 delete_id = (args.get("delete_id") or "").strip()
                 conclusion = args.get("conclusion", "").strip()
                 peer = args.get("peer", "user")

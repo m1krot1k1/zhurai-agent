@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from utils import atomic_replace
 
+from utils import atomic_replace
 
 # Env var name suffixes that indicate credential values.  These are the
 # only env vars whose values we sanitize on load — we must not silently
@@ -136,7 +136,7 @@ def _sanitize_loaded_credentials() -> None:
             "  This usually means the key was copy-pasted from a PDF, "
             "rich-text editor, or web page that substituted lookalike\n"
             "  Unicode glyphs for ASCII letters. If authentication fails "
-            "(e.g. \"API key not valid\"), re-copy the key from the\n"
+            '(e.g. "API key not valid"), re-copy the key from the\n'
             "  provider's dashboard and run `hermes setup` (or edit the "
             ".env file in a plain-text editor).",
             file=sys.stderr,
@@ -191,7 +191,7 @@ def _sanitize_env_file_if_needed(path: Path) -> None:
         if sanitized != original:
             import tempfile
             fd, tmp = tempfile.mkstemp(
-                dir=str(path.parent), suffix=".tmp", prefix=".env_"
+                dir=str(path.parent), suffix=".tmp", prefix=".env_",
             )
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -201,7 +201,7 @@ def _sanitize_env_file_if_needed(path: Path) -> None:
                 atomic_replace(tmp, path)
             except BaseException:
                 try:
-                    os.unlink(tmp)
+                    Path(tmp).unlink()
                 except OSError:
                     pass
                 raise
@@ -370,7 +370,7 @@ def _load_secrets_config(home_path: Path) -> dict:
     except ImportError:
         return {}
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with Path(config_path).open(encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
     except Exception:  # noqa: BLE001
         return {}

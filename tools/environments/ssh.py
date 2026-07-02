@@ -25,11 +25,11 @@ def _ensure_ssh_available() -> None:
     """Fail fast with a clear error when the SSH client is unavailable."""
     if not shutil.which("ssh"):
         raise RuntimeError(
-            "SSH is not installed or not in PATH. Install OpenSSH client: apt install openssh-client"
+            "SSH is not installed or not in PATH. Install OpenSSH client: apt install openssh-client",
         )
     if not shutil.which("scp"):
         raise RuntimeError(
-            "SCP is not installed or not in PATH. Install OpenSSH client: apt install openssh-client"
+            "SCP is not installed or not in PATH. Install OpenSSH client: apt install openssh-client",
         )
 
 
@@ -61,7 +61,7 @@ class SSHEnvironment(BaseEnvironment):
         # triple keeps the path stable across reconnects so ControlMaster
         # reuse still works.
         _socket_id = hashlib.sha256(
-            f"{user}@{host}:{port}".encode()
+            f"{user}@{host}:{port}".encode(),
         ).hexdigest()[:16]
         self.control_socket = self.control_dir / f"{_socket_id}.sock"
         _ensure_ssh_available()
@@ -225,18 +225,18 @@ class SSHEnvironment(BaseEnvironment):
                     rel_remote = os.path.relpath(remote_path, base)
                 except ValueError as exc:
                     raise RuntimeError(
-                        f"remote path {remote_path!r} is not under sync base {base!r}"
+                        f"remote path {remote_path!r} is not under sync base {base!r}",
                     ) from exc
 
                 if rel_remote == "." or rel_remote.startswith("../"):
                     raise RuntimeError(
-                        f"remote path {remote_path!r} escapes sync base {base!r}"
+                        f"remote path {remote_path!r} escapes sync base {base!r}",
                     )
 
                 staged = os.path.join(staging, rel_remote)
-                os.makedirs(os.path.dirname(staged), exist_ok=True)
+                Path(os.path.dirname(staged)).mkdir(exist_ok=True, parents=True)
                 try:
-                    os.symlink(os.path.abspath(host_path), staged)
+                    Path(staged).symlink_to(os.path.abspath(host_path))
                 except OSError as e:
                     # WinError 1314: symlink privilege not held (Windows without Dev Mode)
                     if getattr(e, "winerror", None) == 1314:
@@ -290,12 +290,12 @@ class SSHEnvironment(BaseEnvironment):
             if tar_proc.returncode != 0:
                 raise RuntimeError(
                     f"tar create failed (rc={tar_proc.returncode}): "
-                    f"{tar_stderr_raw.decode(errors='replace').strip()}"
+                    f"{tar_stderr_raw.decode(errors='replace').strip()}",
                 )
             if ssh_proc.returncode != 0:
                 raise RuntimeError(
                     f"tar extract over SSH failed (rc={ssh_proc.returncode}): "
-                    f"{ssh_stderr.decode(errors='replace').strip()}"
+                    f"{ssh_stderr.decode(errors='replace').strip()}",
                 )
 
         logger.debug("SSH: bulk-uploaded %d file(s) via tar pipe", len(files))
@@ -307,7 +307,7 @@ class SSHEnvironment(BaseEnvironment):
         rel_base = f"{self._remote_home}/.hermes".lstrip("/")
         ssh_cmd = self._build_ssh_command()
         ssh_cmd.append(f"tar cf - -C / {shlex.quote(rel_base)}")
-        with open(dest, "wb") as f:
+        with Path(dest).open("wb") as f:
             result = subprocess.run(
                 ssh_cmd,
                 stdin=subprocess.DEVNULL,

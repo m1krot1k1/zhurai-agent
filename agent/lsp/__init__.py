@@ -37,12 +37,12 @@ from agent.lsp.manager import LSPService
 
 logger = logging.getLogger("agent.lsp")
 
-_service: Optional[LSPService] = None
+_service: LSPService | None = None
 _atexit_registered = False
 _service_lock = threading.Lock()
 
 
-def get_service() -> Optional[LSPService]:
+def get_service() -> LSPService | None:
     """Return the process-wide LSP service singleton, or None when disabled.
 
     The service is created lazily on first call.  ``None`` is returned
@@ -96,11 +96,12 @@ def shutdown_service() -> None:
 def _atexit_shutdown() -> None:
     """atexit-registered wrapper.  Logs at debug because by the time
     atexit fires the user has already seen the agent's final output —
-    a noisy shutdown line on top of that is just clutter."""
+    a noisy shutdown line on top of that is just clutter.
+    """
     try:
         shutdown_service()
     except Exception as e:  # noqa: BLE001
         logger.debug("atexit LSP shutdown failed: %s", e)
 
 
-__all__ = ["get_service", "shutdown_service", "LSPService"]
+__all__ = ["LSPService", "get_service", "shutdown_service"]

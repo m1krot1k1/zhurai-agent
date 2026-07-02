@@ -54,7 +54,8 @@ def _extract_autostash_block() -> str:
 
 def _make_unmerged_repo(repo: Path) -> None:
     """Leave ``repo`` with a conflicted (unmerged) index, as an interrupted
-    update would."""
+    update would.
+    """
     _git(repo, "init")
     (repo / "f.txt").write_text("base\n")
     _git(repo, "add", "f.txt")
@@ -99,7 +100,7 @@ def test_install_sh_clears_unmerged_index_then_stashes(tmp_path: Path) -> None:
         "echo BLOCK_OK\n"
     )
     res = subprocess.run(
-        ["bash", "-c", script], cwd=repo, capture_output=True, text=True
+        ["bash", "-c", script], cwd=repo, capture_output=True, text=True,
     )
 
     # The block must complete (previously `git stash` failed with "could not
@@ -120,7 +121,8 @@ def test_install_sh_clears_unmerged_index_then_stashes(tmp_path: Path) -> None:
 
 def test_install_ps1_clears_unmerged_index_before_stash() -> None:
     """install.ps1 must clear an unmerged index before stash/checkout, and do
-    so *before* the stash push (order matters — the fix is a no-op otherwise)."""
+    so *before* the stash push (order matters — the fix is a no-op otherwise).
+    """
     text = INSTALL_PS1.read_text()
     assert "ls-files --unmerged" in text, (
         "install.ps1 must detect an unmerged index before updating"

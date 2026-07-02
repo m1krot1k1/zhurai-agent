@@ -1,8 +1,8 @@
 """Test Discord slash command sync respects the 100-command hard limit."""
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
 import sys
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -100,7 +100,7 @@ async def test_safe_sync_deletes_before_creating():
         return_value=[
             _FakeTreeCommand(name=f"cmd_{i}", command_type=1)
             for i in range(1, 100)
-        ] + [_FakeTreeCommand(name="cmd_new", command_type=1)]
+        ] + [_FakeTreeCommand(name="cmd_new", command_type=1)],
     )
 
     # Track the order of mutations

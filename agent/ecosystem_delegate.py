@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from agent.ecosystem_paths import get_ecosystem_root
 
 
-def resolve_agent_brief(agent_id: str) -> Optional[Path]:
+def resolve_agent_brief(agent_id: str) -> Path | None:
     """Return the first existing brief path for *agent_id* under the ecosystem root."""
     root = get_ecosystem_root()
     if root is None:
@@ -57,7 +57,7 @@ def build_delegate_branch_context(
     objective: str,
     original_request: str = "",
     ownership: str = "",
-    extra: Optional[Dict[str, Any]] = None,
+    extra: dict[str, Any] | None = None,
 ) -> str:
     """Compose a branch *context* string for delegate_task."""
     brief = resolve_agent_brief(agent_id)
@@ -77,7 +77,7 @@ def build_delegate_branch_context(
         lines.append(f"AGENT_BRIEF_PATH: {brief}")
         lines.append(
             "NON-NEGOTIABLE: Read AGENT_BRIEF_PATH at the start of the branch "
-            "and operate strictly in that role."
+            "and operate strictly in that role.",
         )
     for key, value in (extra or {}).items():
         if value is not None and str(value).strip():

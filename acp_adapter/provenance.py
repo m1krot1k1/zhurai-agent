@@ -13,7 +13,7 @@ parsing status text, guessing from token drops, or reading ``state.db``.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Bound defensive walks; compression chains this deep are pathological.
 _MAX_WALK = 100
@@ -24,8 +24,8 @@ def build_session_provenance(
     acp_session_id: str,
     current_hermes_session_id: str,
     *,
-    previous_hermes_session_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    previous_hermes_session_id: str | None = None,
+) -> dict[str, Any] | None:
     """Build ``_meta.hermes.sessionProvenance`` for an ACP session.
 
     Args:
@@ -39,6 +39,7 @@ def build_session_provenance(
     Returns:
         A dict suitable for ``{"hermes": {"sessionProvenance": <dict>}}`` under
         ACP ``_meta``, or ``None`` if the session can't be read.
+
     """
     try:
         row = db.get_session(current_hermes_session_id)
@@ -86,10 +87,10 @@ def build_session_provenance(
 
     rotated = bool(
         previous_hermes_session_id
-        and previous_hermes_session_id != current_hermes_session_id
+        and previous_hermes_session_id != current_hermes_session_id,
     )
 
-    provenance: Dict[str, Any] = {
+    provenance: dict[str, Any] = {
         "acpSessionId": acp_session_id,
         "currentHermesSessionId": current_hermes_session_id,
         "rootHermesSessionId": root_id,
@@ -113,8 +114,8 @@ def session_provenance_meta(
     acp_session_id: str,
     current_hermes_session_id: str,
     *,
-    previous_hermes_session_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    previous_hermes_session_id: str | None = None,
+) -> dict[str, Any] | None:
     """Return a ready ``_meta`` payload: ``{"hermes": {"sessionProvenance": ...}}``."""
     prov = build_session_provenance(
         db,

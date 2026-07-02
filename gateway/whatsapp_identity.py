@@ -33,7 +33,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,7 @@ def to_whatsapp_jid(value: str) -> str:
     return normalized
 
 
-def expand_whatsapp_aliases(identifier: str) -> Set[str]:
+def expand_whatsapp_aliases(identifier: str) -> set[str]:
     """Resolve WhatsApp phone/LID aliases via bridge session mapping files.
 
     Returns the set of all identifiers transitively reachable through the
@@ -134,7 +133,7 @@ def expand_whatsapp_aliases(identifier: str) -> Set[str]:
         return set()
 
     session_dir = get_hermes_home() / "whatsapp" / "session"
-    resolved: Set[str] = set()
+    resolved: set[str] = set()
     queue = [normalized]
 
     while queue:
@@ -159,7 +158,7 @@ def expand_whatsapp_aliases(identifier: str) -> Set[str]:
                 continue
             try:
                 mapped = normalize_whatsapp_identifier(
-                    json.loads(mapping_path.read_text(encoding="utf-8"))
+                    json.loads(mapping_path.read_text(encoding="utf-8")),
                 )
             except (OSError, json.JSONDecodeError) as exc:
                 logger.debug("whatsapp_identity: failed to read %s: %s", mapping_path, exc)

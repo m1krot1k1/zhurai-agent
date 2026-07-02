@@ -12,7 +12,6 @@ from gateway.slash_access import (
     policy_from_extra,
 )
 
-
 # ---------------------------------------------------------------------------
 # policy_from_extra — input normalization + scope resolution
 # ---------------------------------------------------------------------------
@@ -172,7 +171,7 @@ class TestPolicyForSource:
     def test_no_platform_config_returns_disabled(self):
         cfg = GatewayConfig(platforms={})
         src = SessionSource(
-            platform=Platform.DISCORD, chat_id="42", chat_type="dm", user_id="7"
+            platform=Platform.DISCORD, chat_id="42", chat_type="dm", user_id="7",
         )
         p = policy_for_source(cfg, src)
         assert p.enabled is False
@@ -188,11 +187,11 @@ class TestPolicyForSource:
                         "group_allow_admin_from": ["222"],
                         "group_user_allowed_commands": ["help"],
                     },
-                )
-            }
+                ),
+            },
         )
         dm_src = SessionSource(
-            platform=Platform.DISCORD, chat_id="A", chat_type="dm", user_id="111"
+            platform=Platform.DISCORD, chat_id="A", chat_type="dm", user_id="111",
         )
         p = policy_for_source(cfg, dm_src)
         assert p.is_admin("111") is True
@@ -211,11 +210,11 @@ class TestPolicyForSource:
                         "group_allow_admin_from": ["222"],
                         "group_user_allowed_commands": ["help"],
                     },
-                )
-            }
+                ),
+            },
         )
         grp_src = SessionSource(
-            platform=Platform.DISCORD, chat_id="G", chat_type="group", user_id="222"
+            platform=Platform.DISCORD, chat_id="G", chat_type="group", user_id="222",
         )
         p = policy_for_source(cfg, grp_src)
         assert p.is_admin("222") is True
@@ -235,12 +234,12 @@ class TestPolicyForSource:
                         "allow_admin_from": ["111"],
                         "group_allow_admin_from": ["222"],
                     },
-                )
-            }
+                ),
+            },
         )
         for ct in ("group", "channel", "thread", "supergroup"):
             src = SessionSource(
-                platform=Platform.DISCORD, chat_id="X", chat_type=ct, user_id="222"
+                platform=Platform.DISCORD, chat_id="X", chat_type=ct, user_id="222",
             )
             p = policy_for_source(cfg, src)
             assert p.is_admin("222") is True, f"chat_type={ct} should map to group scope"
@@ -253,14 +252,14 @@ class TestPolicyForSource:
                 Platform.DISCORD: PlatformConfig(
                     enabled=True,
                     extra={"group_allow_admin_from": ["222"]},
-                )
-            }
+                ),
+            },
         )
         dm_src = SessionSource(
-            platform=Platform.DISCORD, chat_id="A", chat_type="dm", user_id="999"
+            platform=Platform.DISCORD, chat_id="A", chat_type="dm", user_id="999",
         )
         grp_src = SessionSource(
-            platform=Platform.DISCORD, chat_id="G", chat_type="group", user_id="999"
+            platform=Platform.DISCORD, chat_id="G", chat_type="group", user_id="999",
         )
         dm_p = policy_for_source(cfg, dm_src)
         grp_p = policy_for_source(cfg, grp_src)
@@ -278,10 +277,10 @@ class TestPolicyForSource:
                     extra={"allow_admin_from": ["111"]},
                 ),
                 Platform.TELEGRAM: PlatformConfig(enabled=True, extra={}),
-            }
+            },
         )
         tg_src = SessionSource(
-            platform=Platform.TELEGRAM, chat_id="T", chat_type="dm", user_id="999"
+            platform=Platform.TELEGRAM, chat_id="T", chat_type="dm", user_id="999",
         )
         p = policy_for_source(cfg, tg_src)
         assert p.enabled is False

@@ -30,7 +30,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DESKTOP_PKG = REPO_ROOT / "apps" / "desktop" / "package.json"
 ROOT_LOCK = REPO_ROOT / "package-lock.json"
@@ -77,7 +76,7 @@ def test_electron_dependency_matches_electron_version():
 
 
 def test_lockfile_resolves_the_pinned_electron():
-    """npm ci installs from the lockfile, so it must agree with the pin."""
+    """Npm ci installs from the lockfile, so it must agree with the pin."""
     if not ROOT_LOCK.is_file():
         pytest.skip("root package-lock.json not present")
     spec = _electron_spec(_desktop_pkg())
@@ -110,7 +109,7 @@ def test_no_static_electron_dist_that_can_drift():
 
 
 def test_builder_script_routes_through_dynamic_resolver():
-    """npm run builder must invoke run-electron-builder.cjs, not bare electron-builder."""
+    """Npm run builder must invoke run-electron-builder.cjs, not bare electron-builder."""
     builder = _desktop_pkg().get("scripts", {}).get("builder", "")
     assert "run-electron-builder.cjs" in builder, (
         f"the 'builder' script must run scripts/run-electron-builder.cjs, got "

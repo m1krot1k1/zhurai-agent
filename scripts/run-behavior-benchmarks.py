@@ -27,8 +27,7 @@ def read_text_robust(
         "cp1252",
     ),
 ) -> str:
-    """
-    Robust text reader for validators/benchmarks.
+    """Robust text reader for validators/benchmarks.
 
     Some markdown files may be saved in legacy encodings; benchmark must not crash
     due to UnicodeDecodeError.
@@ -84,7 +83,7 @@ def main() -> int:
                 scenario_failures.append(f'missing file for regex check "{rel_path}"')
                 continue
             if not re.search(pattern, read(path), re.DOTALL):
-                scenario_failures.append(f'pattern not found in {rel_path}: /{pattern}/')
+                scenario_failures.append(f"pattern not found in {rel_path}: /{pattern}/")
 
         for check in scenario.get("forbidden_regex", []):
             rel_path = check["file"]
@@ -93,10 +92,10 @@ def main() -> int:
             if not path.exists():
                 continue
             if re.search(pattern, read(path), re.DOTALL):
-                scenario_failures.append(f'forbidden pattern found in {rel_path}: /{pattern}/')
+                scenario_failures.append(f"forbidden pattern found in {rel_path}: /{pattern}/")
 
         if scenario_failures:
-            failures.append(f'[{scenario_id}] ' + "; ".join(scenario_failures))
+            failures.append(f"[{scenario_id}] " + "; ".join(scenario_failures))
         else:
             passed += 1
 

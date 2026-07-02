@@ -23,10 +23,9 @@ import pytest
 
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import MessageEvent, MessageType
-from gateway.session import SessionSource, build_session_key
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
-
+from gateway.session import SessionSource, build_session_key
 from tests.gateway.relay.stub_connector import StubConnector
 
 
@@ -84,7 +83,8 @@ def wired():
 @pytest.mark.asyncio
 async def test_telegram_descriptor_round_trips_through_stub(wired):
     """The connector's handshake descriptor for Telegram survives JSON + the
-    adapter configures itself from it (utf16 length unit, 4096 limit)."""
+    adapter configures itself from it (utf16 length unit, 4096 limit).
+    """
     adapter, stub = wired
     desc = _telegram_descriptor()
     assert CapabilityDescriptor.from_json(desc.to_json()) == desc
@@ -111,7 +111,8 @@ async def test_inbound_telegram_event_reaches_adapter(wired, monkeypatch):
 @pytest.mark.asyncio
 async def test_two_telegram_chats_isolate_by_chat_id(wired):
     """No guild_id on Telegram — two distinct chats must still isolate, keyed
-    on chat_id alone (the Discord-guild role is played by chat_id here)."""
+    on chat_id alone (the Discord-guild role is played by chat_id here).
+    """
     ev_a = _tg_group_event("chat-A", "userX", "hi A")
     ev_b = _tg_group_event("chat-B", "userX", "hi B")
     key_a = build_session_key(ev_a.source)
@@ -127,7 +128,8 @@ async def test_forum_topics_isolate_by_thread_id_within_one_chat(wired):
     """Telegram forum topics share a single chat_id and isolate by thread_id —
     the Telegram analog of Discord per-guild isolation. Two topics in the same
     forum must NOT collide, and (threads shared across participants by default)
-    a second user in the same topic shares the session."""
+    a second user in the same topic shares the session.
+    """
     topic1 = _tg_group_event("forum-1", "userX", "in topic 1", thread_id="t-1")
     topic2 = _tg_group_event("forum-1", "userX", "in topic 2", thread_id="t-2")
     k1 = build_session_key(topic1.source)
@@ -164,4 +166,3 @@ async def test_outbound_send_round_trips_telegram(wired):
 
 async def _async_capture(sink, event):
     sink.append(event)
-    return None

@@ -49,12 +49,13 @@ class TestMinimaxM3StaleCacheGuard:
     def test_stale_m3_cache_dropped_and_reresolves(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         import importlib
+
         import agent.model_metadata as mm
         importlib.reload(mm)
         base = "https://api.minimaxi.com/anthropic"
         mm.save_context_length("MiniMax-M3", base, 204_800)
         ctx = mm.get_model_context_length(
-            "MiniMax-M3", base_url=base, api_key="", provider="minimax-cn"
+            "MiniMax-M3", base_url=base, api_key="", provider="minimax-cn",
         )
         # Invariant: the stale 204,800 catch-all value must be DROPPED and
         # re-resolved to M3's real, larger context. The exact value depends on
@@ -67,18 +68,20 @@ class TestMinimaxM3StaleCacheGuard:
     def test_correct_m3_cache_preserved(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         import importlib
+
         import agent.model_metadata as mm
         importlib.reload(mm)
         base = "https://api.minimaxi.com/anthropic"
         mm.save_context_length("MiniMax-M3", base, 1_000_000)
         ctx = mm.get_model_context_length(
-            "MiniMax-M3", base_url=base, api_key="", provider="minimax-cn"
+            "MiniMax-M3", base_url=base, api_key="", provider="minimax-cn",
         )
         assert ctx == 1_000_000
 
     def test_m2_cache_not_clobbered(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         import importlib
+
         import agent.model_metadata as mm
         importlib.reload(mm)
         base = "https://api.minimaxi.com/anthropic"
@@ -86,10 +89,9 @@ class TestMinimaxM3StaleCacheGuard:
         for slug in ("MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1"):
             mm.save_context_length(slug, base, 204_800)
             ctx = mm.get_model_context_length(
-                slug, base_url=base, api_key="", provider="minimax-cn"
+                slug, base_url=base, api_key="", provider="minimax-cn",
             )
             assert ctx == 204_800, f"{slug} should stay 204800, got {ctx}"
-
 
 
 class TestMinimaxThinkingSupport:
@@ -203,14 +205,14 @@ class TestMinimaxBetaHeaders:
 
     def test_minimax_global_omits_tool_streaming(self):
         betas = self._build_and_get_betas(
-            "mm-key-123", base_url="https://api.minimax.io/anthropic"
+            "mm-key-123", base_url="https://api.minimax.io/anthropic",
         )
         assert self._TOOL_BETA not in betas
         assert self._THINKING_BETA in betas
 
     def test_minimax_global_trailing_slash(self):
         betas = self._build_and_get_betas(
-            "mm-key-123", base_url="https://api.minimax.io/anthropic/"
+            "mm-key-123", base_url="https://api.minimax.io/anthropic/",
         )
         assert self._TOOL_BETA not in betas
 
@@ -218,14 +220,14 @@ class TestMinimaxBetaHeaders:
 
     def test_minimax_cn_omits_tool_streaming(self):
         betas = self._build_and_get_betas(
-            "mm-cn-key-456", base_url="https://api.minimaxi.com/anthropic"
+            "mm-cn-key-456", base_url="https://api.minimaxi.com/anthropic",
         )
         assert self._TOOL_BETA not in betas
         assert self._THINKING_BETA in betas
 
     def test_minimax_cn_trailing_slash(self):
         betas = self._build_and_get_betas(
-            "mm-cn-key-456", base_url="https://api.minimaxi.com/anthropic/"
+            "mm-cn-key-456", base_url="https://api.minimaxi.com/anthropic/",
         )
         assert self._TOOL_BETA not in betas
 
@@ -238,39 +240,45 @@ class TestMinimaxBetaHeaders:
 
     def test_third_party_proxy_keeps_tool_streaming(self):
         betas = self._build_and_get_betas(
-            "custom-key", base_url="https://my-proxy.example.com/anthropic"
+            "custom-key", base_url="https://my-proxy.example.com/anthropic",
         )
         assert self._TOOL_BETA in betas
 
     def test_custom_base_url_keeps_tool_streaming(self):
         betas = self._build_and_get_betas(
-            "custom-key", base_url="https://custom.api.com"
+            "custom-key", base_url="https://custom.api.com",
         )
         assert self._TOOL_BETA in betas
 
     # -- _common_betas_for_base_url unit tests ---------------------------
 
     def test_common_betas_none_url(self):
-        from agent.anthropic_adapter import _common_betas_for_base_url, _COMMON_BETAS
+        from agent.anthropic_adapter import _COMMON_BETAS, _common_betas_for_base_url
         assert _common_betas_for_base_url(None) == _COMMON_BETAS
 
     def test_common_betas_empty_url(self):
-        from agent.anthropic_adapter import _common_betas_for_base_url, _COMMON_BETAS
+        from agent.anthropic_adapter import _COMMON_BETAS, _common_betas_for_base_url
         assert _common_betas_for_base_url("") == _COMMON_BETAS
 
     def test_common_betas_minimax_url(self):
-        from agent.anthropic_adapter import _common_betas_for_base_url, _TOOL_STREAMING_BETA
+        from agent.anthropic_adapter import (
+            _TOOL_STREAMING_BETA,
+            _common_betas_for_base_url,
+        )
         betas = _common_betas_for_base_url("https://api.minimax.io/anthropic")
         assert _TOOL_STREAMING_BETA not in betas
         assert len(betas) > 0  # still has other betas
 
     def test_common_betas_minimax_cn_url(self):
-        from agent.anthropic_adapter import _common_betas_for_base_url, _TOOL_STREAMING_BETA
+        from agent.anthropic_adapter import (
+            _TOOL_STREAMING_BETA,
+            _common_betas_for_base_url,
+        )
         betas = _common_betas_for_base_url("https://api.minimaxi.com/anthropic")
         assert _TOOL_STREAMING_BETA not in betas
 
     def test_common_betas_regular_url(self):
-        from agent.anthropic_adapter import _common_betas_for_base_url, _COMMON_BETAS
+        from agent.anthropic_adapter import _COMMON_BETAS, _common_betas_for_base_url
         assert _common_betas_for_base_url("https://api.anthropic.com") == _COMMON_BETAS
 
 
@@ -423,7 +431,7 @@ class TestMinimaxSwitchModelCredentialGuard:
 
     def test_switch_to_minimax_does_not_resolve_anthropic_token(self):
         """switch_model() should NOT call resolve_anthropic_token() for MiniMax."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         with patch("run_agent.AIAgent.__init__", return_value=None):
             from run_agent import AIAgent

@@ -26,7 +26,6 @@ import tempfile
 import time
 from pathlib import Path
 
-
 NUM_WORKERS = 5
 NUM_TASKS = 100
 WORKER_TIMEOUT_S = 60
@@ -57,7 +56,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
             # want workers to race on popular assignees).
             row = conn.execute(
                 "SELECT id FROM tasks WHERE status = 'ready' "
-                "AND claim_lock IS NULL LIMIT 1"
+                "AND claim_lock IS NULL LIMIT 1",
             ).fetchone()
             if row is None:
                 empty_polls += 1
@@ -112,7 +111,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
         finally:
             conn.close()
 
-    with open(result_file, "w") as f:
+    with Path(result_file).open("w") as f:
         json.dump(events, f)
 
 
@@ -160,10 +159,10 @@ def main():
     # Aggregate worker events.
     all_events = []
     for i, f in enumerate(result_files):
-        if not os.path.isfile(f):
+        if not Path(f).is_file():
             print(f"  WORKER {i} produced no result file — died?")
             continue
-        with open(f) as fh:
+        with Path(f).open() as fh:
             events = json.load(fh)
         all_events.extend(events)
 
@@ -184,7 +183,7 @@ def main():
                 if prev["worker"] != e["worker"]:
                     failures.append(
                         f"DOUBLE CLAIM: task {e['task']} claimed by "
-                        f"worker {prev['worker']} AND worker {e['worker']}"
+                        f"worker {prev['worker']} AND worker {e['worker']}",
                     )
             claims_by_task[e["task"]] = e
 
@@ -197,7 +196,7 @@ def main():
             elif prev_claim["worker"] != e["worker"]:
                 failures.append(
                     f"WORKER MISMATCH: task {e['task']} claimed by "
-                    f"{prev_claim['worker']} but completed by {e['worker']}"
+                    f"{prev_claim['worker']} but completed by {e['worker']}",
                 )
 
     # Check 3: DB state — every task should be in 'done', no dangling claims
@@ -206,49 +205,49 @@ def main():
         bad_status = conn.execute(
             "SELECT id, status, claim_lock, current_run_id FROM tasks "
             "WHERE status != 'done' OR claim_lock IS NOT NULL "
-            "OR current_run_id IS NOT NULL"
+            "OR current_run_id IS NOT NULL",
         ).fetchall()
         if bad_status:
             for row in bad_status:
                 failures.append(
                     f"BAD FINAL STATE: task {row['id']} status={row['status']} "
-                    f"claim_lock={row['claim_lock']} current_run_id={row['current_run_id']}"
+                    f"claim_lock={row['claim_lock']} current_run_id={row['current_run_id']}",
                 )
 
         # Check 4: exactly one run per task, all closed as completed
         bad_runs = conn.execute(
             "SELECT task_id, COUNT(*) as n FROM task_runs "
-            "GROUP BY task_id HAVING n != 1"
+            "GROUP BY task_id HAVING n != 1",
         ).fetchall()
         if bad_runs:
             for row in bad_runs:
                 failures.append(
-                    f"WRONG RUN COUNT: task {row['task_id']} has {row['n']} runs (expected 1)"
+                    f"WRONG RUN COUNT: task {row['task_id']} has {row['n']} runs (expected 1)",
                 )
 
         open_runs = conn.execute(
-            "SELECT id, task_id FROM task_runs WHERE ended_at IS NULL"
+            "SELECT id, task_id FROM task_runs WHERE ended_at IS NULL",
         ).fetchall()
         for row in open_runs:
             failures.append(f"OPEN RUN: run {row['id']} on task {row['task_id']}")
 
         wrong_outcomes = conn.execute(
             "SELECT task_id, outcome FROM task_runs "
-            "WHERE outcome IS NULL OR outcome != 'completed'"
+            "WHERE outcome IS NULL OR outcome != 'completed'",
         ).fetchall()
         for row in wrong_outcomes:
             failures.append(
-                f"WRONG OUTCOME: task {row['task_id']} run outcome={row['outcome']}"
+                f"WRONG OUTCOME: task {row['task_id']} run outcome={row['outcome']}",
             )
 
         # Check 5: event counts — exactly NUM_TASKS completed events
         completed_events = conn.execute(
-            "SELECT COUNT(*) as n FROM task_events WHERE kind='completed'"
+            "SELECT COUNT(*) as n FROM task_events WHERE kind='completed'",
         ).fetchone()["n"]
         if completed_events != NUM_TASKS:
             failures.append(
                 f"EVENT COUNT MISMATCH: {completed_events} completed events "
-                f"expected {NUM_TASKS}"
+                f"expected {NUM_TASKS}",
             )
 
         # Check 6: count SQLite errors that escaped retry
@@ -277,8 +276,8 @@ def main():
     print(f"Total completes:   {total_completes}")
     print(f"Lost claim races:  {total_lost_races}  (expected contention; not a bug)")
     print(f"Elapsed:           {elapsed:.2f}s")
-    print(f"Throughput:        {NUM_TASKS/elapsed:.1f} tasks/sec")
-    print(f"Per-worker completions:")
+    print(f"Throughput:        {NUM_TASKS / elapsed:.1f} tasks/sec")
+    print("Per-worker completions:")
     for w in sorted(per_worker.keys()):
         print(f"  worker-{w}: {per_worker[w]}")
 

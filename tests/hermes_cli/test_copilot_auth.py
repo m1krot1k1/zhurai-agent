@@ -1,7 +1,8 @@
 """Tests for hermes_cli.copilot_auth — Copilot token validation and resolution."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 
 class TestTokenValidation:
@@ -33,7 +34,6 @@ class TestTokenValidation:
         from hermes_cli.copilot_auth import validate_copilot_token
         valid, msg = validate_copilot_token("")
         assert valid is False
-
 
 
 class TestResolveToken:
@@ -197,5 +197,5 @@ class TestEnvVarOrder:
         from hermes_cli.auth import PROVIDER_REGISTRY
         copilot = PROVIDER_REGISTRY["copilot"]
         assert copilot.api_key_env_vars == (
-            "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"
+            "COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN",
         )

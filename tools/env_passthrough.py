@@ -20,8 +20,9 @@ Both ``code_execution_tool.py`` and ``tools/environments/local.py`` consult
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from contextvars import ContextVar
-from typing import Iterable
+
 from hermes_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)
@@ -159,5 +160,3 @@ def get_all_passthrough() -> frozenset[str]:
 def clear_env_passthrough() -> None:
     """Reset the skill-scoped allowlist (e.g. on session reset)."""
     _get_allowed().clear()
-
-

@@ -12,7 +12,8 @@ so Herm TUI, CLI, and gateway surfaces that already show switch warnings pick it
 
 from __future__ import annotations
 
-from typing import Any, Callable, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from agent.model_metadata import MINIMUM_CONTEXT_LENGTH
 from hermes_cli.model_switch import ModelSwitchResult, resolve_display_context_length
@@ -29,14 +30,14 @@ def _threshold_tokens(context_length: int, threshold_percent: float) -> int:
     return max(int(context_length * threshold_percent), MINIMUM_CONTEXT_LENGTH)
 
 
-def _estimate_tokens(agent: Any, messages: Optional[List[dict]]) -> Optional[int]:
+def _estimate_tokens(agent: Any, messages: list[dict] | None) -> int | None:
     cc = getattr(agent, "context_compressor", None)
     if cc is None:
         return None
 
     if messages is not None:
         protect = int(getattr(cc, "protect_first_n", 3)) + int(
-            getattr(cc, "protect_last_n", 20)
+            getattr(cc, "protect_last_n", 20),
         ) + 1
         if len(messages) <= protect:
             return None
@@ -50,7 +51,7 @@ def _estimate_tokens(agent: Any, messages: Optional[List[dict]]) -> Optional[int
                     messages,
                     system_prompt=system_prompt,
                     tools=tools or None,
-                )
+                ),
             )
         except Exception:
             pass
@@ -66,7 +67,7 @@ def merge_preflight_compression_warning(
     result: ModelSwitchResult,
     *,
     agent: Any = None,
-    messages: Optional[List[dict]] = None,
+    messages: list[dict] | None = None,
     custom_providers: list | None = None,
     config_context_length: int | None = None,
 ) -> None:
@@ -108,13 +109,13 @@ def merge_preflight_compression_warning(
     parts: list[str] = []
     if old_ctx and new_ctx < old_ctx:
         parts.append(
-            f"Context window shrinks ({old_ctx:,} → {new_ctx:,}). "
+            f"Context window shrinks ({old_ctx:,} → {new_ctx:,}). ",
         )
     parts.append(
         f"Session is ~{estimate:,} tokens; "
         f"{result.new_model} allows {new_ctx:,} "
         f"(auto-compress at ~{new_threshold:,}). "
-        f"Your next message will run preflight compression before the model replies."
+        f"Your next message will run preflight compression before the model replies.",
     )
     _append_warning(result, "".join(parts))
 

@@ -52,7 +52,8 @@ class TestMentionStrippedCommandDispatch:
 
     async def test_text_before_command_not_detected(self, discord_adapter, bot_user):
         """'<@BOT> something else /help' → mention stripped, but 'something else /help'
-        doesn't start with / so it's treated as text, not a command."""
+        doesn't start with / so it's treated as text, not a command.
+        """
         msg = make_discord_message(
             content=f"<@{BOT_USER_ID}> something else /help",
             mentions=[bot_user],
@@ -109,7 +110,7 @@ class TestAutoThreadingPreservesCommand:
 
 class TestRepliedToMediaDispatch:
     async def test_reply_to_image_message_caches_referenced_attachment(
-        self, discord_adapter, bot_user, monkeypatch
+        self, discord_adapter, bot_user, monkeypatch,
     ):
         """A text reply to an image-bearing Discord message should give the agent that image."""
         cached_path = "/tmp/replied-discord-image.png"

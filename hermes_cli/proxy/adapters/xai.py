@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import FrozenSet, Optional
 
 from agent.credential_pool import CredentialPool, PooledCredential, load_pool
 from hermes_cli.auth import DEFAULT_XAI_OAUTH_BASE_URL
@@ -17,14 +16,14 @@ _POOL_PROVIDER = "xai-oauth"
 # xAI's public API is OpenAI-compatible for the endpoints Hermes commonly
 # uses. The Responses endpoint is included because Hermes' native xAI runtime
 # uses codex_responses mode.
-_ALLOWED_PATHS: FrozenSet[str] = frozenset(
+_ALLOWED_PATHS: frozenset[str] = frozenset(
     {
         "/responses",
         "/chat/completions",
         "/completions",
         "/embeddings",
         "/models",
-    }
+    },
 )
 
 
@@ -35,7 +34,7 @@ class XAIGrokAdapter(UpstreamAdapter):
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._pool: Optional[CredentialPool] = None
+        self._pool: CredentialPool | None = None
 
     @property
     def name(self) -> str:
@@ -46,7 +45,7 @@ class XAIGrokAdapter(UpstreamAdapter):
         return "xAI Grok OAuth"
 
     @property
-    def allowed_paths(self) -> FrozenSet[str]:
+    def allowed_paths(self) -> frozenset[str]:
         return _ALLOWED_PATHS
 
     def is_authenticated(self) -> bool:
@@ -59,7 +58,7 @@ class XAIGrokAdapter(UpstreamAdapter):
             if pool is None or not pool.has_credentials():
                 raise RuntimeError(
                     "No xAI OAuth credentials found. Run "
-                    "`hermes auth add xai-oauth --type oauth` first."
+                    "`hermes auth add xai-oauth --type oauth` first.",
                 )
 
             entry = pool.select()
@@ -67,7 +66,7 @@ class XAIGrokAdapter(UpstreamAdapter):
                 raise RuntimeError(
                     "No available xAI OAuth credentials found. Run "
                     "`hermes auth reset xai-oauth` or re-authenticate with "
-                    "`hermes auth add xai-oauth --type oauth`."
+                    "`hermes auth add xai-oauth --type oauth`.",
                 )
 
             self._pool = pool
@@ -78,7 +77,7 @@ class XAIGrokAdapter(UpstreamAdapter):
         *,
         failed_credential: UpstreamCredential,
         status_code: int,
-    ) -> Optional[UpstreamCredential]:
+    ) -> UpstreamCredential | None:
         if status_code not in {401, 429}:
             return None
 
@@ -108,7 +107,7 @@ class XAIGrokAdapter(UpstreamAdapter):
             )
             return retry_cred
 
-    def _load_pool(self) -> Optional[CredentialPool]:
+    def _load_pool(self) -> CredentialPool | None:
         try:
             return load_pool(_POOL_PROVIDER)
         except Exception as exc:
@@ -125,7 +124,7 @@ class XAIGrokAdapter(UpstreamAdapter):
         if not bearer:
             raise RuntimeError(
                 "xAI OAuth credential pool entry did not contain an access token. "
-                "Re-authenticate with `hermes auth add xai-oauth --type oauth`."
+                "Re-authenticate with `hermes auth add xai-oauth --type oauth`.",
             )
 
         base_url = (

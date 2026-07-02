@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import shutil
 import sys
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 from hermes_cli.config import (
     check_config_version,
@@ -29,7 +29,7 @@ def _backup_path(path: Path, stamp: str) -> Path:
 
 
 def _backup_existing(paths: Iterable[Path]) -> list[Path]:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     backups: list[Path] = []
     for path in paths:
         if not path.is_file():
@@ -53,7 +53,7 @@ def main() -> int:
     backup_text = ", ".join(str(path) for path in backups) if backups else "none"
     print(
         f"[config-migrate] Migrating config schema {current_ver} -> {latest_ver}; "
-        f"backups: {backup_text}"
+        f"backups: {backup_text}",
     )
     migrate_config(interactive=False, quiet=False)
     return 0

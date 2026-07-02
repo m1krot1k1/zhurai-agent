@@ -1,5 +1,4 @@
-"""
-Integration test: verify _finalize_session persists messages on force-quit.
+"""Integration test: verify _finalize_session persists messages on force-quit.
 
 Tests the fix for TUI sessions losing conversation history when the
 user interrupts and exits before the agent thread finishes flushing.
@@ -12,10 +11,7 @@ Scenarios:
 """
 
 import threading
-import time
-from unittest.mock import MagicMock, PropertyMock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Helpers

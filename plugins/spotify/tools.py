@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 
 from hermes_cli.auth import get_auth_status
 from plugins.spotify.client import (
@@ -56,7 +56,7 @@ def _coerce_bool(raw: Any, default: bool = False) -> bool:
     return default
 
 
-def _as_list(raw: Any) -> List[str]:
+def _as_list(raw: Any) -> list[str]:
     if raw is None:
         return []
     if isinstance(raw, list):

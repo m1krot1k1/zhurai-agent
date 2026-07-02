@@ -9,10 +9,10 @@ import pytest
 
 from gateway.config import PlatformConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(**extra):
     """Build a PlatformConfig(enabled=True, extra=extra) for testing."""
@@ -168,7 +168,7 @@ class TestVoiceAttachmentSSRFProtection:
                     "http://127.0.0.1/voice.silk",
                     "audio/silk",
                     "voice.silk",
-                )
+                ),
             )
 
         assert transcript is None
@@ -237,6 +237,7 @@ class TestQQWebSocketProxy:
 # ---------------------------------------------------------------------------
 # _strip_at_mention
 # ---------------------------------------------------------------------------
+
 
 class TestStripAtMention:
     def _fn(self, content):
@@ -503,7 +504,7 @@ class TestParseJson:
         assert result is None
 
     def test_empty_dict(self):
-        result = self._fn('{}')
+        result = self._fn("{}")
         assert result == {}
 
 
@@ -701,7 +702,8 @@ class TestChunkedUploadHelpers:
     def test_compute_hashes_large_file_has_distinct_md5_10m(self, tmp_path):
         # File > 10,002,432 bytes → md5_10m is truncated, so it differs from full md5.
         from gateway.platforms.qqbot.chunked_upload import (
-            _compute_file_hashes, _MD5_10M_SIZE,
+            _MD5_10M_SIZE,
+            _compute_file_hashes,
         )
         f = tmp_path / "big.bin"
         size = _MD5_10M_SIZE + 1024
@@ -722,7 +724,7 @@ class TestChunkedUploadHelpers:
                 ],
                 "concurrency": 3,
                 "retry_timeout": 90,
-            }
+            },
         }
         r = _parse_prepare_response(raw)
         assert r.upload_id == "uid-42"
@@ -860,7 +862,8 @@ class TestChunkedUploaderFlow:
     @pytest.mark.asyncio
     async def test_daily_limit_raises_structured_error(self, tmp_path):
         from gateway.platforms.qqbot.chunked_upload import (
-            ChunkedUploader, UploadDailyLimitExceededError,
+            ChunkedUploader,
+            UploadDailyLimitExceededError,
         )
 
         f = tmp_path / "a.bin"
@@ -887,8 +890,8 @@ class TestChunkedUploaderFlow:
     @pytest.mark.asyncio
     async def test_part_finish_retries_on_40093001_then_succeeds(self, tmp_path):
         """biz_code 40093001 is retryable — finish-with-retry must keep trying."""
-        from gateway.platforms.qqbot.chunked_upload import ChunkedUploader
         import gateway.platforms.qqbot.chunked_upload as cu
+        from gateway.platforms.qqbot.chunked_upload import ChunkedUploader
 
         # Make the retry loop fast so the test doesn't take real seconds.
         orig_interval = cu._PART_FINISH_RETRY_INTERVAL
@@ -1066,7 +1069,8 @@ class TestBuildApprovalKeyboard:
     def test_round_trip_parse_matches_build(self):
         """Every button built by build_approval_keyboard is parseable."""
         from gateway.platforms.qqbot.keyboards import (
-            build_approval_keyboard, parse_approval_button_data,
+            build_approval_keyboard,
+            parse_approval_button_data,
         )
         session_key = "agent:main:qqbot:c2c:UID123"
         kb = build_approval_keyboard(session_key)
@@ -1093,7 +1097,8 @@ class TestBuildUpdatePromptKeyboard:
 class TestBuildApprovalText:
     def test_exec_approval_includes_command_preview(self):
         from gateway.platforms.qqbot.keyboards import (
-            ApprovalRequest, build_approval_text,
+            ApprovalRequest,
+            build_approval_text,
         )
         req = ApprovalRequest(
             session_key="s",
@@ -1110,7 +1115,8 @@ class TestBuildApprovalText:
 
     def test_plugin_approval_uses_severity_icon(self):
         from gateway.platforms.qqbot.keyboards import (
-            ApprovalRequest, build_approval_text,
+            ApprovalRequest,
+            build_approval_text,
         )
         crit = ApprovalRequest(
             session_key="s", title="dangerous op",
@@ -1128,7 +1134,8 @@ class TestBuildApprovalText:
 
     def test_truncates_long_commands(self):
         from gateway.platforms.qqbot.keyboards import (
-            ApprovalRequest, build_approval_text,
+            ApprovalRequest,
+            build_approval_text,
         )
         long = "x" * 1000
         req = ApprovalRequest(
@@ -1335,6 +1342,7 @@ class TestProcessQuotedContext:
     async def test_quote_with_text_only(self):
         adapter = self._make_adapter()
         # Stub out _process_attachments since there are no attachments anyway.
+
         async def fake_process(_a):
             return {"image_urls": [], "image_media_types": [],
                     "voice_transcripts": [], "attachment_info": ""}
@@ -1376,7 +1384,7 @@ class TestProcessQuotedContext:
                 "attachments": [
                     {"content_type": "audio/silk",
                      "url": "https://qq-cdn/x.silk",
-                     "filename": "rec.silk"}
+                     "filename": "rec.silk"},
                 ],
             }],
         }
@@ -1503,7 +1511,7 @@ class TestProcessQuotedContext:
     async def test_invalid_message_type_string_returns_empty(self):
         adapter = self._make_adapter()
         out = await adapter._process_quoted_context(
-            {"message_type": "not-a-number", "msg_elements": [{"content": "x"}]}
+            {"message_type": "not-a-number", "msg_elements": [{"content": "x"}]},
         )
         assert out["quote_block"] == ""
 
@@ -1623,7 +1631,6 @@ class TestDefaultInteractionDispatch:
             tools.approval.resolve_gateway_approval = orig
 
         assert resolve_calls == [("agent:main:qqbot:c2c:u", "deny", False)]
-
 
     @pytest.mark.asyncio
     async def test_approval_click_rejects_unauthorized_operator(self):
@@ -1903,7 +1910,7 @@ class TestProcessAttachmentsPathExposure:
                 "content_type": "video/mp4",
                 "url": "https://multimedia.nt.qq.com.cn/download/video123",
                 "filename": "my_video.mp4",
-            }
+            },
         ]
         result = await adapter._process_attachments(attachments)
 
@@ -1928,7 +1935,7 @@ class TestProcessAttachmentsPathExposure:
                 "content_type": "application/pdf",
                 "url": "https://multimedia.nt.qq.com.cn/download/file456",
                 "filename": "report.pdf",
-            }
+            },
         ]
         result = await adapter._process_attachments(attachments)
 
@@ -1951,7 +1958,7 @@ class TestProcessAttachmentsPathExposure:
                 "content_type": "video/mp4",
                 "url": "https://cdn.qq.com/vid",
                 "filename": "",
-            }
+            },
         ]
         result = await adapter._process_attachments(attachments)
 
@@ -1973,7 +1980,7 @@ class TestProcessAttachmentsPathExposure:
                 "content_type": "video/mp4",
                 "url": "https://cdn.qq.com/vid",
                 "filename": "vid.mp4",
-            }
+            },
         ]
         result = await adapter._process_attachments(attachments)
         assert result["attachment_info"] == ""
@@ -2001,7 +2008,7 @@ class TestProcessAttachmentsPathExposure:
                 "attachments": [
                     {"content_type": "video/mp4",
                      "url": "https://qq-cdn/clip.mp4",
-                     "filename": "clip.mp4"}
+                     "filename": "clip.mp4"},
                 ],
             }],
         }
@@ -2031,7 +2038,7 @@ class TestProcessAttachmentsPathExposure:
                 "attachments": [
                     {"content_type": "application/pdf",
                      "url": "https://qq-cdn/report.pdf",
-                     "filename": "report.pdf"}
+                     "filename": "report.pdf"},
                 ],
             }],
         }
@@ -2201,7 +2208,8 @@ class TestCloseCodeClassification:
 class TestReadEventsClosedWsGuard:
     """Regression: a closed-but-non-None ws must raise on entry, not return
     normally, so _listen_loop goes through reconnect/backoff instead of
-    busy-looping at 100% CPU (issues #31193 / #31771)."""
+    busy-looping at 100% CPU (issues #31193 / #31771).
+    """
 
     def _make_adapter(self, **extra):
         from gateway.platforms.qqbot import QQAdapter

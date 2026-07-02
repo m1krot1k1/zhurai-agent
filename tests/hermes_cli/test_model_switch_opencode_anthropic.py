@@ -21,7 +21,6 @@ import pytest
 
 from hermes_cli.model_switch import switch_model
 
-
 _MOCK_VALIDATION = {
     "accepted": True,
     "persist": True,
@@ -235,7 +234,7 @@ class TestAgentSwitchModelDefenseInDepth:
             "agent.anthropic_adapter.build_anthropic_client",
             side_effect=_raise_after_capture,
         ), patch("agent.anthropic_adapter.resolve_anthropic_token", return_value=""), patch(
-            "agent.anthropic_adapter._is_oauth_token", return_value=False
+            "agent.anthropic_adapter._is_oauth_token", return_value=False,
         ):
             with pytest.raises(_Sentinel):
                 agent.switch_model(
@@ -250,7 +249,6 @@ class TestAgentSwitchModelDefenseInDepth:
             f"agent.switch_model did not strip /v1; passed {captured.get('base_url')} "
             "to build_anthropic_client"
         )
-
 
 
 class TestStaleConfigDefaultDoesNotWedgeResolver:
@@ -271,8 +269,9 @@ class TestStaleConfigDefaultDoesNotWedgeResolver:
     """
 
     def test_kimi_switch_keeps_v1_despite_claude_config_default(self, tmp_path, monkeypatch):
-        import yaml
         import importlib
+
+        import yaml
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "test-key")
@@ -307,8 +306,9 @@ class TestStaleConfigDefaultDoesNotWedgeResolver:
         assert result.api_mode == "chat_completions"
 
     def test_go_glm_switch_keeps_v1_despite_minimax_config_default(self, tmp_path, monkeypatch):
-        import yaml
         import importlib
+
+        import yaml
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         monkeypatch.setenv("OPENCODE_GO_API_KEY", "test-key")
@@ -344,8 +344,9 @@ class TestStaleConfigDefaultDoesNotWedgeResolver:
         Guards that the target_model plumbing does not break the original
         strip-for-anthropic behavior.
         """
-        import yaml
         import importlib
+
+        import yaml
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         monkeypatch.setenv("OPENCODE_ZEN_API_KEY", "test-key")

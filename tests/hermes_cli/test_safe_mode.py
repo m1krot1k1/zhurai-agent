@@ -16,7 +16,6 @@ import os
 
 import pytest
 
-
 _VARS = ("HERMES_SAFE_MODE", "HERMES_IGNORE_USER_CONFIG", "HERMES_IGNORE_RULES")
 
 
@@ -58,7 +57,7 @@ class TestSafeModePluginDiscovery:
         mgr = PluginManager()
         called = []
         monkeypatch.setattr(
-            mgr, "_discover_and_load_inner", lambda: called.append(True)
+            mgr, "_discover_and_load_inner", lambda: called.append(True),
         )
         mgr.discover_and_load()
         assert called == []          # inner sweep never ran
@@ -72,7 +71,7 @@ class TestSafeModePluginDiscovery:
         mgr = PluginManager()
         called = []
         monkeypatch.setattr(
-            mgr, "_discover_and_load_inner", lambda: called.append(True)
+            mgr, "_discover_and_load_inner", lambda: called.append(True),
         )
         mgr.discover_and_load()
         assert called == [True]

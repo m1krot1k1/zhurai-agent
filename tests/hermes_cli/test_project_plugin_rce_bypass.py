@@ -45,7 +45,8 @@ def _reset_plugin_cache(monkeypatch):
     """The plugin scanner caches its result per-process.  Bust the
     cache before *and* after each test so leakage between tests can't
     mask a regression — and so the production cache the import-time
-    ``_mount_plugin_api_routes()`` populated doesn't bleed in."""
+    ``_mount_plugin_api_routes()`` populated doesn't bleed in.
+    """
     web_server._dashboard_plugins_cache = None
     yield
     web_server._dashboard_plugins_cache = None
@@ -53,7 +54,8 @@ def _reset_plugin_cache(monkeypatch):
 
 def _write_plugin_manifest(root: Path, name: str, manifest: dict) -> Path:
     """Drop a manifest under ``root/<name>/dashboard/manifest.json`` and
-    return the dashboard dir path."""
+    return the dashboard dir path.
+    """
     dashboard_dir = root / name / "dashboard"
     dashboard_dir.mkdir(parents=True)
     (dashboard_dir / "manifest.json").write_text(json.dumps(manifest))
@@ -68,12 +70,14 @@ def _write_plugin_manifest(root: Path, name: str, manifest: dict) -> Path:
 class TestProjectPluginsEnvGate:
     """Project plugins must only be discovered when the env var is set
     to a documented truthy value.  Pre-#29156 any non-empty string —
-    including ``0`` / ``false`` / ``no`` — silently enabled the source."""
+    including ``0`` / ``false`` / ``no`` — silently enabled the source.
+    """
 
     @pytest.fixture
     def project_plugin(self, tmp_path, monkeypatch):
         """Plant a project-source plugin under CWD's ``.hermes/plugins``
-        and isolate the user-plugins dir to an empty tmp tree."""
+        and isolate the user-plugins dir to an empty tmp tree.
+        """
         monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
         (tmp_path / "home").mkdir()
         cwd = tmp_path / "evil-repo"
@@ -92,7 +96,7 @@ class TestProjectPluginsEnvGate:
 
     @pytest.mark.parametrize("value", ["", "0", "false", "FALSE", "no", "off", "False"])
     def test_falsy_values_keep_project_plugins_disabled(
-        self, project_plugin, monkeypatch, value
+        self, project_plugin, monkeypatch, value,
     ):
         if value == "":
             monkeypatch.delenv("HERMES_ENABLE_PROJECT_PLUGINS", raising=False)
@@ -108,7 +112,7 @@ class TestProjectPluginsEnvGate:
 
     @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on", "YES"])
     def test_truthy_values_enable_project_plugins(
-        self, project_plugin, monkeypatch, value
+        self, project_plugin, monkeypatch, value,
     ):
         monkeypatch.setenv("HERMES_ENABLE_PROJECT_PLUGINS", value)
         plugins = web_server._get_dashboard_plugins(force_rescan=True)
@@ -125,7 +129,8 @@ class TestProjectPluginsEnvGate:
 class TestApiPathSanitizer:
     """Unit-level coverage for the new ``_safe_plugin_api_relpath``
     helper.  Anything that escapes the plugin's dashboard directory
-    must come back as ``None``."""
+    must come back as ``None``.
+    """
 
     def _dashboard_dir(self, tmp_path):
         d = tmp_path / "plug" / "dashboard"
@@ -142,7 +147,7 @@ class TestApiPathSanitizer:
         (d / "backend").mkdir()
         (d / "backend" / "routes.py").write_text("router = None\n")
         out = web_server._safe_plugin_api_relpath(
-            "backend/routes.py", dashboard_dir=d
+            "backend/routes.py", dashboard_dir=d,
         )
         assert out == "backend/routes.py"
 
@@ -180,7 +185,8 @@ class TestApiPathSanitizer:
 class TestDiscoveryScrubsApiField:
     """The cached plugin entry must NEVER carry an unsanitised api path.
     A regression here would re-arm the RCE for any caller that uses
-    ``plugin['_api_file']`` directly."""
+    ``plugin['_api_file']`` directly.
+    """
 
     @pytest.fixture
     def user_plugin_factory(self, tmp_path, monkeypatch):
@@ -226,7 +232,7 @@ class TestDiscoveryScrubsApiField:
         # Make the api file actually exist so a downstream mount could
         # in principle proceed — we're only testing the discovery scrub.
         (tmp_path / "plugins" / "safe" / "dashboard" / "api.py").write_text(
-            "router = None\n"
+            "router = None\n",
         )
         plugins = web_server._get_dashboard_plugins(force_rescan=True)
         entry = next(p for p in plugins if p["name"] == "safe")
@@ -322,7 +328,8 @@ class TestDiscoveryScrubsApiField:
 class TestMountApiRoutesRefusesUntrusted:
     """The mount routine is the actual ``importlib`` call site — these
     tests poke synthetic plugin entries directly into the cache and
-    assert the importer is *not* invoked."""
+    assert the importer is *not* invoked.
+    """
 
     def _payload_plugin(self, tmp_path, *, source: str, api_file: str = "api.py"):
         dash = tmp_path / "plug" / "dashboard"
@@ -331,7 +338,7 @@ class TestMountApiRoutesRefusesUntrusted:
         # regardless of whether it exists, since the source/path checks
         # short-circuit before the importer runs.
         (dash / "api.py").write_text(
-            "from fastapi import APIRouter\nrouter = APIRouter()\n"
+            "from fastapi import APIRouter\nrouter = APIRouter()\n",
         )
         return {
             "name": "synthetic",
@@ -381,7 +388,8 @@ class TestMountApiRoutesRefusesUntrusted:
     def test_traversal_api_caught_at_mount_time(self, tmp_path):
         """Defence-in-depth: if discovery is bypassed (e.g. cache
         tampering), mount-time validation still refuses to import a
-        file outside the dashboard dir."""
+        file outside the dashboard dir.
+        """
         plugin = self._payload_plugin(tmp_path, source="user",
                                        api_file="../../../tmp/evil.py")
         web_server._dashboard_plugins_cache = [plugin]
@@ -402,7 +410,8 @@ class TestEndToEndPocBlocked:
     project source was disabled).  Post-fix, the importer must never
     be invoked for the payload path, regardless of how the bypass is
     framed (``=0`` truthy-string bypass, absolute path bypass,
-    project-source bypass)."""
+    project-source bypass).
+    """
 
     def test_full_chain_blocked(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))

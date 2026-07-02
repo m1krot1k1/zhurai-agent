@@ -6,18 +6,18 @@ PATH, shadowing an existing nvm. Uninstall must remove those symlinks, but
 only when they still resolve into the Hermes-managed node dir.
 """
 
-import os
 from pathlib import Path
 
 import pytest
 
-import hermes_cli.uninstall as uninstall
+from hermes_cli import uninstall
 
 
 @pytest.fixture
 def fake_home(tmp_path, monkeypatch):
     """Redirect Path.home() at the home both the installer-symlink target and
-    the ~/.local/bin links live under the same temp dir."""
+    the ~/.local/bin links live under the same temp dir.
+    """
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
@@ -97,7 +97,8 @@ def test_handles_missing_local_bin(fake_home):
 
 def test_removes_dangling_symlink_into_hermes_node(fake_home):
     """A link into the Hermes node dir is removed even if the target file is
-    already gone (dangling) \u2014 the link still shadows PATH."""
+    already gone (dangling) \u2014 the link still shadows PATH.
+    """
     hermes_home = fake_home / ".hermes"
     node_bin = hermes_home / "node" / "bin"
     node_bin.mkdir(parents=True)
@@ -156,7 +157,7 @@ def test_removes_fhs_symlinks_in_usr_local_bin(fake_home, tmp_path, monkeypatch)
 
     # Return only our fake FHS dir as a candidate.
     monkeypatch.setattr(
-        uninstall, "_node_symlink_candidate_dirs", lambda: [fhs_bin]
+        uninstall, "_node_symlink_candidate_dirs", lambda: [fhs_bin],
     )
 
     removed = uninstall.remove_node_symlinks(hermes_home)

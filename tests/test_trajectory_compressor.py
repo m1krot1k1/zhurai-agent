@@ -4,15 +4,15 @@ import importlib
 import os
 import sys
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from trajectory_compressor import (
-    CompressionConfig,
-    TrajectoryMetrics,
     AggregateMetrics,
+    CompressionConfig,
     TrajectoryCompressor,
+    TrajectoryMetrics,
 )
 
 
@@ -44,7 +44,7 @@ def test_generate_summary_kimi_omits_temperature():
     compressor._use_call_llm = False
     compressor.client = MagicMock()
     compressor.client.chat.completions.create.return_value = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))],
     )
 
     metrics = TrajectoryMetrics()
@@ -69,7 +69,7 @@ def test_generate_summary_public_moonshot_kimi_k2_5_omits_temperature():
     compressor._use_call_llm = False
     compressor.client = MagicMock()
     compressor.client.chat.completions.create.return_value = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))],
     )
 
     metrics = TrajectoryMetrics()
@@ -94,7 +94,7 @@ def test_generate_summary_public_moonshot_cn_kimi_k2_5_omits_temperature():
     compressor._use_call_llm = False
     compressor.client = MagicMock()
     compressor.client.chat.completions.create.return_value = SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))]
+        choices=[SimpleNamespace(message=SimpleNamespace(content="[CONTEXT SUMMARY]: summary"))],
     )
 
     metrics = TrajectoryMetrics()
@@ -300,8 +300,8 @@ def _make_compressor(config=None):
     """Create a TrajectoryCompressor with mocked tokenizer and summarizer."""
     if config is None:
         config = CompressionConfig()
-    with patch.object(TrajectoryCompressor, '_init_tokenizer'), \
-         patch.object(TrajectoryCompressor, '_init_summarizer'):
+    with patch.object(TrajectoryCompressor, "_init_tokenizer"), \
+         patch.object(TrajectoryCompressor, "_init_summarizer"):
         compressor = TrajectoryCompressor(config)
     # Provide a simple token counter for tests (1 token per 4 chars)
     compressor.tokenizer = MagicMock()
@@ -459,7 +459,7 @@ class TestTokenCounting:
         tc = _make_compressor()
         trajectory = [
             {"from": "system", "value": "12345678"},   # 2 tokens
-            {"from": "human", "value": "1234567890ab"}, # 3 tokens
+            {"from": "human", "value": "1234567890ab"},  # 3 tokens
         ]
         assert tc.count_trajectory_tokens(trajectory) == 5
 
@@ -484,7 +484,7 @@ class TestGenerateSummary:
         tc = _make_compressor()
         tc.client = MagicMock()
         tc.client.chat.completions.create.return_value = SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
+            choices=[SimpleNamespace(message=SimpleNamespace(content=None))],
         )
         metrics = TrajectoryMetrics()
 
@@ -498,8 +498,8 @@ class TestGenerateSummary:
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(
             return_value=SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
-            )
+                choices=[SimpleNamespace(message=SimpleNamespace(content=None))],
+            ),
         )
         tc._get_async_client = MagicMock(return_value=mock_client)
         metrics = TrajectoryMetrics()
@@ -516,14 +516,14 @@ class TestGenerateSummary:
 
 def _gpt_with_tool_call(label, tokens):
     """A 'gpt' turn carrying a <tool_call> marker, padded to ~`tokens` tokens."""
-    body = f"<tool_call>\n{{\"name\": \"{label}\"}}\n</tool_call>"
+    body = f'<tool_call>\n{{"name": "{label}"}}\n</tool_call>'
     pad = max(0, tokens * 4 - len(body))
     return {"from": "gpt", "value": body + "x" * pad}
 
 
 def _tool_response(label, tokens):
     """A 'tool' turn carrying a <tool_response> marker, padded to ~`tokens` tokens."""
-    body = f"<tool_response>\n{{\"name\": \"{label}\"}}\n</tool_response>"
+    body = f'<tool_response>\n{{"name": "{label}"}}\n</tool_response>'
     pad = max(0, tokens * 4 - len(body))
     return {"from": "tool", "value": body + "x" * pad}
 
@@ -574,7 +574,7 @@ class TestCompressionToolPairIntegrity:
     def test_sync_compression_does_not_orphan_tool_markers(self):
         tc = _make_compressor(self._config())
         tc._generate_summary = MagicMock(
-            return_value="[CONTEXT SUMMARY]: middle turns summarized."
+            return_value="[CONTEXT SUMMARY]: middle turns summarized.",
         )
         trajectory = _paired_trajectory()
         tc.config.target_max_tokens = _target_that_splits_after_index_4(tc, trajectory)
@@ -584,7 +584,7 @@ class TestCompressionToolPairIntegrity:
         assert metrics.was_compressed
         # Every <tool_call> must keep its matching <tool_response>.
         assert _count_marker(compressed, "<tool_call>") == _count_marker(
-            compressed, "<tool_response>"
+            compressed, "<tool_response>",
         )
         # A kept 'tool' turn must always immediately follow its 'gpt' turn —
         # never the inserted summary (a 'human' turn) or another 'tool' turn.
@@ -596,7 +596,7 @@ class TestCompressionToolPairIntegrity:
     async def test_async_compression_does_not_orphan_tool_markers(self):
         tc = _make_compressor(self._config())
         tc._generate_summary_async = AsyncMock(
-            return_value="[CONTEXT SUMMARY]: middle turns summarized."
+            return_value="[CONTEXT SUMMARY]: middle turns summarized.",
         )
         trajectory = _paired_trajectory()
         tc.config.target_max_tokens = _target_that_splits_after_index_4(tc, trajectory)
@@ -605,7 +605,7 @@ class TestCompressionToolPairIntegrity:
 
         assert metrics.was_compressed
         assert _count_marker(compressed, "<tool_call>") == _count_marker(
-            compressed, "<tool_response>"
+            compressed, "<tool_response>",
         )
         for i, turn in enumerate(compressed):
             if turn.get("from") == "tool":

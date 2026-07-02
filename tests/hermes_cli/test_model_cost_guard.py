@@ -63,8 +63,8 @@ def test_openai_gpt55_pro_adds_suggestion(monkeypatch):
     monkeypatch.setattr(
         "agent.usage_pricing.get_pricing_entry",
         lambda *_args, **_kwargs: PricingEntry(
-            input_cost_per_million=Decimal("25"),
-            output_cost_per_million=Decimal("125"),
+            input_cost_per_million=Decimal(25),
+            output_cost_per_million=Decimal(125),
             source="provider_models_api",
         ),
     )
@@ -84,8 +84,8 @@ def test_openai_gpt55_pro_warns_for_nous_portal_pricing(monkeypatch):
                 "pricing": {
                     "prompt": "0.000025",
                     "completion": "0.000125",
-                }
-            }
+                },
+            },
         },
     )
 

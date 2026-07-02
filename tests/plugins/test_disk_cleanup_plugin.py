@@ -15,6 +15,7 @@ Covers the bundled plugin at ``plugins/disk-cleanup/``:
 import importlib
 import json
 import sys
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,7 @@ def _isolate_env(tmp_path, monkeypatch):
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    yield hermes_home
+    return hermes_home
 
 
 def _load_lib():
@@ -39,7 +40,7 @@ def _load_lib():
     repo_root = Path(__file__).resolve().parents[2]
     lib_path = repo_root / "plugins" / "disk-cleanup" / "disk_cleanup.py"
     spec = importlib.util.spec_from_file_location(
-        "disk_cleanup_under_test", lib_path
+        "disk_cleanup_under_test", lib_path,
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -230,7 +231,8 @@ class TestStaleCronEntryMigration:
 
     def test_quick_skips_protected_cron_paths_defense_in_depth(self, _isolate_env):
         """Defense-in-depth: even if guess_category returned cron-output
-        (hypothetically), protected cron paths are never deleted."""
+        (hypothetically), protected cron paths are never deleted.
+        """
         dg = _load_lib()
         cron_dir = _isolate_env / "cron"
         cron_dir.mkdir()
@@ -282,8 +284,8 @@ class TestStaleCronEntryMigration:
         run_md.write_text("x")
 
         # Old enough to be deleted (>14 days)
-        from datetime import datetime, timezone, timedelta
-        old_ts = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        from datetime import datetime, timedelta
+        old_ts = (datetime.now(UTC) - timedelta(days=20)).isoformat()
 
         tracked_file = _isolate_env / "disk-cleanup" / "tracked.json"
         tracked_file.parent.mkdir(parents=True, exist_ok=True)
@@ -353,7 +355,7 @@ class TestTrackForgetQuick:
             assert (_isolate_env / d).exists(), f"{d}/ should be preserved"
 
     def test_quick_does_not_descend_into_protected_top_level_dirs(
-        self, _isolate_env, monkeypatch
+        self, _isolate_env, monkeypatch,
     ):
         dg = _load_lib()
         protected_empty = (
@@ -518,7 +520,7 @@ class TestSlashCommand:
     def test_track_rejects_missing(self, _isolate_env):
         pi = _load_plugin_init()
         out = pi._handle_slash(
-            f"track {_isolate_env / 'nope.txt'} temp"
+            f"track {_isolate_env / 'nope.txt'} temp",
         )
         assert "Not tracked" in out
 
@@ -593,7 +595,7 @@ class TestBundledDiscovery:
             "plugins": {
                 "enabled": ["disk-cleanup"],
                 "disabled": ["disk-cleanup"],
-            }
+            },
         }))
         from hermes_cli import plugins as pmod
         mgr = pmod.PluginManager()
@@ -604,9 +606,10 @@ class TestBundledDiscovery:
 
     def test_memory_and_context_engine_subdirs_skipped(self, _isolate_env):
         """Bundled scan must NOT pick up plugins/memory or plugins/context_engine
-        as top-level plugins — they have their own discovery paths."""
+        as top-level plugins — they have their own discovery paths.
+        """
         self._write_enabled_config(
-            _isolate_env, ["memory", "context_engine", "disk-cleanup"]
+            _isolate_env, ["memory", "context_engine", "disk-cleanup"],
         )
         from hermes_cli import plugins as pmod
         mgr = pmod.PluginManager()

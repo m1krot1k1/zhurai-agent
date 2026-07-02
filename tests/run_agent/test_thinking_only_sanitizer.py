@@ -13,7 +13,6 @@ backstory on why the alternative — fabricating "." stub text — was rejected.
 
 from run_agent import AIAgent
 
-
 # ---------------------------------------------------------------------------
 # _is_thinking_only_assistant — detection
 # ---------------------------------------------------------------------------
@@ -109,7 +108,7 @@ class TestIsThinkingOnlyAssistant:
             "role": "assistant",
             "content": "",
             "codex_reasoning_items": [
-                {"type": "reasoning", "id": "rs_123", "encrypted_content": "enc_blob"}
+                {"type": "reasoning", "id": "rs_123", "encrypted_content": "enc_blob"},
             ],
         }
         assert AIAgent._is_thinking_only_assistant(msg)
@@ -119,7 +118,7 @@ class TestIsThinkingOnlyAssistant:
             "role": "assistant",
             "content": "Visible answer",
             "codex_reasoning_items": [
-                {"type": "reasoning", "id": "rs_123", "encrypted_content": "enc_blob"}
+                {"type": "reasoning", "id": "rs_123", "encrypted_content": "enc_blob"},
             ],
         }
         assert not AIAgent._is_thinking_only_assistant(msg)
@@ -141,7 +140,7 @@ class TestIsThinkingOnlyAssistant:
 
     def test_tool_message_never_thinking_only(self):
         assert not AIAgent._is_thinking_only_assistant(
-            {"role": "tool", "content": "", "tool_call_id": "x"}
+            {"role": "tool", "content": "", "tool_call_id": "x"},
         )
 
     def test_non_dict_returns_false(self):

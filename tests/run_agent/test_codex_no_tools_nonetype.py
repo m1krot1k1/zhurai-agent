@@ -29,10 +29,9 @@ from __future__ import annotations
 
 import sys
 import types
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
-
 
 # Stub optional deps the parent module imports at top level — keeps this
 # test file runnable in the same environment as the existing Codex tests.
@@ -49,23 +48,25 @@ sys.modules.setdefault("fal_client", types.SimpleNamespace())
 @pytest.fixture
 def transport():
     """Fresh ``ResponsesApiTransport`` per test (it is stateless but
-    the import has side-effects on a global transport registry)."""
+    the import has side-effects on a global transport registry).
+    """
     from agent.transports.codex import ResponsesApiTransport
 
     return ResponsesApiTransport()
 
 
 @pytest.fixture
-def codex_messages() -> List[Dict[str, Any]]:
+def codex_messages() -> list[dict[str, Any]]:
     """Minimal Codex-shaped chat history mirroring the #32892 reproducer:
-    one system + one short user message, with no tool calls in history."""
+    one system + one short user message, with no tool calls in history.
+    """
     return [
         {"role": "system", "content": "You are Hermes."},
         {"role": "user", "content": "Hey! What can I help you with?"},
     ]
 
 
-def _build_kwargs_no_tools(transport, messages) -> Dict[str, Any]:
+def _build_kwargs_no_tools(transport, messages) -> dict[str, Any]:
     """Exercise the real ``build_kwargs`` for the codex backend with no tools."""
     return transport.build_kwargs(
         model="gpt-5.5",
@@ -97,7 +98,8 @@ def test_build_kwargs_omits_tools_key_when_no_tools(transport, codex_messages):
 
 def test_build_kwargs_omits_tool_choice_and_parallel_when_no_tools(transport, codex_messages):
     """``tool_choice`` / ``parallel_tool_calls`` are meaningless without
-    tools — and some backends 400 on them.  Confirm we never set them."""
+    tools — and some backends 400 on them.  Confirm we never set them.
+    """
     kwargs = _build_kwargs_no_tools(transport, codex_messages)
 
     assert "tool_choice" not in kwargs
@@ -107,7 +109,8 @@ def test_build_kwargs_omits_tool_choice_and_parallel_when_no_tools(transport, co
 def test_build_kwargs_keeps_required_codex_fields_without_tools(transport, codex_messages):
     """The toolless build must still emit the non-negotiable Codex fields
     (model / instructions / input / store) — otherwise we'd just be moving
-    the bug from the SDK to preflight."""
+    the bug from the SDK to preflight.
+    """
     kwargs = _build_kwargs_no_tools(transport, codex_messages)
 
     assert kwargs["model"] == "gpt-5.5"
@@ -120,7 +123,8 @@ def test_build_kwargs_keeps_required_codex_fields_without_tools(transport, codex
 def test_build_kwargs_emits_tools_when_tools_present(transport, codex_messages):
     """Sanity check the inverse: when tools ARE provided, they MUST appear
     in the outgoing kwargs along with the related ``tool_choice`` /
-    ``parallel_tool_calls`` switches."""
+    ``parallel_tool_calls`` switches.
+    """
     tools = [
         {
             "type": "function",
@@ -129,7 +133,7 @@ def test_build_kwargs_emits_tools_when_tools_present(transport, codex_messages):
                 "description": "Run a shell command.",
                 "parameters": {"type": "object", "properties": {}},
             },
-        }
+        },
     ]
 
     kwargs = transport.build_kwargs(
@@ -139,7 +143,7 @@ def test_build_kwargs_emits_tools_when_tools_present(transport, codex_messages):
         is_codex_backend=True,
     )
 
-    assert "tools" in kwargs and kwargs["tools"], "tools must be present when registered"
+    assert kwargs.get("tools"), "tools must be present when registered"
     assert kwargs["tools"][0]["name"] == "terminal"
     assert kwargs["tool_choice"] == "auto"
     assert kwargs["parallel_tool_calls"] is True
@@ -147,7 +151,8 @@ def test_build_kwargs_emits_tools_when_tools_present(transport, codex_messages):
 
 def test_build_kwargs_drops_empty_tools_list(transport, codex_messages):
     """``tools=[]`` collapses to ``None`` inside ``_responses_tools`` —
-    the resulting kwargs must therefore also omit the key."""
+    the resulting kwargs must therefore also omit the key.
+    """
     kwargs = transport.build_kwargs(
         model="gpt-5.5",
         messages=codex_messages,

@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_login_parser(subparsers, *, cmd_login: Callable) -> None:
@@ -46,14 +46,14 @@ def build_login_parser(subparsers, *, cmd_login: Callable) -> None:
         help="(deprecated) Provider name; ignored — see `hermes model`",
     )
     login_parser.add_argument(
-        "--portal-url", help="Portal base URL (default: production portal)"
+        "--portal-url", help="Portal base URL (default: production portal)",
     )
     login_parser.add_argument(
         "--inference-url",
         help="Inference API base URL (default: production inference API)",
     )
     login_parser.add_argument(
-        "--client-id", default=None, help="OAuth client id to use (default: hermes-cli)"
+        "--client-id", default=None, help="OAuth client id to use (default: hermes-cli)",
     )
     login_parser.add_argument("--scope", default=None, help="OAuth scope to request")
     login_parser.add_argument(
@@ -68,7 +68,7 @@ def build_login_parser(subparsers, *, cmd_login: Callable) -> None:
         help="HTTP request timeout in seconds (default: 15)",
     )
     login_parser.add_argument(
-        "--ca-bundle", help="Path to CA bundle PEM file for TLS verification"
+        "--ca-bundle", help="Path to CA bundle PEM file for TLS verification",
     )
     login_parser.add_argument(
         "--insecure",

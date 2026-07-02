@@ -10,18 +10,17 @@ from unittest.mock import patch
 import pytest
 
 from tools.homeassistant_tool import (
-    _check_ha_available,
-    _filter_and_summarize,
-    _build_service_payload,
-    _parse_service_response,
-    _get_headers,
-    _handle_get_state,
-    _handle_call_service,
     _BLOCKED_DOMAINS,
     _ENTITY_ID_RE,
     _SERVICE_NAME_RE,
+    _build_service_payload,
+    _check_ha_available,
+    _filter_and_summarize,
+    _get_headers,
+    _handle_call_service,
+    _handle_get_state,
+    _parse_service_response,
 )
-
 
 # ---------------------------------------------------------------------------
 # Sample HA state data (matches real HA /api/states response shape)
@@ -226,7 +225,7 @@ class TestDomainBlocklist:
     @pytest.mark.parametrize("domain", sorted(_BLOCKED_DOMAINS))
     def test_blocked_domain_rejected(self, domain):
         result = json.loads(_handle_call_service({
-            "domain": domain, "service": "any_service"
+            "domain": domain, "service": "any_service",
         }))
         assert "error" in result
         assert "blocked" in result["error"].lower()
@@ -236,7 +235,7 @@ class TestDomainBlocklist:
         # This will try to make a real HTTP call and fail, but the important thing
         # is it does NOT return a "blocked" error
         result = json.loads(_handle_call_service({
-            "domain": "light", "service": "turn_on", "entity_id": "light.test"
+            "domain": "light", "service": "turn_on", "entity_id": "light.test",
         }))
         # Should fail with a network/connection error, not a "blocked" error
         if "error" in result:
@@ -299,7 +298,7 @@ class TestEntityIdValidation:
         """Some services (like scene.turn_on) don't need entity_id."""
         # Will fail on network, but should NOT fail on entity_id validation
         result = json.loads(_handle_call_service({
-            "domain": "scene", "service": "turn_on"
+            "domain": "scene", "service": "turn_on",
         }))
         if "error" in result:
             assert "Invalid entity_id" not in result["error"]

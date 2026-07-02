@@ -9,13 +9,12 @@ isolation — no real package metadata, no real config, no real cache.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 
 import hermes_cli.security_advisories as adv
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -58,7 +57,7 @@ def patched_version(monkeypatch: pytest.MonkeyPatch) -> Iterator[dict[str, str]]
     """Override _installed_version with a controllable lookup table."""
     table: dict[str, str] = {}
     monkeypatch.setattr(adv, "_installed_version", lambda pkg: table.get(pkg))
-    yield table
+    return table
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +86,7 @@ class TestDetectCompromised:
         assert hits == []
 
     def test_empty_compromised_set_matches_any_version(
-        self, patched_version
+        self, patched_version,
     ):
         # An advisory with an empty version set is a "any version is suspect"
         # wildcard — used when an entire maintainer namespace is owned.
@@ -129,7 +128,7 @@ class TestAck:
         assert adv.filter_unacked([hit]) == []
 
     def test_filter_unacked_passes_through_unknown(
-        self, fake_advisory, monkeypatch
+        self, fake_advisory, monkeypatch,
     ):
         hit = adv.AdvisoryHit(
             advisory=fake_advisory,
@@ -144,7 +143,7 @@ class TestAck:
         # don't depend on the full hermes_cli.config bootstrap.
         store: dict = {"security": {}}
         monkeypatch.setattr(
-            "hermes_cli.config.load_config", lambda: store
+            "hermes_cli.config.load_config", lambda: store,
         )
         monkeypatch.setattr(
             "hermes_cli.config.save_config",
@@ -171,7 +170,7 @@ class TestAck:
 
 class TestBannerCache:
     def test_first_call_returns_due_hits(
-        self, fake_advisory, isolated_home, monkeypatch
+        self, fake_advisory, isolated_home, monkeypatch,
     ):
         monkeypatch.setattr(adv, "get_acked_ids", lambda: set())
         hit = adv.AdvisoryHit(
@@ -183,7 +182,7 @@ class TestBannerCache:
         assert due == [hit]
 
     def test_second_call_within_window_suppresses(
-        self, fake_advisory, isolated_home, monkeypatch
+        self, fake_advisory, isolated_home, monkeypatch,
     ):
         monkeypatch.setattr(adv, "get_acked_ids", lambda: set())
         hit = adv.AdvisoryHit(
@@ -197,7 +196,7 @@ class TestBannerCache:
         assert again == []
 
     def test_call_after_window_re_banners(
-        self, fake_advisory, isolated_home, monkeypatch
+        self, fake_advisory, isolated_home, monkeypatch,
     ):
         monkeypatch.setattr(adv, "get_acked_ids", lambda: set())
         hit = adv.AdvisoryHit(
@@ -221,7 +220,7 @@ class TestBannerCache:
         assert again == [hit]
 
     def test_acked_hits_never_banner(
-        self, fake_advisory, isolated_home, monkeypatch
+        self, fake_advisory, isolated_home, monkeypatch,
     ):
         monkeypatch.setattr(adv, "get_acked_ids", lambda: {fake_advisory.id})
         hit = adv.AdvisoryHit(
@@ -271,7 +270,7 @@ class TestRendering:
         assert any("No active security advisories" in line for line in lines)
 
     def test_render_doctor_section_with_unacked_hit(
-        self, fake_advisory, monkeypatch
+        self, fake_advisory, monkeypatch,
     ):
         monkeypatch.setattr(adv, "get_acked_ids", lambda: set())
         hit = adv.AdvisoryHit(

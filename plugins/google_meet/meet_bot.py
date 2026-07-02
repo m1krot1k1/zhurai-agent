@@ -36,7 +36,6 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 # Match ``https://meet.google.com/abc-defg-hij`` or ``.../lookup/...`` — the
 # short three-segment code or a lookup URL. Anything else is rejected.
@@ -45,7 +44,7 @@ MEET_URL_RE = re.compile(
     r"[a-z0-9]{3,}-[a-z0-9]{3,}-[a-z0-9]{3,}"
     r"|lookup/[^/?#]+"
     r"|new"
-    r")(?:[/?#].*)?$"
+    r")(?:[/?#].*)?$",
 )
 
 
@@ -93,20 +92,20 @@ class _BotState:
         self.captioning = False
         self.captions_enabled_attempted = False
         self.lobby_waiting = False
-        self.join_attempted_at: Optional[float] = None
-        self.joined_at: Optional[float] = None
-        self.last_caption_at: Optional[float] = None
+        self.join_attempted_at: float | None = None
+        self.joined_at: float | None = None
+        self.last_caption_at: float | None = None
         self.transcript_lines = 0
-        self.error: Optional[str] = None
+        self.error: str | None = None
         self.exited = False
         # v2 realtime fields.
         self.realtime = False
         self.realtime_ready = False
-        self.realtime_device: Optional[str] = None
+        self.realtime_device: str | None = None
         self.audio_bytes_out: int = 0
-        self.last_audio_out_at: Optional[float] = None
-        self.last_barge_in_at: Optional[float] = None
-        self.leave_reason: Optional[str] = None
+        self.last_audio_out_at: float | None = None
+        self.last_barge_in_at: float | None = None
+        self.leave_reason: str | None = None
         # Scraped captions, in order, deduped. Each entry is a dict of
         # {"ts": <epoch>, "speaker": str, "text": str}.
         self._seen: set = set()
@@ -272,7 +271,7 @@ def _start_realtime_speaker(
     voice: str,
     instructions: str,
     stop_flag: dict,
-    state: "_BotState",
+    state: _BotState,
 ) -> None:
     """Wire up the OpenAI Realtime session + speaker thread + PCM pump.
 
@@ -461,7 +460,7 @@ def run_bot() -> int:  # noqa: C901 — orchestration, explicit branches
     if not url or not _is_safe_meet_url(url):
         sys.stderr.write(
             "google_meet bot: refusing to launch — HERMES_MEET_URL must be a "
-            "meet.google.com URL. got: %r\n" % url
+            "meet.google.com URL. got: %r\n" % url,
         )
         return 2
     if not out_dir_env:
@@ -516,7 +515,7 @@ def run_bot() -> int:  # noqa: C901 — orchestration, explicit branches
         state.set(error=f"playwright not installed: {e}", exited=True)
         sys.stderr.write(
             "google_meet bot: playwright is not installed. Run "
-            "`pip install playwright && python -m playwright install chromium`\n"
+            "`pip install playwright && python -m playwright install chromium`\n",
         )
         if rt["bridge"]:
             rt["bridge"].teardown()
@@ -616,7 +615,7 @@ def run_bot() -> int:  # noqa: C901 — orchestration, explicit branches
             #   * periodically flushing realtime counters into status.json
             deadline = (time.time() + duration_s) if duration_s else None
             lobby_deadline = time.time() + float(
-                os.environ.get("HERMES_MEET_LOBBY_TIMEOUT", "300")
+                os.environ.get("HERMES_MEET_LOBBY_TIMEOUT", "300"),
             )
             last_admission_check = 0.0
             while not stop_flag["stop"]:
@@ -692,7 +691,7 @@ def run_bot() -> int:  # noqa: C901 — orchestration, explicit branches
             try:
                 page.evaluate(
                     "() => { const b = document.querySelector('button[aria-label*=\"eave call\"]');"
-                    " if (b) b.click(); }"
+                    " if (b) b.click(); }",
                 )
             except Exception:
                 pass
@@ -837,7 +836,7 @@ def _click_join(page, state: _BotState) -> None:
             continue
 
 
-def _parse_duration(raw: str) -> Optional[float]:
+def _parse_duration(raw: str) -> float | None:
     """Parse ``30m`` / ``2h`` / ``90`` (seconds) → float seconds, or None."""
     if not raw:
         return None

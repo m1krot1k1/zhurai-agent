@@ -1,5 +1,4 @@
-"""
-TTS Provider Registry
+"""TTS Provider Registry
 =====================
 
 Central map of registered TTS providers. Populated by plugins at
@@ -30,7 +29,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Dict, List, Optional
 
 from agent.tts_provider import TTSProvider
 
@@ -59,7 +57,7 @@ _BUILTIN_NAMES = frozenset({
 })
 
 
-_providers: Dict[str, TTSProvider] = {}
+_providers: dict[str, TTSProvider] = {}
 _lock = threading.Lock()
 
 
@@ -80,7 +78,7 @@ def register_provider(provider: TTSProvider) -> None:
     if not isinstance(provider, TTSProvider):
         raise TypeError(
             f"register_provider() expects a TTSProvider instance, "
-            f"got {type(provider).__name__}"
+            f"got {type(provider).__name__}",
         )
     name = provider.name
     if not isinstance(name, str) or not name.strip():
@@ -108,14 +106,14 @@ def register_provider(provider: TTSProvider) -> None:
         )
 
 
-def list_providers() -> List[TTSProvider]:
+def list_providers() -> list[TTSProvider]:
     """Return all registered providers, sorted by name."""
     with _lock:
         items = list(_providers.values())
     return sorted(items, key=lambda p: p.name)
 
 
-def get_provider(name: str) -> Optional[TTSProvider]:
+def get_provider(name: str) -> TTSProvider | None:
     """Return the provider registered under *name*, or None.
 
     Name matching is case-insensitive and whitespace-tolerant — mirrors

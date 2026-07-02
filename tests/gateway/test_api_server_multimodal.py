@@ -22,7 +22,6 @@ from gateway.platforms.api_server import (
     security_headers_middleware,
 )
 
-
 # ---------------------------------------------------------------------------
 # Pure-function tests for _normalize_multimodal_content
 # ---------------------------------------------------------------------------
@@ -275,7 +274,7 @@ class TestResponsesMultimodalHTTP:
                                         "image_url": "https://example.com/cat.png",
                                     },
                                 ],
-                            }
+                            },
                         ],
                     },
                 )
@@ -299,7 +298,7 @@ class TestResponsesMultimodalHTTP:
                         {
                             "role": "user",
                             "content": [{"type": "input_file", "file_id": "f_1"}],
-                        }
+                        },
                     ],
                 },
             )

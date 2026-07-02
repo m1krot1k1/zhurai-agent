@@ -1,5 +1,4 @@
-"""
-Microsoft Teams platform adapter for Hermes Agent.
+"""Microsoft Teams platform adapter for Hermes Agent.
 
 Uses the microsoft-teams-apps SDK for authentication and activity processing.
 Runs an aiohttp webhook server to receive messages from Teams.
@@ -27,8 +26,10 @@ import html
 import json
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import quote
+
+import httpx
 
 # httpx is imported lazily — only the ``_write_summary_via_incoming_webhook``
 # code path actually constructs an ``AsyncClient``. Top-level import here
@@ -48,16 +49,20 @@ except ImportError:
     web = None  # type: ignore[assignment]
 
 try:
-    from microsoft_teams.apps import App, ActivityContext
-    from microsoft_teams.common.http.client import ClientOptions
-    from microsoft_teams.api import MessageActivity, ConversationReference
+    from microsoft_teams.api import ConversationReference, MessageActivity
+    from microsoft_teams.api.activities.invoke.adaptive_card import (
+        AdaptiveCardInvokeActivity,
+    )
     from microsoft_teams.api.activities.typing import TypingActivityInput
-    from microsoft_teams.api.activities.invoke.adaptive_card import AdaptiveCardInvokeActivity
     from microsoft_teams.api.models.adaptive_card import (
         AdaptiveCardActionCardResponse,
         AdaptiveCardActionMessageResponse,
     )
-    from microsoft_teams.api.models.invoke_response import InvokeResponse, AdaptiveCardInvokeResponse
+    from microsoft_teams.api.models.invoke_response import (
+        AdaptiveCardInvokeResponse,
+        InvokeResponse,
+    )
+    from microsoft_teams.apps import ActivityContext, App
     from microsoft_teams.apps.http.adapter import (
         HttpMethod,
         HttpRequest,
@@ -65,6 +70,7 @@ try:
         HttpRouteHandler,
     )
     from microsoft_teams.cards import AdaptiveCard, ExecuteAction, TextBlock
+    from microsoft_teams.common.http.client import ClientOptions
 
     TEAMS_SDK_AVAILABLE = True
 except ImportError:
@@ -89,7 +95,6 @@ except ImportError:
     TextBlock = None  # type: ignore[assignment,misc]
 
 from gateway.config import Platform, PlatformConfig
-from gateway.platforms.helpers import MessageDeduplicator
 from gateway.platforms.base import (
     BasePlatformAdapter,
     MessageEvent,
@@ -98,6 +103,7 @@ from gateway.platforms.base import (
     cache_image_from_url,
     cache_media_bytes,
 )
+from gateway.platforms.helpers import MessageDeduplicator
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +169,7 @@ class TeamsSummaryWriter:
         self,
         payload: Any,
         config: dict[str, Any] | None,
-        existing_record: Optional[dict[str, Any]] = None,
+        existing_record: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         merged = self._resolve_delivery_config(config)
         if existing_record and not _parse_bool(merged.get("force_resend"), default=False):
@@ -182,7 +188,7 @@ class TeamsSummaryWriter:
         if mode == "graph":
             return await self._write_summary_via_graph(payload, merged)
         raise ValueError(
-            "Teams delivery_mode must be 'incoming_webhook' or 'graph'."
+            "Teams delivery_mode must be 'incoming_webhook' or 'graph'.",
         )
 
     def _resolve_delivery_config(self, config: dict[str, Any] | None) -> dict[str, Any]:
@@ -257,7 +263,7 @@ class TeamsSummaryWriter:
         channel_id = str(config.get("channel_id") or "").strip()
         if not team_id or not channel_id:
             raise ValueError(
-                "Graph delivery mode requires chat_id, or both team_id and channel_id."
+                "Graph delivery mode requires chat_id, or both team_id and channel_id.",
             )
         path = (
             f"/teams/{quote(team_id, safe='')}/channels/"
@@ -326,7 +332,7 @@ class TeamsSummaryWriter:
                 continue
             if items:
                 rendered = "".join(f"<li>{html.escape(str(item))}</li>" for item in items if str(item).strip())
-                blocks.append(rendered and f"<ul>{rendered}</ul>" or "<p>None</p>")
+                blocks.append((rendered and f"<ul>{rendered}</ul>") or "<p>None</p>")
             else:
                 blocks.append("<p>None</p>")
         return "".join(blocks)
@@ -359,16 +365,16 @@ class _AiohttpBridgeAdapter:
     route registrations and wires them into our own aiohttp ``Application``.
     """
 
-    def __init__(self, aiohttp_app: "web.Application"):
+    def __init__(self, aiohttp_app: web.Application):
         self._aiohttp_app = aiohttp_app
 
-    def register_route(self, method: "HttpMethod", path: str, handler: "HttpRouteHandler") -> None:
+    def register_route(self, method: HttpMethod, path: str, handler: HttpRouteHandler) -> None:
         """Register an SDK route handler as an aiohttp route."""
 
-        async def _aiohttp_handler(request: "web.Request") -> "web.Response":
+        async def _aiohttp_handler(request: web.Request) -> web.Response:
             body = await request.json()
             headers = dict(request.headers)
-            result: "HttpResponse" = await handler(HttpRequest(body=body, headers=headers))
+            result: HttpResponse = await handler(HttpRequest(body=body, headers=headers))
             status = result.get("status", 200)
             resp_body = result.get("body")
             if resp_body is not None:
@@ -467,11 +473,13 @@ _ALLOWED_TEAMS_SERVICE_HOSTS = frozenset({
 # combine digits, colons, hyphens, dots, '@', and the ``thread.skype`` /
 # ``thread.tacv2`` suffixes; reject anything outside this set so a hostile
 # value cannot path-traverse out of ``/v3/conversations/<id>/activities``.
+import pathlib
 import re as _re_teams
+
 _TEAMS_CONV_ID_RE = _re_teams.compile(r"^[A-Za-z0-9:@\-_.]+$")
 
 
-def _validate_teams_service_url(raw: str) -> Optional[str]:
+def _validate_teams_service_url(raw: str) -> str | None:
     """Return a normalized service URL or ``None`` if it is not allowed.
 
     Requires ``https://`` and a host in ``_ALLOWED_TEAMS_SERVICE_HOSTS``.
@@ -499,10 +507,10 @@ async def _standalone_send(
     chat_id: str,
     message: str,
     *,
-    thread_id: Optional[str] = None,
-    media_files: Optional[list] = None,
+    thread_id: str | None = None,
+    media_files: list | None = None,
     force_document: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Acquire a Bot Framework bearer token and POST a single message activity.
 
     Used by ``tools/send_message_tool._send_via_adapter`` when the gateway
@@ -635,21 +643,20 @@ def check_teams_requirements() -> bool:
 
     def _import() -> dict:
         from aiohttp import web as _web
-        from microsoft_teams.apps import App, ActivityContext
-        from microsoft_teams.common.http.client import ClientOptions
-        from microsoft_teams.api import MessageActivity, ConversationReference
-        from microsoft_teams.api.activities.typing import TypingActivityInput
+        from microsoft_teams.api import ConversationReference, MessageActivity
         from microsoft_teams.api.activities.invoke.adaptive_card import (
             AdaptiveCardInvokeActivity,
         )
+        from microsoft_teams.api.activities.typing import TypingActivityInput
         from microsoft_teams.api.models.adaptive_card import (
             AdaptiveCardActionCardResponse,
             AdaptiveCardActionMessageResponse,
         )
         from microsoft_teams.api.models.invoke_response import (
-            InvokeResponse,
             AdaptiveCardInvokeResponse,
+            InvokeResponse,
         )
+        from microsoft_teams.apps import ActivityContext, App
         from microsoft_teams.apps.http.adapter import (
             HttpMethod,
             HttpRequest,
@@ -657,6 +664,7 @@ def check_teams_requirements() -> bool:
             HttpRouteHandler,
         )
         from microsoft_teams.cards import AdaptiveCard, ExecuteAction, TextBlock
+        from microsoft_teams.common.http.client import ClientOptions
 
         return {
             "web": _web,
@@ -700,14 +708,14 @@ class TeamsAdapter(BasePlatformAdapter):
         self._client_secret = extra.get("client_secret") or os.getenv("TEAMS_CLIENT_SECRET", "")
         self._tenant_id = extra.get("tenant_id") or os.getenv("TEAMS_TENANT_ID", "")
         self._port = _coerce_port(
-            extra.get("port") or os.getenv("TEAMS_PORT", str(_DEFAULT_PORT))
+            extra.get("port") or os.getenv("TEAMS_PORT", str(_DEFAULT_PORT)),
         )
-        self._app: Optional["App"] = None
-        self._runner: Optional["web.AppRunner"] = None
+        self._app: App | None = None
+        self._runner: web.AppRunner | None = None
         self._dedup = MessageDeduplicator(max_size=1000)
         # Maps chat_id → ConversationReference captured from incoming messages.
         # Used to send cards with the correct conversation type (personal/group/channel).
-        self._conv_refs: Dict[str, Any] = {}
+        self._conv_refs: dict[str, Any] = {}
 
     async def connect(self) -> bool:
         # Lazy-install the Teams SDK on demand (parity with Slack/Discord/etc.),
@@ -805,8 +813,8 @@ class TeamsAdapter(BasePlatformAdapter):
         SSRF guard and follows redirects through the shared redirect guard,
         matching the cache_*_from_url helpers in gateway.platforms.base.
         """
-        from tools.url_safety import is_safe_url
         from gateway.platforms.base import _ssrf_redirect_guard
+        from tools.url_safety import is_safe_url
 
         if not is_safe_url(url):
             raise ValueError("Blocked unsafe attachment URL (SSRF protection)")
@@ -939,7 +947,7 @@ class TeamsAdapter(BasePlatformAdapter):
                 try:
                     data = await self._fetch_attachment_bytes(content_url)
                     cached = cache_media_bytes(
-                        data, filename=att_name, mime_type=content_type
+                        data, filename=att_name, mime_type=content_type,
                     )
                     if cached:
                         media_urls.append(cached.path)
@@ -977,7 +985,7 @@ class TeamsAdapter(BasePlatformAdapter):
         )
         await self.handle_message(event)
 
-    async def _send_card(self, chat_id: str, card: "AdaptiveCard") -> "Any":
+    async def _send_card(self, chat_id: str, card: AdaptiveCard) -> Any:
         """Send an AdaptiveCard, using a stored ConversationReference when available."""
         from microsoft_teams.api import MessageActivityInput
 
@@ -985,15 +993,15 @@ class TeamsAdapter(BasePlatformAdapter):
         if conv_ref and self._app:
             activity = MessageActivityInput().add_card(card)
             return await self._app.activity_sender.send(activity, conv_ref)
-        elif self._app:
+        if self._app:
             return await self._app.send(chat_id, card)
         return None
 
     async def _on_card_action(
-        self, ctx: "ActivityContext[AdaptiveCardInvokeActivity]"
-    ) -> "InvokeResponse[AdaptiveCardActionMessageResponse]":
+        self, ctx: ActivityContext[AdaptiveCardInvokeActivity],
+    ) -> InvokeResponse[AdaptiveCardActionMessageResponse]:
         """Handle an Adaptive Card Action.Execute button click."""
-        from tools.approval import resolve_gateway_approval, has_blocking_approval
+        from tools.approval import has_blocking_approval, resolve_gateway_approval
 
         action = ctx.activity.value.action
         data = action.data or {}
@@ -1018,12 +1026,12 @@ class TeamsAdapter(BasePlatformAdapter):
             if not allowed_csv:
                 logger.warning(
                     "[teams] card action rejected: TEAMS_ALLOWED_USERS not configured "
-                    "and TEAMS_ALLOW_ALL_USERS not set — default deny"
+                    "and TEAMS_ALLOW_ALL_USERS not set — default deny",
                 )
                 return InvokeResponse(
                     status=200,
                     body=AdaptiveCardActionMessageResponse(
-                        value="⛔ Approval buttons require TEAMS_ALLOWED_USERS to be configured."
+                        value="⛔ Approval buttons require TEAMS_ALLOWED_USERS to be configured.",
                     ),
                 )
             from_account = ctx.activity.from_
@@ -1055,7 +1063,7 @@ class TeamsAdapter(BasePlatformAdapter):
                 body=AdaptiveCardActionCardResponse(
                     value=AdaptiveCard()
                     .with_version("1.4")
-                    .with_body([TextBlock(text="⚠️ Approval already resolved or expired.", wrap=True)])
+                    .with_body([TextBlock(text="⚠️ Approval already resolved or expired.", wrap=True)]),
                 ),
             )
 
@@ -1080,7 +1088,7 @@ class TeamsAdapter(BasePlatformAdapter):
         return InvokeResponse(
             status=200,
             body=AdaptiveCardActionCardResponse(
-                value=AdaptiveCard().with_version("1.4").with_body(body)
+                value=AdaptiveCard().with_version("1.4").with_body(body),
             ),
         )
 
@@ -1090,7 +1098,7 @@ class TeamsAdapter(BasePlatformAdapter):
         command: str,
         session_key: str,
         description: str = "dangerous command",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Send an Adaptive Card approval prompt with Allow/Deny buttons."""
         if not self._app:
@@ -1150,8 +1158,8 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         if not self._app:
             return SendResult(success=False, error="Teams app not initialized")
@@ -1182,7 +1190,7 @@ class TeamsAdapter(BasePlatformAdapter):
 
         return SendResult(success=True, message_id=last_message_id)
 
-    async def send_typing(self, chat_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    async def send_typing(self, chat_id: str, metadata: dict[str, Any] | None = None) -> None:
         if not self._app:
             return
         try:
@@ -1195,7 +1203,7 @@ class TeamsAdapter(BasePlatformAdapter):
         chat_id: str,
         source: str,
         default_mime: str,
-        caption: Optional[str] = None,
+        caption: str | None = None,
         media_label: str = "media",
     ) -> SendResult:
         """Send any media file/URL as a Teams attachment.
@@ -1212,16 +1220,17 @@ class TeamsAdapter(BasePlatformAdapter):
         try:
             import base64
             import mimetypes
+
             from microsoft_teams.api import Attachment, MessageActivityInput
 
             if source.startswith("http://") or source.startswith("https://"):
                 content_url = source
-                mime_type = mimetypes.guess_type(source.split("?")[0])[0] or default_mime
+                mime_type = mimetypes.guess_type(source.split("?", maxsplit=1)[0])[0] or default_mime
             else:
                 # Local path — encode as base64 data URI
                 path = source.removeprefix("file://")
                 mime_type = mimetypes.guess_type(path)[0] or default_mime
-                with open(path, "rb") as f:
+                with pathlib.Path(path).open("rb") as f:
                     content_url = f"data:{mime_type};base64,{base64.b64encode(f.read()).decode()}"
 
             attachment = Attachment(content_type=mime_type, content_url=content_url)
@@ -1244,9 +1253,9 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_url: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         return await self._send_media_attachment(
             chat_id=chat_id,
@@ -1260,8 +1269,8 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         return await self.send_image(
@@ -1275,9 +1284,9 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         video_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs,
     ) -> SendResult:
         return await self._send_media_attachment(
@@ -1292,9 +1301,9 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         audio_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs,
     ) -> SendResult:
         return await self._send_media_attachment(
@@ -1309,10 +1318,10 @@ class TeamsAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         file_path: str,
-        caption: Optional[str] = None,
-        file_name: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        file_name: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs,
     ) -> SendResult:
         return await self._send_media_attachment(
@@ -1331,16 +1340,16 @@ class TeamsAdapter(BasePlatformAdapter):
 
 def interactive_setup() -> None:
     """Guide the user through Teams setup using the Teams CLI."""
-    from hermes_cli.config import (
-        get_env_value,
-        save_env_value,
-    )
     from hermes_cli.cli_output import (
-        prompt,
-        prompt_yes_no,
         print_info,
         print_success,
         print_warning,
+        prompt,
+        prompt_yes_no,
+    )
+    from hermes_cli.config import (
+        get_env_value,
+        save_env_value,
     )
 
     existing_id = get_env_value("TEAMS_CLIENT_ID")
@@ -1355,7 +1364,7 @@ def interactive_setup() -> None:
     print()
     print_info("Then expose port 3978 publicly (devtunnel / ngrok / cloudflared),")
     print_info("and create your bot:")
-    print_info("  teams app create --name \"Hermes\" --endpoint \"https://<tunnel>/api/messages\"")
+    print_info('  teams app create --name "Hermes" --endpoint "https://<tunnel>/api/messages"')
     print()
     print_info("The CLI will print CLIENT_ID, CLIENT_SECRET, and TENANT_ID. Paste them below.")
     print()

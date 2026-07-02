@@ -29,8 +29,8 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from hermes_constants import get_hermes_home
 
+from hermes_constants import get_hermes_home
 
 # Methods clients send as periodic liveness probes. They are not part of the
 # ACP schema, so the acp router correctly returns JSON-RPC -32601 to the
@@ -79,7 +79,7 @@ def _setup_logging() -> None:
         logging.Formatter(
             "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        ),
     )
     handler.addFilter(_BenignProbeMethodFilter())
     root = logging.getLogger()
@@ -104,7 +104,7 @@ def _load_env() -> None:
             logging.getLogger(__name__).info("Loaded env from %s", env_file)
     else:
         logging.getLogger(__name__).info(
-            "No .env found at %s, using system env", hermes_home / ".env"
+            "No .env found at %s, using system env", hermes_home / ".env",
         )
 
 
@@ -149,6 +149,7 @@ def _print_version() -> None:
 
 def _run_check() -> None:
     import acp  # noqa: F401
+
     from acp_adapter.server import HermesACPAgent  # noqa: F401
 
     print("Hermes ACP check OK")
@@ -173,7 +174,7 @@ def _run_setup() -> None:
     try:
         reply = input(
             "\nInstall browser tools? Downloads agent-browser (npm) and "
-            "optionally Playwright Chromium (~400 MB). [y/N] "
+            "optionally Playwright Chromium (~400 MB). [y/N] ",
         ).strip().lower()
     except (EOFError, KeyboardInterrupt):
         return
@@ -239,6 +240,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.path.insert(0, project_root)
 
     import acp
+
     from .server import HermesACPAgent
 
     # MCP tool discovery from config.yaml — run before asyncio.run() so

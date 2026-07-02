@@ -41,7 +41,7 @@ def test_no_install_when_lock_newer_but_hidden_lock_matches(tmp_path: Path, main
     _touch_ink(tmp_path)
     (tmp_path / "package-lock.json").write_text('{"packages":{"node_modules/foo":{"version":"1.0.0"}}}')
     (tmp_path / "node_modules" / ".package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0","ideallyInert":true}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0","ideallyInert":true}}}',
     )
     os.utime(tmp_path / "package-lock.json", (200, 200))
     os.utime(tmp_path / "node_modules" / ".package-lock.json", (100, 100))
@@ -51,10 +51,10 @@ def test_no_install_when_lock_newer_but_hidden_lock_matches(tmp_path: Path, main
 def test_need_install_when_required_package_missing_from_hidden_lock(tmp_path: Path, main_mod) -> None:
     _touch_ink(tmp_path)
     (tmp_path / "package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0"},"node_modules/bar":{"version":"1.0.0"}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0"},"node_modules/bar":{"version":"1.0.0"}}}',
     )
     (tmp_path / "node_modules" / ".package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0"}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0"}}}',
     )
     assert main_mod._tui_need_npm_install(tmp_path) is True
 
@@ -62,16 +62,16 @@ def test_need_install_when_required_package_missing_from_hidden_lock(tmp_path: P
 def test_no_install_when_only_optional_peer_package_missing_from_hidden_lock(tmp_path: Path, main_mod) -> None:
     _touch_ink(tmp_path)
     (tmp_path / "package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0"},"node_modules/optional":{"version":"1.0.0","optional":true,"peer":true}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0"},"node_modules/optional":{"version":"1.0.0","optional":true,"peer":true}}}',
     )
     (tmp_path / "node_modules" / ".package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0"}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0"}}}',
     )
     assert main_mod._tui_need_npm_install(tmp_path) is False
 
 
 def test_no_install_when_only_peer_annotation_differs(tmp_path: Path, main_mod) -> None:
-    """npm 9 drops the ``peer`` flag from the hidden lock on dev-deps that are
+    """Npm 9 drops the ``peer`` flag from the hidden lock on dev-deps that are
     *also* declared as peers.  That's a cosmetic difference — the package is
     installed at the requested version — so it must not trigger a reinstall.
     Regression for the TUI-in-Docker failure where 16 such mismatches caused
@@ -81,12 +81,12 @@ def test_no_install_when_only_peer_annotation_differs(tmp_path: Path, main_mod) 
     (tmp_path / "package-lock.json").write_text(
         '{"packages":{'
         '"node_modules/foo":{"version":"1.0.0","dev":true,"peer":true,"resolved":"https://x/foo.tgz"}'
-        '}}'
+        '}}',
     )
     (tmp_path / "node_modules" / ".package-lock.json").write_text(
         '{"packages":{'
         '"node_modules/foo":{"version":"1.0.0","dev":true,"resolved":"https://x/foo.tgz"}'
-        '}}'
+        '}}',
     )
     assert main_mod._tui_need_npm_install(tmp_path) is False
 
@@ -95,10 +95,10 @@ def test_install_when_version_differs_even_with_peer_drop(tmp_path: Path, main_m
     """The peer-drop tolerance must not mask a real version skew."""
     _touch_ink(tmp_path)
     (tmp_path / "package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"2.0.0","dev":true,"peer":true}}}'
+        '{"packages":{"node_modules/foo":{"version":"2.0.0","dev":true,"peer":true}}}',
     )
     (tmp_path / "node_modules" / ".package-lock.json").write_text(
-        '{"packages":{"node_modules/foo":{"version":"1.0.0","dev":true}}}'
+        '{"packages":{"node_modules/foo":{"version":"1.0.0","dev":true}}}',
     )
     assert main_mod._tui_need_npm_install(tmp_path) is True
 
@@ -159,7 +159,7 @@ def test_rebuild_when_tui_source_newer_than_bundle(tmp_path: Path, main_mod) -> 
 
 
 def test_make_tui_argv_skips_build_only_on_termux_when_fresh(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     _touch_tui_entry(tmp_path)
     monkeypatch.setenv("TERMUX_VERSION", "1")
@@ -179,7 +179,7 @@ def test_make_tui_argv_skips_build_only_on_termux_when_fresh(
 
 
 def test_make_tui_argv_skips_install_on_termux_when_bundle_fresh(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     _touch_tui_entry(tmp_path)
     monkeypatch.setenv("TERMUX_VERSION", "1")
@@ -199,7 +199,7 @@ def test_make_tui_argv_skips_install_on_termux_when_bundle_fresh(
 
 
 def test_make_tui_argv_scopes_npm_install_on_termux_workspace(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     tui_dir = tmp_path / "ui-tui"
     tui_dir.mkdir()
@@ -239,7 +239,7 @@ def test_make_tui_argv_scopes_npm_install_on_termux_workspace(
 
 
 def test_make_tui_argv_keeps_desktop_workspace_install_behaviour(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     tui_dir = tmp_path / "ui-tui"
     tui_dir.mkdir()
@@ -276,7 +276,7 @@ def test_make_tui_argv_keeps_desktop_workspace_install_behaviour(
 
 
 def test_make_tui_argv_keeps_desktop_always_build_behaviour(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     _touch_tui_entry(tmp_path)
     monkeypatch.delenv("TERMUX_VERSION", raising=False)
@@ -300,7 +300,7 @@ def test_make_tui_argv_keeps_desktop_always_build_behaviour(
 
 
 def test_make_tui_argv_decodes_dev_prebuild_with_utf8_replace(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     ink_dir = tmp_path / "packages" / "hermes-ink"
     ink_dir.mkdir(parents=True)
@@ -328,7 +328,7 @@ def test_make_tui_argv_decodes_dev_prebuild_with_utf8_replace(
 
 
 def test_make_tui_argv_exits_with_recovery_hint_when_workspace_unrecoverable(
-    tmp_path: Path, main_mod, monkeypatch, capsys
+    tmp_path: Path, main_mod, monkeypatch, capsys,
 ) -> None:
     """Missing ui-tui + no git checkout → clean error, never touches node/npm."""
     monkeypatch.delenv("HERMES_TUI_DIR", raising=False)
@@ -353,7 +353,7 @@ def test_make_tui_argv_exits_with_recovery_hint_when_workspace_unrecoverable(
 
 
 def test_make_tui_argv_restores_missing_workspace_from_git(
-    tmp_path: Path, main_mod, monkeypatch, capsys
+    tmp_path: Path, main_mod, monkeypatch, capsys,
 ) -> None:
     """Missing ui-tui in a git checkout self-heals via `git restore` and continues."""
     monkeypatch.delenv("HERMES_TUI_DIR", raising=False)
@@ -419,7 +419,7 @@ def test_workspace_root_returns_dir_when_own_lockfile(tmp_path: Path, main_mod) 
 
 
 def test_workspace_root_returns_dir_when_no_parent_lockfile(
-    tmp_path: Path, main_mod
+    tmp_path: Path, main_mod,
 ) -> None:
     """Has package.json, no own lockfile, but parent also has no lockfile → standalone."""
     sub = tmp_path / "ui-tui"
@@ -430,7 +430,7 @@ def test_workspace_root_returns_dir_when_no_parent_lockfile(
 
 
 def test_workspace_root_consistent_with_need_npm_install(
-    tmp_path: Path, main_mod
+    tmp_path: Path, main_mod,
 ) -> None:
     """Divergence regression: if someone creates ui-tui/package-lock.json
     by accident, _workspace_root (used by both _tui_need_npm_install AND
@@ -500,7 +500,7 @@ def test_no_stray_lockfiles_in_workspace_subdirs(main_mod) -> None:
 
 
 def test_tui_launch_install_uses_workspace_scope(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     """TUI launch npm install must pass --workspace ui-tui to avoid pulling apps/desktop."""
     tui_dir = tmp_path / "ui-tui"
@@ -531,8 +531,9 @@ def test_tui_launch_install_uses_workspace_scope(
     assert "--workspace" in install_cmd
     assert "ui-tui" in install_cmd
 
+
 def test_make_tui_argv_omits_workspace_when_tui_has_own_lockfile(
-    tmp_path: Path, main_mod, monkeypatch
+    tmp_path: Path, main_mod, monkeypatch,
 ) -> None:
     """When ui-tui/ has its own package-lock.json, _workspace_root returns
     tui_dir itself.  npm install --workspace ui-tui would fail in that case

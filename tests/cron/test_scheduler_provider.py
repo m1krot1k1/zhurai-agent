@@ -23,7 +23,8 @@ from unittest.mock import patch
 
 def test_ticker_calls_tick_at_least_once_then_stops():
     """The gateway in-process ticker loop calls cron.scheduler.tick repeatedly
-    and exits promptly once the stop_event is set."""
+    and exits promptly once the stop_event is set.
+    """
     from gateway.run import _start_cron_ticker
 
     calls = []
@@ -56,7 +57,8 @@ def test_ticker_calls_tick_at_least_once_then_stops():
 def test_desktop_ticker_calls_tick_then_stops():
     """The desktop dashboard ticker loop calls cron.scheduler.tick and exits
     once the stop_event is set. Desktop has no live adapters, so it ticks with
-    no adapters/loop."""
+    no adapters/loop.
+    """
     from hermes_cli.web_server import _start_desktop_cron_ticker
 
     calls = []
@@ -87,8 +89,9 @@ def test_desktop_ticker_calls_tick_then_stops():
 
 
 def test_cronscheduler_is_abstract():
-    """name + start are abstract — the bare ABC can't be instantiated."""
+    """Name + start are abstract — the bare ABC can't be instantiated."""
     import pytest
+
     from cron.scheduler_provider import CronScheduler
 
     with pytest.raises(TypeError):
@@ -131,7 +134,8 @@ def test_abc_growth_stays_additive():
 def test_inprocess_provider_ticks_and_stops():
     """The built-in provider drives cron.scheduler.tick(sync=False) on a loop
     and exits promptly when stop_event is set — same contract as the raw
-    ticker characterized above."""
+    ticker characterized above.
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     calls = []
@@ -141,7 +145,7 @@ def test_inprocess_provider_ticks_and_stops():
 
     with patch("cron.scheduler.tick", side_effect=lambda *a, **k: calls.append(k) or 0):
         t = threading.Thread(
-            target=prov.start, args=(stop,), kwargs={"interval": 0}, daemon=True
+            target=prov.start, args=(stop,), kwargs={"interval": 0}, daemon=True,
         )
         t.start()
         time.sleep(0.2)
@@ -155,7 +159,8 @@ def test_inprocess_provider_ticks_and_stops():
 
 def test_inprocess_provider_stop_is_noop():
     """The default stop() hook is a safe no-op (the stop_event is the real
-    stop signal for the built-in)."""
+    stop signal for the built-in).
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     assert InProcessCronScheduler().stop() is None
@@ -173,7 +178,8 @@ def test_default_config_cron_provider_is_empty():
 
 def test_discover_cron_schedulers_returns_list():
     """Discovery returns a list. May be empty — the built-in is core, not
-    discovered, and no bundled non-default provider ships yet."""
+    discovered, and no bundled non-default provider ships yet.
+    """
     from plugins.cron import discover_cron_schedulers
 
     result = discover_cron_schedulers()
@@ -201,7 +207,7 @@ def test_resolve_no_cron_section_falls_back_to_builtin(monkeypatch):
     import hermes_cli.config as cfg
     from cron import scheduler_provider as sp
 
-    monkeypatch.setattr(cfg, "load_config", lambda: {})
+    monkeypatch.setattr(cfg, "load_config", dict)
     prov = sp.resolve_cron_scheduler()
     assert prov.name == "builtin"
 
@@ -269,7 +275,8 @@ def test_resolve_available_provider_is_used(monkeypatch):
 
 def test_hooks_did_not_change_required_surface():
     """The additive hooks must NOT become abstractmethods — the Phase-1 guard
-    still holds (required surface is exactly name + start)."""
+    still holds (required surface is exactly name + start).
+    """
     from cron.scheduler_provider import CronScheduler
 
     assert set(CronScheduler.__abstractmethods__) == {"name", "start"}
@@ -277,7 +284,8 @@ def test_hooks_did_not_change_required_surface():
 
 def test_builtin_inherits_hook_defaults():
     """The built-in inherits no-op defaults for the new hooks (it never needs
-    to override them)."""
+    to override them).
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     p = InProcessCronScheduler()
@@ -289,9 +297,10 @@ def test_builtin_inherits_hook_defaults():
 
 def test_fire_due_default_claims_then_runs(monkeypatch):
     """The default fire_due claims via the store CAS, fetches the job, and runs
-    it through the shared run_one_job body."""
-    import cron.jobs as jobs
+    it through the shared run_one_job body.
+    """
     import cron.scheduler as sched
+    from cron import jobs
     from cron.scheduler_provider import InProcessCronScheduler
 
     ran = []
@@ -305,9 +314,10 @@ def test_fire_due_default_claims_then_runs(monkeypatch):
 
 def test_fire_due_lost_claim_does_not_run(monkeypatch):
     """If the CAS claim is lost (another machine/retry won), fire_due returns
-    False and never runs the job."""
-    import cron.jobs as jobs
+    False and never runs the job.
+    """
     import cron.scheduler as sched
+    from cron import jobs
     from cron.scheduler_provider import InProcessCronScheduler
 
     ran = []
@@ -320,9 +330,10 @@ def test_fire_due_lost_claim_does_not_run(monkeypatch):
 
 def test_fire_due_missing_job_does_not_run(monkeypatch):
     """If the job vanished between arm and fire (e.g. repeat-N exhausted),
-    fire_due returns False without running."""
-    import cron.jobs as jobs
+    fire_due returns False without running.
+    """
     import cron.scheduler as sched
+    from cron import jobs
     from cron.scheduler_provider import InProcessCronScheduler
 
     ran = []
@@ -339,7 +350,8 @@ def test_fire_due_missing_job_does_not_run(monkeypatch):
 
 def test_ticker_survives_baseexception_from_tick():
     """A BaseException (e.g. SystemExit from a provider SDK) raised by tick()
-    must NOT kill the ticker loop — it logs and keeps looping (#32612)."""
+    must NOT kill the ticker loop — it logs and keeps looping (#32612).
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     calls = []
@@ -366,7 +378,8 @@ def test_ticker_survives_baseexception_from_tick():
 
 def test_ticker_records_heartbeat_each_iteration():
     """The loop records a liveness heartbeat on start and after each tick,
-    bumping the success marker only on a clean tick."""
+    bumping the success marker only on a clean tick.
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     beats = []  # (success,) per call
@@ -389,7 +402,8 @@ def test_ticker_records_heartbeat_each_iteration():
 
 def test_failing_tick_records_liveness_but_not_success():
     """A tick that raises bumps the liveness heartbeat but NOT the success
-    marker — so status can distinguish 'alive but failing' from 'firing'."""
+    marker — so status can distinguish 'alive but failing' from 'firing'.
+    """
     from cron.scheduler_provider import InProcessCronScheduler
 
     beats = []
@@ -411,8 +425,9 @@ def test_failing_tick_records_liveness_but_not_success():
 
 def test_heartbeat_roundtrip_and_age(tmp_path, monkeypatch):
     """record_ticker_heartbeat writes fresh timestamps atomically; the age
-    getters read them back as small positive ages."""
-    import cron.jobs as jobs
+    getters read them back as small positive ages.
+    """
+    from cron import jobs
 
     cron_dir = tmp_path / "cron"
     monkeypatch.setattr(jobs, "CRON_DIR", cron_dir)
@@ -438,7 +453,7 @@ def test_heartbeat_roundtrip_and_age(tmp_path, monkeypatch):
 
 def test_heartbeat_age_detects_staleness(tmp_path, monkeypatch):
     """A heartbeat written far in the past reads back as a large age."""
-    import cron.jobs as jobs
+    from cron import jobs
 
     cron_dir = tmp_path / "cron"
     cron_dir.mkdir(parents=True)
@@ -459,7 +474,7 @@ def test_heartbeat_write_failure_is_silent(tmp_path, monkeypatch):
     file), so ensure_dirs()/mkstemp inside _atomic_write_epoch genuinely fail.
     record_ticker_heartbeat must not raise, and no stray .hb_*.tmp may leak.
     """
-    import cron.jobs as jobs
+    from cron import jobs
 
     blocker = tmp_path / "not_a_dir"
     blocker.write_text("i am a file, not a directory")
@@ -479,8 +494,9 @@ def test_heartbeat_write_failure_is_silent(tmp_path, monkeypatch):
 
 def test_cron_status_reports_alive_but_failing(tmp_path, monkeypatch, capsys):
     """cron_status warns when the ticker is alive (fresh heartbeat) but no tick
-    has succeeded recently (#32612: alive-but-failing must not look healthy)."""
-    import cron.jobs as jobs
+    has succeeded recently (#32612: alive-but-failing must not look healthy).
+    """
+    from cron import jobs
     from hermes_cli import cron as cron_cli
 
     monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [4321])
@@ -495,7 +511,7 @@ def test_cron_status_reports_alive_but_failing(tmp_path, monkeypatch, capsys):
 
 
 def test_cron_status_healthy_when_both_fresh(tmp_path, monkeypatch, capsys):
-    import cron.jobs as jobs
+    from cron import jobs
     from hermes_cli import cron as cron_cli
 
     monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [4321])
@@ -509,7 +525,7 @@ def test_cron_status_healthy_when_both_fresh(tmp_path, monkeypatch, capsys):
 
 
 def test_cron_status_reports_stalled_when_no_heartbeat(tmp_path, monkeypatch, capsys):
-    import cron.jobs as jobs
+    from cron import jobs
     from hermes_cli import cron as cron_cli
 
     monkeypatch.setattr("hermes_cli.gateway.find_gateway_pids", lambda: [4321])

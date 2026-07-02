@@ -24,7 +24,7 @@ def test_resolve_agent_brief_from_agents_dir(tmp_path: Path, monkeypatch: pytest
 
 
 def test_build_delegate_branch_context_includes_brief_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     brief = eco / "agents" / "code.md"
@@ -47,7 +47,7 @@ def test_build_delegate_branch_context_includes_brief_path(
 
 
 def test_list_ecosystem_agent_ids_excludes_readme(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     eco = tmp_path / "zhur"
     agents = eco / "agents"

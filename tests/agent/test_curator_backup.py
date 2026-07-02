@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import sys
 import tarfile
 import tempfile
@@ -60,7 +59,8 @@ def test_snapshot_creates_tarball_and_manifest(backup_env):
 
 def test_snapshot_excludes_backups_dir_itself(backup_env):
     """The backup must NOT contain .curator_backups/ — that would recurse
-    with every subsequent snapshot and balloon disk usage."""
+    with every subsequent snapshot and balloon disk usage.
+    """
     cb = backup_env["cb"]
     _write_skill(backup_env["skills"], "alpha")
     snap1 = cb.snapshot_skills(reason="first")
@@ -76,7 +76,8 @@ def test_snapshot_excludes_backups_dir_itself(backup_env):
 
 def test_snapshot_excludes_hub_dir(backup_env):
     """.hub/ is managed by the skills hub. Rolling it back would break
-    lockfile invariants, so the snapshot omits it entirely."""
+    lockfile invariants, so the snapshot omits it entirely.
+    """
     cb = backup_env["cb"]
     hub = backup_env["skills"] / ".hub"
     hub.mkdir()
@@ -100,7 +101,8 @@ def test_snapshot_disabled_returns_none(backup_env, monkeypatch):
 
 def test_snapshot_uniquifies_when_same_second(backup_env, monkeypatch):
     """Two snapshots in the same wallclock second must not clobber each
-    other. The module appends a counter to the second snapshot's id."""
+    other. The module appends a counter to the second snapshot's id.
+    """
     cb = backup_env["cb"]
     _write_skill(backup_env["skills"], "alpha")
     frozen = "2026-05-01T12-00-00Z"
@@ -174,7 +176,8 @@ def test_resolve_backup_unknown_id_returns_none(backup_env):
 
 def test_rollback_restores_deleted_skill(backup_env):
     """The whole point of this feature: user loses a skill, rollback
-    brings it back."""
+    brings it back.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     user_skill = _write_skill(skills, "my-personal-workflow", body="important content")
@@ -196,7 +199,8 @@ def test_rollback_is_itself_undoable(backup_env):
     tree, so the user can undo a mistaken rollback. The safety snapshot
     is a real tarball with reason='pre-rollback to <id>' — it's
     listed by list_backups() just like any other snapshot and can be
-    restored the same way."""
+    restored the same way.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     _write_skill(skills, "v1")
@@ -236,7 +240,8 @@ def test_rollback_no_snapshots_returns_error(backup_env):
 def test_rollback_rejects_unsafe_tarball(backup_env, monkeypatch):
     """Tarballs with absolute paths or .. components must be refused even
     if someone crafts a malicious snapshot. Defense in depth — normal
-    curator snapshots never produce these."""
+    curator snapshots never produce these.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     _write_skill(skills, "alpha")
@@ -252,7 +257,7 @@ def test_rollback_rejects_unsafe_tarball(backup_env, monkeypatch):
         evil.write(b"evil")
         evil.close()
         tf.add(evil.name, arcname="../../etc/evil.md")
-        os.unlink(evil.name)
+        Path(evil.name).unlink()
 
     ok, msg, _ = cb.rollback()
     assert not ok
@@ -265,7 +270,8 @@ def test_rollback_rejects_unsafe_tarball(backup_env, monkeypatch):
 
 def test_real_run_takes_pre_snapshot(backup_env, monkeypatch):
     """A real (non-dry) curator pass must snapshot the tree before calling
-    apply_automatic_transitions. This is the safety net #18373 asked for."""
+    apply_automatic_transitions. This is the safety net #18373 asked for.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     _write_skill(skills, "alpha")
@@ -296,7 +302,8 @@ def test_real_run_takes_pre_snapshot(backup_env, monkeypatch):
 
 def test_dry_run_skips_snapshot(backup_env, monkeypatch):
     """Dry-run previews must not spend disk on a snapshot — they don't
-    mutate anything, so there's nothing to back up."""
+    mutate anything, so there's nothing to back up.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     _write_skill(skills, "alpha")
@@ -343,7 +350,7 @@ def _reload_cron_jobs(home: Path):
         import cron.jobs as _cj
         importlib.reload(_cj)
     else:
-        import cron.jobs as _cj  # noqa: F401
+        import cron.jobs as _cj
     import cron.jobs as cj
     return cj
 
@@ -383,7 +390,8 @@ def test_snapshot_without_cron_jobs_file_still_succeeds(backup_env):
 
 def test_snapshot_cron_jobs_malformed_json_still_captured(backup_env):
     """Malformed jobs.json is still copied to the snapshot (fidelity over
-    validation); the manifest notes the parse warning."""
+    validation); the manifest notes the parse warning.
+    """
     cb = backup_env["cb"]
     _write_skill(backup_env["skills"], "alpha")
     (backup_env["home"] / "cron").mkdir()
@@ -402,7 +410,8 @@ def test_snapshot_cron_jobs_malformed_json_still_captured(backup_env):
 
 def test_rollback_restores_cron_skill_links(backup_env):
     """End-to-end: snapshot with job [alpha,beta], curator-style in-place
-    rewrite to [umbrella], then rollback → skills restored to [alpha,beta]."""
+    rewrite to [umbrella], then rollback → skills restored to [alpha,beta].
+    """
     cb = backup_env["cb"]
     home = backup_env["home"]
     _write_skill(backup_env["skills"], "alpha")
@@ -436,7 +445,8 @@ def test_rollback_restores_cron_skill_links(backup_env):
 
 def test_rollback_only_touches_skill_fields(backup_env):
     """Every field other than skills/skill must remain untouched across rollback.
-    Schedule, enabled, prompt, timestamps — all live state, hands off."""
+    Schedule, enabled, prompt, timestamps — all live state, hands off.
+    """
     cb = backup_env["cb"]
     home = backup_env["home"]
     _write_skill(backup_env["skills"], "alpha")
@@ -481,7 +491,8 @@ def test_rollback_only_touches_skill_fields(backup_env):
 
 def test_rollback_skips_jobs_the_user_deleted(backup_env):
     """If the user deleted a cron job after the snapshot, rollback must
-    NOT resurrect it — the user's delete is a later, explicit choice."""
+    NOT resurrect it — the user's delete is a later, explicit choice.
+    """
     cb = backup_env["cb"]
     home = backup_env["home"]
     _write_skill(backup_env["skills"], "alpha")
@@ -535,7 +546,8 @@ def test_rollback_leaves_new_jobs_untouched(backup_env):
 def test_rollback_with_snapshot_missing_cron_succeeds(backup_env):
     """Older snapshots (created before this feature shipped) have no
     cron-jobs.json. Rollback must still restore the skills tree and not
-    error out."""
+    error out.
+    """
     cb = backup_env["cb"]
     home = backup_env["home"]
     _write_skill(backup_env["skills"], "alpha")
@@ -562,7 +574,8 @@ def test_rollback_with_snapshot_missing_cron_succeeds(backup_env):
 
 def test_restore_cron_skill_links_standalone(backup_env):
     """Unit-level test on _restore_cron_skill_links without the full rollback.
-    Verifies the report structure carefully."""
+    Verifies the report structure carefully.
+    """
     cb = backup_env["cb"]
     home = backup_env["home"]
 
@@ -604,7 +617,8 @@ def _three_ordered_snapshots(cb, skills, monkeypatch):
     keep=3 so the backups dir is exactly at the retention limit. 05-01 holds
     only 'pristine'; later snapshots add 'extra2' and 'extra3'. Leaves
     _utc_id patched to a newest id so the rollback safety snapshot sorts
-    last. Returns the oldest snapshot id."""
+    last. Returns the oldest snapshot id.
+    """
     monkeypatch.setattr(cb, "get_keep", lambda: 3)
     plan = [
         ("2026-05-01T00-00-00Z", ["pristine"]),
@@ -623,7 +637,8 @@ def _three_ordered_snapshots(cb, skills, monkeypatch):
 def test_rollback_to_oldest_snapshot_at_keep_limit_succeeds(backup_env, monkeypatch):
     """Restoring the oldest snapshot when the backups dir is at the keep limit
     must succeed: the pre-rollback safety snapshot's prune step must not evict
-    the snapshot being restored."""
+    the snapshot being restored.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     oldest = _three_ordered_snapshots(cb, skills, monkeypatch)
@@ -638,7 +653,8 @@ def test_rollback_to_oldest_snapshot_at_keep_limit_succeeds(backup_env, monkeypa
 
 def test_rollback_does_not_delete_the_snapshot_it_restores_from(backup_env, monkeypatch):
     """The snapshot a rollback restores from must still exist afterwards — the
-    safety snapshot's prune must never delete the target."""
+    safety snapshot's prune must never delete the target.
+    """
     cb = backup_env["cb"]
     skills = backup_env["skills"]
     oldest = _three_ordered_snapshots(cb, skills, monkeypatch)

@@ -4,18 +4,18 @@ from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
 from hermes_cli.commands import (
-    COMMAND_REGISTRY,
-    COMMANDS,
-    COMMANDS_BY_CATEGORY,
-    CommandDef,
-    GATEWAY_KNOWN_COMMANDS,
-    SUBCOMMANDS,
-    SlashCommandAutoSuggest,
-    SlashCommandCompleter,
     _CMD_NAME_LIMIT,
     _SLACK_RESERVED_COMMANDS,
     _SLACK_VIA_HERMES_ONLY,
     _TG_NAME_LIMIT,
+    COMMAND_REGISTRY,
+    COMMANDS,
+    COMMANDS_BY_CATEGORY,
+    GATEWAY_KNOWN_COMMANDS,
+    SUBCOMMANDS,
+    CommandDef,
+    SlashCommandAutoSuggest,
+    SlashCommandCompleter,
     _clamp_command_names,
     _clamp_telegram_names,
     _sanitize_telegram_name,
@@ -35,7 +35,7 @@ def _completions(completer: SlashCommandCompleter, text: str):
         completer.get_completions(
             Document(text=text),
             CompleteEvent(completion_requested=True),
-        )
+        ),
     )
 
 
@@ -206,7 +206,7 @@ class TestGatewayHelpLines:
         for cmd in COMMAND_REGISTRY:
             if cmd.cli_only and not cmd.gateway_config_gate:
                 # Word-boundary match so `/reload` doesn't match `/reload-mcp`
-                pattern = rf'`/{re.escape(cmd.name)}(?![-_\w])'
+                pattern = rf"`/{re.escape(cmd.name)}(?![-_\w])"
                 assert not re.search(pattern, joined), \
                     f"cli_only command /{cmd.name} should not be in gateway help"
 
@@ -247,7 +247,8 @@ class TestTelegramBotCommands:
     def test_includes_builtin_commands_with_required_args(self):
         """Built-in arg-taking commands (e.g. /queue, /steer, /background)
         are now included because their handlers return usage text when
-        invoked without arguments — issue #24312."""
+        invoked without arguments — issue #24312.
+        """
         names = {name for name, _ in telegram_bot_commands()}
         assert "background" in names
         assert "queue" in names
@@ -285,7 +286,8 @@ class TestSlackSubcommandMap:
 class TestSlackNativeSlashes:
     """Slack native slash command generation — used to register every
     COMMAND_REGISTRY entry as a first-class Slack slash, matching Discord
-    and Telegram."""
+    and Telegram.
+    """
 
     def test_returns_triples(self):
         slashes = slack_native_slashes()
@@ -300,7 +302,8 @@ class TestSlackNativeSlashes:
     def test_hermes_catchall_is_first(self):
         """``/hermes`` must be reserved as the first slot so the legacy
         ``/hermes <subcommand>`` form keeps working after we add new
-        commands and hit the 50-slash cap."""
+        commands and hit the 50-slash cap.
+        """
         slashes = slack_native_slashes()
         assert slashes[0][0] == "hermes"
 
@@ -329,7 +332,8 @@ class TestSlackNativeSlashes:
     def test_excludes_slack_reserved_commands(self):
         """Slack built-in commands (e.g. /status, /me, /join) cannot be
         registered by apps and must be excluded from the manifest.
-        Users can still reach them via /hermes <command>."""
+        Users can still reach them via /hermes <command>.
+        """
         names = {n for n, _d, _h in slack_native_slashes()}
         for reserved in _SLACK_RESERVED_COMMANDS:
             assert reserved not in names, (
@@ -373,6 +377,7 @@ class TestSlackNativeSlashes:
         tg_names = {n for n, _d in telegram_bot_commands()}
         # Some Telegram names have underscores where Slack uses hyphens
         # (e.g. set_home vs sethome). Normalize both sides for comparison.
+
         def _norm(s: str) -> str:
             return s.replace("-", "_").replace("__", "_").strip("_")
 
@@ -409,7 +414,8 @@ class TestSlackAppManifest:
 
     def test_btw_is_in_manifest(self):
         """Regression: /btw must be a native Slack slash, not just a
-        /hermes subcommand."""
+        /hermes subcommand.
+        """
         m = slack_app_manifest()
         commands = [c["command"] for c in m["features"]["slash_commands"]]
         assert "/btw" in commands
@@ -552,7 +558,7 @@ class TestSlashCommandCompleter:
         completer = SlashCommandCompleter(
             skill_commands_provider=lambda: {
                 "/gif-search": {"description": "Search for GIFs across providers"},
-            }
+            },
         )
 
         completions = _completions(completer, "/gif")
@@ -566,7 +572,7 @@ class TestSlashCommandCompleter:
         completer = SlashCommandCompleter(
             skill_commands_provider=lambda: {
                 "/gif-search": {"description": "Search for GIFs"},
-            }
+            },
         )
 
         completions = _completions(completer, "/gif-search")
@@ -596,7 +602,7 @@ class TestSlashCommandCompleter:
         completer = SlashCommandCompleter(
             skill_commands_provider=lambda: {
                 "/long-skill": {"description": long_desc},
-            }
+            },
         )
         completions = _completions(completer, "/long")
         assert len(completions) == 1
@@ -608,7 +614,7 @@ class TestSlashCommandCompleter:
         completer = SlashCommandCompleter(
             skill_commands_provider=lambda: {
                 "/no-desc": {},
-            }
+            },
         )
         completions = _completions(completer, "/no-desc")
         assert len(completions) == 1
@@ -710,15 +716,13 @@ class TestSubcommandCompletion:
 
     def test_tools_enable_completes_toolset_names(self, monkeypatch):
         """`/tools enable ` should suggest currently-disabled toolsets."""
-        from hermes_cli import commands as commands_mod
-
         # `web` is enabled, `spotify` is disabled — enabling should only offer
         # the disabled ones.
         monkeypatch.setattr(
             "hermes_cli.tools_config._get_platform_tools",
             lambda *_a, **_k: {"web", "file"},
         )
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: {})
+        monkeypatch.setattr("hermes_cli.config.load_config", dict)
         monkeypatch.setattr(
             "hermes_cli.tools_config._get_plugin_toolset_keys",
             lambda: set(),
@@ -736,7 +740,7 @@ class TestSubcommandCompletion:
             "hermes_cli.tools_config._get_platform_tools",
             lambda *_a, **_k: {"web", "file"},
         )
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: {})
+        monkeypatch.setattr("hermes_cli.config.load_config", dict)
         monkeypatch.setattr(
             "hermes_cli.tools_config._get_plugin_toolset_keys",
             lambda: set(),
@@ -752,7 +756,7 @@ class TestSubcommandCompletion:
             "hermes_cli.tools_config._get_platform_tools",
             lambda *_a, **_k: set(),
         )
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: {})
+        monkeypatch.setattr("hermes_cli.config.load_config", dict)
         monkeypatch.setattr(
             "hermes_cli.tools_config._get_plugin_toolset_keys",
             lambda: set(),
@@ -768,7 +772,7 @@ class TestSubcommandCompletion:
             "hermes_cli.tools_config._get_platform_tools",
             lambda *_a, **_k: set(),
         )
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: {})
+        monkeypatch.setattr("hermes_cli.config.load_config", dict)
         monkeypatch.setattr(
             "hermes_cli.tools_config._get_plugin_toolset_keys",
             lambda: set(),
@@ -1132,7 +1136,7 @@ class TestTelegramMenuCommands:
 
     def test_operational_builtins_survive_thirty_command_cap(self, tmp_path, monkeypatch):
         (tmp_path / "config.yaml").write_text(
-            "display:\n  tool_progress_command: true\n"
+            "display:\n  tool_progress_command: true\n",
         )
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
@@ -1157,20 +1161,21 @@ class TestTelegramMenuCommands:
     def test_includes_plugin_commands_via_lazy_discovery(self, tmp_path, monkeypatch):
         """Telegram menu generation should discover plugin slash commands on first access."""
         from unittest.mock import patch
+
         import hermes_cli.plugins as plugins_mod
 
         plugin_dir = tmp_path / "plugins" / "cmd-plugin"
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(
-            "name: cmd-plugin\nversion: 0.1.0\ndescription: Test plugin\n"
+            "name: cmd-plugin\nversion: 0.1.0\ndescription: Test plugin\n",
         )
         (plugin_dir / "__init__.py").write_text(
             "def register(ctx):\n"
-            "    ctx.register_command('lcm', lambda args: 'ok', description='LCM status and diagnostics')\n"
+            "    ctx.register_command('lcm', lambda args: 'ok', description='LCM status and diagnostics')\n",
         )
         # Opt-in: plugins are opt-in by default, so enable in config.yaml
         (tmp_path / "config.yaml").write_text(
-            "plugins:\n  enabled:\n    - cmd-plugin\n"
+            "plugins:\n  enabled:\n    - cmd-plugin\n",
         )
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
@@ -1190,7 +1195,7 @@ class TestTelegramMenuCommands:
             "skills:\n"
             "  platform_disabled:\n"
             "    telegram:\n"
-            "      - my-disabled-skill\n"
+            "      - my-disabled-skill\n",
         )
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
@@ -1245,7 +1250,7 @@ class TestTelegramMenuCommands:
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text(
-            f"skills:\n  external_dirs:\n    - {external_dir}\n"
+            f"skills:\n  external_dirs:\n    - {external_dir}\n",
         )
 
         fake_cmds = {
@@ -1290,8 +1295,8 @@ class TestTelegramMenuCommands:
 
     def test_special_chars_in_skill_names_sanitized(self, tmp_path, monkeypatch):
         """Skills with +, /, or other special chars produce valid Telegram names."""
-        from unittest.mock import patch
         import re
+        from unittest.mock import patch
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
@@ -1477,7 +1482,7 @@ class TestDiscordSkillCommands:
             "skills:\n"
             "  platform_disabled:\n"
             "    discord:\n"
-            "      - secret-skill\n"
+            "      - secret-skill\n",
         )
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 
@@ -1870,7 +1875,7 @@ class TestPluginCommandEnumeration:
         from hermes_cli import plugins as _plugins_mod
 
         monkeypatch.setattr(
-            _plugins_mod, "get_plugin_commands", lambda: dict(commands)
+            _plugins_mod, "get_plugin_commands", lambda: dict(commands),
         )
 
     def test_plugin_command_appears_in_telegram_menu(self, monkeypatch):
@@ -1881,7 +1886,7 @@ class TestPluginCommandEnumeration:
                 "description": "Metrics dashboard",
                 "args_hint": "dias:7",
                 "plugin": "metrics-plugin",
-            }
+            },
         })
         names = {name for name, _desc in telegram_bot_commands()}
         assert "metricas" in names
@@ -1894,7 +1899,7 @@ class TestPluginCommandEnumeration:
                 "description": "Run a background job",
                 "args_hint": "<prompt>",
                 "plugin": "jobs-plugin",
-            }
+            },
         })
         names = {name for name, _desc in telegram_bot_commands()}
         assert "background_job" not in names
@@ -1907,7 +1912,7 @@ class TestPluginCommandEnumeration:
                 "description": "Metrics",
                 "args_hint": "",
                 "plugin": "metrics-plugin",
-            }
+            },
         })
         mapping = slack_subcommand_map()
         assert mapping.get("metricas") == "/metricas"
@@ -1920,7 +1925,7 @@ class TestPluginCommandEnumeration:
                 "description": "Plugin status",
                 "args_hint": "",
                 "plugin": "shadow-plugin",
-            }
+            },
         })
         mapping = slack_subcommand_map()
         # Built-in /status must still be present and not overwritten.
@@ -1934,7 +1939,7 @@ class TestPluginCommandEnumeration:
                 "description": "desc",
                 "args_hint": "",
                 "plugin": "p",
-            }
+            },
         })
         names = {name for name, _desc in telegram_bot_commands()}
         assert "my_plugin_cmd" in names
@@ -1950,7 +1955,7 @@ class TestPluginCommandEnumeration:
                 "description": "Metrics",
                 "args_hint": "",
                 "plugin": "p",
-            }
+            },
         })
         assert is_gateway_known_command("metricas") is True
         assert is_gateway_known_command("definitely-not-registered") is False

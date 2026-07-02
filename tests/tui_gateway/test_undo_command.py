@@ -23,16 +23,16 @@ import pytest
 from hermes_state import SessionDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     monkeypatch.setenv("HERMES_HOME", str(home))
-    yield home
+    return home
 
 
-@pytest.fixture()
+@pytest.fixture
 def server(hermes_home):
     with patch.dict(
         "sys.modules",
@@ -50,12 +50,12 @@ def server(hermes_home):
         importlib.reload(mod)
 
 
-@pytest.fixture()
+@pytest.fixture
 def db(hermes_home):
     return SessionDB(db_path=hermes_home / "state.db")
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_with_history(server, db):
     """Build a session with 3 user turns + assistant replies persisted in DB."""
     sid = "sid-undo"
@@ -179,5 +179,6 @@ def test_undo_errors_when_no_active_session(server):
 
 def test_undo_in_pending_input_commands(server):
     """Registry sanity: /undo must be in _PENDING_INPUT_COMMANDS so
-    slash.exec rejects it and the TUI falls through to command.dispatch."""
+    slash.exec rejects it and the TUI falls through to command.dispatch.
+    """
     assert "undo" in server._PENDING_INPUT_COMMANDS

@@ -1,5 +1,4 @@
-"""
-yuanbao_proto.py - Yuanbao WebSocket 协议编解码（纯 Python 实现）
+"""yuanbao_proto.py - Yuanbao WebSocket 协议编解码（纯 Python 实现）
 
 协议层级：
   WebSocket frame
@@ -20,7 +19,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +184,7 @@ def _encode_message(b: bytes) -> bytes:
 
 
 def _parse_fields(data: bytes) -> list[tuple[int, int, bytes | int]]:
-    """
-    解析 protobuf message 的所有字段，返回 [(field_number, wire_type, raw_value), ...]
+    """解析 protobuf message 的所有字段，返回 [(field_number, wire_type, raw_value), ...]
     raw_value:
       - WT_VARINT: int
       - WT_LEN: bytes
@@ -333,8 +330,7 @@ def _decode_head(data: bytes) -> dict:
 
 
 def encode_conn_msg(msg_type: int, seq_no: int, data: bytes) -> bytes:
-    """
-    编码 ConnMsg（简化接口，对应任务要求的签名）。
+    """编码 ConnMsg（简化接口，对应任务要求的签名）。
 
     Args:
         msg_type: cmd_type（CMD_TYPE 枚举值）
@@ -343,6 +339,7 @@ def encode_conn_msg(msg_type: int, seq_no: int, data: bytes) -> bytes:
 
     Returns:
         ConnMsg 编码后的 bytes
+
     """
     head_bytes = _encode_head(
         cmd_type=msg_type,
@@ -359,8 +356,7 @@ def encode_conn_msg(msg_type: int, seq_no: int, data: bytes) -> bytes:
 
 
 def decode_conn_msg(data: bytes) -> dict:
-    """
-    解码 ConnMsg，返回 {msg_type, seq_no, data, head}。
+    """解码 ConnMsg，返回 {msg_type, seq_no, data, head}。
 
     Returns:
         {
@@ -369,6 +365,7 @@ def decode_conn_msg(data: bytes) -> dict:
           "data":     bytes,    # 内层 payload
           "head":     dict,     # 完整 head 字段
         }
+
     """
     _dbg("decode_conn_msg", data)
     fdict = _fields_to_dict(_parse_fields(data))
@@ -395,8 +392,7 @@ def encode_conn_msg_full(
     data: bytes,
     need_ack: bool = False,
 ) -> bytes:
-    """
-    编码完整的 ConnMsg（含 cmd/msg_id/module 等 head 字段）。
+    """编码完整的 ConnMsg（含 cmd/msg_id/module 等 head 字段）。
     比 encode_conn_msg 提供更多 head 控制。
     """
     head_bytes = _encode_head(
@@ -427,8 +423,7 @@ def encode_conn_msg_full(
 
 
 def encode_biz_msg(service: str, method: str, req_id: str, body: bytes) -> bytes:
-    """
-    将业务 payload 包装为 ConnMsg bytes。
+    """将业务 payload 包装为 ConnMsg bytes。
 
     Args:
         service: 模块名（head.module），如 "yuanbao_openclaw_proxy"
@@ -438,6 +433,7 @@ def encode_biz_msg(service: str, method: str, req_id: str, body: bytes) -> bytes
 
     Returns:
         ConnMsg bytes（可直接发送到 WebSocket）
+
     """
     return encode_conn_msg_full(
         cmd_type=CMD_TYPE["Request"],
@@ -450,8 +446,7 @@ def encode_biz_msg(service: str, method: str, req_id: str, body: bytes) -> bytes
 
 
 def decode_biz_msg(data: bytes) -> dict:
-    """
-    解码 ConnMsg bytes，返回业务层信息。
+    """解码 ConnMsg bytes，返回业务层信息。
 
     Returns:
         {
@@ -462,6 +457,7 @@ def decode_biz_msg(data: bytes) -> dict:
           "is_response": bool,   # cmd_type == 1 (Response)
           "head":        dict,   # 完整 head
         }
+
     """
     result = decode_conn_msg(data)
     head = result["head"]
@@ -671,9 +667,8 @@ def _decode_log_ext(data: bytes) -> dict:
 #   20: log_ext (message LogInfoExt)
 
 
-def decode_inbound_push(data: bytes) -> Optional[dict]:
-    """
-    解析入站消息推送的 biz payload（InboundMessagePush proto bytes）。
+def decode_inbound_push(data: bytes) -> dict | None:
+    """解析入站消息推送的 biz payload（InboundMessagePush proto bytes）。
 
     Args:
         data: ConnMsg.data 字段的 bytes（即 biz payload）
@@ -701,6 +696,7 @@ def decode_inbound_push(data: bytes) -> Optional[dict]:
           "recall_msg_seq_list": [{"msg_seq": int, "msg_id": str}, ...] 或 None,
         }
         或 None（解析失败）
+
     """
     try:
         _dbg("decode_inbound_push input", data)
@@ -833,7 +829,7 @@ def _decode_forward_msg(data: bytes) -> dict:
     }
 
 
-def decode_forward_msg_data(data: bytes) -> Optional[dict]:
+def decode_forward_msg_data(data: bytes) -> dict | None:
     """Parse ForwardMsgData protobuf bytes (the base64-decoded ext_map value).
 
     Args:
@@ -843,6 +839,7 @@ def decode_forward_msg_data(data: bytes) -> Optional[dict]:
         A dict matching the structure consumed by
         ``ForwardedRecordsParseMiddleware.build_forward_text``
         (``sub_type`` / ``nick_name`` / ``msg`` list); ``None`` on parse failure.
+
     """
     try:
         fdict = _fields_to_dict(_parse_fields(data))
@@ -925,12 +922,11 @@ def _encode_send_c2c_req(
     msg_body: list,
     msg_id: str = "",
     msg_random: int = 0,
-    msg_seq: Optional[int] = None,
+    msg_seq: int | None = None,
     group_code: str = "",
     trace_id: str = "",
 ) -> bytes:
-    """
-    Encode a SendC2CMessageReq biz payload.
+    """Encode a SendC2CMessageReq biz payload.
 
     SendC2CMessageReq fields:
       1: msg_id (string)
@@ -970,12 +966,11 @@ def _encode_send_group_req(
     msg_id: str = "",
     to_account: str = "",
     random: str = "",
-    msg_seq: Optional[int] = None,
+    msg_seq: int | None = None,
     ref_msg_id: str = "",
     trace_id: str = "",
 ) -> bytes:
-    """
-    Encode a SendGroupMessageReq biz payload.
+    """Encode a SendGroupMessageReq biz payload.
 
     SendGroupMessageReq fields:
       1: msg_id (string)
@@ -1017,12 +1012,11 @@ def encode_send_c2c_message(
     from_account: str,
     msg_id: str = "",
     msg_random: int = 0,
-    msg_seq: Optional[int] = None,
+    msg_seq: int | None = None,
     group_code: str = "",
     trace_id: str = "",
 ) -> bytes:
-    """
-    Encode a C2C send-message request and return the full ConnMsg bytes
+    """Encode a C2C send-message request and return the full ConnMsg bytes
     (ready to be sent over WebSocket).
 
     Args:
@@ -1039,6 +1033,7 @@ def encode_send_c2c_message(
 
     Returns:
         ConnMsg bytes
+
     """
     biz_bytes = _encode_send_c2c_req(
         to_account=to_account,
@@ -1069,12 +1064,11 @@ def encode_send_group_message(
     msg_id: str = "",
     to_account: str = "",
     random: str = "",
-    msg_seq: Optional[int] = None,
+    msg_seq: int | None = None,
     ref_msg_id: str = "",
     trace_id: str = "",
 ) -> bytes:
-    """
-    Encode a group send-message request and return the full ConnMsg bytes
+    """Encode a group send-message request and return the full ConnMsg bytes
     (ready to be sent over WebSocket).
 
     Args:
@@ -1090,6 +1084,7 @@ def encode_send_group_message(
 
     Returns:
         ConnMsg bytes
+
     """
     biz_bytes = _encode_send_group_req(
         group_code=group_code,
@@ -1129,8 +1124,7 @@ def encode_auth_bind(
     bot_version: str = "",
     route_env: str = "",
 ) -> bytes:
-    """
-    构造 auth-bind 请求 ConnMsg bytes。
+    """构造 auth-bind 请求 ConnMsg bytes。
 
     AuthBindReq fields:
       1: biz_id (string)
@@ -1205,8 +1199,7 @@ def encode_send_private_heartbeat(
     to_account: str,
     heartbeat: int = WS_HEARTBEAT_RUNNING,
 ) -> bytes:
-    """
-    编码 SendPrivateHeartbeatReq，返回完整 ConnMsg bytes。
+    """编码 SendPrivateHeartbeatReq，返回完整 ConnMsg bytes。
 
     SendPrivateHeartbeatReq fields:
       1: from_account (string)
@@ -1233,8 +1226,7 @@ def encode_send_group_heartbeat(
     heartbeat: int = WS_HEARTBEAT_RUNNING,
     send_time: int = 0,
 ) -> bytes:
-    """
-    编码 SendGroupHeartbeatReq，返回完整 ConnMsg bytes。
+    """编码 SendGroupHeartbeatReq，返回完整 ConnMsg bytes。
 
     SendGroupHeartbeatReq fields:
       1: from_account (string)
@@ -1266,8 +1258,7 @@ def encode_send_group_heartbeat(
 # ============================================================
 
 def encode_query_group_info(group_code: str) -> bytes:
-    """
-    编码 QueryGroupInfoReq，返回完整 ConnMsg bytes。
+    """编码 QueryGroupInfoReq，返回完整 ConnMsg bytes。
 
     QueryGroupInfoReq fields:
       1: group_code (string)
@@ -1282,9 +1273,8 @@ def encode_query_group_info(group_code: str) -> bytes:
     )
 
 
-def decode_query_group_info_rsp(data: bytes) -> Optional[dict]:
-    """
-    解码 QueryGroupInfoRsp biz payload。
+def decode_query_group_info_rsp(data: bytes) -> dict | None:
+    """解码 QueryGroupInfoRsp biz payload。
 
     Proto 结构（对齐 TS biz-codec / member.ts queryGroupInfo）：
 
@@ -1303,6 +1293,7 @@ def decode_query_group_info_rsp(data: bytes) -> Optional[dict]:
 
     Returns:
         解码后的 dict，或 None（解析失败）
+
     """
     try:
         fdict = _fields_to_dict(_parse_fields(data))
@@ -1342,8 +1333,7 @@ def encode_get_group_member_list(
     offset: int = 0,
     limit: int = 200,
 ) -> bytes:
-    """
-    编码 GetGroupMemberListReq，返回完整 ConnMsg bytes。
+    """编码 GetGroupMemberListReq，返回完整 ConnMsg bytes。
 
     GetGroupMemberListReq fields:
       1: group_code (string)
@@ -1363,9 +1353,8 @@ def encode_get_group_member_list(
     )
 
 
-def decode_get_group_member_list_rsp(data: bytes) -> Optional[dict]:
-    """
-    解码 GetGroupMemberListRsp biz payload。
+def decode_get_group_member_list_rsp(data: bytes) -> dict | None:
+    """解码 GetGroupMemberListRsp biz payload。
 
     GetGroupMemberListRsp fields:
       1: code         (int32)
@@ -1390,6 +1379,7 @@ def decode_get_group_member_list_rsp(data: bytes) -> Optional[dict]:
           "is_complete": bool,
         }
         或 None（解析失败）
+
     """
     try:
         fdict = _fields_to_dict(_parse_fields(data))

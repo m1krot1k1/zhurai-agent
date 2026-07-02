@@ -75,7 +75,8 @@ def _hermes_0day_entry():
 
 def test_validator_flags_ssh_key_persistence_payload():
     """The hermes-0day authorized_keys payload has NO network egress — it must
-    still be flagged via the persistence-surface rule."""
+    still be flagged via the persistence-surface rule.
+    """
     from hermes_cli.mcp_security import validate_mcp_server_entry
 
     warnings = validate_mcp_server_entry("h1781406356", _hermes_0day_entry())
@@ -102,7 +103,8 @@ def test_validator_flags_persistence_surfaces(script):
 
 def test_ioc_blocklist_rejects_regardless_of_command_shape():
     """A known IOC is refused even when the command isn't a shell interpreter
-    (e.g. an attacker hides the key in an env var on a python MCP)."""
+    (e.g. an attacker hides the key in an env var on a python MCP).
+    """
     from hermes_cli.mcp_security import validate_mcp_server_entry
 
     # IOC in env, command is a benign-looking python server.
@@ -204,7 +206,7 @@ def test_runtime_loader_skips_dangerous_entry(monkeypatch):
 
 
 def test_explicit_registration_skips_dangerous_entry_before_connect(monkeypatch):
-    import tools.mcp_tool as mcp_tool
+    from tools import mcp_tool
 
     monkeypatch.setattr(mcp_tool, "_MCP_AVAILABLE", True)
     monkeypatch.setattr(mcp_tool, "_ensure_mcp_loop", lambda: None)
@@ -270,6 +272,7 @@ def test_migration_disables_existing_dangerous_entry(tmp_path):
 
 def test_dashboard_mcp_add_rejects_dangerous_entry():
     from fastapi.testclient import TestClient
+
     from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
     client = TestClient(app)

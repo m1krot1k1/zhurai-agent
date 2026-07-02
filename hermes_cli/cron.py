@@ -1,5 +1,4 @@
-"""
-Cron subcommand for hermes CLI.
+"""Cron subcommand for hermes CLI.
 
 Handles standalone cron management commands like list, create, edit,
 pause/resume/run/remove, status, and tick.
@@ -8,8 +7,8 @@ pause/resume/run/remove, status, and tick.
 import json
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, List, Optional
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -26,7 +25,7 @@ _GATEWAY_LIFECYCLE_PATTERNS = re.compile(
     r"(hermes\s+gateway\s+(restart|stop|start))"
     r"|(launchctl\s+(kickstart|unload|load|stop|restart)\s+.*hermes)"
     r"|(systemctl\s+(-\S+\s+)*(restart|stop|start)\s+.*hermes)"
-    r"|(p?kill\s+.*hermes.*gateway)"
+    r"|(p?kill\s+.*hermes.*gateway)",
 )
 
 
@@ -35,7 +34,7 @@ def _contains_gateway_lifecycle_command(text: str) -> bool:
     return bool(_GATEWAY_LIFECYCLE_PATTERNS.search(text))
 
 
-def _normalize_skills(single_skill=None, skills: Optional[Iterable[str]] = None) -> Optional[List[str]]:
+def _normalize_skills(single_skill=None, skills: Iterable[str] | None = None) -> list[str] | None:
     if skills is None:
         if single_skill is None:
             return None
@@ -43,7 +42,7 @@ def _normalize_skills(single_skill=None, skills: Optional[Iterable[str]] = None)
     else:
         raw_items = list(skills)
 
-    normalized: List[str] = []
+    normalized: list[str] = []
     for item in raw_items:
         text = str(item or "").strip()
         if text and text not in normalized:
@@ -166,9 +165,9 @@ def cron_status():
         # don't report "will fire" when the ticker is dead or failing
         # (#32612, #32895).
         from cron.jobs import (
+            TICKER_INTERVAL_SECONDS,
             get_ticker_heartbeat_age,
             get_ticker_success_age,
-            TICKER_INTERVAL_SECONDS,
         )
 
         # Allow ~3 missed ticker iterations (+ a little slack) before declaring
@@ -366,10 +365,10 @@ def _job_action(action: str, job_id: str, success_verb: str) -> int:
 
 def cron_command(args):
     """Handle cron subcommands."""
-    subcmd = getattr(args, 'cron_command', None)
+    subcmd = getattr(args, "cron_command", None)
 
     if subcmd is None or subcmd == "list":
-        show_all = getattr(args, 'all', False)
+        show_all = getattr(args, "all", False)
         cron_list(show_all)
         return 0
 

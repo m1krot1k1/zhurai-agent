@@ -3,27 +3,26 @@
 import json
 import logging
 import os
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Awaitable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from tools.vision_tools import (
-    _validate_image_url,
-    _handle_vision_analyze,
-    _determine_mime_type,
-    _image_to_base64_data_url,
-    _resize_image_for_vision,
-    _image_exceeds_dimension,
     _EMBED_MAX_DIMENSION,
-    _is_image_size_error,
     _MAX_BASE64_BYTES,
     _RESIZE_TARGET_BYTES,
-    vision_analyze_tool,
+    _determine_mime_type,
+    _handle_vision_analyze,
+    _image_exceeds_dimension,
+    _image_to_base64_data_url,
+    _is_image_size_error,
+    _resize_image_for_vision,
+    _validate_image_url,
     check_vision_requirements,
+    vision_analyze_tool,
 )
-
 
 # ---------------------------------------------------------------------------
 # _validate_image_url — urlparse-based validation
@@ -59,7 +58,7 @@ class TestValidateImageUrl:
             assert _validate_image_url("https://img.example.com/pic?w=200&h=200") is True
 
     def test_localhost_url_blocked_by_ssrf(self):
-        """localhost URLs are now blocked by SSRF protection."""
+        """Localhost URLs are now blocked by SSRF protection."""
         assert _validate_image_url("http://localhost:8080/image.png") is False
 
     def test_valid_url_with_port(self):
@@ -177,14 +176,14 @@ class TestHandleVisionAnalyze:
     def test_returns_awaitable(self):
         """The handler must return an Awaitable (coroutine) since it's registered as async."""
         with patch(
-            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock
+            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock,
         ) as mock_tool:
             mock_tool.return_value = json.dumps({"result": "ok"})
             result = _handle_vision_analyze(
                 {
                     "image_url": "https://example.com/img.png",
                     "question": "What is this?",
-                }
+                },
             )
             # It should be an Awaitable (coroutine)
             assert isinstance(result, Awaitable)
@@ -194,14 +193,14 @@ class TestHandleVisionAnalyze:
     def test_prompt_contains_question(self):
         """The full prompt should incorporate the user's question."""
         with patch(
-            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock
+            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock,
         ) as mock_tool:
             mock_tool.return_value = json.dumps({"result": "ok"})
             coro = _handle_vision_analyze(
                 {
                     "image_url": "https://example.com/img.png",
                     "question": "Describe the cat",
-                }
+                },
             )
             # Clean up coroutine
             coro.close()
@@ -214,13 +213,13 @@ class TestHandleVisionAnalyze:
         """AUXILIARY_VISION_MODEL env var should override DEFAULT_VISION_MODEL."""
         with (
             patch(
-                "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock
+                "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock,
             ) as mock_tool,
             patch.dict(os.environ, {"AUXILIARY_VISION_MODEL": "custom/model-v1"}),
         ):
             mock_tool.return_value = json.dumps({"result": "ok"})
             coro = _handle_vision_analyze(
-                {"image_url": "https://example.com/img.png", "question": "test"}
+                {"image_url": "https://example.com/img.png", "question": "test"},
             )
             coro.close()
             call_args = mock_tool.call_args
@@ -231,7 +230,7 @@ class TestHandleVisionAnalyze:
         """Without AUXILIARY_VISION_MODEL, model should be None (let call_llm resolve default)."""
         with (
             patch(
-                "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock
+                "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock,
             ) as mock_tool,
             patch.dict(os.environ, {}, clear=False),
         ):
@@ -239,7 +238,7 @@ class TestHandleVisionAnalyze:
             os.environ.pop("AUXILIARY_VISION_MODEL", None)
             mock_tool.return_value = json.dumps({"result": "ok"})
             coro = _handle_vision_analyze(
-                {"image_url": "https://example.com/img.png", "question": "test"}
+                {"image_url": "https://example.com/img.png", "question": "test"},
             )
             coro.close()
             call_args = mock_tool.call_args
@@ -251,7 +250,7 @@ class TestHandleVisionAnalyze:
     def test_empty_args_graceful(self):
         """Missing keys should default to empty strings, not raise."""
         with patch(
-            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock
+            "tools.vision_tools.vision_analyze_tool", new_callable=AsyncMock,
         ) as mock_tool:
             mock_tool.return_value = json.dumps({"result": "ok"})
             result = _handle_vision_analyze({})
@@ -285,7 +284,7 @@ class TestErrorLoggingExcInfo:
                 pytest.raises(ConnectionError),
             ):
                 await _download_image(
-                    "https://example.com/img.jpg", dest, max_retries=1
+                    "https://example.com/img.jpg", dest, max_retries=1,
                 )
 
             # Should have logged with exc_info (traceback present)
@@ -306,7 +305,7 @@ class TestErrorLoggingExcInfo:
             caplog.at_level(logging.ERROR, logger="tools.vision_tools"),
         ):
             result = await vision_analyze_tool(
-                "https://example.com/img.jpg", "describe this", "test/model"
+                "https://example.com/img.jpg", "describe this", "test/model",
             )
             result_data = json.loads(result)
             # Error response uses "success": False, not an "error" key
@@ -354,7 +353,7 @@ class TestErrorLoggingExcInfo:
 
                 with patch.object(Path, "unlink", failing_unlink):
                     result = await vision_analyze_tool(
-                        "https://example.com/tempimg.jpg", "describe", "test/model"
+                        "https://example.com/tempimg.jpg", "describe", "test/model",
                     )
 
             warning_records = [
@@ -380,7 +379,7 @@ class TestVisionConfig:
 
         with (
             patch("hermes_cli.config.load_config", return_value={
-                "auxiliary": {"vision": {"temperature": 1, "timeout": 77}}
+                "auxiliary": {"vision": {"temperature": 1, "timeout": 77}},
             }),
             patch(
                 "tools.vision_tools._image_to_base64_data_url",
@@ -513,12 +512,12 @@ class TestVisionRequirements:
     def test_check_requirements_accepts_codex_auth(self, monkeypatch, tmp_path):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         (tmp_path / "auth.json").write_text(
-            '{"active_provider":"openai-codex","providers":{"openai-codex":{"tokens":{"access_token":"codex-access-token","refresh_token":"codex-refresh-token"}}}}'
+            '{"active_provider":"openai-codex","providers":{"openai-codex":{"tokens":{"access_token":"codex-access-token","refresh_token":"codex-refresh-token"}}}}',
         )
         # config.yaml must reference the codex provider so vision auto-detect
         # falls back to the active provider via _read_main_provider().
         (tmp_path / "config.yaml").write_text(
-            'model:\n  default: gpt-4o\n  provider: openai-codex\n'
+            "model:\n  default: gpt-4o\n  provider: openai-codex\n",
         )
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
@@ -570,7 +569,7 @@ class TestTildeExpansion:
             ),
         ):
             result = await vision_analyze_tool(
-                "~/test_image.png", "describe this", "test/model"
+                "~/test_image.png", "describe this", "test/model",
             )
             data = json.loads(result)
             assert data["success"] is True
@@ -585,7 +584,7 @@ class TestTildeExpansion:
         monkeypatch.setenv("USERPROFILE", str(fake_home))
 
         result = await vision_analyze_tool(
-            "~/nonexistent.png", "describe this", "test/model"
+            "~/nonexistent.png", "describe this", "test/model",
         )
         data = json.loads(result)
         assert data["success"] is False
@@ -622,7 +621,7 @@ class TestFileUriSupport:
             ),
         ):
             result = await vision_analyze_tool(
-                f"file://{img}", "describe this", "test/model"
+                f"file://{img}", "describe this", "test/model",
             )
             data = json.loads(result)
             assert data["success"] is True
@@ -631,7 +630,7 @@ class TestFileUriSupport:
     async def test_file_uri_nonexistent_gives_error(self, tmp_path):
         """file:// pointing to a missing file should fail gracefully."""
         result = await vision_analyze_tool(
-            f"file://{tmp_path}/nonexistent.png", "describe this", "test/model"
+            f"file://{tmp_path}/nonexistent.png", "describe this", "test/model",
         )
         data = json.loads(result)
         assert data["success"] is False
@@ -699,7 +698,7 @@ class TestErrorClassification:
 
         api_error = Exception(
             "Error code: 400 - {'type': 'error', 'error': "
-            "{'type': 'invalid_request_error', 'message': 'Invalid request data'}}"
+            "{'type': 'invalid_request_error', 'message': 'Invalid request data'}}",
         )
 
         with (
@@ -1000,14 +999,14 @@ class TestDownloadRetryClassification:
         request = httpx.Request("GET", "https://example.com/img.jpg")
         response = httpx.Response(status_code, request=request)
         return httpx.HTTPStatusError(
-            f"{status_code}", request=request, response=response
+            f"{status_code}", request=request, response=response,
         )
 
     def _make_client_raising_status(self, status_code):
         """AsyncClient whose response.raise_for_status() raises HTTPStatusError."""
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock(
-            side_effect=self._status_error(status_code)
+            side_effect=self._status_error(status_code),
         )
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -1034,6 +1033,7 @@ class TestDownloadRetryClassification:
     async def test_404_fails_fast_without_retry(self, tmp_path):
         """A 404 must raise on the first attempt — no backoff sleep, no extra GETs."""
         import httpx
+
         from tools.vision_tools import _download_image
 
         mock_client = self._make_client_raising_status(404)
@@ -1044,7 +1044,7 @@ class TestDownloadRetryClassification:
             pytest.raises(httpx.HTTPStatusError),
         ):
             await _download_image(
-                "https://example.com/missing.jpg", tmp_path / "x.jpg", max_retries=3
+                "https://example.com/missing.jpg", tmp_path / "x.jpg", max_retries=3,
             )
         # Exactly one attempt, zero backoff sleeps.
         assert mock_client.get.await_count == 1
@@ -1054,6 +1054,7 @@ class TestDownloadRetryClassification:
     async def test_503_retries_then_raises(self, tmp_path):
         """A 5xx is retried up to max_retries, sleeping between attempts."""
         import httpx
+
         from tools.vision_tools import _download_image
 
         mock_client = self._make_client_raising_status(503)
@@ -1064,7 +1065,7 @@ class TestDownloadRetryClassification:
             pytest.raises(httpx.HTTPStatusError),
         ):
             await _download_image(
-                "https://example.com/flaky.jpg", tmp_path / "y.jpg", max_retries=3
+                "https://example.com/flaky.jpg", tmp_path / "y.jpg", max_retries=3,
             )
         # All three attempts used, two backoff sleeps between them.
         assert mock_client.get.await_count == 3

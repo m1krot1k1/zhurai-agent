@@ -13,7 +13,6 @@ import base64
 import json
 from unittest.mock import patch
 
-
 from tools.vision_tools import (
     _build_native_vision_tool_result,
     _handle_vision_analyze,
@@ -21,10 +20,9 @@ from tools.vision_tools import (
     _vision_analyze_native,
 )
 
-
 # Minimal valid 1x1 PNG bytes.
 _TINY_PNG = base64.b64decode(
-    b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+    b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
 )
 
 
@@ -101,7 +99,7 @@ class TestVisionAnalyzeNative:
         img = tmp_path / "test.png"
         img.write_bytes(_TINY_PNG)
         result = asyncio.get_event_loop().run_until_complete(
-            _vision_analyze_native(str(img), "what is this?")
+            _vision_analyze_native(str(img), "what is this?"),
         )
         assert isinstance(result, dict)
         assert result.get("_multimodal") is True
@@ -113,7 +111,7 @@ class TestVisionAnalyzeNative:
 
     def test_missing_file_returns_error_string(self, tmp_path):
         result = asyncio.get_event_loop().run_until_complete(
-            _vision_analyze_native(str(tmp_path / "nope.png"), "?")
+            _vision_analyze_native(str(tmp_path / "nope.png"), "?"),
         )
         # tool_error returns a JSON string, not the multimodal envelope
         assert isinstance(result, str)
@@ -123,7 +121,7 @@ class TestVisionAnalyzeNative:
 
     def test_empty_image_url_returns_error(self):
         result = asyncio.get_event_loop().run_until_complete(
-            _vision_analyze_native("", "?")
+            _vision_analyze_native("", "?"),
         )
         assert isinstance(result, str)
         parsed = json.loads(result)
@@ -134,7 +132,7 @@ class TestVisionAnalyzeNative:
         img = tmp_path / "t.png"
         img.write_bytes(_TINY_PNG)
         result = asyncio.get_event_loop().run_until_complete(
-            _vision_analyze_native(f"file://{img}", "?")
+            _vision_analyze_native(f"file://{img}", "?"),
         )
         assert isinstance(result, dict)
         assert result.get("_multimodal") is True
@@ -164,7 +162,7 @@ class TestVisionAnalyzeNative:
         assert big.stat().st_size * 4 // 3 > 5 * 1024 * 1024, "test image not big enough"
 
         result = asyncio.get_event_loop().run_until_complete(
-            _vision_analyze_native(str(big), "describe")
+            _vision_analyze_native(str(big), "describe"),
         )
         assert isinstance(result, dict) and result.get("_multimodal") is True
         url = next(
@@ -190,7 +188,7 @@ class TestHandleVisionAnalyzeFastPath:
         img.write_bytes(_TINY_PNG)
 
         # Set runtime override so the handler thinks we're on opus@openrouter
-        from agent.auxiliary_client import set_runtime_main, clear_runtime_main
+        from agent.auxiliary_client import clear_runtime_main, set_runtime_main
         set_runtime_main("openrouter", "anthropic/claude-opus-4.6")
         try:
             # Mock decide_image_input_mode to always return "native" so the
@@ -216,7 +214,7 @@ class TestHandleVisionAnalyzeFastPath:
         async def _aux_sentinel(*args, **kwargs):
             return '{"sentinel": "aux-path"}'
 
-        from agent.auxiliary_client import set_runtime_main, clear_runtime_main
+        from agent.auxiliary_client import clear_runtime_main, set_runtime_main
         set_runtime_main("openrouter", "qwen/qwen3-coder")
         try:
             with patch("tools.vision_tools.vision_analyze_tool", side_effect=_aux_sentinel):
@@ -236,7 +234,7 @@ class TestHandleVisionAnalyzeFastPath:
         async def _aux_sentinel(*args, **kwargs):
             return '{"sentinel": "aux-path"}'
 
-        from agent.auxiliary_client import set_runtime_main, clear_runtime_main
+        from agent.auxiliary_client import clear_runtime_main, set_runtime_main
         set_runtime_main("brand-new-provider", "anthropic/claude-opus-4.6")
         try:
             with patch("tools.vision_tools.vision_analyze_tool", side_effect=_aux_sentinel):
@@ -256,7 +254,7 @@ class TestHandleVisionAnalyzeFastPath:
         async def _aux_sentinel(*args, **kwargs):
             return '{"sentinel": "aux-path"}'
 
-        from agent.auxiliary_client import set_runtime_main, clear_runtime_main
+        from agent.auxiliary_client import clear_runtime_main, set_runtime_main
         set_runtime_main("brand-new-provider", "llava-v1.6")
         try:
             with patch(
@@ -281,7 +279,7 @@ class TestHandleVisionAnalyzeFastPath:
         async def _aux_sentinel(*args, **kwargs):
             return '{"sentinel": "aux-path"}'
 
-        from agent.auxiliary_client import set_runtime_main, clear_runtime_main
+        from agent.auxiliary_client import clear_runtime_main, set_runtime_main
         set_runtime_main("brand-new-provider", "llava-v1.6")
         try:
             with patch(

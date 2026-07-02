@@ -9,14 +9,14 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, FrozenSet, Optional
+from typing import Any
 
 from hermes_cli.auth import (
-    AuthError,
     DEFAULT_NOUS_INFERENCE_URL,
-    _load_auth_store,
+    AuthError,
     _auth_store_lock,
     _is_terminal_nous_refresh_error,
+    _load_auth_store,
     _quarantine_nous_oauth_state,
     _quarantine_nous_pool_entries,
     _save_auth_store,
@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 # Endpoints inference-api.nousresearch.com actually serves. Anything else
 # the proxy will reject with 404 — keeps stray clients from leaking weird
 # requests to the upstream.
-_ALLOWED_PATHS: FrozenSet[str] = frozenset(
+_ALLOWED_PATHS: frozenset[str] = frozenset(
     {
         "/chat/completions",
         "/completions",
         "/embeddings",
         "/models",
-    }
+    },
 )
 
 
@@ -58,7 +58,7 @@ class NousPortalAdapter(UpstreamAdapter):
         return "Nous Portal"
 
     @property
-    def allowed_paths(self) -> FrozenSet[str]:
+    def allowed_paths(self) -> frozenset[str]:
         return _ALLOWED_PATHS
 
     def is_authenticated(self) -> bool:
@@ -69,7 +69,7 @@ class NousPortalAdapter(UpstreamAdapter):
         # to recover. The refresh helper validates and refreshes as needed.
         return bool(
             state.get("agent_key")
-            or (state.get("refresh_token") and state.get("access_token"))
+            or (state.get("refresh_token") and state.get("access_token")),
         )
 
     def get_credential(self) -> UpstreamCredential:
@@ -80,7 +80,7 @@ class NousPortalAdapter(UpstreamAdapter):
         *,
         failed_credential: UpstreamCredential,
         status_code: int,
-    ) -> Optional[UpstreamCredential]:
+    ) -> UpstreamCredential | None:
         _ = failed_credential
         if status_code != 401:
             return None
@@ -98,7 +98,7 @@ class NousPortalAdapter(UpstreamAdapter):
             state = self._read_state()
             if state is None:
                 raise RuntimeError(
-                    "Not logged into Nous Portal. Run `hermes auth add nous` first."
+                    "Not logged into Nous Portal. Run `hermes auth add nous` first.",
                 )
 
             try:
@@ -118,18 +118,18 @@ class NousPortalAdapter(UpstreamAdapter):
                         quarantine_reason="proxy_refresh_failure",
                     )
                 raise RuntimeError(
-                    f"Failed to refresh Nous Portal credentials: {exc}"
+                    f"Failed to refresh Nous Portal credentials: {exc}",
                 ) from exc
             except Exception as exc:
                 raise RuntimeError(
-                    f"Failed to refresh Nous Portal credentials: {exc}"
+                    f"Failed to refresh Nous Portal credentials: {exc}",
                 ) from exc
 
             runtime_key = refreshed.get("api_key")
             if not runtime_key:
                 raise RuntimeError(
                     "Nous Portal refresh did not return a usable inference JWT. "
-                    "Try `hermes auth add nous` to re-authenticate."
+                    "Try `hermes auth add nous` to re-authenticate.",
                 )
 
             base_url = (
@@ -149,7 +149,7 @@ class NousPortalAdapter(UpstreamAdapter):
     # to hermes_cli.auth to avoid expanding that module's public surface.
     # ------------------------------------------------------------------
 
-    def _read_state(self) -> Optional[Dict[str, Any]]:
+    def _read_state(self) -> dict[str, Any] | None:
         try:
             with _auth_store_lock():
                 store = _load_auth_store()
@@ -164,10 +164,10 @@ class NousPortalAdapter(UpstreamAdapter):
 
     def _save_state(
         self,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         *,
-        quarantine_error: Optional[AuthError] = None,
-        quarantine_reason: Optional[str] = None,
+        quarantine_error: AuthError | None = None,
+        quarantine_reason: str | None = None,
     ) -> None:
         try:
             with _auth_store_lock():

@@ -9,12 +9,11 @@ Covers:
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 import pytest
 
 from tests.tools.conftest import register_all_web_providers
-
 
 # ---------------------------------------------------------------------------
 # ABC enforcement
@@ -56,7 +55,7 @@ class TestWebProviderABCs:
             def supports_search(self) -> bool:
                 return True
 
-            def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+            def search(self, query: str, limit: int = 5) -> dict[str, Any]:
                 return {"success": True, "data": {"web": []}}
 
         d = Dummy()
@@ -88,10 +87,10 @@ class TestWebProviderABCs:
             def supports_extract(self) -> bool:
                 return True
 
-            def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+            def search(self, query: str, limit: int = 5) -> dict[str, Any]:
                 return {"success": True, "data": {"web": []}}
 
-            def extract(self, urls: List[str], **kwargs: Any) -> List[Dict[str, Any]]:
+            def extract(self, urls: list[str], **kwargs: Any) -> list[dict[str, Any]]:
                 return [{"url": urls[0], "content": "x"}]
 
         d = Dummy()
@@ -118,7 +117,7 @@ class TestWebProviderABCs:
             def supports_search(self) -> bool:
                 return True
 
-            def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+            def search(self, query: str, limit: int = 5) -> dict[str, Any]:
                 return {"success": True, "data": {"web": []}}
 
         # Should instantiate fine — extract has default supports_*()
@@ -302,7 +301,7 @@ class TestUnconfiguredErrorEnvelopeParity:
         monkeypatch.setattr(web_tools, "_firecrawl_client", None, raising=False)
         monkeypatch.setattr(web_tools, "_firecrawl_client_config", None, raising=False)
         monkeypatch.setattr(web_tools, "_ddgs_package_importable", lambda: False)
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
 
         result = json.loads(web_tools.web_search_tool("hello world", limit=3))
         assert "error" in result, f"expected top-level 'error' key, got {result}"
@@ -333,7 +332,8 @@ class TestDispatchersTriggerPluginDiscovery:
     def _clear_registry(self):
         """Reset the web_search registry to empty and return a callback
         that restores the original contents. Used in a try/finally so the
-        snapshot is restored even when the dispatcher under test raises."""
+        snapshot is restored even when the dispatcher under test raises.
+        """
         from agent import web_search_registry
 
         with web_search_registry._lock:
@@ -361,8 +361,9 @@ class TestDispatchersTriggerPluginDiscovery:
         import asyncio
         import json
         from unittest.mock import MagicMock
-        from agent.web_search_provider import WebSearchProvider
+
         from agent import web_search_registry
+        from agent.web_search_provider import WebSearchProvider
         from tools import web_tools
 
         restore = self._clear_registry()
@@ -406,7 +407,7 @@ class TestDispatchersTriggerPluginDiscovery:
             # the test stays valid even if the import inside the helper is
             # later moved to module scope or renamed.
             monkeypatch.setattr(
-                web_tools, "_ensure_web_plugins_loaded", mock_hook
+                web_tools, "_ensure_web_plugins_loaded", mock_hook,
             )
             monkeypatch.setattr(
                 web_tools, "_load_web_config",
@@ -419,7 +420,7 @@ class TestDispatchersTriggerPluginDiscovery:
                 web_tools.web_extract_tool(
                     ["https://example.com"],
                     use_llm_processing=False,
-                )
+                ),
             ))
 
             # The hook must have been called BEFORE the registry lookup —
@@ -442,8 +443,9 @@ class TestDispatchersTriggerPluginDiscovery:
         """
         import json
         from unittest.mock import MagicMock
-        from agent.web_search_provider import WebSearchProvider
+
         from agent import web_search_registry
+        from agent.web_search_provider import WebSearchProvider
         from tools import web_tools
 
         restore = self._clear_registry()
@@ -466,7 +468,7 @@ class TestDispatchersTriggerPluginDiscovery:
                 def search(self, query, limit=5):
                     return {"success": True, "data": {"web": [
                         {"title": "ok", "url": "https://x", "description": "",
-                         "position": 0}
+                         "position": 0},
                     ]}}
 
             def _register_fake() -> None:
@@ -475,7 +477,7 @@ class TestDispatchersTriggerPluginDiscovery:
 
             mock_hook = MagicMock(wraps=_register_fake)
             monkeypatch.setattr(
-                web_tools, "_ensure_web_plugins_loaded", mock_hook
+                web_tools, "_ensure_web_plugins_loaded", mock_hook,
             )
             monkeypatch.setattr(
                 web_tools, "_load_web_config",
@@ -492,4 +494,3 @@ class TestDispatchersTriggerPluginDiscovery:
             assert web_search_registry.get_provider("brave-free") is not None
         finally:
             restore()
-

@@ -9,7 +9,6 @@ cron job store.
 import importlib
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -17,12 +16,12 @@ from cron.blueprint_catalog import (
     CATALOG,
     BlueprintFillError,
     BlueprintSlot,
-    fill_blueprint,
-    get_blueprint,
     blueprint_catalog_entry,
     blueprint_deeplink,
     blueprint_form_schema,
     blueprint_slash_command,
+    fill_blueprint,
+    get_blueprint,
 )
 
 
@@ -118,7 +117,7 @@ class TestValidation:
 
     def test_origin_threads_through(self):
         spec = fill_blueprint(
-            get_blueprint("morning-brief"), {"time": "08:00"}, origin={"platform": "telegram", "chat_id": "9"}
+            get_blueprint("morning-brief"), {"time": "08:00"}, origin={"platform": "telegram", "chat_id": "9"},
         )
         assert spec["origin"] == {"platform": "telegram", "chat_id": "9"}
 
@@ -137,7 +136,7 @@ class TestRenderers:
 
     def test_slash_command_quotes_freetext(self):
         cmd = blueprint_slash_command(
-            get_blueprint("custom-reminder"), {"what": "drink water", "time": "10:00"}
+            get_blueprint("custom-reminder"), {"what": "drink water", "time": "10:00"},
         )
         assert '"drink water"' in cmd
 
@@ -161,7 +160,7 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(home))
     import hermes_constants
     importlib.reload(hermes_constants)
-    import cron.jobs as jobs
+    from cron import jobs
     importlib.reload(jobs)
     return jobs
 

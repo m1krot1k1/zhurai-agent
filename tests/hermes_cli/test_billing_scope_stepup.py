@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-import hermes_cli.auth as auth
+from hermes_cli import auth
 from hermes_cli.auth import (
     NOUS_BILLING_MANAGE_SCOPE,
     nous_token_has_billing_scope,
     step_up_nous_billing_scope,
 )
-
 
 # ---------------------------------------------------------------------------
 # nous_token_has_billing_scope
@@ -28,7 +27,7 @@ def test_has_scope_true_when_present(monkeypatch):
 
 def test_has_scope_false_when_absent(monkeypatch):
     monkeypatch.setattr(
-        auth, "get_provider_auth_state", lambda p: {"scope": "inference:invoke tool:invoke"}
+        auth, "get_provider_auth_state", lambda p: {"scope": "inference:invoke tool:invoke"},
     )
     assert nous_token_has_billing_scope() is False
 
@@ -41,7 +40,7 @@ def test_has_scope_false_when_no_state(monkeypatch):
 def test_has_scope_no_substring_false_positive(monkeypatch):
     # "billing:manage-lite" must NOT match billing:manage (split-based, not substring).
     monkeypatch.setattr(
-        auth, "get_provider_auth_state", lambda p: {"scope": "billing:manage-lite"}
+        auth, "get_provider_auth_state", lambda p: {"scope": "billing:manage-lite"},
     )
     assert nous_token_has_billing_scope() is False
 
@@ -55,7 +54,7 @@ def test_has_scope_no_substring_false_positive(monkeypatch):
 def _stub_persist(monkeypatch):
     """Neutralize the persistence side-effects so step-up tests are pure."""
     monkeypatch.setattr(auth, "_auth_store_lock", lambda: _NullCtx())
-    monkeypatch.setattr(auth, "_load_auth_store", lambda: {})
+    monkeypatch.setattr(auth, "_load_auth_store", dict)
     monkeypatch.setattr(auth, "_save_provider_state", lambda *a, **kw: None)
     monkeypatch.setattr(auth, "_save_auth_store", lambda *a, **kw: "auth.json")
     monkeypatch.setattr(auth, "_write_shared_nous_state", lambda *a, **kw: None)
@@ -152,7 +151,8 @@ def test_step_up_forwards_on_verification_callback(monkeypatch, _stub_persist):
 
 def test_device_login_fires_on_verification_before_polling(monkeypatch):
     """on_verification(url, code) must fire BEFORE _poll_for_token (so the TUI
-    can render the link while the flow blocks waiting for approval)."""
+    can render the link while the flow blocks waiting for approval).
+    """
     order: list[str] = []
 
     monkeypatch.setattr(

@@ -14,7 +14,6 @@ import pytest
 
 from hermes_cli import send_cmd
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -70,7 +69,7 @@ def test_positional_message_success(fake_tool, capsys):
         send_cmd.cmd_send(args)
     assert exc.value.code == 0
     assert fake_tool.calls == [
-        {"action": "send", "target": "telegram", "message": "hello world"}
+        {"action": "send", "target": "telegram", "message": "hello world"},
     ]
     out = capsys.readouterr()
     assert "sent" in out.out or out.out == ""  # "sent" is the default success banner
@@ -213,7 +212,7 @@ def test_skipped_result_is_success(monkeypatch):
 
     fake_mod = _types.ModuleType("tools.send_message_tool")
     fake_mod.send_message_tool = lambda args, **_kw: json.dumps(
-        {"success": True, "skipped": True, "reason": "duplicate"}
+        {"success": True, "skipped": True, "reason": "duplicate"},
     )
     monkeypatch.setitem(_sys.modules, "tools.send_message_tool", fake_mod)
 
@@ -235,7 +234,7 @@ def test_list_human_output(monkeypatch, capsys):
     fake_dir = _types.ModuleType("gateway.channel_directory")
     fake_dir.format_directory_for_display = lambda: "Available messaging targets:\n\nTelegram:\n  telegram:-100123\n"
     fake_dir.load_directory = lambda: {
-        "platforms": {"telegram": [{"id": "-100123", "name": "Test Group"}]}
+        "platforms": {"telegram": [{"id": "-100123", "name": "Test Group"}]},
     }
     monkeypatch.setitem(_sys.modules, "gateway.channel_directory", fake_dir)
 
@@ -254,7 +253,7 @@ def test_list_json(monkeypatch, capsys):
     fake_dir = _types.ModuleType("gateway.channel_directory")
     fake_dir.format_directory_for_display = lambda: "(ignored in json mode)"
     fake_dir.load_directory = lambda: {
-        "platforms": {"telegram": [{"id": "-100123", "name": "Test Group"}]}
+        "platforms": {"telegram": [{"id": "-100123", "name": "Test Group"}]},
     }
     monkeypatch.setitem(_sys.modules, "gateway.channel_directory", fake_dir)
 
@@ -277,7 +276,7 @@ def test_list_filter_platform(monkeypatch, capsys):
         "platforms": {
             "telegram": [{"id": "-100123", "name": "TG Chat"}],
             "discord": [{"id": "555", "name": "bot-home"}],
-        }
+        },
     }
     monkeypatch.setitem(_sys.modules, "gateway.channel_directory", fake_dir)
 
@@ -348,7 +347,7 @@ def test_load_hermes_env_bridges_config_yaml_scalars(tmp_path, monkeypatch):
     hermes_home.mkdir()
     (hermes_home / ".env").write_text("SOME_TOKEN=abc123\n")
     (hermes_home / "config.yaml").write_text(
-        "TELEGRAM_HOME_CHANNEL: '5550001111'\nnested:\n  ignored: true\n"
+        "TELEGRAM_HOME_CHANNEL: '5550001111'\nnested:\n  ignored: true\n",
     )
 
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -379,6 +378,7 @@ def test_load_hermes_env_does_not_override_existing(tmp_path, monkeypatch):
     monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "env_value")
 
     from importlib import reload
+
     import hermes_cli.config as _hc_config
     reload(_hc_config)
 
@@ -394,6 +394,7 @@ def test_load_hermes_env_handles_missing_files(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
 
     from importlib import reload
+
     import hermes_cli.config as _hc_config
     reload(_hc_config)
 

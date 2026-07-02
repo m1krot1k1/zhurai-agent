@@ -7,8 +7,10 @@ Jaccard similarity reranking and trust-weighted scoring.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 if TYPE_CHECKING:
     from .store import MemoryStore
@@ -148,7 +150,7 @@ class FactRetriever:
                 extracted = hrr.unbind(bank_vec, probe_key)
                 # Use extracted signal to score individual facts
                 return self._score_facts_by_vector(
-                    extracted, category=category, limit=limit
+                    extracted, category=category, limit=limit,
                 )
 
         # Score against individual fact vectors directly
@@ -443,7 +445,7 @@ class FactRetriever:
 
     def _score_facts_by_vector(
         self,
-        target_vec: "np.ndarray",
+        target_vec: np.ndarray,
         category: str | None = None,
         limit: int = 10,
     ) -> list[dict]:
@@ -582,9 +584,9 @@ class FactRetriever:
                 ts = timestamp_str
 
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
 
-            age_days = (datetime.now(timezone.utc) - ts).total_seconds() / 86400
+            age_days = (datetime.now(UTC) - ts).total_seconds() / 86400
             if age_days < 0:
                 return 1.0
 

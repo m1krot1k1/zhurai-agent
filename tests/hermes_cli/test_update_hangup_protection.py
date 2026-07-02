@@ -15,11 +15,10 @@ import sys
 import pytest
 
 from hermes_cli.main import (
-    _UpdateOutputStream,
     _finalize_update_output,
     _install_hangup_protection,
+    _UpdateOutputStream,
 )
-
 
 # -----------------------------------------------------------------------------
 # _UpdateOutputStream
@@ -130,7 +129,7 @@ class TestUpdateOutputStream:
                 return True
 
             def write(self, data):
-                raise BrokenPipeError()
+                raise BrokenPipeError
 
             def flush(self):
                 return None
@@ -177,7 +176,7 @@ class TestInstallHangupProtection:
             _finalize_update_output(state)
 
     @pytest.mark.skipif(
-        not hasattr(signal, "SIGHUP"), reason="SIGHUP not available on this platform"
+        not hasattr(signal, "SIGHUP"), reason="SIGHUP not available on this platform",
     )
     def test_installs_sighup_ignore(self, tmp_path, monkeypatch):
         """SIGHUP should be set to SIG_IGN so SSH disconnect doesn't kill the update."""
@@ -253,7 +252,7 @@ class TestInstallHangupProtection:
 
         # Patch the import inside _install_hangup_protection.
         monkeypatch.setattr(
-            "hermes_cli.config.get_hermes_home", _boom, raising=True
+            "hermes_cli.config.get_hermes_home", _boom, raising=True,
         )
 
         original_handler = (
@@ -305,7 +304,8 @@ class TestFinalizeUpdateOutput:
 
     def test_skipped_install_leaves_stdio_alone(self):
         """When install failed (state['installed']=False) finalize should not
-        touch sys.stdout / sys.stderr (they were never wrapped)."""
+        touch sys.stdout / sys.stderr (they were never wrapped).
+        """
         # Build a synthetic state that mimics a failed install.
         sentinel_out = object()
         state = {

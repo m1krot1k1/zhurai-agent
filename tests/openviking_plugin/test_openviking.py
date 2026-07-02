@@ -11,7 +11,7 @@ def _write_skill(skills_dir, name, body="Do the thing."):
     skill_dir = skills_dir / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(
-        f"---\nname: {name}\ndescription: Description for {name}\n---\n\n# {name}\n\n{body}\n"
+        f"---\nname: {name}\ndescription: Description for {name}\n---\n\n# {name}\n\n{body}\n",
     )
     return skill_dir
 
@@ -30,7 +30,7 @@ class FakeVikingClient:
 
     def get(self, path, params=None, **kwargs):
         self.calls.append((path, params or {}))
-        response = self.responses[(path, tuple(sorted((params or {}).items())))]
+        response = self.responses[path, tuple(sorted((params or {}).items()))]
         if isinstance(response, Exception):
             raise response
         return response
@@ -85,9 +85,8 @@ class TestOpenVikingSkillQuerySafety:
         assert openviking_plugin._derive_openviking_user_text(skill_message) == ""
 
     def test_skill_markers_match_hermes_scaffolding(self, tmp_path, monkeypatch):
-        import agent.skill_bundles as skill_bundles
-        import agent.skill_commands as skill_commands
-        import tools.skills_tool as skills_tool
+        from agent import skill_bundles, skill_commands
+        from tools import skills_tool
 
         skills_dir = tmp_path / "skills"
         bundles_dir = tmp_path / "skill-bundles"
@@ -128,7 +127,7 @@ class TestOpenVikingSkillQuerySafety:
         RecordingVikingClient.calls = []
         monkeypatch.setattr(openviking_plugin, "_VikingClient", RecordingVikingClient)
         provider = OpenVikingMemoryProvider()
-        provider._client = cast(Any, object())
+        provider._client = cast("Any", object())
         provider._endpoint = "http://openviking.test"
         provider._api_key = ""
         provider._account = "default"
@@ -151,14 +150,14 @@ class TestOpenVikingSkillQuerySafety:
             (
                 "/api/v1/search/find",
                 {"query": "make a skill for release triage", "limit": 5},
-            )
+            ),
         ]
 
     def test_queue_prefetch_searches_only_skill_bundle_user_instruction(self, monkeypatch):
         RecordingVikingClient.calls = []
         monkeypatch.setattr(openviking_plugin, "_VikingClient", RecordingVikingClient)
         provider = OpenVikingMemoryProvider()
-        provider._client = cast(Any, object())
+        provider._client = cast("Any", object())
         provider._endpoint = "http://openviking.test"
         provider._api_key = ""
         provider._account = "default"
@@ -182,14 +181,14 @@ class TestOpenVikingSkillQuerySafety:
             (
                 "/api/v1/search/find",
                 {"query": "fix the failing retrieval test", "limit": 5},
-            )
+            ),
         ]
 
     def test_queue_prefetch_skips_slash_skill_without_user_instruction(self, monkeypatch):
         RecordingVikingClient.calls = []
         monkeypatch.setattr(openviking_plugin, "_VikingClient", RecordingVikingClient)
         provider = OpenVikingMemoryProvider()
-        provider._client = cast(Any, object())
+        provider._client = cast("Any", object())
         skill_message = (
             '[IMPORTANT: The user has invoked the "skill-creator" skill, indicating they want '
             "you to follow its instructions. The full skill content is loaded below.]\n\n"
@@ -206,7 +205,7 @@ class TestOpenVikingSkillQuerySafety:
         RecordingVikingClient.calls = []
         monkeypatch.setattr(openviking_plugin, "_VikingClient", RecordingVikingClient)
         provider = OpenVikingMemoryProvider()
-        provider._client = cast(Any, object())
+        provider._client = cast("Any", object())
         provider._endpoint = "http://openviking.test"
         provider._api_key = ""
         provider._account = "default"
@@ -241,7 +240,7 @@ class TestOpenVikingSkillQuerySafety:
                             "parts": [{"type": "text", "text": "Done."}],
                             "peer_id": "hermes",
                         },
-                    ]
+                    ],
                 },
             ),
         ]
@@ -250,7 +249,7 @@ class TestOpenVikingSkillQuerySafety:
         RecordingVikingClient.calls = []
         monkeypatch.setattr(openviking_plugin, "_VikingClient", RecordingVikingClient)
         provider = OpenVikingMemoryProvider()
-        provider._client = cast(Any, object())
+        provider._client = cast("Any", object())
         skill_message = (
             '[IMPORTANT: The user has invoked the "skill-creator" skill, indicating they want '
             "you to follow its instructions. The full skill content is loaded below.]\n\n"
@@ -282,7 +281,7 @@ class TestOpenVikingTurnConversion:
                             "name": "shell_command",
                             "arguments": json.dumps({"command": "rg assemble"}),
                         },
-                    }
+                    },
                 ],
             },
             {
@@ -316,7 +315,7 @@ class TestOpenVikingTurnConversion:
                             "name": "shell_command",
                             "arguments": json.dumps({"command": "rg assemble"}),
                         },
-                    }
+                    },
                 ],
             },
             {
@@ -332,10 +331,10 @@ class TestOpenVikingTurnConversion:
 
         assert [message["role"] for message in batch] == ["user", "assistant", "assistant", "assistant"]
         assert batch[0]["parts"] == [
-            {"type": "text", "text": "Please inspect the repository for assemble hooks."}
+            {"type": "text", "text": "Please inspect the repository for assemble hooks."},
         ]
         assert batch[1]["parts"] == [
-            {"type": "text", "text": "I will search the codebase."}
+            {"type": "text", "text": "I will search the codebase."},
         ]
         assert batch[2]["parts"] == [
             {
@@ -345,10 +344,10 @@ class TestOpenVikingTurnConversion:
                 "tool_input": {"command": "rg assemble"},
                 "tool_output": "agent/context_engine.py: no preassemble hook",
                 "tool_status": "completed",
-            }
+            },
         ]
         assert batch[3]["parts"] == [
-            {"type": "text", "text": "The current main does not expose assemble."}
+            {"type": "text", "text": "The current main does not expose assemble."},
         ]
 
     def test_messages_to_openviking_batch_marks_json_tool_error_results(self):
@@ -365,7 +364,7 @@ class TestOpenVikingTurnConversion:
                             "name": "read_file",
                             "arguments": json.dumps({"path": "missing.md"}),
                         },
-                    }
+                    },
                 ],
             },
             {
@@ -387,7 +386,7 @@ class TestOpenVikingTurnConversion:
                 "tool_input": {"path": "missing.md"},
                 "tool_output": json.dumps({"error": "File not found", "exit_code": 1}),
                 "tool_status": "error",
-            }
+            },
         ]
 
     def test_messages_to_openviking_batch_keeps_pending_tool_call_without_result(self):
@@ -404,7 +403,7 @@ class TestOpenVikingTurnConversion:
                             "name": "long_check",
                             "arguments": json.dumps({"target": "repo"}),
                         },
-                    }
+                    },
                 ],
             },
         ]
@@ -509,8 +508,8 @@ class TestOpenVikingTurnConversion:
                             {
                                 "uri": "viking://user/hermes/memories/context",
                                 "abstract": "Old OpenViking memory content",
-                            }
-                        ]
+                            },
+                        ],
                     }),
                 },
                 {
@@ -533,7 +532,7 @@ class TestOpenVikingTurnConversion:
                     "tool_input": {"command": "rg preassemble"},
                     "tool_output": "plugins/memory/openviking/__init__.py",
                     "tool_status": "completed",
-                }
+                },
             ]
             batch_text = json.dumps(batch)
             assert recall_tool_name not in batch_text
@@ -557,7 +556,7 @@ class TestOpenVikingTurnConversion:
                             "name": "viking_search",
                             "arguments": json.dumps({"query": "decision"}),
                         },
-                    }
+                    },
                 ],
             },
             {
@@ -623,7 +622,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/overview",
                     (("uri", "viking://user/hermes"),),
                 ): {"result": {"content": "overview text"}},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": "viking://user/hermes/.overview.md", "level": "overview"}))
@@ -645,7 +644,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/read",
                     (("uri", "viking://user/hermes/memories/profile.md"),),
                 ): {"result": "full text"},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": "viking://user/hermes/memories/profile.md", "level": "full"}))
@@ -673,7 +672,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/read",
                     (("uri", file_uri),),
                 ): {"result": {"content": "full content"}},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": file_uri, "level": "overview"}))
@@ -697,7 +696,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/overview",
                     (("uri", "viking://user/hermes"),),
                 ): {"result": "overview"},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": "viking://user/hermes/.overview.md", "level": "overview"}))
@@ -722,7 +721,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/overview",
                     (("uri", dir_uri),),
                 ): {"result": "dir overview"},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": dir_uri, "level": "overview"}))
@@ -752,7 +751,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/read",
                     (("uri", file_uri),),
                 ): {"result": {"content": "fallback full content"}},
-            }
+            },
         )
 
         result = json.loads(provider._tool_read({"uri": file_uri, "level": "overview"}))
@@ -775,7 +774,7 @@ class TestOpenVikingRead:
                     "/api/v1/content/overview",
                     (("uri", "viking://user/hermes"),),
                 ): RuntimeError("500 Internal Server Error"),
-            }
+            },
         )
 
         try:
@@ -802,10 +801,10 @@ class TestOpenVikingBrowse:
                         "entries": [
                             {"name": "memories", "uri": "viking://user/hermes/memories", "type": "dir"},
                             {"rel_path": "profile.md", "uri": "viking://user/hermes/memories/profile.md", "isDir": False, "abstract": "Profile"},
-                        ]
-                    }
+                        ],
+                    },
                 },
-            }
+            },
         )
 
         result = json.loads(provider._tool_browse({"action": "list", "path": "viking://user/hermes"}))

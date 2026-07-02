@@ -1,5 +1,4 @@
-"""
-yuanbao_tools.py - 元宝平台工具集
+"""yuanbao_tools.py - 元宝平台工具集
 
 提供以下工具函数，供 hermes-agent 的 "hermes-yuanbao" toolset 使用：
   - get_group_info        : 查询群基本信息（群名、群主、成员数）
@@ -20,7 +19,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +83,7 @@ async def query_group_members(
     name: str = "",
     mention: bool = False,
 ) -> dict:
-    """
-    统一的群成员查询工具（对齐 TS query_session_members）。
+    """统一的群成员查询工具（对齐 TS query_session_members）。
 
     action:
       - find      : 按昵称模糊搜索
@@ -110,7 +107,7 @@ async def query_group_members(
                 "user_id": m.get("user_id", ""),
                 "nickname": m.get("nickname", m.get("nick_name", "")),
                 "role": _USER_TYPE_LABEL.get(
-                    m.get("user_type", m.get("role", 0)), "unknown"
+                    m.get("user_type", m.get("role", 0)), "unknown",
                 ),
             }
             for m in raw.get("members", [])
@@ -170,8 +167,7 @@ async def query_group_members(
 
 
 async def search_sticker(query: str = "", limit: int = 10) -> dict:
-    """
-    在内置贴纸表中按关键词模糊搜索，返回 Top-N 候选。
+    """在内置贴纸表中按关键词模糊搜索，返回 Top-N 候选。
 
     返回每条候选的 sticker_id / name / description / package_id，
     供 LLM 选择后传给 send_sticker。空 query 时返回前 N 条。
@@ -210,8 +206,7 @@ async def send_sticker(
     chat_id: str = "",
     reply_to: str = "",
 ) -> dict:
-    """
-    向 chat_id（缺省取当前会话）发送一张内置贴纸（TIMFaceElem）。
+    """向 chat_id（缺省取当前会话）发送一张内置贴纸（TIMFaceElem）。
 
     Args:
         sticker:   贴纸名称（如 "六六六"）或 sticker_id（如 "278"）。为空时随机发送一张。
@@ -220,13 +215,14 @@ async def send_sticker(
         reply_to:  群聊场景的引用消息 ID（可选）。
 
     Returns: ``{"success": bool, ...}``
+
     """
-    from gateway.session_context import get_session_env
     from gateway.platforms.yuanbao_sticker import (
+        get_random_sticker,
         get_sticker_by_id,
         get_sticker_by_name,
-        get_random_sticker,
     )
+    from gateway.session_context import get_session_env
 
     target = (chat_id or "").strip() or get_session_env("HERMES_SESSION_CHAT_ID", "")
     if not target:
@@ -240,7 +236,7 @@ async def send_sticker(
         return {"success": False, "error": "Yuanbao adapter is not connected"}
 
     raw = (sticker or "").strip()
-    sticker_obj: Optional[dict] = None
+    sticker_obj: dict | None = None
     if not raw:
         sticker_obj = get_random_sticker()
     else:
@@ -292,10 +288,9 @@ async def send_dm(
     name: str,
     message: str,
     user_id: str = "",
-    media_files: Optional[List[Tuple[str, bool]]] = None,
+    media_files: list[tuple[str, bool]] | None = None,
 ) -> dict:
-    """
-    Send a DM (private chat message) to a group member, with optional media.
+    """Send a DM (private chat message) to a group member, with optional media.
 
     Workflow:
       1. If user_id is provided, send directly.
@@ -310,6 +305,7 @@ async def send_dm(
         media_files: (Optional) List of (file_path, is_voice) tuples to send
                      after the text message.  Images are sent via
                      send_image_file; everything else via send_document.
+
     """
     if not message and not media_files:
         return {"success": False, "error": "message or media_files is required"}
@@ -475,7 +471,7 @@ async def _handle_yb_send_dm(args, **kw):
     media_files = BasePlatformAdapter.filter_media_delivery_paths(media_files)
 
     return tool_result(await send_dm(
-        group_code=group_code,        name=args.get("name", ""),
+        group_code=group_code, name=args.get("name", ""),
         message=message,
         user_id=args.get("user_id", ""),
         media_files=media_files or None,

@@ -37,7 +37,7 @@ def test_stub_connector_does_not_leak_into_production_paths():
             for pat in _LEAK_PATTERNS:
                 if pat.search(text):
                     offenders.append(
-                        f"{path.relative_to(_REPO_ROOT)} matches {pat.pattern!r}"
+                        f"{path.relative_to(_REPO_ROOT)} matches {pat.pattern!r}",
                     )
     assert not offenders, (
         "relay test stub leaked into production paths:\n  " + "\n  ".join(offenders)

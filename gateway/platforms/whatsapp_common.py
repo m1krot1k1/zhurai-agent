@@ -1,5 +1,4 @@
-"""
-Transport-agnostic WhatsApp behavior shared by the Baileys bridge adapter
+"""Transport-agnostic WhatsApp behavior shared by the Baileys bridge adapter
 and the official WhatsApp Cloud API adapter.
 
 The mixin provides:
@@ -35,8 +34,8 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, Optional
-
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,7 @@ class WhatsAppBehaviorMixin:
 
     # ------------------------------------------------------------------ JID helpers
     @staticmethod
-    def _normalize_whatsapp_id(value: Optional[str]) -> str:
+    def _normalize_whatsapp_id(value: str | None) -> str:
         if not value:
             return ""
         normalized = str(value).strip()
@@ -207,11 +206,11 @@ class WhatsAppBehaviorMixin:
                 )
         if compiled:
             logger.info(
-                "[%s] Loaded %d WhatsApp mention pattern(s)", self.name, len(compiled)
+                "[%s] Loaded %d WhatsApp mention pattern(s)", self.name, len(compiled),
             )
         return compiled
 
-    def _bot_ids_from_message(self, data: Dict[str, Any]) -> set[str]:
+    def _bot_ids_from_message(self, data: dict[str, Any]) -> set[str]:
         bot_ids = set()
         for candidate in data.get("botIds") or []:
             normalized = self._normalize_whatsapp_id(candidate)
@@ -219,13 +218,13 @@ class WhatsAppBehaviorMixin:
                 bot_ids.add(normalized)
         return bot_ids
 
-    def _message_is_reply_to_bot(self, data: Dict[str, Any]) -> bool:
+    def _message_is_reply_to_bot(self, data: dict[str, Any]) -> bool:
         quoted_participant = self._normalize_whatsapp_id(data.get("quotedParticipant"))
         if not quoted_participant:
             return False
         return quoted_participant in self._bot_ids_from_message(data)
 
-    def _message_mentions_bot(self, data: Dict[str, Any]) -> bool:
+    def _message_mentions_bot(self, data: dict[str, Any]) -> bool:
         bot_ids = self._bot_ids_from_message(data)
         if not bot_ids:
             return False
@@ -245,13 +244,13 @@ class WhatsAppBehaviorMixin:
                 return True
         return False
 
-    def _message_matches_mention_patterns(self, data: Dict[str, Any]) -> bool:
+    def _message_matches_mention_patterns(self, data: dict[str, Any]) -> bool:
         if not self._mention_patterns:
             return False
         body = str(data.get("body") or "")
         return any(pattern.search(body) for pattern in self._mention_patterns)
 
-    def _clean_bot_mention_text(self, text: str, data: Dict[str, Any]) -> str:
+    def _clean_bot_mention_text(self, text: str, data: dict[str, Any]) -> str:
         if not text:
             return text
         bot_ids = self._bot_ids_from_message(data)
@@ -260,11 +259,11 @@ class WhatsAppBehaviorMixin:
             bare_id = bot_id.split("@", 1)[0]
             if bare_id:
                 cleaned = re.sub(
-                    rf"@{re.escape(bare_id)}\b[,:\-]*\s*", "", cleaned
+                    rf"@{re.escape(bare_id)}\b[,:\-]*\s*", "", cleaned,
                 )
         return cleaned.strip() or text
 
-    def _should_process_message(self, data: Dict[str, Any]) -> bool:
+    def _should_process_message(self, data: dict[str, Any]) -> bool:
         chat_id_raw = str(data.get("chatId") or "")
         # WhatsApp uses pseudo-chats for Status updates (Stories) and
         # Channel/Newsletter broadcasts. These are not real conversations
@@ -352,7 +351,7 @@ class WhatsAppBehaviorMixin:
             return f"*{inner}*"
 
         result = re.sub(
-            r"^#{1,6}\s+(.+)$", _header_to_bold, result, flags=re.MULTILINE
+            r"^#{1,6}\s+(.+)$", _header_to_bold, result, flags=re.MULTILINE,
         )
 
         # --- 5. Convert markdown links: [text](url) → text (url) ---

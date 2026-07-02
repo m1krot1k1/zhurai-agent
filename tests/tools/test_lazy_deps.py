@@ -12,11 +12,9 @@ call is mocked — we never actually shell out during unit tests.
 
 from __future__ import annotations
 
-
 import pytest
 
 import tools.lazy_deps as ld
-
 
 # ---------------------------------------------------------------------------
 # Spec safety
@@ -187,7 +185,7 @@ class TestEnsure:
         monkeypatch.setattr(
             ld, "_venv_pip_install",
             lambda specs, **kw: ld._InstallResult(
-                False, "", "ERROR: package not found on PyPI"
+                False, "", "ERROR: package not found on PyPI",
             ),
         )
         with pytest.raises(ld.FeatureUnavailable, match="pip install failed"):
@@ -329,7 +327,7 @@ class TestActiveFeatures:
 
 class TestRefreshActiveFeatures:
     def test_no_active_features_returns_empty(self, monkeypatch):
-        monkeypatch.setattr(ld, "active_features", lambda: [])
+        monkeypatch.setattr(ld, "active_features", list)
         assert ld.refresh_active_features() == {}
 
     def test_already_current_is_noop(self, monkeypatch):
@@ -368,7 +366,7 @@ class TestRefreshActiveFeatures:
         monkeypatch.setattr(
             ld, "_venv_pip_install",
             lambda specs, **kw: ld._InstallResult(
-                False, "", "ERROR: PyPI 404 quarantine"
+                False, "", "ERROR: PyPI 404 quarantine",
             ),
         )
         result = ld.refresh_active_features()
@@ -393,6 +391,7 @@ class TestRefreshActiveFeatures:
         monkeypatch.setitem(ld.LAZY_DEPS, "b.fail", ("pkgb==1.0",))
         # a.ok: already satisfied → "current"
         # b.fail: missing + install fails → "failed:"
+
         def fake_satisfied(spec):
             return ld._pkg_name_from_spec(spec) == "pkga"
         monkeypatch.setattr(ld, "_is_satisfied", fake_satisfied)

@@ -32,8 +32,8 @@ class TestApprovalInterrupt:
     SESSION_KEY = "interrupt-test-session"
 
     def setup_method(self):
-        from tools.interrupt import set_interrupt
         from tools import interrupt as _interrupt_mod
+        from tools.interrupt import set_interrupt
 
         _clear_approval_state()
         # Wipe ALL per-thread interrupt bits — thread idents are recycled by
@@ -52,8 +52,8 @@ class TestApprovalInterrupt:
         os.environ["HERMES_SESSION_KEY"] = self.SESSION_KEY
 
     def teardown_method(self):
-        from tools.interrupt import set_interrupt
         from tools import interrupt as _interrupt_mod
+        from tools.interrupt import set_interrupt
 
         with _interrupt_mod._lock:
             _interrupt_mod._interrupted_threads.clear()
@@ -67,7 +67,8 @@ class TestApprovalInterrupt:
 
     def test_interrupt_unblocks_pending_approval_quickly(self):
         """An interrupt on the waiting thread must resolve the wait as deny
-        well before the (here, intentionally long) approval timeout."""
+        well before the (here, intentionally long) approval timeout.
+        """
         from tools import approval as mod
         from tools.interrupt import set_interrupt
 
@@ -93,7 +94,7 @@ class TestApprovalInterrupt:
 
         def _worker():
             result_holder["result"] = mod._await_gateway_decision(
-                self.SESSION_KEY, _notify_cb, approval_data
+                self.SESSION_KEY, _notify_cb, approval_data,
             )
             result_holder["thread_id"] = threading.get_ident()
 
@@ -122,7 +123,8 @@ class TestApprovalInterrupt:
 
     def test_unrelated_thread_interrupt_does_not_unblock(self):
         """An interrupt flagged on a *different* thread must NOT release this
-        session's approval wait — interrupts are thread-scoped."""
+        session's approval wait — interrupts are thread-scoped.
+        """
         from tools import approval as mod
         from tools.interrupt import set_interrupt
 
@@ -144,7 +146,7 @@ class TestApprovalInterrupt:
 
         def _worker():
             result_holder["result"] = mod._await_gateway_decision(
-                self.SESSION_KEY, _notify_cb, approval_data
+                self.SESSION_KEY, _notify_cb, approval_data,
             )
 
         t = threading.Thread(target=_worker, daemon=True)

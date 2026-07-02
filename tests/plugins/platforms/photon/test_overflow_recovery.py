@@ -17,7 +17,7 @@ No Node sidecar is spawned and no ports are bound.
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -67,9 +67,9 @@ async def test_typing_cooldown_suppresses_rapid_repeats(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter = _make_adapter(monkeypatch)
-    calls: list[Dict[str, Any]] = []
+    calls: list[dict[str, Any]] = []
 
-    async def _fake_call(path: str, payload: Dict[str, Any]) -> Any:
+    async def _fake_call(path: str, payload: dict[str, Any]) -> Any:
         calls.append(payload)
         return {"ok": True}
 
@@ -90,7 +90,7 @@ async def test_typing_cooldown_is_per_chat(
     adapter = _make_adapter(monkeypatch)
     calls: list[str] = []
 
-    async def _fake_call(path: str, payload: Dict[str, Any]) -> Any:
+    async def _fake_call(path: str, payload: dict[str, Any]) -> Any:
         calls.append(payload["spaceId"])
         return {"ok": True}
 
@@ -110,7 +110,7 @@ async def test_stop_typing_resets_cooldown(
     adapter = _make_adapter(monkeypatch)
     starts = 0
 
-    async def _fake_call(path: str, payload: Dict[str, Any]) -> Any:
+    async def _fake_call(path: str, payload: dict[str, Any]) -> Any:
         nonlocal starts
         if payload.get("state") == "start":
             starts += 1

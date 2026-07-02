@@ -13,13 +13,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from hermes_constants import get_hermes_home
-
 from ._oss_providers import (
-    LLM_PROVIDERS,
     EMBEDDER_PROVIDERS,
-    VECTOR_PROVIDERS,
     KNOWN_DIMS,
+    LLM_PROVIDERS,
+    VECTOR_PROVIDERS,
     validate_oss_config,
 )
 
@@ -305,12 +303,12 @@ def _setup_platform(hermes_home: str, config: dict, flags: dict[str, str]) -> No
     if env_writes:
         _write_env(Path(hermes_home) / ".env", env_writes)
 
-    print(f"\n  Memory provider: mem0")
-    print(f"  Activation saved to config.yaml")
-    print(f"  Provider config saved")
+    print("\n  Memory provider: mem0")
+    print("  Activation saved to config.yaml")
+    print("  Provider config saved")
     if env_writes:
-        print(f"  API keys saved to .env")
-    print(f"\n  Start a new session to activate.\n")
+        print("  API keys saved to .env")
+    print("\n  Start a new session to activate.\n")
 
 
 def _setup_oss(hermes_home: str, config: dict, flags: dict[str, str]) -> None:
@@ -358,14 +356,14 @@ def _setup_oss(hermes_home: str, config: dict, flags: dict[str, str]) -> None:
     save_config(config)
 
     _run_connectivity_checks(oss_config)
-    print(f"\n  ✓ Mem0 configured (OSS mode)")
+    print("\n  ✓ Mem0 configured (OSS mode)")
     print(f"    LLM:      {oss_config['llm']['provider']} ({oss_config['llm']['config'].get('model', '')})")
     print(f"    Embedder: {oss_config['embedder']['provider']} ({oss_config['embedder']['config'].get('model', '')})")
     print(f"    Vector:   {vector_id}")
     if env_writes:
-        print(f"    API keys saved to .env")
-    print(f"    Config saved to mem0.json")
-    print(f"    Provider set in config.yaml")
+        print("    API keys saved to .env")
+    print("    Config saved to mem0.json")
+    print("    Provider set in config.yaml")
     print("\n  Start a new session to activate.\n")
 
 
@@ -417,7 +415,7 @@ def _ensure_pgvector(host: str = "localhost", port: int = 5432) -> dict | None:
                 _wait_for_port(host, port, timeout=15)
                 ok, _ = _check_pgvector(host, port)
                 if ok:
-                    print(f"  ✓ PostgreSQL container restarted")
+                    print("  ✓ PostgreSQL container restarted")
                     return None
         except Exception:
             pass
@@ -425,13 +423,11 @@ def _ensure_pgvector(host: str = "localhost", port: int = 5432) -> dict | None:
         answer = input("  Start pgvector via Docker? [Y/n]: ").strip().lower()
         if answer in ("", "y", "yes"):
             return _start_pgvector_docker(host, port)
-        else:
-            print("  Skipping Docker setup. Make sure PostgreSQL with pgvector is running.")
-            return None
-    else:
-        print("  Docker not found. Install Docker to auto-start pgvector,")
-        print("  or run PostgreSQL with pgvector manually.")
+        print("  Skipping Docker setup. Make sure PostgreSQL with pgvector is running.")
         return None
+    print("  Docker not found. Install Docker to auto-start pgvector,")
+    print("  or run PostgreSQL with pgvector manually.")
+    return None
 
 
 def _start_pgvector_docker(host: str, port: int) -> dict | None:
@@ -465,14 +461,13 @@ def _start_pgvector_docker(host: str, port: int) -> dict | None:
                 "user": "postgres", "password": _PGVECTOR_PASSWORD,
                 "dbname": "postgres",
             }
-        else:
-            print("  Warning: Container started but PostgreSQL not yet accepting connections.")
-            print("  It may need a few more seconds. Config will be saved; retry later.")
-            return {
-                "host": host, "port": port,
-                "user": "postgres", "password": _PGVECTOR_PASSWORD,
-                "dbname": "postgres",
-            }
+        print("  Warning: Container started but PostgreSQL not yet accepting connections.")
+        print("  It may need a few more seconds. Config will be saved; retry later.")
+        return {
+            "host": host, "port": port,
+            "user": "postgres", "password": _PGVECTOR_PASSWORD,
+            "dbname": "postgres",
+        }
     except subprocess.CalledProcessError as e:
         print(f"  Failed to start Docker container: {e}")
         return None
@@ -538,7 +533,7 @@ def _ollama_has_model(url: str, model: str) -> bool:
         resp = urllib.request.urlopen(req, timeout=5)
         data = json.loads(resp.read())
         names = [m.get("name", "") for m in data.get("models", [])]
-        base_model = model.split(":")[0]
+        base_model = model.split(":", maxsplit=1)[0]
         return any(model in n or base_model in n for n in names)
     except Exception:
         return False
@@ -711,14 +706,14 @@ def _setup_oss_interactive(hermes_home: str, config: dict) -> None:
     save_config(config)
 
     _run_connectivity_checks(oss_config)
-    print(f"\n  ✓ Mem0 configured (OSS mode)")
+    print("\n  ✓ Mem0 configured (OSS mode)")
     print(f"    LLM:      {oss_config['llm']['provider']} ({oss_config['llm']['config'].get('model', '')})")
     print(f"    Embedder: {oss_config['embedder']['provider']} ({oss_config['embedder']['config'].get('model', '')})")
     print(f"    Vector:   {vector_id}")
     if env_writes:
-        print(f"    API keys saved to .env")
-    print(f"    Config saved to mem0.json")
-    print(f"    Provider set in config.yaml")
+        print("    API keys saved to .env")
+    print("    Config saved to mem0.json")
+    print("    Provider set in config.yaml")
     print("\n  Start a new session to activate.\n")
 
 

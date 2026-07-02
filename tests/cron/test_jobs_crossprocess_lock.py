@@ -23,7 +23,6 @@ import pytest
 
 from cron import jobs
 
-
 # Repo root (parent of the ``cron`` package) so the child process can import it.
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(jobs.__file__)))
 
@@ -60,8 +59,8 @@ def test_jobs_lock_excludes_another_process(tmp_path, monkeypatch):
                     if pathlib.Path({str(release)!r}).exists():
                         break
                     time.sleep(0.01)
-            """
-        )
+            """,
+        ),
     )
 
     blocker = tmp_path / "blocker.py"
@@ -79,8 +78,8 @@ def test_jobs_lock_excludes_another_process(tmp_path, monkeypatch):
             pathlib.Path({str(blocker_started)!r}).write_text("1")
             with jobs._jobs_lock():
                 pathlib.Path({str(blocker_acquired)!r}).write_text("1")
-            """
-        )
+            """,
+        ),
     )
 
     child = subprocess.Popen([sys.executable, str(holder)])

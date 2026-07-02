@@ -1,7 +1,6 @@
 """Tests for plugins/memory/honcho/cli.py."""
 
 from types import SimpleNamespace
-import json
 
 
 class TestResolveApiKey:
@@ -140,7 +139,8 @@ class TestCmdSetupLocalJwt:
     def test_local_setup_stores_jwt_under_host_block(self, monkeypatch, tmp_path):
         """Self-hosted users supplying a JWT must have it written under hosts.<host>.apiKey,
         not as the top-level cloud apiKey, so cloud/hybrid switching is preserved and
-        get_honcho_client treats it as an explicit local auth opt-in."""
+        get_honcho_client treats it as an explicit local auth opt-in.
+        """
         cfg = self._run_setup(
             monkeypatch,
             tmp_path,
@@ -161,7 +161,8 @@ class TestCmdSetupLocalJwt:
 
     def test_local_setup_blank_jwt_keeps_local_no_auth(self, monkeypatch, tmp_path):
         """Blank JWT prompt response on a fresh local config must not introduce an apiKey
-        anywhere (local no-auth Honcho deployments must still work out of the box)."""
+        anywhere (local no-auth Honcho deployments must still work out of the box).
+        """
         cfg = self._run_setup(
             monkeypatch,
             tmp_path,
@@ -269,14 +270,14 @@ class TestCmdStatus:
                             "tokenEndpoint": "https://api.honcho.dev/oauth/token",
                             "expiresAt": 9999999999,
                         },
-                    }
-                }
+                    },
+                },
             }
 
             def resolve_session_name(self):
                 return "hermes"
 
-        monkeypatch.setattr(honcho_cli, "_read_config", lambda: {})
+        monkeypatch.setattr(honcho_cli, "_read_config", dict)
         monkeypatch.setattr(honcho_cli, "_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_local_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_active_profile_name", lambda: "default")
@@ -313,6 +314,7 @@ class TestCloneHonchoForProfile:
         monkeypatch.setattr(honcho_cli, "_local_config_path", lambda: cfg_path)
         monkeypatch.setattr(honcho_cli, "_ensure_peer_exists", lambda host_key=None: True)
         written = {}
+
         def _write(c, path=None):
             written["cfg"] = c
         monkeypatch.setattr(honcho_cli, "_write_config", _write)
@@ -448,6 +450,7 @@ class TestSetupWizardDeploymentShape:
 
         # Scripted _prompt: pop answers in order. Default-return for unconsumed prompts.
         answer_iter = iter(answers)
+
         def _scripted_prompt(label, default=None, secret=False):
             # Auth-method prompt is orthogonal to shape; auto-answer apikey so the answer lists stay shape-only.
             if "OAuth" in label:
@@ -573,7 +576,8 @@ class TestSetupWizardDeploymentShape:
 
     def test_unpin_decline_steer_keeps_per_user(self, monkeypatch, tmp_path):
         """Operator can decline the steer ('n') and accept orphaning, ending
-        up with per-user peers (no aliases)."""
+        up with per-user peers (no aliases).
+        """
         initial_cfg = {
             "apiKey": "***",
             "hosts": {"hermes": {"pinPeerName": True, "peerName": "eri"}},
@@ -612,7 +616,7 @@ class TestSetupWizardDeploymentShape:
         assert "pinPeerName" not in host
 
     def test_host_pin_user_peer_false_overrides_root_pin_peer_name(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """Host ``pinUserPeer: false`` outranks host ``pinPeerName`` in the
         resolver.  Detection must agree, otherwise the wizard would offer
@@ -693,7 +697,8 @@ class TestSetupWizardDeploymentShape:
 
     def test_no_gateway_connected_skips_mapping_when_declined(self, monkeypatch, tmp_path):
         """With no gateway platforms connected, the tree is gated off; declining
-        the 'configure anyway?' prompt leaves identity mapping untouched."""
+        the 'configure anyway?' prompt leaves identity mapping untouched.
+        """
         initial_cfg = {
             "apiKey": "***",
             "hosts": {"hermes": {"peerName": "eri"}},
@@ -709,7 +714,8 @@ class TestSetupWizardDeploymentShape:
 
     def test_undetectable_gateway_skips_mapping_when_declined(self, monkeypatch, tmp_path):
         """When the gateway package can't be inspected (None), the wizard asks
-        whether the gateway is running; 'no' skips the mapping step."""
+        whether the gateway is running; 'no' skips the mapping step.
+        """
         initial_cfg = {
             "apiKey": "***",
             "hosts": {"hermes": {"peerName": "eri"}},
@@ -723,7 +729,8 @@ class TestSetupWizardDeploymentShape:
 
     def test_raw_edit_sets_resolver_knobs_directly(self, monkeypatch, tmp_path):
         """The [e] escape hatch lets a power user set pinUserPeer + an alias +
-        prefix directly, bypassing the intent tree."""
+        prefix directly, bypassing the intent tree.
+        """
         answers = [
             "cloud", "", "eri", "hermetika", "hermes",
             "e",               # tree: edit raw keys
@@ -772,7 +779,8 @@ class TestCloneCarriesPinUserPeer:
 class TestMigratePinKey:
     """``_migrate_pin_key`` rewrites the legacy ``pinPeerName`` onto the
     canonical ``pinUserPeer`` in place, without clobbering an existing
-    canonical value."""
+    canonical value.
+    """
 
     def test_legacy_key_renamed_to_canonical(self):
         import plugins.memory.honcho.cli as honcho_cli

@@ -113,13 +113,13 @@ def test_refresh_preserves_memory_provider_and_context_engine_tools(monkeypatch)
     # Provider exposes its schemas; context compressor exposes lcm_*.
     agent._memory_manager = types.SimpleNamespace(
         get_all_tool_schemas=lambda: [
-            {"name": "memory_search", "description": "", "parameters": {}}
-        ]
+            {"name": "memory_search", "description": "", "parameters": {}},
+        ],
     )
     agent.context_compressor = types.SimpleNamespace(
         get_tool_schemas=lambda: [
-            {"name": "lcm_grep", "description": "", "parameters": {}}
-        ]
+            {"name": "lcm_grep", "description": "", "parameters": {}},
+        ],
     )
     agent._context_engine_tool_names = {"lcm_grep"}
 
@@ -143,10 +143,11 @@ def test_refresh_preserves_memory_provider_and_context_engine_tools(monkeypatch)
 def test_refresh_respects_context_engine_toolset_gate(monkeypatch):
     """#5544: context-engine tools must NOT be re-injected on a restricted
     toolset. A platform with enabled_toolsets that excludes context_engine
-    must not get lcm_* leaked back in by a refresh."""
+    must not get lcm_* leaked back in by a refresh.
+    """
     agent = _agent(["read_file"], enabled=["coding"])  # context_engine NOT enabled
     agent.context_compressor = types.SimpleNamespace(
-        get_tool_schemas=lambda: [{"name": "lcm_grep", "description": "", "parameters": {}}]
+        get_tool_schemas=lambda: [{"name": "lcm_grep", "description": "", "parameters": {}}],
     )
     agent._context_engine_tool_names = set()
 
@@ -164,7 +165,8 @@ def test_refresh_respects_context_engine_toolset_gate(monkeypatch):
 
 def test_refreshed_tool_is_callable_through_valid_tool_names_guard(monkeypatch):
     """The whole point: a late tool, once refreshed, passes the name guard the
-    run loop uses to accept/reject tool calls (agent.valid_tool_names)."""
+    run loop uses to accept/reject tool calls (agent.valid_tool_names).
+    """
     agent = _agent(["read_file"])
 
     import model_tools
@@ -241,8 +243,8 @@ def test_resolve_discovery_timeout_explicit_wins(monkeypatch):
 
 
 def test_resolve_discovery_timeout_reads_config(monkeypatch):
-    from hermes_cli import mcp_startup
     import hermes_cli.config as cfg
+    from hermes_cli import mcp_startup
 
     monkeypatch.setattr(cfg, "load_config", lambda: {"mcp_discovery_timeout": 8.0})
 
@@ -250,8 +252,8 @@ def test_resolve_discovery_timeout_reads_config(monkeypatch):
 
 
 def test_resolve_discovery_timeout_falls_back_on_bad_value(monkeypatch):
-    from hermes_cli import mcp_startup
     import hermes_cli.config as cfg
+    from hermes_cli import mcp_startup
 
     # Non-positive / unparsable → DEFAULT_CONFIG value, never hang.
     default = float(cfg.DEFAULT_CONFIG.get("mcp_discovery_timeout", 1.5))
@@ -264,7 +266,8 @@ def test_resolve_discovery_timeout_falls_back_on_bad_value(monkeypatch):
 
 def test_stale_generation_refresh_does_not_clobber_newer(monkeypatch):
     """A slower refresh that computed an OLDER registry generation must not
-    overwrite a snapshot a newer-generation refresh already published."""
+    overwrite a snapshot a newer-generation refresh already published.
+    """
     from tools import registry as _reg_mod
 
     agent = _agent(["read_file"])
@@ -287,6 +290,7 @@ def test_stale_generation_refresh_does_not_clobber_newer(monkeypatch):
 def test_wait_returns_instantly_when_no_discovery_thread(monkeypatch):
     """The common case (no MCP / discovery done) pays ~0s regardless of bound."""
     import time
+
     from hermes_cli import mcp_startup
 
     monkeypatch.setattr(mcp_startup, "_mcp_discovery_thread", None)

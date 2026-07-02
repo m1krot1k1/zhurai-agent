@@ -21,7 +21,7 @@ These tests pin the corrected behavior.
 """
 import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import httpx
@@ -394,7 +394,7 @@ def test_minimax_dashboard_poller_accepts_absolute_ms_expired_in():
     """Dashboard MiniMax completion must accept unix-ms token expiry values."""
     from hermes_cli import web_server as ws
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     abs_ms = int((now.timestamp() + 1800) * 1000)
     session_id = "minimax-absolute-ms-test"
     ws._oauth_sessions[session_id] = {
@@ -461,7 +461,7 @@ def test_anthropic_pkce_branch_still_works():
 
 
 def test_xai_oauth_listed_as_loopback_flow():
-    """xAI Grok OAuth must surface in the catalog as a first-class loopback flow."""
+    """XAI Grok OAuth must surface in the catalog as a first-class loopback flow."""
     resp = client.get("/api/providers/oauth", headers=HEADERS)
     assert resp.status_code == 200, resp.text
     providers = {p["id"]: p for p in resp.json()["providers"]}
@@ -786,7 +786,7 @@ def test_cancel_loopback_session_shuts_down_callback_server():
 
     try:
         resp = client.delete(
-            f"/api/providers/oauth/sessions/{session_id}", headers=HEADERS
+            f"/api/providers/oauth/sessions/{session_id}", headers=HEADERS,
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["ok"] is True

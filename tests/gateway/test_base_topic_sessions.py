@@ -8,7 +8,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from gateway.config import Platform, PlatformConfig
-from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, ProcessingOutcome, SendResult
+from gateway.platforms.base import (
+    BasePlatformAdapter,
+    MessageEvent,
+    MessageType,
+    ProcessingOutcome,
+    SendResult,
+)
 from gateway.session import SessionSource, build_session_key
 
 
@@ -33,13 +39,12 @@ class DummyTelegramAdapter(BasePlatformAdapter):
                 "content": content,
                 "reply_to": reply_to,
                 "metadata": metadata,
-            }
+            },
         )
         return SendResult(success=True, message_id="1")
 
     async def send_typing(self, chat_id: str, metadata=None) -> None:
         self.typing.append({"chat_id": chat_id, "metadata": metadata})
-        return None
 
     async def get_chat_info(self, chat_id: str):
         return {"id": chat_id}
@@ -135,13 +140,13 @@ class TestBasePlatformTopicSessions:
                 "content": "ack",
                 "reply_to": None,
                 "metadata": {"thread_id": "17585", "notify": True},
-            }
+            },
         ]
         assert typing_calls == [
             {
                 "chat_id": "-1001",
                 "metadata": {"thread_id": "17585"},
-            }
+            },
         ]
         assert adapter.processing_hooks == [
             ("start", "1"),
@@ -322,7 +327,7 @@ class TestTelegramAutoTtsCaptionDelivery:
                 "content": long_reply,
                 "reply_to": None,
                 "metadata": {"thread_id": "17585", "notify": True},
-            }
+            },
         ]
 
     @pytest.mark.asyncio
@@ -351,5 +356,5 @@ class TestTelegramAutoTtsCaptionDelivery:
                 "content": "Short reply",
                 "reply_to": None,
                 "metadata": {"thread_id": "17585", "notify": True},
-            }
+            },
         ]

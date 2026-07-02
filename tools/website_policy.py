@@ -15,7 +15,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 from hermes_constants import get_hermes_home
@@ -32,8 +32,8 @@ _DEFAULT_WEBSITE_BLOCKLIST = {
 # URL check (a multi-URL extract with 50 pages would otherwise mean 51 YAML parses).
 _CACHE_TTL_SECONDS = 30.0
 _cache_lock = threading.Lock()
-_cached_policy: Optional[Dict[str, Any]] = None
-_cached_policy_path: Optional[str] = None
+_cached_policy: dict[str, Any] | None = None
+_cached_policy_path: str | None = None
 _cached_policy_time: float = 0.0
 
 
@@ -49,7 +49,7 @@ def _normalize_host(host: str) -> str:
     return (host or "").strip().lower().rstrip(".")
 
 
-def _normalize_rule(rule: Any) -> Optional[str]:
+def _normalize_rule(rule: Any) -> str | None:
     if not isinstance(rule, str):
         return None
     value = rule.strip().lower()
@@ -59,12 +59,11 @@ def _normalize_rule(rule: Any) -> Optional[str]:
         parsed = urlparse(value)
         value = parsed.netloc or parsed.path
     value = value.split("/", 1)[0].strip().rstrip(".")
-    if value.startswith("www."):
-        value = value[4:]
+    value = value.removeprefix("www.")
     return value or None
 
 
-def _iter_blocklist_file_rules(path: Path) -> List[str]:
+def _iter_blocklist_file_rules(path: Path) -> list[str]:
     """Load rules from a shared blocklist file.
 
     Missing or unreadable files log a warning and return an empty list
@@ -79,7 +78,7 @@ def _iter_blocklist_file_rules(path: Path) -> List[str]:
         logger.warning("Failed to read shared blocklist file %s (skipping): %s", path, exc)
         return []
 
-    rules: List[str] = []
+    rules: list[str] = []
     for line in raw.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
@@ -90,7 +89,7 @@ def _iter_blocklist_file_rules(path: Path) -> List[str]:
     return rules
 
 
-def _load_policy_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def _load_policy_config(config_path: Path | None = None) -> dict[str, Any]:
     config_path = config_path or _get_default_config_path()
     if not config_path.exists():
         return dict(_DEFAULT_WEBSITE_BLOCKLIST)
@@ -102,7 +101,7 @@ def _load_policy_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
         return dict(_DEFAULT_WEBSITE_BLOCKLIST)
 
     try:
-        with open(config_path, encoding="utf-8") as f:
+        with Path(config_path).open(encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
     except yaml.YAMLError as exc:
         raise WebsitePolicyError(f"Invalid config YAML at {config_path}: {exc}") from exc
@@ -128,7 +127,7 @@ def _load_policy_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     return policy
 
 
-def load_website_blocklist(config_path: Optional[Path] = None) -> Dict[str, Any]:
+def load_website_blocklist(config_path: Path | None = None) -> dict[str, Any]:
     """Load and return the parsed website blocklist policy.
 
     Results are cached for ``_CACHE_TTL_SECONDS`` to avoid re-reading
@@ -165,8 +164,8 @@ def load_website_blocklist(config_path: Optional[Path] = None) -> Dict[str, Any]
     if not isinstance(enabled, bool):
         raise WebsitePolicyError("security.website_blocklist.enabled must be a boolean")
 
-    rules: List[Dict[str, str]] = []
-    seen: set[Tuple[str, str]] = set()
+    rules: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
 
     for raw_rule in raw_domains:
         normalized = _normalize_rule(raw_rule)
@@ -229,7 +228,7 @@ def _extract_host_from_urlish(url: str) -> str:
     return ""
 
 
-def check_website_access(url: str, config_path: Optional[Path] = None) -> Optional[Dict[str, str]]:
+def check_website_access(url: str, config_path: Path | None = None) -> dict[str, str] | None:
     """Check whether a URL is allowed by the website blocklist policy.
 
     Returns ``None`` if access is allowed, or a dict with block metadata

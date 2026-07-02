@@ -27,7 +27,8 @@ def _loop_reenters(retry_count: int, max_retries: int) -> bool:
 
 class TestGenuineNous429ReentersLoop:
     """The assignment used by the genuine-429 branch must leave the loop
-    condition True so the top-of-loop guard gets a chance to run."""
+    condition True so the top-of-loop guard gets a chance to run.
+    """
 
     def test_fixed_assignment_reenters_for_typical_max_retries(self):
         for max_retries in (1, 2, 3, 5, 10):
@@ -38,7 +39,8 @@ class TestGenuineNous429ReentersLoop:
 
     def test_buggy_assignment_never_reenters(self):
         """Documents the bug shape: retry_count = max_retries exits the
-        loop immediately, skipping the fallback guard."""
+        loop immediately, skipping the fallback guard.
+        """
         for max_retries in (1, 2, 3, 5, 10):
             retry_count = max_retries
             assert not _loop_reenters(retry_count, max_retries)
@@ -47,7 +49,8 @@ class TestGenuineNous429ReentersLoop:
 class TestSourceUsesReentrantAssignment:
     """Belt-and-suspenders: the production source must use the re-entrant
     form in the genuine-Nous-429 branch.  Protects against an accidental
-    revert (e.g. a stale-branch merge resolving in favor of the old code)."""
+    revert (e.g. a stale-branch merge resolving in favor of the old code).
+    """
 
     def test_genuine_branch_does_not_skip_to_max_retries(self):
         from agent import conversation_loop

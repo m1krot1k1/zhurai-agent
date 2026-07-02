@@ -23,7 +23,6 @@ from gateway.platforms.api_server import (
     security_headers_middleware,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -304,8 +303,6 @@ class TestRunEvents:
                 assert "run.completed" in body
                 assert "Hello!" in body
 
-
-
     @pytest.mark.asyncio
     async def test_approval_response_without_pending_returns_409(self, adapter):
         app = _create_runs_app(adapter)
@@ -512,7 +509,7 @@ class TestStopRun:
 
                 # Subscribe to events in background
                 events_task = asyncio.ensure_future(
-                    cli.get(f"/v1/runs/{run_id}/events")
+                    cli.get(f"/v1/runs/{run_id}/events"),
                 )
 
                 await asyncio.sleep(0.1)

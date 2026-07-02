@@ -51,7 +51,8 @@ def test_logs_gateways_is_seeded(stage2_text: str) -> None:
 def test_logs_subtree_is_healed_when_chown_needed(stage2_text: str) -> None:
     """The needs_chown repair loop must cover the logs subtree recursively —
     that is what makes the seed entry above sufficient (no separate
-    logs/gateways loop entry needed)."""
+    logs/gateways loop entry needed).
+    """
     m = re.search(r"for sub in ([^;]*); do", stage2_text)
     assert m, "stage2-hook.sh must contain the needs_chown subdir repair loop"
     assert "logs" in m.group(1).split(), (

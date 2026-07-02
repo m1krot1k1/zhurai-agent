@@ -5,13 +5,14 @@ reading arbitrary files (e.g., ~/.hermes/.env) via path traversal.
 """
 
 import json
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from tools.skills_tool import skill_view
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_skills(tmp_path):
     """Create a fake skills directory with one skill and a sensitive file outside."""
     skills_dir = tmp_path / "skills"

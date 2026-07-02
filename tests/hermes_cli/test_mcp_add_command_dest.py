@@ -55,7 +55,7 @@ class TestMcpAddCommandDest:
         """
         parser = _build_parser()
         args = parser.parse_args(
-            ["mcp", "add", "foo", "--url", "https://example.com/mcp"]
+            ["mcp", "add", "foo", "--url", "https://example.com/mcp"],
         )
 
         assert args.command == "mcp"
@@ -68,7 +68,7 @@ class TestMcpAddCommandDest:
         """`--command npx` must populate args.mcp_command, not args.command."""
         parser = _build_parser()
         args = parser.parse_args(
-            ["mcp", "add", "github", "--command", "npx"]
+            ["mcp", "add", "github", "--command", "npx"],
         )
 
         assert args.command == "mcp"
@@ -103,7 +103,7 @@ class TestMcpAddCommandDest:
                 "run",
                 "--profile",
                 "research",
-            ]
+            ],
         )
 
         assert args.command == "mcp"

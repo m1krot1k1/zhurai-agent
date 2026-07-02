@@ -1,12 +1,11 @@
 """Tests for OSS provider definitions and validation."""
 
-import pytest
 
 from plugins.memory.mem0._oss_providers import (
-    LLM_PROVIDERS,
     EMBEDDER_PROVIDERS,
-    VECTOR_PROVIDERS,
     KNOWN_DIMS,
+    LLM_PROVIDERS,
+    VECTOR_PROVIDERS,
     validate_oss_config,
 )
 

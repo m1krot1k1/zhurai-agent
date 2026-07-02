@@ -12,14 +12,14 @@ import shlex
 import tarfile
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from hermes_constants import get_hermes_home
 from tools.environments.base import (
     BaseEnvironment,
-    _ThreadedProcessHandle,
     _load_json_store,
     _save_json_store,
+    _ThreadedProcessHandle,
 )
 from tools.environments.file_sync import (
     FileSyncManager,
@@ -115,7 +115,7 @@ def _resolve_modal_image(image_spec: Any) -> Any:
     ]
     if add_python:
         setup_commands.insert(0,
-            "RUN apt-get update -qq && apt-get install -y -qq python3 python3-venv > /dev/null 2>&1 || true"
+            "RUN apt-get update -qq && apt-get install -y -qq python3 python3-venv > /dev/null 2>&1 || true",
         )
 
     return _modal.Image.from_registry(
@@ -128,8 +128,8 @@ class _AsyncWorker:
     """Background thread with its own event loop for async-safe Modal calls."""
 
     def __init__(self):
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._thread: Optional[threading.Thread] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
         self._started = threading.Event()
 
     def start(self):
@@ -176,7 +176,7 @@ class ModalEnvironment(BaseEnvironment):
         image: str,
         cwd: str = "/root",
         timeout: int = 60,
-        modal_sandbox_kwargs: Optional[dict[str, Any]] = None,
+        modal_sandbox_kwargs: dict[str, Any] | None = None,
         persistent_filesystem: bool = True,
         task_id: str = "default",
     ):
@@ -195,7 +195,7 @@ class ModalEnvironment(BaseEnvironment):
         restored_from_legacy_key = False
         if self._persistent:
             restored_snapshot_id, restored_from_legacy_key = _get_snapshot_restore_candidate(
-                self._task_id
+                self._task_id,
             )
             if restored_snapshot_id:
                 logger.info("Modal: restoring from snapshot %s", restored_snapshot_id[:20])
@@ -207,8 +207,8 @@ class ModalEnvironment(BaseEnvironment):
         try:
             from tools.credential_files import (
                 get_credential_file_mounts,
-                iter_skills_files,
                 iter_cache_files,
+                iter_skills_files,
             )
 
             for mount_entry in get_credential_file_mounts():
@@ -216,14 +216,14 @@ class ModalEnvironment(BaseEnvironment):
                     _modal.Mount.from_local_file(
                         mount_entry["host_path"],
                         remote_path=mount_entry["container_path"],
-                    )
+                    ),
                 )
             for entry in iter_skills_files():
                 cred_mounts.append(
                     _modal.Mount.from_local_file(
                         entry["host_path"],
                         remote_path=entry["container_path"],
-                    )
+                    ),
                 )
             cache_files = iter_cache_files()
             for entry in cache_files:
@@ -231,7 +231,7 @@ class ModalEnvironment(BaseEnvironment):
                     _modal.Mount.from_local_file(
                         entry["host_path"],
                         remote_path=entry["container_path"],
-                    )
+                    ),
                 )
         except Exception as e:
             logger.debug("Modal: could not load credential file mounts: %s", e)
@@ -361,7 +361,7 @@ class ModalEnvironment(BaseEnvironment):
             if exit_code != 0:
                 stderr_text = await proc.stderr.read.aio()
                 raise RuntimeError(
-                    f"Modal bulk upload failed (exit {exit_code}): {stderr_text}"
+                    f"Modal bulk upload failed (exit {exit_code}): {stderr_text}",
                 )
 
         self._worker.run_coroutine(_bulk(), timeout=120)
@@ -374,7 +374,7 @@ class ModalEnvironment(BaseEnvironment):
         """
         async def _download():
             proc = await self._sandbox.exec.aio(
-                "bash", "-c", "tar cf - -C / root/.hermes"
+                "bash", "-c", "tar cf - -C / root/.hermes",
             )
             data = await proc.stdout.read.aio()
             exit_code = await proc.wait.aio()

@@ -179,7 +179,7 @@ class TestPatchHandler:
         from tools.file_tools import patch_tool
         result = json.loads(patch_tool(
             mode="replace", path="/tmp/f.py",
-            old_string="foo", new_string="bar"
+            old_string="foo", new_string="bar",
         ))
         assert result["status"] == "ok"
         mock_ops.patch_replace.assert_called_once_with("/tmp/f.py", "foo", "bar", False)
@@ -241,7 +241,8 @@ class TestPatchHandler:
         carry prompt-injection-controlled paths (skill content, web extract).
         ``..`` traversal in the header must be rejected before the patch is
         applied, even though the explicit ``path=`` arg is allowed to use
-        ``..`` for legitimate cross-worktree edits."""
+        ``..`` for legitimate cross-worktree edits.
+        """
         from tools.file_tools import patch_tool
         result = json.loads(patch_tool(
             mode="patch",
@@ -341,7 +342,7 @@ class TestPatchHints:
         mock_ops = MagicMock()
         result_obj = MagicMock()
         result_obj.to_dict.return_value = {
-            "error": "Could not find match for old_string in foo.py"
+            "error": "Could not find match for old_string in foo.py",
         }
         mock_ops.patch_replace.return_value = result_obj
         mock_get.return_value = mock_ops
@@ -495,7 +496,8 @@ class TestSensitivePathCheck:
 class TestPatchSchemaShape:
     """PATCH_SCHEMA must advertise per-mode required params via description
     text (not JSON-schema ``required``), so strict models like kimi-k2.x stop
-    silently omitting old_string / new_string / patch content."""
+    silently omitting old_string / new_string / patch content.
+    """
 
     def test_per_mode_required_params_documented_in_descriptions(self):
         desc = PATCH_SCHEMA["description"]

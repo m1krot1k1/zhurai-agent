@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pytest
 
 import hermes_logging
+
 # Use whatever RotatingFileHandler class hermes_logging actually resolved so
 # the autouse fixture's isinstance checks (which strip rotating handlers
 # between tests) match the real handlers on every platform. hermes_logging
@@ -139,7 +140,7 @@ class TestSetupLogging:
 
     def test_custom_max_size_and_backup(self, hermes_home):
         hermes_logging.setup_logging(
-            hermes_home=hermes_home, max_size_mb=10, backup_count=5
+            hermes_home=hermes_home, max_size_mb=10, backup_count=5,
         )
 
         root = logging.getLogger()
@@ -553,7 +554,7 @@ class TestComponentFilter:
     def test_passes_matching_prefix(self):
         f = hermes_logging._ComponentFilter(("gateway",))
         record = logging.LogRecord(
-            "gateway.run", logging.INFO, "", 0, "msg", (), None
+            "gateway.run", logging.INFO, "", 0, "msg", (), None,
         )
         assert f.filter(record) is True
 
@@ -562,33 +563,33 @@ class TestComponentFilter:
         # the gateway component filter is built from COMPONENT_PREFIXES["gateway"]
         # (which includes "plugins.platforms"), so such records pass.
         f = hermes_logging._ComponentFilter(
-            hermes_logging.COMPONENT_PREFIXES["gateway"]
+            hermes_logging.COMPONENT_PREFIXES["gateway"],
         )
         record = logging.LogRecord(
-            "plugins.platforms.telegram.adapter", logging.INFO, "", 0, "msg", (), None
+            "plugins.platforms.telegram.adapter", logging.INFO, "", 0, "msg", (), None,
         )
         assert f.filter(record) is True
 
     def test_blocks_non_matching(self):
         f = hermes_logging._ComponentFilter(("gateway",))
         record = logging.LogRecord(
-            "tools.terminal_tool", logging.INFO, "", 0, "msg", (), None
+            "tools.terminal_tool", logging.INFO, "", 0, "msg", (), None,
         )
         assert f.filter(record) is False
 
     def test_multiple_prefixes(self):
         f = hermes_logging._ComponentFilter(("agent", "run_agent", "model_tools"))
         assert f.filter(logging.LogRecord(
-            "agent.compressor", logging.INFO, "", 0, "", (), None
+            "agent.compressor", logging.INFO, "", 0, "", (), None,
         ))
         assert f.filter(logging.LogRecord(
-            "run_agent", logging.INFO, "", 0, "", (), None
+            "run_agent", logging.INFO, "", 0, "", (), None,
         ))
         assert f.filter(logging.LogRecord(
-            "model_tools", logging.INFO, "", 0, "", (), None
+            "model_tools", logging.INFO, "", 0, "", (), None,
         ))
         assert not f.filter(logging.LogRecord(
-            "tools.browser", logging.INFO, "", 0, "", (), None
+            "tools.browser", logging.INFO, "", 0, "", (), None,
         ))
 
 
@@ -615,7 +616,7 @@ class TestComponentPrefixes:
         assert "model_tools" in prefixes
 
     def test_tools_prefix(self):
-        assert ("tools",) == hermes_logging.COMPONENT_PREFIXES["tools"]
+        assert hermes_logging.COMPONENT_PREFIXES["tools"] == ("tools",)
 
     def test_cli_prefix(self):
         prefixes = hermes_logging.COMPONENT_PREFIXES["cli"]
@@ -623,7 +624,7 @@ class TestComponentPrefixes:
         assert "cli" in prefixes
 
     def test_cron_prefix(self):
-        assert ("cron",) == hermes_logging.COMPONENT_PREFIXES["cron"]
+        assert hermes_logging.COMPONENT_PREFIXES["cron"] == ("cron",)
 
     def test_gui_prefix(self):
         prefixes = hermes_logging.COMPONENT_PREFIXES["gui"]
@@ -891,7 +892,7 @@ class TestExternalRotationRecovery:
             assert log_path.read_text() == "before rotation\n"
 
             # External rotation (NOT via handler.doRollover()).
-            os.rename(log_path, rotated)
+            Path(log_path).rename(rotated)
             assert not log_path.exists()
 
             self._emit(handler, "after rotation")
@@ -912,7 +913,7 @@ class TestExternalRotationRecovery:
             self._emit(handler, "before unlink")
             assert log_path.read_text() == "before unlink\n"
 
-            os.unlink(log_path)
+            Path(log_path).unlink()
             assert not log_path.exists()
 
             self._emit(handler, "after unlink")
@@ -936,7 +937,7 @@ class TestExternalRotationRecovery:
             self._emit(handler, "AAAA" * 32)
             assert log_path.stat().st_size > 0
 
-            with open(log_path, "w"):
+            with Path(log_path).open("w"):
                 pass  # truncate to zero
             assert log_path.stat().st_size == 0
 
@@ -996,7 +997,7 @@ class TestExternalRotationRecovery:
         assert "BEFORE rotation" in gw_path.read_text()
 
         # External actor renames the file out from under us.
-        os.rename(gw_path, rotated)
+        Path(gw_path).rename(rotated)
         assert not gw_path.exists()
 
         # Caller (or some restart path) re-enters setup_logging.  This used
@@ -1022,7 +1023,6 @@ class TestSafeStderr:
 
     def test_returns_stderr_on_utf8_system(self, monkeypatch):
         """On UTF-8 systems, _safe_stderr() returns sys.stderr unchanged."""
-        import io
         fake_stderr = io.StringIO()
         monkeypatch.setattr(sys, "stderr", fake_stderr)
         # On Linux/macOS, encoding is typically utf-8
@@ -1032,10 +1032,9 @@ class TestSafeStderr:
 
     def test_wraps_non_utf8_stderr(self, monkeypatch):
         """On non-UTF-8 systems (e.g. Windows cp949), wraps stderr with UTF-8."""
-        import io
-
         class FakeStderr:
             """Simulates a Windows stderr with legacy encoding."""
+
             encoding = "cp949"
             buffer = io.BytesIO()
 
@@ -1055,8 +1054,6 @@ class TestSafeStderr:
 
     def test_handler_emits_unicode_without_crash(self, tmp_path):
         """StreamHandler with _safe_stderr can emit Unicode messages."""
-        import io
-
         # Create a stderr-like stream with ASCII encoding
         class AsciiStream:
             encoding = "ascii"
@@ -1075,7 +1072,7 @@ class TestSafeStderr:
                 io.BytesIO(),
                 encoding="utf-8",
                 errors="replace",
-            )
+            ),
         )
         handler.setFormatter(logging.Formatter("%(message)s"))
         logger = logging.getLogger("_test_unicode")

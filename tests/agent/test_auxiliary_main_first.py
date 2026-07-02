@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
-
 # ── Text aux tasks — _resolve_auto ──────────────────────────────────────────
 
 
@@ -34,7 +32,7 @@ class TestResolveAutoMainFirst:
             "agent.auxiliary_client._read_main_model",
             return_value="anthropic/claude-sonnet-4.6",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve:
             mock_client = MagicMock()
             mock_resolve.return_value = (mock_client, "anthropic/claude-sonnet-4.6")
@@ -60,7 +58,7 @@ class TestResolveAutoMainFirst:
             "agent.auxiliary_client._read_main_model",
             return_value="anthropic/claude-opus-4.6",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve:
             mock_client = MagicMock()
             mock_resolve.return_value = (mock_client, "anthropic/claude-opus-4.6")
@@ -82,7 +80,7 @@ class TestResolveAutoMainFirst:
         ), patch(
             "agent.auxiliary_client._read_main_model", return_value="deepseek-chat",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve:
             mock_client = MagicMock()
             mock_resolve.return_value = (mock_client, "deepseek-chat")
@@ -201,7 +199,7 @@ class TestResolveAutoMainFirst:
         ), patch(
             "agent.auxiliary_client._read_main_model", return_value="config-model",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve:
             mock_resolve.return_value = (MagicMock(), "runtime-model")
 
@@ -228,7 +226,7 @@ class TestResolveAutoMainFirst:
         ), patch(
             "agent.auxiliary_client._read_main_model", return_value="config-model",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve:
             mock_resolve.return_value = (MagicMock(), "mimo-v2.5-pro")
 
@@ -265,7 +263,7 @@ class TestResolveVisionMainFirst:
             "agent.auxiliary_client._read_main_model",
             return_value="anthropic/claude-sonnet-4.6",
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve, patch(
             "agent.auxiliary_client._resolve_task_provider_model",
             return_value=("auto", None, None, None, None),
@@ -332,14 +330,14 @@ class TestResolveVisionMainFirst:
         assert model == "xiaomi/mimo-v2-omni"
 
     def test_exotic_provider_with_vision_override_preserved(self):
-        """xiaomi → mimo-v2.5 override still wins over main_model."""
+        """Xiaomi → mimo-v2.5 override still wins over main_model."""
         with patch(
             "agent.auxiliary_client._read_main_provider", return_value="xiaomi",
         ), patch(
             "agent.auxiliary_client._read_main_model",
             return_value="mimo-v2-pro",  # text model
         ), patch(
-            "agent.auxiliary_client.resolve_provider_client"
+            "agent.auxiliary_client.resolve_provider_client",
         ) as mock_resolve, patch(
             "agent.auxiliary_client._resolve_task_provider_model",
             return_value=("auto", None, None, None, None),
@@ -470,7 +468,7 @@ class TestResolveVisionMainFirst:
             "agent.auxiliary_client._resolve_task_provider_model",
             return_value=("nous", None, None, None, None),  # explicit override
         ), patch(
-            "agent.auxiliary_client._resolve_strict_vision_backend"
+            "agent.auxiliary_client._resolve_strict_vision_backend",
         ) as mock_strict:
             mock_strict.return_value = (MagicMock(), "nous-default-model")
 

@@ -21,9 +21,9 @@ from tools.tool_backend_helpers import (
     coerce_modal_mode,
     has_direct_modal_credentials,
     managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
     normalize_browser_cloud_provider,
     normalize_modal_mode,
+    nous_tool_gateway_unavailable_message,
     prefers_gateway,
     resolve_modal_backend_state,
     resolve_openai_audio_api_key,
@@ -292,7 +292,7 @@ class TestResolveModalBackendState:
             lambda: nous_enabled,
         )
         return resolve_modal_backend_state(
-            mode, has_direct=has_direct, managed_ready=managed_ready
+            mode, has_direct=has_direct, managed_ready=managed_ready,
         )
 
     # --- auto mode ---

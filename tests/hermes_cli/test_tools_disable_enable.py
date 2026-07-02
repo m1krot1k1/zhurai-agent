@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from hermes_cli.tools_config import tools_disable_enable_command
 
-
 # ── Built-in toolset disable ────────────────────────────────────────────────
 
 
@@ -70,7 +69,7 @@ class TestToolsDisableMcp:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config") as mock_save:
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["github:create_issue"], platform="cli")
+                Namespace(tools_action="disable", names=["github:create_issue"], platform="cli"),
             )
         saved = mock_save.call_args[0][0]
         assert "create_issue" in saved["mcp_servers"]["github"]["tools"]["exclude"]
@@ -80,7 +79,7 @@ class TestToolsDisableMcp:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config") as mock_save:
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["github:create_issue"], platform="cli")
+                Namespace(tools_action="disable", names=["github:create_issue"], platform="cli"),
             )
         saved = mock_save.call_args[0][0]
         assert saved["mcp_servers"]["github"]["tools"]["exclude"].count("create_issue") == 1
@@ -90,7 +89,7 @@ class TestToolsDisableMcp:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config"):
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["unknown:tool"], platform="cli")
+                Namespace(tools_action="disable", names=["unknown:tool"], platform="cli"),
             )
         out = capsys.readouterr().out
         assert "MCP server 'unknown' not found in config" in out
@@ -106,7 +105,7 @@ class TestToolsEnableMcp:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config") as mock_save:
             tools_disable_enable_command(
-                Namespace(tools_action="enable", names=["github:create_issue"], platform="cli")
+                Namespace(tools_action="enable", names=["github:create_issue"], platform="cli"),
             )
         saved = mock_save.call_args[0][0]
         assert "create_issue" not in saved["mcp_servers"]["github"]["tools"]["exclude"]
@@ -186,7 +185,7 @@ class TestToolsValidation:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config"):
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["web"], platform="invalid_platform")
+                Namespace(tools_action="disable", names=["web"], platform="invalid_platform"),
             )
         out = capsys.readouterr().out
         assert "Unknown platform 'invalid_platform'" in out
@@ -196,7 +195,7 @@ class TestToolsValidation:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config"):
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["nonexistent_toolset"], platform="cli")
+                Namespace(tools_action="disable", names=["nonexistent_toolset"], platform="cli"),
             )
         out = capsys.readouterr().out
         assert "Unknown toolset 'nonexistent_toolset'" in out
@@ -206,7 +205,7 @@ class TestToolsValidation:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config") as mock_save:
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["nonexistent_toolset"], platform="cli")
+                Namespace(tools_action="disable", names=["nonexistent_toolset"], platform="cli"),
             )
         saved = mock_save.call_args[0][0]
         assert "web" in saved["platform_toolsets"]["cli"]
@@ -217,7 +216,7 @@ class TestToolsValidation:
         with patch("hermes_cli.tools_config.load_config", return_value=config), \
              patch("hermes_cli.tools_config.save_config") as mock_save:
             tools_disable_enable_command(
-                Namespace(tools_action="disable", names=["web", "bad_toolset"], platform="cli")
+                Namespace(tools_action="disable", names=["web", "bad_toolset"], platform="cli"),
             )
         saved = mock_save.call_args[0][0]
         assert "web" not in saved["platform_toolsets"]["cli"]

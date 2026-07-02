@@ -134,8 +134,8 @@ class TestRunJobScript:
 
     def test_script_subprocess_env_sanitized(self, cron_env, monkeypatch):
         """Cron scripts must not inherit Hermes provider env (SECURITY.md §2.3)."""
-        from tools.environments.local import _HERMES_PROVIDER_ENV_BLOCKLIST
         from cron.scheduler import _run_job_script
+        from tools.environments.local import _HERMES_PROVIDER_ENV_BLOCKLIST
 
         # sorted() so the probed var is deterministic across runs
         # (frozenset iteration order varies with PYTHONHASHSEED).
@@ -149,8 +149,8 @@ class TestRunJobScript:
                 import os
                 key = {blocked_var!r}
                 print("PRESENT" if os.environ.get(key) else "ABSENT")
-                """
-            )
+                """,
+            ),
         )
 
         success, output = _run_job_script("env_probe.py")
@@ -235,7 +235,6 @@ class TestBuildJobPromptWithScript:
         prompt = _build_job_prompt(job)
         assert "## Script Output" not in prompt
         assert "Simple job." in prompt
-
 
 
 class TestCronjobToolScript:

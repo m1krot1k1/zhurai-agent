@@ -22,7 +22,6 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Dict, Optional
 
 import yaml
 
@@ -34,8 +33,8 @@ _DEFAULT_MANAGED_DIR = Path("/etc/hermes")
 
 _CACHE_LOCK = threading.Lock()
 # path_key -> (mtime_ns, size, parsed)
-_CONFIG_CACHE: Dict[str, tuple] = {}
-_ENV_CACHE: Dict[str, tuple] = {}
+_CONFIG_CACHE: dict[str, tuple] = {}
+_ENV_CACHE: dict[str, tuple] = {}
 
 
 def _under_pytest() -> bool:
@@ -49,7 +48,7 @@ def _under_pytest() -> bool:
     return "PYTEST_CURRENT_TEST" in os.environ
 
 
-def get_managed_dir() -> Optional[Path]:
+def get_managed_dir() -> Path | None:
     """Resolve the managed-scope directory, or None when no scope is present.
 
     Resolution (highest priority first):
@@ -78,7 +77,7 @@ def invalidate_managed_cache() -> None:
         _ENV_CACHE.clear()
 
 
-def _cached_read(path: Path, cache: Dict[str, tuple], parse):
+def _cached_read(path: Path, cache: dict[str, tuple], parse):
     """Shared (mtime_ns, size)-keyed read. Returns a deepcopy of the parsed value.
 
     Returns ``None`` when the file is absent or fails to parse (fail-open). A
@@ -97,7 +96,7 @@ def _cached_read(path: Path, cache: Dict[str, tuple], parse):
         if hit is not None and hit[:2] == key:
             return copy.deepcopy(hit[2])
     try:
-        with open(path, encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             parsed = parse(f)
     except Exception as exc:  # noqa: BLE001 — fail-open, but LOUD
         logger.warning(
@@ -125,7 +124,7 @@ def load_managed_config() -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def load_managed_env() -> Dict[str, str]:
+def load_managed_env() -> dict[str, str]:
     """Parsed managed .env (KEY=VALUE), or {} when absent (fail-open)."""
     managed_dir = get_managed_dir()
     if managed_dir is None:
@@ -159,7 +158,11 @@ def apply_managed_overlay(config: dict) -> dict:
         if not managed:
             return config
         # Imported lazily to avoid an import cycle (config imports managed_scope).
-        from hermes_cli.config import _deep_merge, _expand_env_vars, _normalize_root_model_keys
+        from hermes_cli.config import (
+            _deep_merge,
+            _expand_env_vars,
+            _normalize_root_model_keys,
+        )
 
         managed_expanded = _normalize_root_model_keys(_expand_env_vars(managed))
         # A bare ``model: x/y`` string in the managed file must merge as
@@ -172,13 +175,13 @@ def apply_managed_overlay(config: dict) -> dict:
             managed_expanded = dict(managed_expanded)
             managed_expanded["model"] = {"default": managed_expanded["model"]}
         return _deep_merge(config, managed_expanded)
-    except Exception:  # noqa: BLE001 — overlay must never break a caller
+    except Exception:
         logger.warning("managed scope: failed to apply config overlay", exc_info=True)
         return config
 
 
-def _parse_env(f) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def _parse_env(f) -> dict[str, str]:
+    out: dict[str, str] = {}
     for line in f:
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:

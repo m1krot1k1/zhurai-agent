@@ -34,7 +34,7 @@ class TestClawHubSource(unittest.TestCase):
     @patch.object(ClawHubSource, "_load_catalog_index", return_value=[])
     @patch("tools.skills_hub.httpx.get")
     def test_search_uses_listing_endpoint_as_fallback(
-        self, mock_get, _mock_load_catalog, _mock_read_cache, _mock_write_cache
+        self, mock_get, _mock_load_catalog, _mock_read_cache, _mock_write_cache,
     ):
         def side_effect(url, *args, **kwargs):
             if url.endswith("/skills"):
@@ -47,8 +47,8 @@ class TestClawHubSource(unittest.TestCase):
                                 "displayName": "CalDAV Calendar",
                                 "summary": "Calendar integration",
                                 "tags": ["calendar", "productivity"],
-                            }
-                        ]
+                            },
+                        ],
                     },
                 )
             if url.endswith("/skills/caldav"):
@@ -78,7 +78,7 @@ class TestClawHubSource(unittest.TestCase):
     )
     @patch("tools.skills_hub.httpx.get")
     def test_search_falls_back_to_exact_slug_when_search_results_are_irrelevant(
-        self, mock_get, _mock_load_catalog, _mock_read_cache, _mock_write_cache
+        self, mock_get, _mock_load_catalog, _mock_read_cache, _mock_write_cache,
     ):
         def side_effect(url, *args, **kwargs):
             if url.endswith("/skills"):
@@ -90,8 +90,8 @@ class TestClawHubSource(unittest.TestCase):
                                 "slug": "apple-music-dj",
                                 "displayName": "Apple Music DJ",
                                 "summary": "Unrelated result",
-                            }
-                        ]
+                            },
+                        ],
                     },
                 )
             if url.endswith("/skills/self-improving-agent"):
@@ -141,7 +141,7 @@ class TestClawHubSource(unittest.TestCase):
                 identifier="apple-music-dj",
                 trust_level="community",
                 tags=[],
-            )
+            ),
         ]
         results = self.src._finalize_search_results("self-improving-agent", poisoned, 5)
 
@@ -163,7 +163,7 @@ class TestClawHubSource(unittest.TestCase):
         ),
     )
     def test_search_matches_space_separated_query_to_hyphenated_slug(
-        self, _mock_exact_slug
+        self, _mock_exact_slug,
     ):
         results = self.src.search("self improving", limit=5)
 
@@ -230,7 +230,7 @@ class TestClawHubSource(unittest.TestCase):
                         "files": [
                             {"path": "SKILL.md", "rawUrl": "https://files.example/skill-md"},
                             {"path": "README.md", "content": "hello"},
-                        ]
+                        ],
                     },
                 )
             if url == "https://files.example/skill-md":
@@ -285,7 +285,7 @@ class TestClawHubSource(unittest.TestCase):
                     json_data={
                         "files": [
                             {"path": "SKILL.md", "rawUrl": "http://127.0.0.1/private-skill"},
-                        ]
+                        ],
                     },
                 )
             return _MockResponse(status_code=404, json_data={})
@@ -302,7 +302,7 @@ class TestClawHubSource(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_search_empty_query_paginates_full_catalog(
-        self, mock_get, _mock_read_cache, _mock_write_cache
+        self, mock_get, _mock_read_cache, _mock_write_cache,
     ):
         """Empty query must walk the cursor-paginated catalog.
 
@@ -354,12 +354,13 @@ class TestClawHubSource(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_catalog_walk_aborts_on_budget_and_does_not_poison_cache(
-        self, mock_get, _mock_read_cache, mock_write_cache
+        self, mock_get, _mock_read_cache, mock_write_cache,
     ):
         """A walk truncated by the wall-clock budget must stop early and must
         NOT write the (partial) result to the cache. Before the budget guard
         the walk ran up to 750 pages and cached unconditionally — a truncated
-        walk poisoned the cache with incomplete catalog data."""
+        walk poisoned the cache with incomplete catalog data.
+        """
         page_calls = {"n": 0}
 
         def side_effect(url, *args, **kwargs):
@@ -372,7 +373,7 @@ class TestClawHubSource(unittest.TestCase):
                     status_code=200,
                     json_data={
                         "items": [
-                            {"slug": f"skill-{idx}", "displayName": f"Skill {idx}"}
+                            {"slug": f"skill-{idx}", "displayName": f"Skill {idx}"},
                         ],
                         "nextCursor": f"cursor-{idx + 1}",
                     },
@@ -397,10 +398,11 @@ class TestClawHubSource(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_catalog_walk_caches_when_terminating_naturally_within_budget(
-        self, mock_get, _mock_read_cache, mock_write_cache
+        self, mock_get, _mock_read_cache, mock_write_cache,
     ):
         """Happy path: a walk that exhausts the cursor within the budget DOES
-        write the cache."""
+        write the cache.
+        """
 
         def side_effect(url, *args, **kwargs):
             if url.endswith("/skills"):
@@ -408,7 +410,7 @@ class TestClawHubSource(unittest.TestCase):
                     status_code=200,
                     json_data={
                         "items": [
-                            {"slug": "only-skill", "displayName": "Only Skill"}
+                            {"slug": "only-skill", "displayName": "Only Skill"},
                         ],
                         # No nextCursor -> natural termination.
                     },
@@ -427,7 +429,8 @@ class TestClawHubSource(unittest.TestCase):
 class TestClawHubCatalogWalkBounded(unittest.TestCase):
     """max_items bounds the walk so browse's cold-start fallback renders one
     page without walking the entire 50k+ catalog. The offline index builder
-    keeps max_items=0 (unbounded) and walks to exhaustion."""
+    keeps max_items=0 (unbounded) and walks to exhaustion.
+    """
 
     def setUp(self):
         self.src = ClawHubSource()
@@ -442,7 +445,8 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
 
     def _infinite_pages(self, page_calls):
         """A side_effect that always advertises another cursor — the walk would
-        never stop on its own, so only max_items / budget can break it."""
+        never stop on its own, so only max_items / budget can break it.
+        """
 
         def side_effect(url, *args, **kwargs):
             if url.endswith("/skills"):
@@ -452,7 +456,7 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
                     status_code=200,
                     json_data={
                         "items": [
-                            {"slug": f"skill-{idx}", "displayName": f"Skill {idx}"}
+                            {"slug": f"skill-{idx}", "displayName": f"Skill {idx}"},
                         ],
                         "nextCursor": f"cursor-{idx + 1}",
                     },
@@ -465,10 +469,11 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_max_items_stops_walk_early_and_does_not_cache(
-        self, mock_get, _mock_read_cache, mock_write_cache
+        self, mock_get, _mock_read_cache, mock_write_cache,
     ):
         """A bounded walk stops as soon as it has >= max_items skills and must
-        NOT poison the shared full-catalog cache with the partial slice."""
+        NOT poison the shared full-catalog cache with the partial slice.
+        """
         page_calls = {"n": 0}
         mock_get.side_effect = self._infinite_pages(page_calls)
 
@@ -485,7 +490,7 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_max_items_zero_ignores_wall_clock_budget(
-        self, mock_get, _mock_read_cache, _mock_write_cache
+        self, mock_get, _mock_read_cache, _mock_write_cache,
     ):
         """Index builder path (max_items=0) must not truncate on the browse budget."""
         page_calls = {"n": 0}
@@ -502,10 +507,11 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_max_items_zero_is_unbounded_and_caches(
-        self, mock_get, _mock_read_cache, mock_write_cache
+        self, mock_get, _mock_read_cache, mock_write_cache,
     ):
         """max_items=0 (the index builder's path) walks to natural termination
-        and DOES cache the complete catalog."""
+        and DOES cache the complete catalog.
+        """
 
         def side_effect(url, *args, **kwargs):
             if url.endswith("/skills"):
@@ -533,10 +539,11 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
     def test_empty_query_browse_bounds_walk_to_limit(
-        self, mock_get, _mock_read_cache, _mock_write_cache
+        self, mock_get, _mock_read_cache, _mock_write_cache,
     ):
         """search("", limit=N) is the browse cold-start path — it must bound the
-        catalog walk to N rather than walking the whole 50k+ catalog."""
+        catalog walk to N rather than walking the whole 50k+ catalog.
+        """
         page_calls = {"n": 0}
         mock_get.side_effect = self._infinite_pages(page_calls)
 

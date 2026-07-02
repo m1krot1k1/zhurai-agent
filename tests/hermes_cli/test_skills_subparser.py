@@ -20,8 +20,8 @@ def test_no_duplicate_skills_subparser():
     import sys
 
     # Remove cached module if present
-    if 'hermes_cli.main' in sys.modules:
-        del sys.modules['hermes_cli.main']
+    if "hermes_cli.main" in sys.modules:
+        del sys.modules["hermes_cli.main"]
 
     try:
         import hermes_cli.main  # noqa: F401
@@ -29,6 +29,6 @@ def test_no_duplicate_skills_subparser():
         if "conflicting subparser" in str(e):
             raise AssertionError(
                 f"Duplicate subparser detected: {e}. "
-                "See issue #898 for details."
+                "See issue #898 for details.",
             ) from e
         raise

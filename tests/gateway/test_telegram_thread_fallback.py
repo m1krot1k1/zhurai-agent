@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gateway.config import PlatformConfig, Platform
+from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import (
     MessageEvent,
     MessageType,
@@ -23,7 +23,6 @@ from gateway.platforms.base import (
     _thread_metadata_for_source,
 )
 from gateway.session import build_session_key
-
 
 # ── Fake telegram.error hierarchy ──────────────────────────────────────
 # Mirrors the real python-telegram-bot hierarchy:
@@ -952,7 +951,7 @@ async def test_send_image_url_dm_topic_reply_not_found_retry_drops_thread_id(mon
         return SimpleNamespace(message_id=784)
 
     adapter._bot = SimpleNamespace(send_photo=mock_send_photo)
-    import tools.url_safety as url_safety
+    from tools import url_safety
 
     monkeypatch.setattr(url_safety, "is_safe_url", lambda _url: True)
 
@@ -1012,7 +1011,7 @@ async def test_send_image_upload_dm_topic_reply_not_found_retry_drops_thread_id(
         SimpleNamespace(AsyncClient=_FakeAsyncClient),
     )
     adapter._bot = SimpleNamespace(send_photo=mock_send_photo)
-    import tools.url_safety as url_safety
+    from tools import url_safety
 
     monkeypatch.setattr(url_safety, "is_safe_url", lambda _url: True)
 
@@ -1325,7 +1324,7 @@ async def test_send_retries_pool_timeout():
             raise FakeTimedOut(
                 "Pool timeout: All connections in the connection pool are "
                 "occupied. Request was *not* sent to Telegram. Consider "
-                "adjusting the connection pool size or the pool timeout."
+                "adjusting the connection pool size or the pool timeout.",
             )
         return SimpleNamespace(message_id=202)
 
@@ -1349,7 +1348,7 @@ async def test_send_marks_pool_timeout_retryable_after_exhaustion():
         attempt[0] += 1
         raise FakeTimedOut(
             "Pool timeout: All connections in the connection pool are occupied. "
-            "Request was *not* sent to Telegram."
+            "Request was *not* sent to Telegram.",
         )
 
     adapter._bot = SimpleNamespace(send_message=mock_send_message)

@@ -1,5 +1,4 @@
-"""
-Yuanbao platform adapter.
+"""Yuanbao platform adapter.
 
 Connects to the Yuanbao WebSocket gateway, handles authentication (AUTH_BIND),
 heartbeat, reconnection, message receive (T05) and send (T06).
@@ -29,16 +28,16 @@ import logging
 import os
 import re
 import secrets
+import sys
 import time
 import urllib.parse
 import uuid
-from datetime import datetime, timezone, timedelta
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Dict, Iterator, List, Optional, Tuple
-
-import sys
+from typing import Any, ClassVar
 
 import httpx
 
@@ -62,37 +61,39 @@ from gateway.platforms.base import (
 )
 from gateway.platforms.helpers import MessageDeduplicator
 from gateway.platforms.yuanbao_media import (
-    download_url as media_download_url,
-    get_cos_credentials,
-    upload_to_cos,
-    build_image_msg_body,
     build_file_msg_body,
+    build_image_msg_body,
+    get_cos_credentials,
     guess_mime_type,
     md5_hex,
+    upload_to_cos,
+)
+from gateway.platforms.yuanbao_media import (
+    download_url as media_download_url,
 )
 from gateway.platforms.yuanbao_proto import (
     CMD_TYPE,
+    HERMES_INSTANCE_ID,
+    WS_HEARTBEAT_FINISH,
+    WS_HEARTBEAT_RUNNING,
     _fields_to_dict,
     _get_string,
     _get_varint,
     _parse_fields,
-    WS_HEARTBEAT_RUNNING,
-    WS_HEARTBEAT_FINISH,
-    HERMES_INSTANCE_ID,
     decode_conn_msg,
-    decode_inbound_push,
     decode_forward_msg_data,
-    decode_query_group_info_rsp,
     decode_get_group_member_list_rsp,
+    decode_inbound_push,
+    decode_query_group_info_rsp,
     encode_auth_bind,
+    encode_get_group_member_list,
     encode_ping,
     encode_push_ack,
+    encode_query_group_info,
     encode_send_c2c_message,
+    encode_send_group_heartbeat,
     encode_send_group_message,
     encode_send_private_heartbeat,
-    encode_send_group_heartbeat,
-    encode_query_group_info,
-    encode_get_group_member_list,
     next_seq_no,
 )
 from gateway.session import build_session_key
@@ -159,10 +160,10 @@ SLOW_RESPONSE_MESSAGE = "任务有点复杂，正在努力处理中，请耐心�
 # Regex matching Yuanbao resource reference anchors in transcript text:
 #   [image|ybres:abc123]  [file:report.pdf|ybres:xyz789]  [voice|ybres:...]
 _YB_RES_REF_RE = re.compile(
-    r"\[(image|voice|video|file(?::[^|\]]*)?)\|ybres:([A-Za-z0-9_\-]+)\]"
+    r"\[(image|voice|video|file(?::[^|\]]*)?)\|ybres:([A-Za-z0-9_\-]+)\]",
 )
 
-# Patched local-media anchors once an inbound resource has been downloaded to the local cache. 
+# Patched local-media anchors once an inbound resource has been downloaded to the local cache.
 #   [image: /opt/data/image_cache/img_xxx.bmp]
 #   [file: report.pdf → /opt/data/.../report.pdf]
 #   (and any future kind, e.g. [video: /opt/.../clip.mp4])
@@ -172,12 +173,13 @@ _YB_LOCAL_MEDIA_RE = re.compile(r"\[(\w+):[^\]]*?(/[^\]]+?)\s*\]")
 _RESOLVABLE_MEDIA_KINDS = frozenset({"image", "file", "video"})
 
 # Strip page indicators like (1/3) appended by BasePlatformAdapter
-_INDICATOR_RE = re.compile(r'\s*\(\d+/\d+\)$')
+_INDICATOR_RE = re.compile(r"\s*\(\d+/\d+\)$")
 
 # Observed-media backfill: how many recent transcript messages to scan
 OBSERVED_MEDIA_BACKFILL_LOOKBACK = 50
 # Max number of resource references to resolve per inbound turn
 OBSERVED_MEDIA_BACKFILL_MAX_RESOLVE_PER_TURN = 12
+
 
 class MarkdownProcessor:
     """Encapsulates all Markdown-related utilities for the Yuanbao platform.
@@ -195,8 +197,7 @@ class MarkdownProcessor:
 
     @staticmethod
     def has_unclosed_fence(text: str) -> bool:
-        """
-        Detect whether the text has unclosed code block fences.
+        """Detect whether the text has unclosed code block fences.
 
         Scan line by line, toggling in/out state when encountering a line starting with ```.
         An odd number of toggles indicates an unclosed fence.
@@ -206,10 +207,11 @@ class MarkdownProcessor:
 
         Returns:
             Returns True if the text ends with an unclosed fence, otherwise False
+
         """
         in_fence = False
-        for line in text.split('\n'):
-            if line.startswith('```'):
+        for line in text.split("\n"):
+            if line.startswith("```"):
                 in_fence = not in_fence
         return in_fence
 
@@ -217,20 +219,20 @@ class MarkdownProcessor:
 
     @staticmethod
     def ends_with_table_row(text: str) -> bool:
-        """
-        Detect whether the text ends with a table row (last non-empty line starts and ends with |).
+        """Detect whether the text ends with a table row (last non-empty line starts and ends with |).
 
         Args:
             text: Text to check
 
         Returns:
             Returns True if the last non-empty line is a table row
+
         """
         trimmed = text.rstrip()
         if not trimmed:
             return False
-        last_line = trimmed.split('\n')[-1].strip()
-        return last_line.startswith('|') and last_line.endswith('|')
+        last_line = trimmed.split("\n")[-1].strip()
+        return last_line.startswith("|") and last_line.endswith("|")
 
     # -- Paragraph boundary splitting --------------------------------------
 
@@ -238,10 +240,9 @@ class MarkdownProcessor:
     def split_at_paragraph_boundary(
         text: str,
         max_chars: int,
-        len_fn: Optional[Callable[[str], int]] = None,
+        len_fn: Callable[[str], int] | None = None,
     ) -> tuple[str, str]:
-        """
-        Find the nearest paragraph boundary split point within max_chars, return (head, tail).
+        """Find the nearest paragraph boundary split point within max_chars, return (head, tail).
 
         Split priority:
         1. Blank line (paragraph boundary)
@@ -256,10 +257,11 @@ class MarkdownProcessor:
 
         Returns:
             (head, tail) tuple, head is the front part, tail is the back part, satisfying head + tail == text
+
         """
         _len = len_fn or len
         if _len(text) <= max_chars:
-            return text, ''
+            return text, ""
 
         # Build a character-index window that fits within max_chars.
         # When len_fn != len we cannot simply slice [:max_chars], so we
@@ -277,12 +279,12 @@ class MarkdownProcessor:
             window = text[:lo]
 
         # 1. Prefer the last blank line (\n\n) as paragraph boundary
-        pos = window.rfind('\n\n')
+        pos = window.rfind("\n\n")
         if pos > 0:
             return text[:pos + 2], text[pos + 2:]
 
         # 2. Then find the last newline after a sentence-ending punctuation
-        sentence_end_re = re.compile(r'[。！？.!?]\n')
+        sentence_end_re = re.compile(r"[。！？.!?]\n")
         best_pos = -1
         for m in sentence_end_re.finditer(window):
             best_pos = m.end()
@@ -290,7 +292,7 @@ class MarkdownProcessor:
             return text[:best_pos], text[best_pos:]
 
         # 3. Fallback: find the last newline
-        pos = window.rfind('\n')
+        pos = window.rfind("\n")
         if pos > 0:
             return text[:pos + 1], text[pos + 1:]
 
@@ -303,18 +305,17 @@ class MarkdownProcessor:
     @staticmethod
     def is_fence_atom(text: str) -> bool:
         """Determine whether an atomic block is a code block (starts with ```)."""
-        return text.lstrip().startswith('```')
+        return text.lstrip().startswith("```")
 
     @staticmethod
     def is_table_atom(text: str) -> bool:
         """Determine whether an atomic block is a table (first line starts with |)."""
-        first_line = text.split('\n')[0].strip()
-        return first_line.startswith('|') and first_line.endswith('|')
+        first_line = text.split("\n", maxsplit=1)[0].strip()
+        return first_line.startswith("|") and first_line.endswith("|")
 
     @staticmethod
     def split_into_atoms(text: str) -> list[str]:
-        """
-        Split text into a list of "atomic blocks", each being an indivisible logical unit:
+        """Split text into a list of "atomic blocks", each being an indivisible logical unit:
 
         - Code block (fence): from opening ``` to closing ``` (including fence lines)
         - Table: consecutive |...| lines forming a whole segment
@@ -327,8 +328,9 @@ class MarkdownProcessor:
 
         Returns:
             List of atomic block strings (all non-empty)
+
         """
-        lines = text.split('\n')
+        lines = text.split("\n")
         atoms: list[str] = []
 
         current_lines: list[str] = []
@@ -336,11 +338,11 @@ class MarkdownProcessor:
 
         def _is_table_line(line: str) -> bool:
             stripped = line.strip()
-            return stripped.startswith('|') and stripped.endswith('|')
+            return stripped.startswith("|") and stripped.endswith("|")
 
         def _flush_current() -> None:
             if current_lines:
-                atom = '\n'.join(current_lines)
+                atom = "\n".join(current_lines)
                 if atom.strip():
                     atoms.append(atom)
                 current_lines.clear()
@@ -348,10 +350,10 @@ class MarkdownProcessor:
         for line in lines:
             if in_fence:
                 current_lines.append(line)
-                if line.startswith('```') and len(current_lines) > 1:
+                if line.startswith("```") and len(current_lines) > 1:
                     in_fence = False
                     _flush_current()
-            elif line.startswith('```'):
+            elif line.startswith("```"):
                 _flush_current()
                 in_fence = True
                 current_lines.append(line)
@@ -359,7 +361,7 @@ class MarkdownProcessor:
                 if current_lines and not _is_table_line(current_lines[-1]):
                     _flush_current()
                 current_lines.append(line)
-            elif line.strip() == '':
+            elif line.strip() == "":
                 _flush_current()
             else:
                 if current_lines and _is_table_line(current_lines[-1]):
@@ -377,10 +379,9 @@ class MarkdownProcessor:
         cls,
         text: str,
         max_chars: int = 4000,
-        len_fn: Optional[Callable[[str], int]] = None,
+        len_fn: Callable[[str], int] | None = None,
     ) -> list[str]:
-        """
-        Split Markdown text into multiple chunks by max_chars.
+        """Split Markdown text into multiple chunks by max_chars.
 
         Guarantees:
         - Each chunk <= max_chars characters (unless a single code block/table itself exceeds the limit)
@@ -396,6 +397,7 @@ class MarkdownProcessor:
 
         Returns:
             List of text chunks after splitting (non-empty)
+
         """
         _len = len_fn or len
 
@@ -416,7 +418,7 @@ class MarkdownProcessor:
 
         def _flush_parts() -> None:
             if current_parts:
-                chunks.append('\n\n'.join(current_parts))
+                chunks.append("\n\n".join(current_parts))
 
         for atom in atoms:
             atom_len = _len(atom)
@@ -473,7 +475,7 @@ class MarkdownProcessor:
             merged: list[str] = [result[0]]
             for chunk in result[1:]:
                 prev = merged[-1]
-                combined = prev + '\n\n' + chunk
+                combined = prev + "\n\n" + chunk
                 if _len(combined) <= max_chars:
                     merged[-1] = combined
                 else:
@@ -486,8 +488,7 @@ class MarkdownProcessor:
 
     @classmethod
     def infer_block_separator(cls, prev_chunk: str, next_chunk: str) -> str:
-        """
-        Infer the separator to use between two split chunks.
+        """Infer the separator to use between two split chunks.
 
         Rules (aligned with TS markdown-stream.ts):
         - Previous chunk ends with code fence or next chunk starts with fence → single newline '\\n'
@@ -500,28 +501,28 @@ class MarkdownProcessor:
 
         Returns:
             '\\n' or '\\n\\n'
+
         """
         prev_trimmed = prev_chunk.rstrip()
         next_trimmed = next_chunk.lstrip()
 
         # Previous chunk ends with fence or next chunk starts with fence
-        if prev_trimmed.endswith('```') or next_trimmed.startswith('```'):
-            return '\n'
+        if prev_trimmed.endswith("```") or next_trimmed.startswith("```"):
+            return "\n"
 
         # Table continuation
         if cls.ends_with_table_row(prev_chunk):
-            first_line = next_trimmed.split('\n')[0].strip() if next_trimmed else ''
-            if first_line.startswith('|') and first_line.endswith('|'):
-                return '\n'
+            first_line = next_trimmed.split("\n")[0].strip() if next_trimmed else ""
+            if first_line.startswith("|") and first_line.endswith("|"):
+                return "\n"
 
-        return '\n\n'
+        return "\n\n"
 
     # -- Streaming fence merge ---------------------------------------------
 
     @classmethod
     def merge_block_streaming_fences(cls, chunks: list[str]) -> list[str]:
-        """
-        Stream-aware fence-conscious chunk merging.
+        """Stream-aware fence-conscious chunk merging.
 
         When streaming output produces multiple chunks truncated in the middle of a fence,
         attempt to merge adjacent chunks to complete the fence.
@@ -536,6 +537,7 @@ class MarkdownProcessor:
 
         Returns:
             Merged chunk list (length <= original length)
+
         """
         if not chunks:
             return []
@@ -558,8 +560,7 @@ class MarkdownProcessor:
 
     @staticmethod
     def strip_outer_markdown_fence(text: str) -> str:
-        """
-        Strip outer Markdown fence.
+        """Strip outer Markdown fence.
 
         When AI reply is entirely wrapped in ```markdown\\n...\\n```, remove the outer fence,
         keeping the content. Only strip when the first line is ```markdown (case-insensitive) and the last line is ```.
@@ -569,11 +570,12 @@ class MarkdownProcessor:
 
         Returns:
             Text with outer fence stripped (returns original if no match)
+
         """
         if not text:
             return text
 
-        lines = text.split('\n')
+        lines = text.split("\n")
         if len(lines) < 3:
             return text
 
@@ -581,23 +583,22 @@ class MarkdownProcessor:
         last_line = lines[-1].strip()
 
         # First line must be ```markdown (optional language tag md/markdown)
-        if not re.match(r'^```(?:markdown|md)?\s*$', first_line, re.IGNORECASE):
+        if not re.match(r"^```(?:markdown|md)?\s*$", first_line, re.IGNORECASE):
             return text
 
         # Last line must be plain ```
-        if last_line != '```':
+        if last_line != "```":
             return text
 
         # Strip first and last lines
-        inner = '\n'.join(lines[1:-1])
+        inner = "\n".join(lines[1:-1])
         return inner
 
     # -- Table sanitization ------------------------------------------------
 
     @staticmethod
     def sanitize_markdown_table(text: str) -> str:
-        """
-        Table output sanitization.
+        """Table output sanitization.
 
         Handle common formatting issues in AI-generated Markdown tables:
         1. Remove extra whitespace before/after table rows
@@ -609,27 +610,28 @@ class MarkdownProcessor:
 
         Returns:
             Sanitized text
+
         """
-        if '|' not in text:
+        if "|" not in text:
             return text
 
-        lines = text.split('\n')
+        lines = text.split("\n")
         result_lines: list[str] = []
 
         for line in lines:
             stripped = line.strip()
 
             # Table row processing
-            if stripped.startswith('|') and stripped.endswith('|'):
+            if stripped.startswith("|") and stripped.endswith("|"):
                 # Separator row normalization: | --- | --- | → |---|---|
-                if re.match(r'^\|[\s\-:]+(\|[\s\-:]+)+\|$', stripped):
-                    cells = stripped.split('|')
-                    normalized = '|'.join(
+                if re.match(r"^\|[\s\-:]+(\|[\s\-:]+)+\|$", stripped):
+                    cells = stripped.split("|")
+                    normalized = "|".join(
                         cell.strip() if cell.strip() else cell
                         for cell in cells
                     )
                     result_lines.append(normalized)
-                elif stripped == '||' or stripped.replace('|', '').strip() == '':
+                elif stripped == "||" or stripped.replace("|", "").strip() == "":
                     # Empty table row → skip
                     continue
                 else:
@@ -637,14 +639,13 @@ class MarkdownProcessor:
             else:
                 result_lines.append(line)
 
-        return '\n'.join(result_lines)
+        return "\n".join(result_lines)
 
     # -- Markdown hint prompt ----------------------------------------------
 
     @staticmethod
     def markdown_hint_system_prompt() -> str:
-        """
-        Markdown rendering hint (appended to system prompt).
+        """Markdown rendering hint (appended to system prompt).
 
         Tell AI that Yuanbao platform supports Markdown rendering, including:
         - Code blocks (```lang)
@@ -658,6 +659,7 @@ class MarkdownProcessor:
             "- Bold: **text** / Italic: *text*\n"
             "Please use Markdown formatting when appropriate to improve readability."
         )
+
 
 class SignManager:
     """Encapsulates all sign-token related logic for the Yuanbao platform.
@@ -902,7 +904,9 @@ class SignManager:
         return dict(cls._cache[app_key])
 
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
+
 
 @dataclass
 class InboundContext:
@@ -916,7 +920,7 @@ class InboundContext:
     raw_frames: list = dc_field(default_factory=list)  # Raw bytes frames (debounce-aggregated)
 
     # Populated by DecodeMiddleware
-    push: Optional[dict] = None
+    push: dict | None = None
     decoded_via: str = ""  # "json" | "protobuf"
 
     # Extracted from push by FieldExtractMiddleware
@@ -939,20 +943,20 @@ class InboundContext:
 
     # Populated by ExtractContentMiddleware for elem_type 1009 (WeChat forward).
     # Contains the parsed ForwardMsgData dict (sub_type / nick_name / msg list).
-    forwarded_records: Optional[dict] = None
+    forwarded_records: dict | None = None
 
     # Owner command detection
-    owner_command: Optional[str] = None
+    owner_command: str | None = None
 
     # Source built by BuildSourceMiddleware
-    source: Optional[Any] = None  # SessionSource
+    source: Any | None = None  # SessionSource
 
     # Populated by ClassifyMessageTypeMiddleware
-    msg_type: Optional[Any] = None  # MessageType | YuanbaoMessageType
+    msg_type: Any | None = None  # MessageType | YuanbaoMessageType
 
     # Populated by QuoteContextMiddleware
-    reply_to_message_id: Optional[str] = None
-    reply_to_text: Optional[str] = None
+    reply_to_message_id: str | None = None
+    reply_to_text: str | None = None
     quote_media_refs: list = dc_field(default_factory=list)  # List of (rid, kind, filename)
 
     # Populated by MediaResolveMiddleware. Combined list of resolved local
@@ -967,7 +971,7 @@ class InboundContext:
     link_urls: list = dc_field(default_factory=list)
 
     # Populated by GroupAttributionMiddleware
-    channel_prompt: Optional[str] = None
+    channel_prompt: str | None = None
 
 
 class InboundMiddleware(ABC):
@@ -1024,7 +1028,7 @@ class InboundPipeline:
 
     # -- Registration API --------------------------------------------------
 
-    def use(self, name_or_mw, handler=None, when=None) -> "InboundPipeline":
+    def use(self, name_or_mw, handler=None, when=None) -> InboundPipeline:
         """Append a middleware to the end of the pipeline.
 
         Accepts either:
@@ -1035,7 +1039,7 @@ class InboundPipeline:
         self._middlewares.append((name, h, when))
         return self
 
-    def use_before(self, target: str, name_or_mw, handler=None, when=None) -> "InboundPipeline":
+    def use_before(self, target: str, name_or_mw, handler=None, when=None) -> InboundPipeline:
         """Insert a middleware before *target* (by name).  Appends if not found."""
         name, h = self._normalize(name_or_mw, handler)
         idx = next((i for i, (n, _, _) in enumerate(self._middlewares) if n == target), None)
@@ -1046,7 +1050,7 @@ class InboundPipeline:
             self._middlewares.insert(idx, entry)
         return self
 
-    def use_after(self, target: str, name_or_mw, handler=None, when=None) -> "InboundPipeline":
+    def use_after(self, target: str, name_or_mw, handler=None, when=None) -> InboundPipeline:
         """Insert a middleware after *target* (by name).  Appends if not found."""
         name, h = self._normalize(name_or_mw, handler)
         idx = next((i for i, (n, _, _) in enumerate(self._middlewares) if n == target), None)
@@ -1057,7 +1061,7 @@ class InboundPipeline:
             self._middlewares.insert(idx + 1, entry)
         return self
 
-    def remove(self, name: str) -> "InboundPipeline":
+    def remove(self, name: str) -> InboundPipeline:
         """Remove a middleware by name."""
         self._middlewares = [(n, h, w) for n, h, w in self._middlewares if n != name]
         return self
@@ -1091,6 +1095,8 @@ class InboundPipeline:
             # End of chain — nothing more to do
 
         await next_fn()
+
+
 class DecodeMiddleware(InboundMiddleware):
     """Decode raw inbound frames from JSON or Protobuf into ctx.push.
 
@@ -1345,7 +1351,7 @@ class RecallGuardMiddleware(InboundMiddleware):
     # -- Branch C: interrupt currently-processing message ---------------
 
     @staticmethod
-    def _find_processing_session(adapter, recalled_id: str) -> Optional[str]:
+    def _find_processing_session(adapter, recalled_id: str) -> str | None:
         for sk, mid in adapter._processing_msg_ids.items():
             if mid == recalled_id and sk in adapter._active_sessions:
                 return sk
@@ -1357,14 +1363,14 @@ class RecallGuardMiddleware(InboundMiddleware):
         where = f"group {group_code}" if group_code else f"direct chat with {from_account}"
         recall_text = (
             f"[CRITICAL — MESSAGE RECALLED] The user message that triggered "
-            f"your current task (message_id=\"{recalled_id}\") in {where} has "
+            f'your current task (message_id="{recalled_id}") in {where} has '
             f"been recalled/withdrawn by the sender. "
             f"IGNORE any prior system note asking you to finish processing "
             f"tool results — the original request is void. "
             f"Do NOT continue the task, do NOT call more tools, do NOT "
             f"reference the recalled content. "
             f"Reply only with a brief acknowledgment such as "
-            f"\"The message has been recalled.\" in the "
+            f'"The message has been recalled." in the '
             f"language the user was using."
         )
 
@@ -1429,7 +1435,7 @@ class RecallGuardMiddleware(InboundMiddleware):
 
     @classmethod
     def _patch_transcript(cls, adapter, recalled_id: str, group_code: str,
-                          from_account: str, recalled_content: Optional[str] = None) -> None:
+                          from_account: str, recalled_content: str | None = None) -> None:
         store = getattr(adapter, "_session_store", None)
         if not store:
             return
@@ -1484,7 +1490,7 @@ class RecallGuardMiddleware(InboundMiddleware):
         store.append_to_transcript(sid, {
             "role": "system",
             "content": f'[recall] message_id="{recalled_id}" has been recalled; do not quote or reference it.',
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            "timestamp": datetime.now(tz=UTC).isoformat(),
         })
         logger.info("[%s] Recall: system note for msg_id=%s (branch B)", adapter.name, recalled_id)
 
@@ -1495,7 +1501,7 @@ class SkipSelfMiddleware(InboundMiddleware):
     name = "skip-self"
 
     @staticmethod
-    def _is_self_reference(from_account: str, bot_id: Optional[str]) -> bool:
+    def _is_self_reference(from_account: str, bot_id: str | None) -> bool:
         """Detect whether the message is from the bot itself."""
         if not from_account or not bot_id:
             return False
@@ -1617,15 +1623,16 @@ class AutoSetHomeMiddleware(InboundMiddleware):
                 adapter._auto_sethome_done = True  # DM seen — no further upgrades needed
             if _should_set:
                 try:
+                    import yaml
+
                     from hermes_constants import get_hermes_home
                     from utils import atomic_yaml_write
-                    import yaml
 
                     _home = get_hermes_home()
                     config_path = _home / "config.yaml"
                     user_config: dict = {}
                     if config_path.exists():
-                        with open(config_path, encoding="utf-8") as f:
+                        with Path(config_path).open(encoding="utf-8") as f:
                             user_config = yaml.safe_load(f) or {}
                     user_config["YUANBAO_HOME_CHANNEL"] = ctx.chat_id
                     atomic_yaml_write(config_path, user_config)
@@ -1666,7 +1673,7 @@ class ExtractContentMiddleware(InboundMiddleware):
         return "\n".join(lines)
 
     @staticmethod
-    def _format_link_understanding(custom: dict) -> Optional[str]:
+    def _format_link_understanding(custom: dict) -> str | None:
         """Format elem_type 1007 (link understanding card) into bracket-placeholder text."""
         content = custom.get("content")
         if not content:
@@ -1689,6 +1696,7 @@ class ExtractContentMiddleware(InboundMiddleware):
 
         Returns:
             Resource ID string, or empty string if not found
+
         """
         if not url:
             return ""
@@ -1802,18 +1810,18 @@ class ExtractContentMiddleware(InboundMiddleware):
         (Chinese input method) to ASCII slash so commands are recognized correctly.
         """
         text = text.strip()
-        if text.startswith('\uff0f'):  # Full-width slash
-            text = '/' + text[1:]
+        if text.startswith("\uff0f"):  # Full-width slash
+            text = "/" + text[1:]
         return text
 
     @staticmethod
-    def _extract_inbound_media_refs(msg_body: list) -> List[Dict[str, str]]:
+    def _extract_inbound_media_refs(msg_body: list) -> list[dict[str, str]]:
         """Extract inbound image/file references from TIM msg_body.
 
         Return example:
           [{"kind": "image", "url": "https://..."}, {"kind": "file", "url": "...", "name": "a.pdf"}]
         """
-        refs: List[Dict[str, str]] = []
+        refs: list[dict[str, str]] = []
         for elem in msg_body or []:
             if not isinstance(elem, dict):
                 continue
@@ -1845,7 +1853,7 @@ class ExtractContentMiddleware(InboundMiddleware):
                     or str(content.get("filename") or "").strip()
                 )
                 if file_url:
-                    ref: Dict[str, str] = {"kind": "file", "url": file_url}
+                    ref: dict[str, str] = {"kind": "file", "url": file_url}
                     if file_name:
                         ref["name"] = file_name
                     refs.append(ref)
@@ -1885,7 +1893,7 @@ class ExtractContentMiddleware(InboundMiddleware):
         return urls
 
     @staticmethod
-    def _extract_forwarded_records(msg_body: list, user_id: str = "") -> Optional[dict]:
+    def _extract_forwarded_records(msg_body: list, user_id: str = "") -> dict | None:
         """Extract ForwardMsgData from ext_map for elem_type 1009 (WeChat forward).
 
         The detailed chat-record payload lives in ``msg_content.ext_map``
@@ -1950,6 +1958,7 @@ class ExtractContentMiddleware(InboundMiddleware):
         ctx.forwarded_records = self._extract_forwarded_records(ctx.msg_body, ctx.from_account)
         await next_fn()
 
+
 class PlaceholderFilterMiddleware(InboundMiddleware):
     """Skip pure placeholder messages (e.g. '[image]' with no media)."""
 
@@ -1995,8 +2004,8 @@ class OwnerCommandMiddleware(InboundMiddleware):
     def _rewrite_slash_command(text: str) -> str:
         """Normalize full-width slash to ASCII slash and strip whitespace."""
         text = text.strip()
-        if text.startswith('\uff0f'):  # Full-width slash
-            text = '/' + text[1:]
+        if text.startswith("\uff0f"):  # Full-width slash
+            text = "/" + text[1:]
         return text
 
     @classmethod
@@ -2007,7 +2016,7 @@ class OwnerCommandMiddleware(InboundMiddleware):
         msg_body: list,
         chat_type: str,
         from_account: str,
-    ) -> Tuple[Optional[str], Optional[str], bool]:
+    ) -> tuple[str | None, str | None, bool]:
         """Identify allowlisted slash commands and determine sender identity.
 
         Returns (cmd, cmd_line, is_owner):
@@ -2099,7 +2108,7 @@ class GroupAtGuardMiddleware(InboundMiddleware):
     name = "group-at-guard"
 
     @staticmethod
-    def _is_at_bot(msg_body: list, bot_id: Optional[str]) -> bool:
+    def _is_at_bot(msg_body: list, bot_id: str | None) -> bool:
         """Detect whether the message @Bot.
 
         AT element format: TIMCustomElem, msg_content.data is a JSON string:
@@ -2123,7 +2132,7 @@ class GroupAtGuardMiddleware(InboundMiddleware):
         return False
 
     @staticmethod
-    def _extract_bot_mention_text(msg_body: list, bot_id: Optional[str]) -> str:
+    def _extract_bot_mention_text(msg_body: list, bot_id: str | None) -> str:
         """Extract the display text used to @-mention this bot (e.g. ``@yuanbao-bot``)."""
         if not bot_id:
             return ""
@@ -2144,7 +2153,7 @@ class GroupAtGuardMiddleware(InboundMiddleware):
         return ""
 
     @staticmethod
-    def _build_group_channel_prompt(msg_body: list, bot_id: Optional[str]) -> str:
+    def _build_group_channel_prompt(msg_body: list, bot_id: str | None) -> str:
         """Build a per-turn group-chat prompt that highlights which message to respond to."""
         bid = str(bot_id or "unknown")
         bot_mention = GroupAtGuardMiddleware._extract_bot_mention_text(msg_body, bot_id) or "unknown"
@@ -2163,8 +2172,8 @@ class GroupAtGuardMiddleware(InboundMiddleware):
         adapter, source, sender_display: str, text: str,
         *,
         ctx: InboundContext,
-        msg_id: Optional[str] = None,
-        forwarded_records: Optional[dict] = None,
+        msg_id: str | None = None,
+        forwarded_records: dict | None = None,
     ) -> None:
         """Write a group message into the session transcript without triggering the agent.
 
@@ -2190,7 +2199,7 @@ class GroupAtGuardMiddleware(InboundMiddleware):
             entry: dict = {
                 "role": "user",
                 "content": attributed,
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "timestamp": datetime.now(tz=UTC).isoformat(),
                 "observed": True,
             }
             if msg_id:
@@ -2252,7 +2261,8 @@ class GroupAttributionMiddleware(InboundMiddleware):
 
 class YuanbaoMessageType(Enum):
     """Yuanbao-local message subtypes; coerced back to :class:`MessageType`
-    before leaving the adapter (see :class:`DispatchMiddleware`)."""
+    before leaving the adapter (see :class:`DispatchMiddleware`).
+    """
 
     # WeChat forwarded chat records (TIMCustomElem, elem_type 1009).
     CHAT_RECORD = "chat_record"
@@ -2302,7 +2312,7 @@ class QuoteContextMiddleware(InboundMiddleware):
 
     name = "quote-context"
 
-    def _extract_quote_context(self, cloud_custom_data: str) -> Tuple[Optional[str], Optional[str]]:
+    def _extract_quote_context(self, cloud_custom_data: str) -> tuple[str | None, str | None]:
         """Extract quote text context, mapping to MessageEvent.reply_to_*.
         """
         if not cloud_custom_data:
@@ -2324,8 +2334,8 @@ class QuoteContextMiddleware(InboundMiddleware):
         return quote_id, quote_text
 
     async def _extract_media_refs_from_transcript(
-        self, ctx: InboundContext
-    ) -> List[Tuple[str, str, str]]:
+        self, ctx: InboundContext,
+    ) -> list[tuple[str, str, str]]:
         """Look up the quoted message in the transcript history and return any
         ``[kind|ybres:RID]`` anchors found in its content as
         ``(rid, kind, filename)`` tuples.
@@ -2337,7 +2347,7 @@ class QuoteContextMiddleware(InboundMiddleware):
         if ctx.reply_to_message_id is None:
             return []
         adapter = ctx.adapter
-        media_refs: List[Tuple[str, str, str]] = []
+        media_refs: list[tuple[str, str, str]] = []
         try:
             store = getattr(adapter, "_session_store", None)
             if not store or ctx.source is None:
@@ -2422,7 +2432,7 @@ class ForwardedRecordsParseMiddleware(InboundMiddleware):
     @classmethod
     def _media_marker(
         cls, media: dict, plain_text: str = "",
-    ) -> Tuple[str, Optional[Dict[str, str]]]:
+    ) -> tuple[str, dict[str, str] | None]:
         """Render one ``msgContent.multimedia`` entry as a textual marker.
 
         Returns ``(marker, ref)``. Downloadable media emits a
@@ -2445,7 +2455,7 @@ class ForwardedRecordsParseMiddleware(InboundMiddleware):
 
         if media_type in ("file", "document", "code"):
             if url and rid:
-                ref: Dict[str, str] = {"kind": "file", "url": url}
+                ref: dict[str, str] = {"kind": "file", "url": url}
                 if file_name:
                     ref["name"] = file_name
                 return f"[file|ybres:{rid}] {file_name}".rstrip(), ref
@@ -2470,7 +2480,7 @@ class ForwardedRecordsParseMiddleware(InboundMiddleware):
     def _walk_forward_msgs(
         cls,
         forward_data: dict,
-    ) -> Iterator[Tuple[str, str, List[Dict[str, str]]]]:
+    ) -> Iterator[tuple[str, str, list[dict[str, str]]]]:
         """Walk ``ForwardMsgData['msg']`` and yield ``(sender, body, refs)``.
 
         Per-record dispatch over ``msgContent`` (text / multimedia / nested
@@ -2488,11 +2498,11 @@ class ForwardedRecordsParseMiddleware(InboundMiddleware):
             plain_text = msg.get("plainText", "")
             msg_contents = msg.get("msgContent", []) or []
 
-            refs: List[Dict[str, str]] = []
+            refs: list[dict[str, str]] = []
             if not msg_contents:
                 rendered = plain_text
             else:
-                parts: List[str] = []
+                parts: list[str] = []
                 for mc in msg_contents:
                     if not isinstance(mc, dict):
                         continue
@@ -2510,9 +2520,8 @@ class ForwardedRecordsParseMiddleware(InboundMiddleware):
                                     refs.append(ref)
                     elif mc_type == 3:  # nested FORWARD_MSG (design §2.10.10)
                         parts.append("[嵌套聊天记录]")
-                    else:
-                        if plain_text:
-                            parts.append(plain_text)
+                    elif plain_text:
+                        parts.append(plain_text)
                 rendered = "  ".join(p for p in parts if p) or plain_text
 
             if len(rendered) > cls.FORWARD_MSG_TEXT_MAX_CHARS:
@@ -2552,12 +2561,12 @@ class MediaResolveMiddleware(InboundMiddleware):
 
     # --- Resource download cache (keyed by resourceId) ---
     # Avoids redundant downloads of the same resource within the TTL window.
-    _resource_cache: ClassVar[Dict[str, Tuple[str, str, float]]] = {}  # rid -> (local_path, mime, ts)
+    _resource_cache: ClassVar[dict[str, tuple[str, str, float]]] = {}  # rid -> (local_path, mime, ts)
     _RESOURCE_CACHE_TTL_S: ClassVar[int] = 24 * 60 * 60  # 24 hours
     _RESOURCE_CACHE_MAX_SIZE: ClassVar[int] = 256
 
     @classmethod
-    def _get_cached_resource(cls, resource_id: str) -> Optional[Tuple[str, str]]:
+    def _get_cached_resource(cls, resource_id: str) -> tuple[str, str] | None:
         """Return cached ``(local_path, mime)`` if still valid and file exists, else None."""
         if not resource_id:
             return None
@@ -2569,7 +2578,7 @@ class MediaResolveMiddleware(InboundMiddleware):
             cls._resource_cache.pop(resource_id, None)
             return None
         # Verify the cached file still exists on disk (cache dir may be swept).
-        if not os.path.isfile(local_path):
+        if not Path(local_path).is_file():
             cls._resource_cache.pop(resource_id, None)
             return None
         return local_path, mime
@@ -2644,7 +2653,7 @@ class MediaResolveMiddleware(InboundMiddleware):
                 code = payload.get("code")
                 if code not in {None, 0}:
                     raise RuntimeError(
-                        f"resource/v1/download failed: code={code}, msg={payload.get('msg', '')}"
+                        f"resource/v1/download failed: code={code}, msg={payload.get('msg', '')}",
                     )
                 data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
                 real_url = str((data or {}).get("url") or (data or {}).get("realUrl") or "").strip()
@@ -2682,9 +2691,9 @@ class MediaResolveMiddleware(InboundMiddleware):
     @classmethod
     async def _download_and_cache(
         cls, adapter, *, fetch_url: str, kind: str,
-        file_name: Optional[str] = None, log_tag: str = "",
+        file_name: str | None = None, log_tag: str = "",
         resource_id: str = "",
-    ) -> Optional[Tuple[str, str]]:
+    ) -> tuple[str, str] | None:
         """Download a Yuanbao resource and cache locally. Returns ``(local_path, mime)`` or ``None``.
 
         When *resource_id* is provided, an in-memory cache keyed by resourceId
@@ -2754,15 +2763,15 @@ class MediaResolveMiddleware(InboundMiddleware):
 
     @classmethod
     async def _resolve_media_urls(
-        cls, adapter, media_refs: List[Dict[str, str]]
-    ) -> Tuple[List[str], List[str]]:
+        cls, adapter, media_refs: list[dict[str, str]],
+    ) -> tuple[list[str], list[str]]:
         """Resolve inbound media refs: download to local cache, return (local_paths, mime_types).
 
         Yuanbao COS hostnames resolve to private IPs, tripping the SSRF guard
         in vision_tools. We download ourselves and return local cache paths.
         """
-        media_urls: List[str] = []
-        media_types: List[str] = []
+        media_urls: list[str] = []
+        media_types: list[str] = []
 
         for ref in media_refs:
             kind = str(ref.get("kind") or "").strip().lower()
@@ -2803,14 +2812,14 @@ class MediaResolveMiddleware(InboundMiddleware):
     async def _resolve_ybres_refs(
         cls,
         adapter,
-        refs: List[Tuple[str, str, str]],
+        refs: list[tuple[str, str, str]],
         *,
         log_prefix: str,
-    ) -> Tuple[List[str], List[str]]:
+    ) -> tuple[list[str], list[str]]:
         """Resolve a list of ``(rid, kind, filename)`` ybres tuples to local paths.
         """
-        media_paths: List[str] = []
-        mimes: List[str] = []
+        media_paths: list[str] = []
+        mimes: list[str] = []
         for rid, kind, filename in refs:
             if kind not in _RESOLVABLE_MEDIA_KINDS:
                 continue
@@ -2840,7 +2849,7 @@ class MediaResolveMiddleware(InboundMiddleware):
     @classmethod
     async def _collect_observed_media(
         cls, adapter, source,
-    ) -> Tuple[List[str], List[str]]:
+    ) -> tuple[list[str], list[str]]:
         """Resolve recent observed image/file anchors from transcript into ``(local_paths, mimes)``."""
         store = getattr(adapter, "_session_store", None)
         if not store:
@@ -2865,7 +2874,7 @@ class MediaResolveMiddleware(InboundMiddleware):
         # handing off to ``_resolve_ybres_refs`` so downstream prompt insertion
         # preserves natural reading order.
         window = history[-OBSERVED_MEDIA_BACKFILL_LOOKBACK:]
-        order: List[Tuple[str, str, str]] = []  # (rid, kind, filename)
+        order: list[tuple[str, str, str]] = []  # (rid, kind, filename)
         seen: set = set()
         for msg in reversed(window):
             content = msg.get("content")
@@ -2900,8 +2909,8 @@ class MediaResolveMiddleware(InboundMiddleware):
 
     @classmethod
     async def _resolve_quote_media(
-        cls, adapter, quote_media_refs: List[Tuple[str, str, str]],
-    ) -> Tuple[List[str], List[str]]:
+        cls, adapter, quote_media_refs: list[tuple[str, str, str]],
+    ) -> tuple[list[str], list[str]]:
         """Resolve media anchors carried by the quoted message.
 
         ``quote_media_refs`` is a list of ``(rid, kind, filename)`` tuples
@@ -2912,7 +2921,7 @@ class MediaResolveMiddleware(InboundMiddleware):
         )
 
     @staticmethod
-    def _collect_quote_local_media(ctx: InboundContext) -> Tuple[List[str], List[str]]:
+    def _collect_quote_local_media(ctx: InboundContext) -> tuple[list[str], list[str]]:
         """Private-chat fallback for recovering already-local quoted media.
 
         Only already-local media is handled here: by the time a turn is cached,
@@ -2924,8 +2933,8 @@ class MediaResolveMiddleware(InboundMiddleware):
         Returns ``(local_paths, mimes)`` for media already downloaded to the
         local cache on its original turn, ready to inject as-is.
         """
-        paths: List[str] = []
-        mimes: List[str] = []
+        paths: list[str] = []
+        mimes: list[str] = []
         rid_key = ctx.reply_to_message_id
         if not rid_key:
             return paths, mimes
@@ -2943,7 +2952,7 @@ class MediaResolveMiddleware(InboundMiddleware):
             path = (m.group(2) or "").strip()
             if not path or path in seen:
                 continue
-            if not os.path.exists(path):
+            if not Path(path).exists():
                 continue
             seen.add(path)
             mime = guess_mime_type(os.path.basename(path)) or (
@@ -2961,11 +2970,11 @@ class MediaResolveMiddleware(InboundMiddleware):
         # don't need to re-check @bot status here before downloading media.
         adapter = ctx.adapter
 
-        urls: List[str] = []
-        types: List[str] = []
+        urls: list[str] = []
+        types: list[str] = []
         seen: set = set()
 
-        def _add_unique_pairs(pair_lists: Tuple[List[str], List[str]]) -> None:
+        def _add_unique_pairs(pair_lists: tuple[list[str], list[str]]) -> None:
             u_list, m_list = pair_lists
             for u, m in zip(u_list, m_list):
                 if not u or u in seen:
@@ -3032,7 +3041,7 @@ class PatchAnchorsMiddleware(InboundMiddleware):
     name = "patch-anchors"
 
     @staticmethod
-    def _patch(text: str, urls: List[str], types: List[str]) -> str:
+    def _patch(text: str, urls: list[str], types: list[str]) -> str:
         if not text or not urls:
             return text
         patched = text
@@ -3138,7 +3147,7 @@ class DispatchMiddleware(InboundMiddleware):
         await next_fn()
 
     @staticmethod
-    async def _consume_group_queue(adapter: "YuanbaoAdapter", session_key: str) -> None:
+    async def _consume_group_queue(adapter: YuanbaoAdapter, session_key: str) -> None:
         """Drain the group queue one dispatch at a time, waiting for each to finish."""
         _IDLE_TIMEOUT = 2.0
         queue = adapter._group_queues.get(session_key)
@@ -3148,7 +3157,7 @@ class DispatchMiddleware(InboundMiddleware):
             while True:
                 try:
                     dispatch_fn = await asyncio.wait_for(queue.get(), timeout=_IDLE_TIMEOUT)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     break
                 logger.debug(
                     "[%s] Group queue: dispatching for %s (remaining=%d)",
@@ -3203,6 +3212,7 @@ class InboundPipelineBuilder:
             pipeline.use(mw_cls())
         return pipeline
 
+
 class ConnectionManager:
     """Manages the WebSocket connection lifecycle for YuanbaoAdapter.
 
@@ -3214,20 +3224,20 @@ class ConnectionManager:
       - Reconnect with exponential backoff
     """
 
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
+    def __init__(self, adapter: YuanbaoAdapter) -> None:
         self._adapter = adapter
         self._ws = None  # websockets connection
-        self._connect_id: Optional[str] = None
-        self._heartbeat_task: Optional[asyncio.Task] = None
-        self._recv_task: Optional[asyncio.Task] = None
-        self._pending_acks: Dict[str, asyncio.Future] = {}
-        self._pending_pong: Optional[asyncio.Future] = None
+        self._connect_id: str | None = None
+        self._heartbeat_task: asyncio.Task | None = None
+        self._recv_task: asyncio.Task | None = None
+        self._pending_acks: dict[str, asyncio.Future] = {}
+        self._pending_pong: asyncio.Future | None = None
         self._consecutive_hb_timeouts: int = 0
         self._reconnect_attempts: int = 0
         self._reconnecting: bool = False
         # Debounce buffer for aggregating multi-part inbound messages
-        self._inbound_buffer: Dict[str, list] = {}  # key -> [raw_data_frames, ...]
-        self._inbound_timers: Dict[str, asyncio.TimerHandle] = {}  # key -> timer
+        self._inbound_buffer: dict[str, list] = {}  # key -> [raw_data_frames, ...]
+        self._inbound_timers: dict[str, asyncio.TimerHandle] = {}  # key -> timer
 
     # -- Properties --------------------------------------------------------
 
@@ -3236,7 +3246,7 @@ class ConnectionManager:
         return self._ws
 
     @property
-    def connect_id(self) -> Optional[str]:
+    def connect_id(self) -> str | None:
         return self._connect_id
 
     @property
@@ -3293,7 +3303,7 @@ class ConnectionManager:
 
         # Acquire platform-scoped lock to prevent duplicate connections
         if not adapter._acquire_platform_lock(
-            'yuanbao-app-key', adapter._app_key, 'Yuanbao app key'
+            "yuanbao-app-key", adapter._app_key, "Yuanbao app key",
         ):
             return False
 
@@ -3332,10 +3342,10 @@ class ConnectionManager:
             adapter._mark_connected()
             adapter._loop = asyncio.get_running_loop()
             self._heartbeat_task = asyncio.create_task(
-                self._heartbeat_loop(), name=f"yuanbao-heartbeat-{self._connect_id}"
+                self._heartbeat_loop(), name=f"yuanbao-heartbeat-{self._connect_id}",
             )
             self._recv_task = asyncio.create_task(
-                self._receive_loop(), name=f"yuanbao-recv-{self._connect_id}"
+                self._receive_loop(), name=f"yuanbao-recv-{self._connect_id}",
             )
             logger.info(
                 "[%s] Connected. connectId=%s botId=%s",
@@ -3346,7 +3356,7 @@ class ConnectionManager:
 
             return True
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("[%s] Connection timed out", adapter.name)
             await self._cleanup_ws()
             adapter._release_platform_lock()
@@ -3359,7 +3369,6 @@ class ConnectionManager:
 
     async def close(self) -> None:
         """Cancel background tasks, fail pending futures, and close the WebSocket."""
-
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
             try:
@@ -3448,18 +3457,17 @@ class ConnectionManager:
                         self._connect_id = connect_id
                         logger.info("[%s] BIND_ACK received: connectId=%s", adapter.name, connect_id)
                         return True
-                    else:
-                        logger.error("[%s] BIND_ACK missing connectId", adapter.name)
-                        return False
+                    logger.error("[%s] BIND_ACK missing connectId", adapter.name)
+                    return False
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("[%s] AUTH_BIND timeout", adapter.name)
             return False
         except Exception as exc:
             logger.error("[%s] AUTH_BIND error: %s", adapter.name, exc, exc_info=True)
             return False
 
-    def _extract_connect_id(self, decoded_msg: dict) -> Optional[str]:
+    def _extract_connect_id(self, decoded_msg: dict) -> str | None:
         """Extract connectId from decoded BIND_ACK message."""
         data: bytes = decoded_msg.get("data", b"")
         if not data:
@@ -3475,7 +3483,7 @@ class ConnectionManager:
                 )
                 return None
             connect_id = _get_string(fdict, 3)
-            return connect_id if connect_id else None
+            return connect_id or None
         except Exception as exc:
             logger.warning("[%s] Failed to extract connectId: %s", self._adapter.name, exc)
             return None
@@ -3502,7 +3510,7 @@ class ConnectionManager:
                     try:
                         await asyncio.wait_for(pong_future, timeout=10.0)
                         self._consecutive_hb_timeouts = 0
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         self._pending_acks.pop(msg_id, None)
                         self._consecutive_hb_timeouts += 1
                         logger.warning(
@@ -3534,10 +3542,10 @@ class ConnectionManager:
         except asyncio.CancelledError:
             pass
         except websockets.exceptions.ConnectionClosed as close_exc:  # type: ignore[union-attr]
-            close_code = getattr(close_exc, 'code', None)
+            close_code = getattr(close_exc, "code", None)
             logger.warning(
                 "[%s] WebSocket connection closed: code=%s reason=%s",
-                adapter.name, close_code, getattr(close_exc, 'reason', ''),
+                adapter.name, close_code, getattr(close_exc, "reason", ""),
             )
             if close_code and close_code in NO_RECONNECT_CLOSE_CODES:
                 logger.error(
@@ -3751,7 +3759,7 @@ class ConnectionManager:
             await self._ws.send(encoded_conn_msg)
             result = await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception:
             raise
@@ -3838,15 +3846,15 @@ class ConnectionManager:
                 )
                 return True
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("[%s] Reconnect attempt %d timed out", adapter.name, attempt + 1)
             except Exception as exc:
                 logger.warning(
-                    "[%s] Reconnect attempt %d failed: %s", adapter.name, attempt + 1, exc
+                    "[%s] Reconnect attempt %d failed: %s", adapter.name, attempt + 1, exc,
                 )
 
         logger.error(
-            "[%s] Giving up after %d reconnect attempts", adapter.name, MAX_RECONNECT_ATTEMPTS
+            "[%s] Giving up after %d reconnect attempts", adapter.name, MAX_RECONNECT_ATTEMPTS,
         )
         adapter._mark_disconnected()
         return False
@@ -3854,13 +3862,14 @@ class ConnectionManager:
     async def _cleanup_ws(self) -> None:
         """Close and clear the WebSocket connection, bounded by
         ``WS_CLOSE_TIMEOUT_S`` so an unresponsive server can't stall teardown
-        (see the constant's definition for the full rationale)."""
+        (see the constant's definition for the full rationale).
+        """
         ws = self._ws
         self._ws = None
         if ws is not None:
             try:
                 await asyncio.wait_for(ws.close(), timeout=WS_CLOSE_TIMEOUT_S)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Server never echoed the close frame within the bound; drop the
                 # connection. websockets force-closes the transport on cancel,
                 # and at shutdown the loop is tearing down anyway.
@@ -3870,6 +3879,7 @@ class ConnectionManager:
                 )
             except Exception:
                 pass
+
 
 class MediaSendHandler(ABC):
     """Abstract base class for media send strategies.
@@ -3884,12 +3894,13 @@ class MediaSendHandler(ABC):
 
     @abstractmethod
     async def acquire_file(
-        self, adapter: "YuanbaoAdapter", **kwargs: Any,
-    ) -> Tuple[bytes, str, str]:
+        self, adapter: YuanbaoAdapter, **kwargs: Any,
+    ) -> tuple[bytes, str, str]:
         """Return (file_bytes, filename, content_type).
 
         Raises:
             ValueError: when file cannot be acquired (not found, empty, etc.)
+
         """
 
     @abstractmethod
@@ -3902,12 +3913,12 @@ class MediaSendHandler(ABC):
 
     async def handle(
         self,
-        adapter: "YuanbaoAdapter",
+        adapter: YuanbaoAdapter,
         chat_id: str,
-        reply_to: Optional[str] = None,
-        caption: Optional[str] = None,
+        reply_to: str | None = None,
+        caption: str | None = None,
         **kwargs: Any,
-    ) -> "SendResult":
+    ) -> SendResult:
         """Template method: shared media send flow."""
         conn = adapter._connection
         sender = adapter._outbound.sender
@@ -4010,9 +4021,9 @@ class ImageUrlHandler(MediaSendHandler):
             image_url, max_size_mb=adapter.MEDIA_MAX_SIZE_MB,
         )
         if not content_type or content_type == "application/octet-stream":
-            path_part = image_url.split("?")[0]
+            path_part = image_url.split("?", maxsplit=1)[0]
             content_type = guess_mime_type(path_part) or "image/jpeg"
-        filename = os.path.basename(image_url.split("?")[0]) or "image.jpg"
+        filename = os.path.basename(image_url.split("?", maxsplit=1)[0]) or "image.jpg"
         return file_bytes, filename, content_type
 
     def build_msg_body(self, upload_result, **kwargs):
@@ -4032,11 +4043,10 @@ class ImageFileHandler(MediaSendHandler):
 
     async def acquire_file(self, adapter, **kwargs):
         image_path: str = kwargs["image_path"]
-        if not os.path.isfile(image_path):
+        if not Path(image_path).is_file():
             raise ValueError(f"File not found: {image_path}")
         logger.info("[%s] ImageFileHandler: reading %s", adapter.name, image_path)
-        with open(image_path, "rb") as f:
-            file_bytes = f.read()
+        file_bytes = Path(image_path).read_bytes()
         filename = os.path.basename(image_path) or "image.jpg"
         content_type = guess_mime_type(filename) or "image/jpeg"
         return file_bytes, filename, content_type
@@ -4064,7 +4074,7 @@ class FileUrlHandler(MediaSendHandler):
         )
         filename = kwargs.get("filename")
         if not filename:
-            path_part = file_url.split("?")[0]
+            path_part = file_url.split("?", maxsplit=1)[0]
             filename = os.path.basename(path_part) or "file"
         if not content_type or content_type == "application/octet-stream":
             content_type = guess_mime_type(filename) or "application/octet-stream"
@@ -4084,11 +4094,10 @@ class DocumentHandler(MediaSendHandler):
 
     async def acquire_file(self, adapter, **kwargs):
         file_path: str = kwargs["file_path"]
-        if not os.path.isfile(file_path):
+        if not Path(file_path).is_file():
             raise ValueError(f"File not found: {file_path}")
         logger.info("[%s] DocumentHandler: reading %s", adapter.name, file_path)
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
+        file_bytes = Path(file_path).read_bytes()
         filename = kwargs.get("filename") or os.path.basename(file_path) or "document"
         content_type = guess_mime_type(filename) or "application/octet-stream"
         return file_bytes, filename, content_type
@@ -4114,10 +4123,10 @@ class StickerHandler(MediaSendHandler):
 
     def build_msg_body(self, upload_result, **kwargs):
         from gateway.platforms.yuanbao_sticker import (
-            get_sticker_by_name,
-            get_random_sticker,
             build_face_msg_body,
             build_sticker_msg_body,
+            get_random_sticker,
+            get_sticker_by_name,
         )
         sticker_name = kwargs.get("sticker_name")
         face_index = kwargs.get("face_index")
@@ -4127,11 +4136,11 @@ class StickerHandler(MediaSendHandler):
             if sticker is None:
                 raise ValueError(f"Sticker not found: {sticker_name!r}")
             return build_sticker_msg_body(sticker)
-        elif face_index is not None:
+        if face_index is not None:
             return build_face_msg_body(face_index=face_index)
-        else:
-            sticker = get_random_sticker()
-            return build_sticker_msg_body(sticker)
+        sticker = get_random_sticker()
+        return build_sticker_msg_body(sticker)
+
 
 class GroupQueryService:
     """Encapsulates all group query operations (both low-level WS calls and
@@ -4143,18 +4152,19 @@ class GroupQueryService:
       - Member cache population on the adapter
     """
 
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
+    def __init__(self, adapter: YuanbaoAdapter) -> None:
         self._adapter = adapter
 
     # ------------------------------------------------------------------
     # Low-level WS query methods
     # ------------------------------------------------------------------
 
-    async def query_group_info_raw(self, group_code: str) -> Optional[dict]:
+    async def query_group_info_raw(self, group_code: str) -> dict | None:
         """Query group info via WS (group name, owner, member count, etc.).
 
         Returns:
             Decoded dict or None on failure.
+
         """
         adapter = self._adapter
         if adapter._connection.ws is None:
@@ -4174,7 +4184,7 @@ class GroupQueryService:
             if biz_data and isinstance(biz_data, bytes):
                 return decode_query_group_info_rsp(biz_data)
             return {"group_code": group_code}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[%s] query_group_info timeout: group=%s", adapter.name, group_code)
             return None
         except Exception as exc:
@@ -4182,12 +4192,13 @@ class GroupQueryService:
             return None
 
     async def get_group_member_list_raw(
-        self, group_code: str, offset: int = 0, limit: int = 200
-    ) -> Optional[dict]:
+        self, group_code: str, offset: int = 0, limit: int = 200,
+    ) -> dict | None:
         """Query group member list via WS.
 
         Returns:
             Decoded dict or None on failure.  Also populates adapter._member_cache.
+
         """
         adapter = self._adapter
         if adapter._connection.ws is None:
@@ -4211,7 +4222,7 @@ class GroupQueryService:
             if result and result.get("members"):
                 adapter._member_cache[group_code] = (time.time(), result["members"])
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[%s] get_group_member_list timeout: group=%s", adapter.name, group_code)
             return None
         except Exception as exc:
@@ -4240,7 +4251,7 @@ class GroupQueryService:
         self,
         chat_id: str,
         action: str = "list_all",
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> dict:
         """AI tool: Query group member list.
 
@@ -4251,6 +4262,7 @@ class GroupQueryService:
 
         Returns:
             {"members": [...], "total": int, "mentionHint": str}
+
         """
         if not chat_id.startswith("group:"):
             return {"error": "This command is only available in group chats"}
@@ -4294,10 +4306,10 @@ class HeartbeatManager:
       - Explicit stop with optional FINISH signal
     """
 
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
+    def __init__(self, adapter: YuanbaoAdapter) -> None:
         self._adapter = adapter
-        self._reply_heartbeat_tasks: Dict[str, asyncio.Task] = {}
-        self._reply_hb_last_active: Dict[str, float] = {}
+        self._reply_heartbeat_tasks: dict[str, asyncio.Task] = {}
+        self._reply_hb_last_active: dict[str, float] = {}
 
     async def send_heartbeat_once(self, chat_id: str, heartbeat_val: int) -> None:
         """Send a single heartbeat (RUNNING or FINISH), best effort."""
@@ -4415,10 +4427,10 @@ class SlowResponseNotifier:
     SLOW_RESPONSE_TIMEOUT_S seconds, sends a courtesy message.
     """
 
-    def __init__(self, adapter: "YuanbaoAdapter", sender: "MessageSender") -> None:
+    def __init__(self, adapter: YuanbaoAdapter, sender: MessageSender) -> None:
         self._adapter = adapter
         self._sender = sender
-        self._tasks: Dict[str, asyncio.Task] = {}
+        self._tasks: dict[str, asyncio.Task] = {}
 
     async def start(self, chat_id: str) -> None:
         """Start a delayed task that notifies the user when the agent is slow."""
@@ -4471,16 +4483,16 @@ class MessageSender:
     IMAGE_EXTS: ClassVar[frozenset] = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"})
     CHAT_DICT_MAX_SIZE: ClassVar[int] = 1000  # Max distinct chat IDs in _chat_locks
 
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
+    def __init__(self, adapter: YuanbaoAdapter) -> None:
         self._adapter = adapter
         self._chat_locks: collections.OrderedDict[str, asyncio.Lock] = collections.OrderedDict()
 
         # Optional hooks injected by OutboundManager for coordination
-        self._on_send_start: Optional[Callable[[str], Any]] = None   # cancel slow-notifier
-        self._on_send_finish: Optional[Callable[[str], Any]] = None  # send FINISH heartbeat
+        self._on_send_start: Callable[[str], Any] | None = None   # cancel slow-notifier
+        self._on_send_finish: Callable[[str], Any] | None = None  # send FINISH heartbeat
 
         # Media send handlers (strategy pattern)
-        self._media_handlers: Dict[str, MediaSendHandler] = {
+        self._media_handlers: dict[str, MediaSendHandler] = {
             "image_url": ImageUrlHandler(),
             "image_file": ImageFileHandler(),
             "file_url": FileUrlHandler(),
@@ -4519,9 +4531,9 @@ class MessageSender:
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
         group_code: str = "",
-    ) -> "SendResult":
+    ) -> SendResult:
         """Send text message with auto-chunking and per-chat-id ordering guarantee."""
         adapter = self._adapter
         conn = adapter._connection
@@ -4558,10 +4570,10 @@ class MessageSender:
         self,
         chat_id: str,
         handler_name: str,
-        reply_to: Optional[str] = None,
-        caption: Optional[str] = None,
+        reply_to: str | None = None,
+        caption: str | None = None,
         **kwargs: Any,
-    ) -> "SendResult":
+    ) -> SendResult:
         """Dispatch media send to the named handler strategy."""
         handler = self._media_handlers.get(handler_name)
         if handler is None:
@@ -4580,8 +4592,8 @@ class MessageSender:
         self,
         chat_id: str,
         message: str,
-        media_files: Optional[List[Tuple[str, bool]]] = None,
-    ) -> Dict[str, Any]:
+        media_files: list[tuple[str, bool]] | None = None,
+    ) -> dict[str, Any]:
         """Send text + media via Yuanbao (used by the ``send_message`` tool).
 
         Unlike Weixin which creates a fresh adapter per call, Yuanbao reuses
@@ -4590,7 +4602,7 @@ class MessageSender:
         extension.
         """
         adapter = self._adapter
-        last_result: Optional["SendResult"] = None
+        last_result: SendResult | None = None
 
         # 1. Send text
         if message.strip():
@@ -4623,9 +4635,9 @@ class MessageSender:
         self,
         chat_id: str,
         msg_body: list,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
         group_code: str = "",
-    ) -> "SendResult":
+    ) -> SendResult:
         """Lock + dispatch an arbitrary MsgBody to C2C or group."""
         lock = self.get_chat_lock(chat_id)
         async with lock:
@@ -4644,10 +4656,10 @@ class MessageSender:
         self,
         chat_id: str,
         text: str,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
         retry: int = 3,
         group_code: str = "",
-    ) -> "SendResult":
+    ) -> SendResult:
         """Send a single text chunk with retry (exponential backoff: 1s, 2s, 4s)."""
         adapter = self._adapter
         last_error: str = "Unknown error"
@@ -4695,14 +4707,14 @@ class MessageSender:
         self,
         group_code: str,
         text: str,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
     ) -> dict:
         """Send group text message, auto-converting @nickname to TIMCustomElem."""
         msg_body = self._build_msg_body_with_mentions(text, group_code)
         return await self.send_group_msg_body(group_code, msg_body, reply_to)
 
     # @mention pattern: (whitespace or start) + @ + nickname + (whitespace or end)
-    _AT_USER_RE = re.compile(r'(?:(?<=\s)|(?<=^))@(\S+?)(?=\s|$)', re.MULTILINE)
+    _AT_USER_RE = re.compile(r"(?:(?<=\s)|(?<=^))@(\S+?)(?=\s|$)", re.MULTILINE)
 
     def _build_msg_body_with_mentions(self, text: str, group_code: str) -> list:
         """Parse @nickname patterns and build mixed TIMTextElem + TIMCustomElem msg_body."""
@@ -4773,7 +4785,7 @@ class MessageSender:
         self,
         group_code: str,
         msg_body: list,
-        reply_to: Optional[str] = None,
+        reply_to: str | None = None,
     ) -> dict:
         """Send group message with arbitrary MsgBody."""
         adapter = self._adapter
@@ -4791,13 +4803,13 @@ class MessageSender:
 
     @staticmethod
     async def _dispatch_encoded(
-        adapter: "YuanbaoAdapter", encoded: bytes, req_id: str,
+        adapter: YuanbaoAdapter, encoded: bytes, req_id: str,
     ) -> dict:
         """Send pre-encoded bytes via WS and return a normalised result dict."""
         try:
             response = await adapter._connection.send_biz_request(encoded, req_id=req_id)
             return {"success": True, "msg_key": response.get("msg_id", "")}
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return {"success": False, "error": f"Request timeout after {DEFAULT_SEND_TIMEOUT}s"}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -4806,12 +4818,13 @@ class MessageSender:
 
     @staticmethod
     def validate_media(
-        file_bytes: Optional[bytes], filename: str, max_size_mb: int = 20
-    ) -> Optional[str]:
+        file_bytes: bytes | None, filename: str, max_size_mb: int = 20,
+    ) -> str | None:
         """Media pre-validation: check file validity before sending/uploading.
 
         Returns:
             Error description (str) if validation fails, otherwise None.
+
         """
         if file_bytes is None or len(file_bytes) == 0:
             return f"Empty file: {filename}"
@@ -4827,10 +4840,9 @@ class MessageSender:
     def truncate_message(
         content: str,
         max_length: int = 4000,
-        len_fn: Optional[Callable[[str], int]] = None,
-    ) -> List[str]:
-        """
-        Split a long message into chunks with table-awareness.
+        len_fn: Callable[[str], int] | None = None,
+    ) -> list[str]:
+        """Split a long message into chunks with table-awareness.
 
         Delegates core splitting to ``MarkdownProcessor.chunk_markdown_text``
         and strips page indicators like ``(1/3)`` from the output.
@@ -4848,9 +4860,9 @@ class MessageSender:
         )
 
         # Strip page indicators like (1/3) that BasePlatformAdapter may add
-        chunks = [_INDICATOR_RE.sub('', c) for c in chunks]
+        chunks = [_INDICATOR_RE.sub("", c) for c in chunks]
 
-        return chunks if chunks else [content]
+        return chunks or [content]
 
     # -- Cron wrapper stripping ---------------------------------------------
 
@@ -4897,7 +4909,7 @@ class OutboundManager:
     # Expose class-level constants from MessageSender for backward compatibility
     CHAT_DICT_MAX_SIZE: ClassVar[int] = MessageSender.CHAT_DICT_MAX_SIZE
 
-    def __init__(self, adapter: "YuanbaoAdapter") -> None:
+    def __init__(self, adapter: YuanbaoAdapter) -> None:
         self._adapter = adapter
         self.sender: MessageSender = MessageSender(adapter)
         self.heartbeat: HeartbeatManager = HeartbeatManager(adapter)
@@ -4920,22 +4932,22 @@ class OutboundManager:
     # -- Delegated public API (used by YuanbaoAdapter) ---------------------
 
     async def send_text(
-        self, chat_id: str, content: str, reply_to: Optional[str] = None,
+        self, chat_id: str, content: str, reply_to: str | None = None,
         group_code: str = "",
-    ) -> "SendResult":
+    ) -> SendResult:
         """Send text message with auto-chunking."""
         return await self.sender.send_text(chat_id, content, reply_to, group_code=group_code)
 
     async def send_media(
         self, chat_id: str, handler_name: str, **kwargs: Any,
-    ) -> "SendResult":
+    ) -> SendResult:
         """Dispatch media send to the named handler strategy."""
         return await self.sender.send_media(chat_id, handler_name, **kwargs)
 
     async def send_direct(
         self, chat_id: str, message: str,
-        media_files: Optional[List[Tuple[str, bool]]] = None,
-    ) -> Dict[str, Any]:
+        media_files: list[tuple[str, bool]] | None = None,
+    ) -> dict[str, Any]:
         """Send text + media (used by send_message tool)."""
         return await self.sender.send_direct(chat_id, message, media_files)
 
@@ -4966,8 +4978,8 @@ class OutboundManager:
 
     @staticmethod
     def validate_media(
-        file_bytes: Optional[bytes], filename: str, max_size_mb: int = 20,
-    ) -> Optional[str]:
+        file_bytes: bytes | None, filename: str, max_size_mb: int = 20,
+    ) -> str | None:
         """Proxy to MessageSender.validate_media."""
         return MessageSender.validate_media(file_bytes, filename, max_size_mb)
 
@@ -4989,15 +5001,15 @@ class YuanbaoAdapter(BasePlatformAdapter):
 
     # -- Active instance registry (class-level singleton) -------------------
 
-    _active_instance: ClassVar[Optional["YuanbaoAdapter"]] = None
+    _active_instance: ClassVar[YuanbaoAdapter | None] = None
 
     @classmethod
-    def get_active(cls) -> Optional["YuanbaoAdapter"]:
+    def get_active(cls) -> YuanbaoAdapter | None:
         """Return the currently connected YuanbaoAdapter, or None."""
         return cls._active_instance
 
     @classmethod
-    def set_active(cls, adapter: Optional["YuanbaoAdapter"]) -> None:
+    def set_active(cls, adapter: YuanbaoAdapter | None) -> None:
         """Register (or clear) the active adapter instance."""
         cls._active_instance = adapter
 
@@ -5008,7 +5020,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
         _extra = config.extra or {}
         self._app_key: str = (_extra.get("app_id") or "").strip()
         self._app_secret: str = (_extra.get("app_secret") or "").strip()
-        self._bot_id: Optional[str] = _extra.get("bot_id") or None
+        self._bot_id: str | None = _extra.get("bot_id") or None
         self._ws_url: str = (_extra.get("ws_url") or DEFAULT_WS_GATEWAY_URL).strip()
         self._api_domain: str = (_extra.get("api_domain") or DEFAULT_API_DOMAIN).rstrip("/")
         self._route_env: str = (_extra.get("route_env") or "").strip()
@@ -5026,23 +5038,23 @@ class YuanbaoAdapter(BasePlatformAdapter):
         # Member cache: group_code -> (updated_ts, [{"user_id":..., "nickname":..., ...}, ...])
         # Populated by get_group_member_list(), used by @mention resolution.
         # Entries older than MEMBER_CACHE_TTL_S are treated as stale.
-        self._member_cache: Dict[str, Tuple[float, list]] = {}
+        self._member_cache: dict[str, tuple[float, list]] = {}
         self.MEMBER_CACHE_TTL_S: float = 300.0  # 5 minutes
 
         # Inbound message deduplication (WS reconnect / network jitter)
         self._dedup = MessageDeduplicator(ttl_seconds=300)
 
         # Group chat sequential dispatch queue (session_key → asyncio.Queue).
-        self._group_queues: Dict[str, asyncio.Queue] = {}
+        self._group_queues: dict[str, asyncio.Queue] = {}
 
         # Recall support: track which msg_id is being processed per session_key
         # so RecallGuardMiddleware can detect "currently processing" messages.
-        self._processing_msg_ids: Dict[str, str] = {}
-        self._processing_msg_texts: Dict[str, str] = {}
+        self._processing_msg_ids: dict[str, str] = {}
+        self._processing_msg_texts: dict[str, str] = {}
         # Bounded cache of msg_id → attributed content for recent messages.
         # Used by _patch_transcript as content-match fallback when transcript
         # entries lack a message_id field (agent-processed @bot messages).
-        self._msg_content_cache: Dict[str, str] = {}
+        self._msg_content_cache: dict[str, str] = {}
 
         # Reply-to dedup: inbound_msg_id -> expire_ts
         # ------------------------------------------------------------------
@@ -5148,14 +5160,14 @@ class YuanbaoAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
         group_code: str = "",
     ) -> SendResult:
         """Send text message with auto-chunking. Delegates to OutboundManager."""
         return await self._outbound.send_text(chat_id, content, reply_to, group_code=group_code)
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         """Return basic chat metadata derived from the chat_id prefix.
 
         chat_id conventions:
@@ -5168,7 +5180,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
             return {"name": chat_id, "type": "group"}
         return {"name": chat_id, "type": "dm"}
 
-    async def send_typing(self, chat_id: str, metadata: Optional[dict] = None) -> None:
+    async def send_typing(self, chat_id: str, metadata: dict | None = None) -> None:
         """Send "typing" status heartbeat (RUNNING). Delegates to OutboundManager."""
         try:
             await self._outbound.start_typing(chat_id)
@@ -5199,13 +5211,13 @@ class YuanbaoAdapter(BasePlatformAdapter):
     # Group query (delegate to GroupQueryService)
     # ------------------------------------------------------------------
 
-    async def query_group_info(self, group_code: str) -> Optional[dict]:
+    async def query_group_info(self, group_code: str) -> dict | None:
         """Query group info (delegates to GroupQueryService)."""
         return await self._group_query.query_group_info_raw(group_code)
 
     async def get_group_member_list(
-        self, group_code: str, offset: int = 0, limit: int = 200
-    ) -> Optional[dict]:
+        self, group_code: str, offset: int = 0, limit: int = 200,
+    ) -> dict | None:
         """Query group member list (delegates to GroupQueryService)."""
         return await self._group_query.get_group_member_list_raw(group_code, offset=offset, limit=limit)
 
@@ -5216,8 +5228,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
     DM_MAX_CHARS = 10000  # DM text limit
 
     async def send_dm(self, user_id: str, text: str, group_code: str = "") -> SendResult:
-        """
-        Actively send C2C private chat message.
+        """Actively send C2C private chat message.
 
         Args:
             user_id: Target user ID
@@ -5226,6 +5237,7 @@ class YuanbaoAdapter(BasePlatformAdapter):
 
         Returns:
             SendResult
+
         """
         if not self._access_policy.is_dm_allowed(user_id):
             return SendResult(success=False, error="DM access denied for this user")
@@ -5242,9 +5254,9 @@ class YuanbaoAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_url: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict | None = None,
         **kwargs: Any,
     ) -> SendResult:
         """Send image message (URL). Delegates to OutboundManager via ImageUrlHandler."""
@@ -5258,9 +5270,9 @@ class YuanbaoAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         image_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict | None = None,
         **kwargs: Any,
     ) -> SendResult:
         """Send local image file. Delegates to OutboundManager via ImageFileHandler."""
@@ -5274,9 +5286,9 @@ class YuanbaoAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         file_url: str,
-        filename: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        filename: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict | None = None,
         **kwargs: Any,
     ) -> SendResult:
         """Send file message (URL). Delegates to OutboundManager via FileUrlHandler."""
@@ -5289,9 +5301,9 @@ class YuanbaoAdapter(BasePlatformAdapter):
     async def send_sticker(
         self,
         chat_id: str,
-        sticker_name: Optional[str] = None,
-        face_index: Optional[int] = None,
-        reply_to: Optional[str] = None,
+        sticker_name: str | None = None,
+        face_index: int | None = None,
+        reply_to: str | None = None,
         **kwargs: Any,
     ) -> SendResult:
         """Send sticker/emoji. Delegates to OutboundManager via StickerHandler."""
@@ -5306,10 +5318,10 @@ class YuanbaoAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         file_path: str,
-        filename: Optional[str] = None,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        filename: str | None = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict | None = None,
         **kwargs: Any,
     ) -> SendResult:
         """Send local file (document). Delegates to OutboundManager via DocumentHandler."""
@@ -5344,16 +5356,16 @@ class YuanbaoAdapter(BasePlatformAdapter):
 # ---------------------------------------------------------------------------
 
 
-def get_active_adapter() -> Optional["YuanbaoAdapter"]:
+def get_active_adapter() -> YuanbaoAdapter | None:
     """Delegate to ``YuanbaoAdapter.get_active()``."""
     return YuanbaoAdapter.get_active()
 
 
 async def send_yuanbao_direct(
-    adapter: "YuanbaoAdapter",
+    adapter: YuanbaoAdapter,
     chat_id: str,
     message: str,
-    media_files: Optional[List[Tuple[str, bool]]] = None,
-) -> Dict[str, Any]:
+    media_files: list[tuple[str, bool]] | None = None,
+) -> dict[str, Any]:
     """Delegate to ``OutboundManager.send_direct``."""
     return await adapter._outbound.send_direct(chat_id, message, media_files)

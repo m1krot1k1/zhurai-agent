@@ -37,19 +37,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def _eprint(*args: Any) -> None:
     print(*args, file=sys.stderr)
 
 
-def _load_items(input_file: Optional[str]) -> List[Dict[str, Any]]:
+def _load_items(input_file: str | None) -> list[dict[str, Any]]:
     raw = ""
     if input_file:
-        with open(input_file, encoding="utf-8") as f:
-            raw = f.read()
+        raw = pathlib.Path(input_file).read_text(encoding="utf-8")
     else:
         raw = sys.stdin.read()
     raw = raw.strip()
@@ -71,7 +71,7 @@ def _load_items(input_file: Optional[str]) -> List[Dict[str, Any]]:
     sys.exit(2)
 
 
-def _item_id(item: Dict[str, Any], index: int) -> str:
+def _item_id(item: dict[str, Any], index: int) -> str:
     for key in ("id", "guid", "message_id", "url", "link"):
         val = item.get(key)
         if val:
@@ -90,7 +90,7 @@ _CLASSIFY_INSTRUCTIONS = (
 )
 
 
-def _build_prompt(items: List[Dict[str, Any]], criteria: str) -> str:
+def _build_prompt(items: list[dict[str, Any]], criteria: str) -> str:
     lines = [f"USER IMPORTANCE CRITERIA:\n{criteria}\n", "ITEMS:"]
     for i, item in enumerate(items):
         # Show a compact view; the model sees the salient fields.
@@ -103,12 +103,12 @@ def _build_prompt(items: List[Dict[str, Any]], criteria: str) -> str:
             view = item  # fall back to the whole object
         lines.append(f"[{i}] {json.dumps(view, ensure_ascii=False)[:1200]}")
     lines.append(
-        "\nReturn the JSON array of scores now (one object per item, same order)."
+        "\nReturn the JSON array of scores now (one object per item, same order).",
     )
     return "\n".join(lines)
 
 
-def _parse_scores(content: str, n_items: int) -> Dict[int, Dict[str, Any]]:
+def _parse_scores(content: str, n_items: int) -> dict[int, dict[str, Any]]:
     text = (content or "").strip()
     # Tolerate accidental markdown fences.
     if text.startswith("```"):
@@ -130,7 +130,7 @@ def _parse_scores(content: str, n_items: int) -> Dict[int, Dict[str, Any]]:
         else:
             _eprint("classify_items: classifier returned no JSON array")
             return {}
-    out: Dict[int, Dict[str, Any]] = {}
+    out: dict[int, dict[str, Any]] = {}
     if isinstance(arr, list):
         for obj in arr:
             if not isinstance(obj, dict):

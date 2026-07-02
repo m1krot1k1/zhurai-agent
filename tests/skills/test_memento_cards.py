@@ -4,7 +4,7 @@ import csv
 import json
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -136,9 +136,9 @@ class TestRating:
     def test_hard_adds_1_day(self, capsys):
         _run(capsys, ["add", "--question", "Q", "--answer", "A"])
         card_id = _run(capsys, ["list"])["cards"][0]["id"]
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         result = _run(capsys, ["rate", "--id", card_id, "--rating", "hard"])
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
         next_review = datetime.fromisoformat(result["card"]["next_review_at"])
         assert before + timedelta(days=1) <= next_review <= after + timedelta(days=1)
         assert result["card"]["ease_streak"] == 0
@@ -146,7 +146,7 @@ class TestRating:
     def test_good_adds_3_days(self, capsys):
         _run(capsys, ["add", "--question", "Q", "--answer", "A"])
         card_id = _run(capsys, ["list"])["cards"][0]["id"]
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         result = _run(capsys, ["rate", "--id", card_id, "--rating", "good"])
         next_review = datetime.fromisoformat(result["card"]["next_review_at"])
         assert next_review >= before + timedelta(days=3)
@@ -229,7 +229,7 @@ class TestCSV:
         assert result["exported"] == 2
 
         # Verify CSV content
-        with open(csv_path, "r") as f:
+        with Path(csv_path).open() as f:
             reader = csv.reader(f)
             rows = list(reader)
         assert len(rows) == 2
@@ -252,7 +252,7 @@ class TestCSV:
 
     def test_import_without_collection_column(self, capsys, tmp_path):
         csv_path = str(tmp_path / "no_col.csv")
-        with open(csv_path, "w", newline="") as f:
+        with Path(csv_path).open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Q1", "A1"])
             writer.writerow(["Q2", "A2"])
@@ -265,7 +265,7 @@ class TestCSV:
 
     def test_import_skips_empty_rows(self, capsys, tmp_path):
         csv_path = str(tmp_path / "sparse.csv")
-        with open(csv_path, "w", newline="") as f:
+        with Path(csv_path).open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Q1", "A1"])
             writer.writerow(["", ""])  # empty
@@ -353,8 +353,7 @@ class TestEdgeCases:
     def test_corrupt_json_recovery(self, capsys):
         """Corrupt JSON file should be treated as empty."""
         memento_cards.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(memento_cards.CARDS_FILE, "w") as f:
-            f.write("{corrupted json...")
+        Path(memento_cards.CARDS_FILE).write_text("{corrupted json...")
         result = _run(capsys, ["list"])
         assert result["count"] == 0
         # Can still add
@@ -364,7 +363,7 @@ class TestEdgeCases:
     def test_missing_cards_key_recovery(self, capsys):
         """JSON without 'cards' key should be treated as empty."""
         memento_cards.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(memento_cards.CARDS_FILE, "w") as f:
+        with Path(memento_cards.CARDS_FILE).open("w") as f:
             json.dump({"version": 1}, f)
         result = _run(capsys, ["list"])
         assert result["count"] == 0
@@ -420,7 +419,7 @@ class TestUserAnswer:
                       "--user-answer", "my answer"])
         csv_path = str(tmp_path / "export.csv")
         _run(capsys, ["export", "--output", csv_path])
-        with open(csv_path) as f:
+        with Path(csv_path).open() as f:
             rows = list(csv.reader(f))
         # CSV stays 3-column (question, answer, collection) — user_answer is internal only
         assert len(rows[0]) == 3

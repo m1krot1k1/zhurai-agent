@@ -1,5 +1,4 @@
-"""
-test_yuanbao_pipeline.py - Unit tests for the inbound middleware pipeline.
+"""test_yuanbao_pipeline.py - Unit tests for the inbound middleware pipeline.
 
 Tests cover:
   1. InboundPipeline engine (use, use_before, use_after, remove, execute)
@@ -10,47 +9,48 @@ Tests cover:
   6. OOP middleware ABC and class tests
 """
 
-import sys
-import os
 import json
+import os
+import sys
 
 # Ensure project root is on the path
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from gateway.config import PlatformConfig
 from gateway.platforms.yuanbao import (
+    AccessGuardMiddleware,
+    AccessPolicy,
+    BuildSourceMiddleware,
+    ChatRoutingMiddleware,
+    DecodeMiddleware,
+    DedupMiddleware,
+    DispatchMiddleware,
+    ExtractContentMiddleware,
+    ExtractFieldsMiddleware,
+    GroupAtGuardMiddleware,
     InboundContext,
     InboundMiddleware,
     InboundPipeline,
-    DecodeMiddleware,
-    ExtractFieldsMiddleware,
-    DedupMiddleware,
-    SkipSelfMiddleware,
-    ChatRoutingMiddleware,
-    AccessPolicy,
-    AccessGuardMiddleware,
-    ExtractContentMiddleware,
-    PlaceholderFilterMiddleware,
-    OwnerCommandMiddleware,
-    BuildSourceMiddleware,
-    GroupAtGuardMiddleware,
-    QuoteContextMiddleware,
-    MediaResolveMiddleware,
-    PatchAnchorsMiddleware,
-    DispatchMiddleware,
     InboundPipelineBuilder,
+    MediaResolveMiddleware,
+    OwnerCommandMiddleware,
+    PatchAnchorsMiddleware,
+    PlaceholderFilterMiddleware,
+    QuoteContextMiddleware,
+    SkipSelfMiddleware,
     YuanbaoAdapter,
 )
-from gateway.config import PlatformConfig
-
 
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def make_config(**kwargs):
     extra = kwargs.pop("extra", {})
@@ -251,7 +251,7 @@ class TestInboundPipeline:
         assert pipeline.middleware_names == ["a", "b"]
 
     def test_remove(self):
-        """remove deletes middleware by name."""
+        """Remove deletes middleware by name."""
         async def noop(ctx, next_fn):
             await next_fn()
 
@@ -260,7 +260,7 @@ class TestInboundPipeline:
         assert pipeline.middleware_names == ["a", "c"]
 
     def test_remove_nonexistent_is_noop(self):
-        """remove with nonexistent name is a no-op."""
+        """Remove with nonexistent name is a no-op."""
         async def noop(ctx, next_fn):
             await next_fn()
 
@@ -557,7 +557,7 @@ class TestExtractContentMiddleware:
         msg_body = [
             {"msg_type": "TIMTextElem", "msg_content": {"text": "Hello!"}},
             {"msg_type": "TIMImageElem", "msg_content": {
-                "image_info_array": [{"url": "https://img.example.com/1.jpg"}]
+                "image_info_array": [{"url": "https://img.example.com/1.jpg"}],
             }},
         ]
         ctx = make_ctx(adapter=adapter, msg_body=msg_body)
@@ -621,7 +621,7 @@ class TestGroupAtGuardMiddleware:
         adapter._bot_id = "bot_123"
         msg_body = [
             {"msg_type": "TIMCustomElem", "msg_content": {
-                "data": json.dumps({"elem_type": 1002, "text": "@Bot", "user_id": "bot_123"})
+                "data": json.dumps({"elem_type": 1002, "text": "@Bot", "user_id": "bot_123"}),
             }},
         ]
         ctx = make_ctx(
@@ -816,7 +816,6 @@ class TestPipelineIntegration:
         assert isinstance(adapter._inbound_pipeline, InboundPipeline)
 
 
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
@@ -832,6 +831,7 @@ class TestInboundMiddlewareABC:
         """Subclass with handle() can be instantiated."""
         class GoodMiddleware(InboundMiddleware):
             name = "good"
+
             async def handle(self, ctx, next_fn):
                 await next_fn()
         mw = GoodMiddleware()
@@ -842,6 +842,7 @@ class TestInboundMiddlewareABC:
         """Middleware instances are callable via __call__."""
         class TestMW(InboundMiddleware):
             name = "test"
+
             async def handle(self, ctx, next_fn):
                 ctx.raw_text = "called"
                 await next_fn()
@@ -892,6 +893,7 @@ class TestPipelineOOPRegistration:
         """pipeline.use(SomeMiddleware()) auto-extracts name."""
         class TestMW(InboundMiddleware):
             name = "test-mw"
+
             async def handle(self, ctx, next_fn):
                 ctx.raw_text = "oop-works"
                 await next_fn()
@@ -910,6 +912,7 @@ class TestPipelineOOPRegistration:
 
         class OopMW(InboundMiddleware):
             name = "oop"
+
             async def handle(self, ctx, next_fn):
                 order.append("oop")
                 await next_fn()
@@ -964,7 +967,7 @@ class TestQuoteContextMiddleware:
                 "id": "quoted-msg-001",
                 "desc": "Hello world",
                 "sender_nickname": "Alice",
-            }
+            },
         })
         quote_id, quote_text = QuoteContextMiddleware()._extract_quote_context(cloud_data)
         assert quote_id == "quoted-msg-001"
@@ -977,7 +980,7 @@ class TestQuoteContextMiddleware:
                 "id": "quoted-msg-003",
                 "desc": "",
                 "sender_nickname": "Carol",
-            }
+            },
         })
         quote_id, quote_text = QuoteContextMiddleware()._extract_quote_context(cloud_data)
         assert quote_id == "quoted-msg-003"
@@ -989,7 +992,7 @@ class TestQuoteContextMiddleware:
             "quote": {
                 "id": "",
                 "desc": "some text",
-            }
+            },
         })
         quote_id, _quote_text = QuoteContextMiddleware()._extract_quote_context(cloud_data)
         assert quote_id is None
@@ -1006,7 +1009,7 @@ class TestQuoteContextMiddleware:
                 "id": "quoted-msg-004",
                 "desc": "Check this image",
                 "sender_nickname": "Dave",
-            }
+            },
         })
         adapter = make_adapter()
         adapter._session_store = None  # no transcript lookup path

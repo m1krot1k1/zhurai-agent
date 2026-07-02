@@ -34,7 +34,8 @@ class TestCustomProviderModelSwitch:
 
     def test_saved_model_still_probes_endpoint(self, config_home):
         """When a model is already saved, the function must still call
-        fetch_api_models to probe the endpoint — not skip with early return."""
+        fetch_api_models to probe the endpoint — not skip with early return.
+        """
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -60,6 +61,7 @@ class TestCustomProviderModelSwitch:
     def test_can_switch_to_different_model(self, config_home):
         """User selects a different model than the saved one."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -83,6 +85,7 @@ class TestCustomProviderModelSwitch:
     def test_probe_failure_falls_back_to_saved(self, config_home):
         """When endpoint probe fails and user presses Enter, saved model is used."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -106,6 +109,7 @@ class TestCustomProviderModelSwitch:
     def test_no_saved_model_still_works(self, config_home):
         """First-time flow (no saved model) still works as before."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -129,6 +133,7 @@ class TestCustomProviderModelSwitch:
     def test_api_mode_set_from_provider_info(self, config_home):
         """When custom_providers entry has api_mode, it should be applied."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -159,6 +164,7 @@ class TestCustomProviderModelSwitch:
     def test_api_mode_cleared_when_not_specified(self, config_home):
         """When custom_providers entry has no api_mode, stale api_mode is removed."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         # Pre-seed a stale api_mode in config
@@ -186,6 +192,7 @@ class TestCustomProviderModelSwitch:
     def test_env_template_api_key_is_preserved_in_model_config(self, config_home, monkeypatch):
         """Selecting an env-backed custom provider must not inline the secret."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         config_path = config_home / "config.yaml"
@@ -197,7 +204,7 @@ class TestCustomProviderModelSwitch:
             "- name: Example Provider\n"
             "  base_url: https://api.example-provider.test/v1\n"
             "  api_key: ${EXAMPLE_PROVIDER_API_KEY}\n"
-            "  model: qwen3.6-35b-fast\n"
+            "  model: qwen3.6-35b-fast\n",
         )
         monkeypatch.setenv("EXAMPLE_PROVIDER_API_KEY", "sk-live-example-provider")
 
@@ -228,6 +235,7 @@ class TestCustomProviderModelSwitch:
     def test_key_env_custom_provider_persists_reference_not_secret(self, config_home, monkeypatch):
         """key_env custom providers should also avoid writing plaintext keys."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         config_path = config_home / "config.yaml"
@@ -238,7 +246,7 @@ class TestCustomProviderModelSwitch:
             "- name: Example Provider\n"
             "  base_url: https://api.example-provider.test/v1\n"
             "  key_env: EXAMPLE_PROVIDER_API_KEY\n"
-            "  model: qwen3.6-35b-fast\n"
+            "  model: qwen3.6-35b-fast\n",
         )
         monkeypatch.setenv("EXAMPLE_PROVIDER_API_KEY", "sk-live-example-provider")
 
@@ -262,7 +270,7 @@ class TestCustomProviderModelSwitch:
         assert "sk-live-example-provider" not in config_path.read_text()
 
     def test_env_ref_base_url_preserves_api_key_ref_through_picker(
-        self, config_home, monkeypatch
+        self, config_home, monkeypatch,
     ):
         """Integration regression: when BOTH ``base_url`` and ``api_key`` use
         ``${VAR}`` templates (the Discord-reported NeuralWatt case), the picker
@@ -275,6 +283,7 @@ class TestCustomProviderModelSwitch:
         ``config.yaml``. This test drives the real picker-callsite code path.
         """
         import yaml
+
         from hermes_cli.main import select_provider_and_model
 
         config_path = config_home / "config.yaml"
@@ -287,7 +296,7 @@ class TestCustomProviderModelSwitch:
             "  base_url: ${NEURALWATT_API_BASE}\n"
             "  api_key: ${NEURALWATT_API_KEY}\n"
             "  model: qwen3.6-35b-fast\n"
-            "  models: []\n"
+            "  models: []\n",
         )
         monkeypatch.setenv("NEURALWATT_API_BASE", "https://api.neuralwatt.com/v1")
         monkeypatch.setenv("NEURALWATT_API_KEY", "sk-live-neuralwatt-secret")
@@ -302,7 +311,7 @@ class TestCustomProviderModelSwitch:
                 if "NeuralWatt" in label:
                     return i
             raise AssertionError(
-                f"NeuralWatt entry missing from provider menu: {labels}"
+                f"NeuralWatt entry missing from provider menu: {labels}",
             )
 
         with patch("hermes_cli.main._prompt_provider_choice",
@@ -327,7 +336,7 @@ class TestCustomProviderModelSwitch:
         assert "sk-live-neuralwatt-secret" not in saved
 
     def test_bare_custom_current_provider_matches_env_base_url_before_first_fallback(
-        self, config_home, monkeypatch
+        self, config_home, monkeypatch,
     ):
         """`hermes model` must mark the custom provider matching model.base_url
         as current instead of falling back to the first saved custom provider.
@@ -358,7 +367,7 @@ class TestCustomProviderModelSwitch:
             "  base_url: ${NEURALWATT_API_BASE}\n"
             "  api_key: ${NEURALWATT_API_KEY}\n"
             "  model: kimi-k2.6-fast\n"
-            "  models: []\n"
+            "  models: []\n",
         )
         monkeypatch.setenv("CEREBRAS_API_BASE", "https://api.cerebras.ai/v1")
         monkeypatch.setenv("CEREBRAS_API_KEY", "sk-live-cerebras-secret")
@@ -388,11 +397,13 @@ class TestCustomProviderModelSwitch:
         )
 
     def test_named_custom_provider_selection_preserves_base_url_env_ref(
-        self, config_home, monkeypatch
+        self, config_home, monkeypatch,
     ):
         """Selecting an env-backed custom provider should not expand its
-        ``base_url`` template into ``model.base_url`` on disk."""
+        ``base_url`` template into ``model.base_url`` on disk.
+        """
         import yaml
+
         from hermes_cli.main import select_provider_and_model
 
         config_path = config_home / "config.yaml"
@@ -405,7 +416,7 @@ class TestCustomProviderModelSwitch:
             "  base_url: ${NEURALWATT_API_BASE}\n"
             "  api_key: ${NEURALWATT_API_KEY}\n"
             "  model: qwen3.6-35b-fast\n"
-            "  models: []\n"
+            "  models: []\n",
         )
         monkeypatch.setenv("NEURALWATT_API_BASE", "https://api.neuralwatt.com/v1")
         monkeypatch.setenv("NEURALWATT_API_KEY", "sk-live-neuralwatt-secret")
@@ -415,7 +426,7 @@ class TestCustomProviderModelSwitch:
                 if "NeuralWatt" in label:
                     return i
             raise AssertionError(
-                f"NeuralWatt entry missing from provider menu: {labels}"
+                f"NeuralWatt entry missing from provider menu: {labels}",
             )
 
         with patch("hermes_cli.main._prompt_provider_choice",
@@ -439,7 +450,7 @@ class TestCustomProviderModelSwitch:
         assert "sk-live-neuralwatt-secret" not in saved
 
     def test_key_env_providers_dict_entry_does_not_add_api_key(
-        self, config_home, monkeypatch
+        self, config_home, monkeypatch,
     ):
         """Regression for #15803: a ``providers:`` (keyed-schema) entry that
         relies on ``key_env`` must not gain an ``api_key`` field after the
@@ -453,6 +464,7 @@ class TestCustomProviderModelSwitch:
         ``api_key`` belongs on disk.
         """
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         config_path = config_home / "config.yaml"
@@ -465,7 +477,7 @@ class TestCustomProviderModelSwitch:
             "    transport: anthropic_messages\n"
             "    model: claude-opus-4-7\n"
             "    default_model: claude-opus-4-7\n"
-            "custom_providers: []\n"
+            "custom_providers: []\n",
         )
         monkeypatch.setenv("HERMES_CRS_HENKEE_KEY", "cr_live_secret_xyz")
 
@@ -513,12 +525,14 @@ class TestCustomProviderModelSwitch:
         assert "${HERMES_CRS_HENKEE_KEY}" not in saved_text
 
     def test_key_env_providers_dict_preserves_existing_api_key(
-        self, config_home, monkeypatch
+        self, config_home, monkeypatch,
     ):
         """A ``providers:`` entry that already has an inline ``api_key``
         template must keep it untouched. Only entries that never declared
-        an ``api_key`` should skip the write."""
+        an ``api_key`` should skip the write.
+        """
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         config_path = config_home / "config.yaml"
@@ -532,7 +546,7 @@ class TestCustomProviderModelSwitch:
             "    transport: anthropic_messages\n"
             "    model: claude-opus-4-7\n"
             "    default_model: claude-opus-4-7\n"
-            "custom_providers: []\n"
+            "custom_providers: []\n",
         )
         monkeypatch.setenv("HERMES_CRS_HENKEE_KEY", "cr_live_secret_xyz")
 
@@ -568,11 +582,13 @@ class TestCustomProviderModelSwitch:
 class TestCustomProviderDiscoverModels:
     """#18726: honor ``discover_models: false`` in the terminal ``hermes model``
     named-custom flow so the picker shows the configured ``models:`` subset
-    instead of the endpoint's full live catalog."""
+    instead of the endpoint's full live catalog.
+    """
 
     def test_discover_false_uses_configured_list_and_skips_probe(self, config_home):
         """discover_models: false + configured models → no live probe, the
-        configured list is used verbatim."""
+        configured list is used verbatim.
+        """
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -596,6 +612,7 @@ class TestCustomProviderDiscoverModels:
     def test_discover_false_saves_choice_from_configured_list(self, config_home):
         """User picks the 2nd configured model; it persists, list-driven."""
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -621,7 +638,8 @@ class TestCustomProviderDiscoverModels:
 
     def test_default_still_probes_when_discover_unset(self, config_home):
         """Default (discover_models unset → True) keeps live-probe behaviour
-        even when a models: list is configured — Option B opt-out semantics."""
+        even when a models: list is configured — Option B opt-out semantics.
+        """
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {
@@ -650,8 +668,10 @@ class TestCustomProviderDiscoverModels:
 
     def test_probe_empty_falls_back_to_configured_list(self, config_home):
         """When discovery is on but the probe returns nothing, fall back to the
-        configured models: list instead of forcing manual entry."""
+        configured models: list instead of forcing manual entry.
+        """
         import yaml
+
         from hermes_cli.main import _model_flow_named_custom
 
         provider_info = {

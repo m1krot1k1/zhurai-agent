@@ -18,6 +18,7 @@ Usage (CLI):
 
 import math
 import os
+import pathlib
 import random
 import shutil
 import subprocess
@@ -25,8 +26,8 @@ import tempfile
 
 from PIL import Image, ImageDraw
 
-
 # ── Pixel drawing helpers ──────────────────────────────────────────────
+
 
 def _px(draw, x, y, color, size=2):
     x, y = int(x), int(y)
@@ -47,6 +48,7 @@ def _pixel_cross(draw, x, y, color, arm=2):
 def init_stars(rng, W, H):
     return [(rng.randint(0, W), rng.randint(0, H // 2)) for _ in range(15)]
 
+
 def draw_stars(draw, stars, t, W, H):
     for i, (sx, sy) in enumerate(stars):
         if math.sin(t * 2.0 + i * 0.7) > 0.65:
@@ -55,8 +57,9 @@ def draw_stars(draw, stars, t, W, H):
 
 def init_fireflies(rng, W, H):
     return [{"x": rng.randint(20, W - 20), "y": rng.randint(H // 4, H - 20),
-             "phase": rng.uniform(0, 6.28), "speed": rng.uniform(0.3, 0.8)}
+             "phase": rng.uniform(0, math.tau), "speed": rng.uniform(0.3, 0.8)}
             for _ in range(10)]
+
 
 def draw_fireflies(draw, ff, t, W, H):
     for f in ff:
@@ -71,9 +74,10 @@ def draw_fireflies(draw, ff, t, W, H):
 def init_leaves(rng, W, H):
     return [{"x": rng.randint(0, W), "y": rng.randint(-H, 0),
              "speed": rng.uniform(0.5, 1.5), "wobble": rng.uniform(0.02, 0.05),
-             "phase": rng.uniform(0, 6.28),
+             "phase": rng.uniform(0, math.tau),
              "color": rng.choice([(180, 120, 50), (160, 100, 40), (200, 140, 60)])}
             for _ in range(12)]
+
 
 def draw_leaves(draw, leaves, t, W, H):
     for leaf in leaves:
@@ -85,8 +89,9 @@ def draw_leaves(draw, leaves, t, W, H):
 
 def init_dust_motes(rng, W, H):
     return [{"x": rng.randint(30, W - 30), "y": rng.randint(30, H - 30),
-             "phase": rng.uniform(0, 6.28), "speed": rng.uniform(0.2, 0.5),
+             "phase": rng.uniform(0, math.tau), "speed": rng.uniform(0.2, 0.5),
              "amp": rng.uniform(2, 6)} for _ in range(20)]
+
 
 def draw_dust_motes(draw, motes, t, W, H):
     for m in motes:
@@ -99,9 +104,10 @@ def draw_dust_motes(draw, motes, t, W, H):
 
 def init_sparkles(rng, W, H):
     return [(rng.randint(W // 4, 3 * W // 4), rng.randint(H // 4, 3 * H // 4),
-             rng.uniform(0, 6.28),
+             rng.uniform(0, math.tau),
              rng.choice([(180, 200, 255), (255, 220, 150), (200, 180, 255)]))
             for _ in range(10)]
+
 
 def draw_sparkles(draw, sparkles, t, W, H):
     for sx, sy, phase, color in sparkles:
@@ -113,6 +119,7 @@ def init_rain(rng, W, H):
     return [{"x": rng.randint(0, W), "y": rng.randint(0, H),
              "speed": rng.uniform(4, 8)} for _ in range(30)]
 
+
 def draw_rain(draw, rain, t, W, H):
     for r in rain:
         y = (r["y"] + t * r["speed"] * 20) % H
@@ -122,6 +129,7 @@ def draw_rain(draw, rain, t, W, H):
 
 def init_lightning(rng, W, H):
     return {"timer": 0, "flash": False, "rng": rng}
+
 
 def draw_lightning(draw, state, t, W, H):
     state["timer"] += 1
@@ -141,6 +149,7 @@ def init_bubbles(rng, W, H):
              "speed": rng.uniform(0.3, 0.8), "size": rng.choice([1, 2, 2])}
             for _ in range(15)]
 
+
 def draw_bubbles(draw, bubbles, t, W, H):
     for b in bubbles:
         x = b["x"] + math.sin(t * 0.5 + b["x"]) * 3
@@ -151,9 +160,10 @@ def draw_bubbles(draw, bubbles, t, W, H):
 
 def init_embers(rng, W, H):
     return [{"x": rng.randint(0, W), "y": rng.randint(0, H),
-             "speed": rng.uniform(0.3, 0.9), "phase": rng.uniform(0, 6.28),
+             "speed": rng.uniform(0.3, 0.9), "phase": rng.uniform(0, math.tau),
              "color": rng.choice([(255, 150, 30), (255, 100, 20), (255, 200, 50)])}
             for _ in range(18)]
+
 
 def draw_embers(draw, embers, t, W, H):
     for e in embers:
@@ -169,6 +179,7 @@ def init_snowflakes(rng, W, H):
              "size": rng.choice([2, 2, 3])}
             for _ in range(40)]
 
+
 def draw_snowflakes(draw, flakes, t, W, H):
     for f in flakes:
         x = f["x"] + math.sin(t * f["wobble"] + f["x"]) * 20
@@ -180,9 +191,10 @@ def draw_snowflakes(draw, flakes, t, W, H):
 
 
 def init_neon_pulse(rng, W, H):
-    return [(rng.randint(0, W), rng.randint(0, H), rng.uniform(0, 6.28),
+    return [(rng.randint(0, W), rng.randint(0, H), rng.uniform(0, math.tau),
              rng.choice([(255, 0, 200), (0, 255, 255), (255, 50, 150)]))
             for _ in range(8)]
+
 
 def draw_neon_pulse(draw, points, t, W, H):
     for x, y, phase, color in points:
@@ -192,7 +204,8 @@ def draw_neon_pulse(draw, points, t, W, H):
 
 def init_heat_shimmer(rng, W, H):
     return [{"x": rng.randint(0, W), "y": rng.randint(H // 2, H),
-             "phase": rng.uniform(0, 6.28)} for _ in range(12)]
+             "phase": rng.uniform(0, math.tau)} for _ in range(12)]
+
 
 def draw_heat_shimmer(draw, points, t, W, H):
     for p in points:
@@ -240,7 +253,7 @@ def _ensure_ffmpeg():
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
             "ffmpeg not found on PATH. Install via your package manager or "
-            "download from https://ffmpeg.org/"
+            "download from https://ffmpeg.org/",
         )
 
 
@@ -266,10 +279,11 @@ def pixel_art_video(
 
     Returns:
         (mp4_path, gif_path_or_None)
+
     """
     if scene not in SCENES:
         raise ValueError(
-            f"Unknown scene {scene!r}. Choose from: {sorted(SCENES)}"
+            f"Unknown scene {scene!r}. Choose from: {sorted(SCENES)}",
         )
     _ensure_ffmpeg()
 
@@ -283,7 +297,7 @@ def pixel_art_video(
         layers.append((draw_fn, init_fn(rng, W, H)))
 
     n_frames = fps * duration
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)) or ".", exist_ok=True)
+    pathlib.Path(os.path.dirname(os.path.abspath(output_path)) or ".").mkdir(exist_ok=True, parents=True)
 
     with tempfile.TemporaryDirectory(prefix="pixelart_frames_") as frames_dir:
         for frame_idx in range(n_frames):

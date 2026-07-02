@@ -47,7 +47,7 @@ import subprocess
 import sys
 import threading
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from tools.computer_use.backend import (
     ActionResult,
@@ -126,7 +126,7 @@ def _cua_telemetry_disabled() -> bool:
         return True
 
 
-def cua_driver_child_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+def cua_driver_child_env(base_env: dict[str, str] | None = None) -> dict[str, str]:
     """Return the environment dict for spawning cua-driver.
 
     Starts from ``base_env`` (defaults to ``os.environ``) and, when telemetry
@@ -145,7 +145,7 @@ def _resolve_mcp_invocation(
     driver_cmd: str,
     *,
     timeout: float = 6.0,
-) -> Tuple[str, List[str]]:
+) -> tuple[str, list[str]]:
     """Return ``(command, args)`` that spawn cua-driver's stdio MCP server.
 
     Surface 8 of NousResearch/hermes-agent#47072: instead of hardcoding
@@ -189,6 +189,7 @@ def _resolve_mcp_invocation(
         return driver_cmd, args
     return command, args
 
+
 # Regex to parse element lines from get_window_state AX tree markdown.
 #
 # Handles two output formats from different cua-driver versions:
@@ -200,7 +201,7 @@ def _resolve_mcp_invocation(
 # Group 3: quoted label (classic format)
 # Group 4: id= label (new format)
 _ELEMENT_LINE_RE = re.compile(
-    r'^\s*(?:-\s+)?\[(\d+)\]\s+(\w+)(?:\s+"([^"]*)"|(?:\s+\(\d+\))?\s+id=([^\s\[\]]*))?' ,
+    r'^\s*(?:-\s+)?\[(\d+)\]\s+(\w+)(?:\s+"([^"]*)"|(?:\s+\(\d+\))?\s+id=([^\s\[\]]*))?',
     re.MULTILINE,
 )
 
@@ -218,7 +219,7 @@ def cua_driver_binary_available() -> bool:
     return bool(shutil.which(_CUA_DRIVER_CMD))
 
 
-def cua_driver_update_check(*, timeout: float = 8.0) -> Optional[Dict[str, Any]]:
+def cua_driver_update_check(*, timeout: float = 8.0) -> dict[str, Any] | None:
     """Run ``cua-driver check-update --json`` and return its parsed state.
 
     The payload mirrors the ``check_for_update`` MCP tool:
@@ -256,9 +257,10 @@ def cua_driver_update_check(*, timeout: float = 8.0) -> Optional[Dict[str, Any]]
     return data
 
 
-def cua_driver_update_nudge() -> Optional[str]:
+def cua_driver_update_nudge() -> str | None:
     """One-line "an update is available" message, or ``None`` when up to date,
-    indeterminate, or the driver is too old to report."""
+    indeterminate, or the driver is too old to report.
+    """
     state = cua_driver_update_check()
     if not state or not state.get("update_available"):
         return None
@@ -275,7 +277,8 @@ _update_checked = False
 
 def _maybe_nudge_update() -> None:
     """Emit an update nudge at most once per process, off-thread so the
-    (cached, ~20h) GitHub poll never blocks the first computer_use action."""
+    (cached, ~20h) GitHub poll never blocks the first computer_use action.
+    """
     global _update_checked
     if _update_checked:
         return
@@ -290,15 +293,15 @@ def _maybe_nudge_update() -> None:
             logger.info("computer_use: %s", msg)
 
     threading.Thread(
-        target=_run, name="cua-driver-update-check", daemon=True
+        target=_run, name="cua-driver-update-check", daemon=True,
     ).start()
 
 
 def cua_driver_install_hint() -> str:
     if sys.platform == "win32":
         installer = (
-            '  irm https://raw.githubusercontent.com/trycua/cua/main/'
-            'libs/cua-driver/scripts/install.ps1 | iex'
+            "  irm https://raw.githubusercontent.com/trycua/cua/main/"
+            "libs/cua-driver/scripts/install.ps1 | iex"
         )
     else:
         installer = (
@@ -315,7 +318,7 @@ def cua_driver_install_hint() -> str:
     )
 
 
-def _parse_elements_from_tree(markdown: str) -> List[UIElement]:
+def _parse_elements_from_tree(markdown: str) -> list[UIElement]:
     """Parse UIElement list from get_window_state AX tree markdown.
 
     Last-resort fallback for cua-driver builds that don't carry the
@@ -341,7 +344,7 @@ def _parse_elements_from_tree(markdown: str) -> List[UIElement]:
     return elements
 
 
-def _parse_elements_from_structured(raw_elements: List[Dict[str, Any]]) -> List[UIElement]:
+def _parse_elements_from_structured(raw_elements: list[dict[str, Any]]) -> list[UIElement]:
     """Surface 2 of NousResearch/hermes-agent#47072: read the canonical
     ``structuredContent.elements`` array cua-driver-rs emits on every
     ``get_window_state`` response (trycua/cua#1961).
@@ -358,7 +361,7 @@ def _parse_elements_from_structured(raw_elements: List[Dict[str, Any]]) -> List[
     whole walk — the wrapper degrades to "fewer elements" rather than
     "no elements" on a bad row.
     """
-    elements: List[UIElement] = []
+    elements: list[UIElement] = []
     for raw in raw_elements:
         if not isinstance(raw, dict):
             continue
@@ -368,7 +371,7 @@ def _parse_elements_from_structured(raw_elements: List[Dict[str, Any]]) -> List[
         role = raw.get("role") if isinstance(raw.get("role"), str) else ""
         label = raw.get("label") if isinstance(raw.get("label"), str) else ""
         frame = raw.get("frame") if isinstance(raw.get("frame"), dict) else None
-        bounds: Tuple[int, int, int, int] = (0, 0, 0, 0)
+        bounds: tuple[int, int, int, int] = (0, 0, 0, 0)
         if frame:
             try:
                 bounds = (
@@ -394,7 +397,7 @@ def _parse_elements_from_structured(raw_elements: List[Dict[str, Any]]) -> List[
     return elements
 
 
-def _image_dimensions_from_bytes(raw: bytes) -> Tuple[int, int]:
+def _image_dimensions_from_bytes(raw: bytes) -> tuple[int, int]:
     """Best-effort PNG/JPEG dimension sniffing without extra dependencies."""
     if raw.startswith(b"\x89PNG\r\n\x1a\n") and len(raw) >= 24:
         width = int.from_bytes(raw[16:20], "big")
@@ -433,7 +436,7 @@ def _image_dimensions_from_bytes(raw: bytes) -> Tuple[int, int]:
     return 0, 0
 
 
-def _split_tree_text(full_text: str) -> Tuple[str, str]:
+def _split_tree_text(full_text: str) -> tuple[str, str]:
     """Split get_window_state text into (summary_line, tree_markdown)."""
     lines = full_text.split("\n", 1)
     summary = lines[0]
@@ -441,7 +444,7 @@ def _split_tree_text(full_text: str) -> Tuple[str, str]:
     return summary, tree
 
 
-def _parse_key_combo(keys: str) -> Tuple[Optional[str], List[str]]:
+def _parse_key_combo(keys: str) -> tuple[str | None, list[str]]:
     """Parse a key string like 'cmd+s' into (key, modifiers).
 
     Returns (key, modifiers) where key is the non-modifier key and modifiers
@@ -450,7 +453,7 @@ def _parse_key_combo(keys: str) -> Tuple[Optional[str], List[str]]:
     MODIFIER_NAMES = {"cmd", "command", "shift", "option", "alt", "ctrl", "control", "fn"}
     KEY_ALIASES = {"command": "cmd", "alt": "option", "control": "ctrl"}
 
-    parts = [p.strip().lower() for p in re.split(r'[+\-]', keys) if p.strip()]
+    parts = [p.strip().lower() for p in re.split(r"[+\-]", keys) if p.strip()]
     modifiers = []
     key = None
     for part in parts:
@@ -470,8 +473,8 @@ class _AsyncBridge:
     """Runs one asyncio loop on a daemon thread; marshals coroutines from the caller."""
 
     def __init__(self) -> None:
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._thread: Optional[threading.Thread] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
         self._ready = threading.Event()
 
     def start(self) -> None:
@@ -496,7 +499,7 @@ class _AsyncBridge:
         if not self._ready.wait(timeout=5.0):
             raise RuntimeError("cua-driver asyncio bridge failed to start")
 
-    def run(self, coro, timeout: Optional[float] = 30.0) -> Any:
+    def run(self, coro, timeout: float | None = 30.0) -> Any:
         from agent.async_utils import safe_schedule_threadsafe
         if not self._loop or not self._thread or not self._thread.is_alive():
             if asyncio.iscoroutine(coro):
@@ -547,13 +550,13 @@ class _CuaDriverSession:
         # "accessibility.element_tokens", "input.keyboard.type.terminal_safe").
         # Empty until the session starts; consumers should call
         # `supports_capability` rather than reading directly.
-        self._capabilities: Dict[str, set] = {}
+        self._capabilities: dict[str, set] = {}
         self._capability_version: str = ""
         # Lifecycle plumbing — see class docstring above.
         self._ready_event = threading.Event()
-        self._shutdown_event: Optional[asyncio.Event] = None  # created on bridge loop
+        self._shutdown_event: asyncio.Event | None = None  # created on bridge loop
         self._lifecycle_future = None  # concurrent.futures.Future
-        self._setup_error: Optional[BaseException] = None
+        self._setup_error: BaseException | None = None
 
     def _require_started(self) -> None:
         if not self._started:
@@ -569,6 +572,7 @@ class _CuaDriverSession:
         """
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
+
         from tools.environments.local import _sanitize_subprocess_env
 
         # Build the shutdown event on the loop's thread so the asyncio
@@ -621,7 +625,8 @@ class _CuaDriverSession:
     async def _populate_capabilities(self, session: Any) -> None:
         """Surface 4: cache per-tool capability sets + capability_version
         from tools/list. Soft prerequisite — discovery failure leaves
-        the map empty and supports_capability degrades to False."""
+        the map empty and supports_capability degrades to False.
+        """
         try:
             tools_list = await session.list_tools()
             for tool in getattr(tools_list, "tools", []) or []:
@@ -663,7 +668,8 @@ class _CuaDriverSession:
 
     def _start_lifecycle_locked(self) -> None:
         """Spawn the lifecycle owner and wait for it to reach ready.
-        Caller must hold self._lock."""
+        Caller must hold self._lock.
+        """
         # Reset per-session state.
         self._ready_event = threading.Event()
         self._setup_error = None
@@ -675,7 +681,7 @@ class _CuaDriverSession:
         if loop is None:
             raise RuntimeError("cua-driver bridge not started")
         self._lifecycle_future = asyncio.run_coroutine_threadsafe(
-            self._lifecycle_coro(), loop
+            self._lifecycle_coro(), loop,
         )
         if not self._ready_event.wait(timeout=15.0):
             # Best-effort: signal shutdown if the future is still alive.
@@ -685,7 +691,7 @@ class _CuaDriverSession:
         # before setting _ready_event. Re-raise it on the caller's thread.
         if self._setup_error is not None:
             raise RuntimeError(
-                f"cua-driver session setup failed: {self._setup_error}"
+                f"cua-driver session setup failed: {self._setup_error}",
             ) from self._setup_error
 
     def stop(self) -> None:
@@ -697,7 +703,8 @@ class _CuaDriverSession:
 
     def _stop_lifecycle_locked(self) -> None:
         """Signal shutdown + wait for the lifecycle coroutine to unwind.
-        Caller must hold self._lock."""
+        Caller must hold self._lock.
+        """
         self._signal_shutdown_locked()
         fut = self._lifecycle_future
         if fut is None:
@@ -725,12 +732,12 @@ class _CuaDriverSession:
                 # Loop closed — nothing to signal.
                 pass
 
-    async def _call_tool_async(self, name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_tool_async(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         result = await self._session.call_tool(name, args)
         return _extract_tool_result(result)
 
     # ── Capability detection (Surface 4 of #47072) ────────────────────
-    def supports_capability(self, capability: str, tool: Optional[str] = None) -> bool:
+    def supports_capability(self, capability: str, tool: str | None = None) -> bool:
         """Return True when the connected cua-driver advertises the given
         capability token (trycua/cua#1961 capability vocabulary).
 
@@ -765,13 +772,15 @@ class _CuaDriverSession:
     def capabilities_discovered(self) -> bool:
         """True once ``tools/list`` populated the per-tool map. When False,
         ``_has_tool`` answers are not trustworthy (discovery failed or the
-        session hasn't started) and capture() should probe defensively."""
+        session hasn't started) and capture() should probe defensively.
+        """
         return bool(self._capabilities)
 
     @property
     def capability_version(self) -> str:
         """Driver-advertised capability vocabulary version (empty string
-        when the driver predates the field — older builds had no version)."""
+        when the driver predates the field — older builds had no version).
+        """
         return self._capability_version
 
     @staticmethod
@@ -787,7 +796,8 @@ class _CuaDriverSession:
 
     def _restart_session_locked(self) -> None:
         """Recreate the MCP session after the daemon/stdin transport was closed.
-        Caller must hold self._lock (the reconnect-once retry path holds it)."""
+        Caller must hold self._lock (the reconnect-once retry path holds it).
+        """
         if self._started:
             try:
                 self._stop_lifecycle_locked()
@@ -800,7 +810,7 @@ class _CuaDriverSession:
         self._start_lifecycle_locked()
         self._started = True
 
-    def call_tool(self, name: str, args: Dict[str, Any], timeout: float = 30.0) -> Dict[str, Any]:
+    def call_tool(self, name: str, args: dict[str, Any], timeout: float = 30.0) -> dict[str, Any]:
         self._require_started()
         try:
             return self._bridge.run(self._call_tool_async(name, args), timeout=timeout)
@@ -816,7 +826,7 @@ class _CuaDriverSession:
             return self._bridge.run(self._call_tool_async(name, args), timeout=timeout)
 
 
-def _extract_tool_result(mcp_result: Any) -> Dict[str, Any]:
+def _extract_tool_result(mcp_result: Any) -> dict[str, Any]:
     """Convert an mcp CallToolResult into a plain dict.
 
     cua-driver returns a mix of text parts, image parts, and structuredContent.
@@ -840,11 +850,11 @@ def _extract_tool_result(mcp_result: Any) -> Dict[str, Any]:
     base64-prefix sniffing.
     """
     data: Any = None
-    images: List[str] = []
-    image_mime_types: List[str] = []
+    images: list[str] = []
+    image_mime_types: list[str] = []
     is_error = bool(getattr(mcp_result, "isError", False))
-    structured: Optional[Dict] = getattr(mcp_result, "structuredContent", None) or None
-    text_chunks: List[str] = []
+    structured: dict | None = getattr(mcp_result, "structuredContent", None) or None
+    text_chunks: list[str] = []
     for part in getattr(mcp_result, "content", []) or []:
         ptype = getattr(part, "type", None)
         if ptype == "text":
@@ -870,7 +880,7 @@ def _extract_tool_result(mcp_result: Any) -> Dict[str, Any]:
     }
 
 
-def _image_from_tool_result(out: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+def _image_from_tool_result(out: dict[str, Any]) -> tuple[str | None, str | None]:
     """Pull a (png_b64, mime_type) pair out of a flattened tool result.
 
     cua-driver delivers window screenshots in two shapes depending on tool +
@@ -920,9 +930,9 @@ class CuaDriverBackend(ComputerUseBackend):
         self._bridge = _AsyncBridge()
         self._session = _CuaDriverSession(self._bridge)
         # Sticky context — updated by capture(), used by action tools.
-        self._active_pid: Optional[int] = None
-        self._active_window_id: Optional[int] = None
-        self._last_app: Optional[str] = None  # last app name targeted via capture/focus_app
+        self._active_pid: int | None = None
+        self._active_window_id: int | None = None
+        self._last_app: str | None = None  # last app name targeted via capture/focus_app
         # Surface 6 of NousResearch/hermes-agent#47072: per-snapshot
         # `element_index -> element_token` map populated on capture().
         # Action tools (click/scroll/set_value/...) attach the matching
@@ -930,7 +940,7 @@ class CuaDriverBackend(ComputerUseBackend):
         # explicitly instead of silently re-resolving to a different
         # element. Cleared whenever a fresh capture overwrites the
         # snapshot context.
-        self._snapshot_tokens: Dict[int, str] = {}
+        self._snapshot_tokens: dict[int, str] = {}
         # Per-instance cua-driver session id. cua-driver's MCP server
         # instructions ask every consumer to declare a stable session
         # at the start of a run (start_session) and tear it down at
@@ -1009,7 +1019,7 @@ class CuaDriverBackend(ComputerUseBackend):
         return cua_driver_binary_available()
 
     # ── Capture ────────────────────────────────────────────────────
-    def capture(self, mode: str = "som", app: Optional[str] = None) -> CaptureResult:
+    def capture(self, mode: str = "som", app: str | None = None) -> CaptureResult:
         """Capture the frontmost on-screen window (optionally filtered by app name).
 
         Maps hermes `capture(mode, app)` → cua-driver `list_windows` +
@@ -1059,7 +1069,7 @@ class CuaDriverBackend(ComputerUseBackend):
             # does surface. This makes "show me my screen" and "click the
             # taskbar" work; a single image still can't span multiple monitors
             # — that's a driver limitation, not a wrapper one.
-            def _is_desktop_window(w: Dict[str, Any]) -> bool:
+            def _is_desktop_window(w: dict[str, Any]) -> bool:
                 haystack = f"{w.get('app_name', '')} {w.get('title', '')}".lower()
                 return any(name in haystack for name in _DESKTOP_WINDOW_NAMES)
 
@@ -1116,9 +1126,9 @@ class CuaDriverBackend(ComputerUseBackend):
             self._last_app = app_name
 
         # Step 2: capture.
-        png_b64: Optional[str] = None
-        image_mime_type: Optional[str] = None
-        elements: List[UIElement] = []
+        png_b64: str | None = None
+        image_mime_type: str | None = None
+        elements: list[UIElement] = []
         width = height = 0
         window_title = ""
 
@@ -1140,7 +1150,7 @@ class CuaDriverBackend(ComputerUseBackend):
                 self._session._has_tool("screenshot")
                 or not self._session.capabilities_discovered
             )
-            sc_out: Optional[Dict[str, Any]] = None
+            sc_out: dict[str, Any] | None = None
             if use_screenshot:
                 sc_out = self._session.call_tool(
                     "screenshot",
@@ -1190,7 +1200,7 @@ class CuaDriverBackend(ComputerUseBackend):
             summary, tree = _split_tree_text(text)
 
             # Parse element count from summary e.g. "✅ AppName — 42 elements, turn 3..."
-            m = re.search(r'(\d+)\s+elements?', summary)
+            m = re.search(r"(\d+)\s+elements?", summary)
 
             # Surface 2 of NousResearch/hermes-agent#47072: prefer the
             # canonical structuredContent.elements array (trycua/cua#1961).
@@ -1252,12 +1262,12 @@ class CuaDriverBackend(ComputerUseBackend):
     def click(
         self,
         *,
-        element: Optional[int] = None,
-        x: Optional[int] = None,
-        y: Optional[int] = None,
+        element: int | None = None,
+        x: int | None = None,
+        y: int | None = None,
         button: str = "left",
         click_count: int = 1,
-        modifiers: Optional[List[str]] = None,
+        modifiers: list[str] | None = None,
     ) -> ActionResult:
         pid = self._active_pid
         if pid is None:
@@ -1278,7 +1288,7 @@ class CuaDriverBackend(ComputerUseBackend):
                                 message=f"unknown button {button!r} — expected left, right, middle.")
         tool = "double_click" if click_count == 2 else "click"
 
-        args: Dict[str, Any] = {"pid": pid, "button": button_norm}
+        args: dict[str, Any] = {"pid": pid, "button": button_norm}
         if element is not None:
             if self._active_window_id is None:
                 return ActionResult(ok=False, action=tool,
@@ -1299,18 +1309,18 @@ class CuaDriverBackend(ComputerUseBackend):
     def drag(
         self,
         *,
-        from_element: Optional[int] = None,
-        to_element: Optional[int] = None,
-        from_xy: Optional[Tuple[int, int]] = None,
-        to_xy: Optional[Tuple[int, int]] = None,
+        from_element: int | None = None,
+        to_element: int | None = None,
+        from_xy: tuple[int, int] | None = None,
+        to_xy: tuple[int, int] | None = None,
         button: str = "left",
-        modifiers: Optional[List[str]] = None,
+        modifiers: list[str] | None = None,
     ) -> ActionResult:
         pid = self._active_pid
         if pid is None:
             return ActionResult(ok=False, action="drag",
                                 message="No active window — call capture() first.")
-        args: Dict[str, Any] = {"pid": pid}
+        args: dict[str, Any] = {"pid": pid}
         if from_element is not None and to_element is not None:
             if self._active_window_id is None:
                 return ActionResult(ok=False, action="drag",
@@ -1331,16 +1341,16 @@ class CuaDriverBackend(ComputerUseBackend):
         *,
         direction: str,
         amount: int = 3,
-        element: Optional[int] = None,
-        x: Optional[int] = None,
-        y: Optional[int] = None,
-        modifiers: Optional[List[str]] = None,
+        element: int | None = None,
+        x: int | None = None,
+        y: int | None = None,
+        modifiers: list[str] | None = None,
     ) -> ActionResult:
         pid = self._active_pid
         if pid is None:
             return ActionResult(ok=False, action="scroll",
                                 message="No active window — call capture() first.")
-        args: Dict[str, Any] = {
+        args: dict[str, Any] = {
             "pid": pid,
             "direction": direction,
             "amount": max(1, min(50, amount)),
@@ -1375,11 +1385,10 @@ class CuaDriverBackend(ComputerUseBackend):
         if modifiers:
             # hotkey requires at least one modifier + one key.
             return self._action("hotkey", {"pid": pid, "keys": modifiers + [key_name]})
-        else:
-            return self._action("press_key", {"pid": pid, "key": key_name})
+        return self._action("press_key", {"pid": pid, "key": key_name})
 
     # ── Value setter ────────────────────────────────────────────────
-    def set_value(self, value: str, element: Optional[int] = None) -> ActionResult:
+    def set_value(self, value: str, element: int | None = None) -> ActionResult:
         """Set a value on an element. Handles AXPopUpButton selects natively."""
         pid = self._active_pid
         window_id = self._active_window_id
@@ -1389,7 +1398,7 @@ class CuaDriverBackend(ComputerUseBackend):
         if element is None:
             return ActionResult(ok=False, action="set_value",
                                 message="set_value requires element= (element index).")
-        args: Dict[str, Any] = {
+        args: dict[str, Any] = {
             "pid": pid,
             "window_id": window_id,
             "element_index": element,
@@ -1398,7 +1407,7 @@ class CuaDriverBackend(ComputerUseBackend):
         return self._action("set_value", args)
 
     # ── Introspection ──────────────────────────────────────────────
-    def list_apps(self) -> List[Dict[str, Any]]:
+    def list_apps(self) -> list[dict[str, Any]]:
         out = self._session.call_tool("list_apps", {"session": self._session_id})
         data = out["data"]
         if isinstance(data, list):
@@ -1409,7 +1418,7 @@ class CuaDriverBackend(ComputerUseBackend):
         if isinstance(data, str):
             apps = []
             for line in data.splitlines():
-                m = re.search(r'(.+?)\s+\(pid\s+(\d+)\)', line)
+                m = re.search(r"(.+?)\s+\(pid\s+(\d+)\)", line)
                 if m:
                     apps.append({"name": m.group(1).strip(), "pid": int(m.group(2))})
             return apps
@@ -1472,12 +1481,12 @@ class CuaDriverBackend(ComputerUseBackend):
     def launch_app(
         self,
         *,
-        bundle_id: Optional[str] = None,
-        name: Optional[str] = None,
-        urls: Optional[List[str]] = None,
-        additional_arguments: Optional[List[str]] = None,
+        bundle_id: str | None = None,
+        name: str | None = None,
+        urls: list[str] | None = None,
+        additional_arguments: list[str] | None = None,
         creates_new_application_instance: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Idempotent launch. Returns ``{pid, bundle_id, name, windows[]}``
         so callers can skip an extra ``list_windows`` round-trip before
         ``get_window_state``.
@@ -1485,10 +1494,11 @@ class CuaDriverBackend(ComputerUseBackend):
         ``creates_new_application_instance=True`` forces a new instance
         even if the app is already running — use it when concurrent
         runs may touch the same app so each session gets its own
-        isolated window."""
+        isolated window.
+        """
         if not bundle_id and not name:
             raise ValueError("launch_app requires either bundle_id or name")
-        args: Dict[str, Any] = {"session": self._session_id}
+        args: dict[str, Any] = {"session": self._session_id}
         if bundle_id:
             args["bundle_id"] = bundle_id
         if name:
@@ -1504,15 +1514,17 @@ class CuaDriverBackend(ComputerUseBackend):
 
     def kill_app(self, *, pid: int) -> ActionResult:
         """Terminate by pid. Equivalent to ``kill -9`` on POSIX,
-        ``taskkill /F`` on Windows."""
+        ``taskkill /F`` on Windows.
+        """
         return self._action("kill_app", {"pid": int(pid)})
 
     def bring_to_front(self, *, pid: int,
-                       window_id: Optional[int] = None) -> ActionResult:
+                       window_id: int | None = None) -> ActionResult:
         """Activate a window so subsequent foreground-dispatched input
         lands on it. cua-driver's docstring notes this is the cheaper
-        path than per-call SetForegroundWindow flashes."""
-        args: Dict[str, Any] = {"pid": int(pid)}
+        path than per-call SetForegroundWindow flashes.
+        """
+        args: dict[str, Any] = {"pid": int(pid)}
         if window_id is not None:
             args["window_id"] = int(window_id)
         return self._action("bring_to_front", args)
@@ -1524,33 +1536,37 @@ class CuaDriverBackend(ComputerUseBackend):
         visual hint — it does NOT move the real OS pointer (cua-driver
         explicitly avoids stealing pointer focus). The overlay glides
         smoothly to the target, so consumers use it before a click to
-        give a visible "where the agent is going" cue."""
+        give a visible "where the agent is going" cue.
+        """
         return self._action("move_cursor", {"x": int(x), "y": int(y)})
 
-    def get_cursor_position(self) -> Tuple[int, int]:
+    def get_cursor_position(self) -> tuple[int, int]:
         """Return the *real* OS cursor position in screen points
-        (origin top-left)."""
+        (origin top-left).
+        """
         out = self._session.call_tool(
-            "get_cursor_position", {"session": self._session_id}
+            "get_cursor_position", {"session": self._session_id},
         )
         sc = out.get("structuredContent") or {}
         return int(sc.get("x", 0)), int(sc.get("y", 0))
 
-    def get_screen_size(self) -> Dict[str, Any]:
+    def get_screen_size(self) -> dict[str, Any]:
         """Return the logical size of the main display in points plus
         its backing scale factor. Shape:
-        ``{width, height, backing_scale_factor}``."""
+        ``{width, height, backing_scale_factor}``.
+        """
         out = self._session.call_tool(
-            "get_screen_size", {"session": self._session_id}
+            "get_screen_size", {"session": self._session_id},
         )
         return out.get("structuredContent") or {}
 
     def zoom(self, *, window_id: int, x: float, y: float, w: float, h: float,
              factor: float = 1.0, format: str = "jpeg",
-             quality: int = 85) -> Dict[str, Any]:
+             quality: int = 85) -> dict[str, Any]:
         """Return a JPEG / PNG of a sub-region of a window, optionally
         scaled. cua-driver supports zoom-to-rect for callers that need
-        a higher-resolution view of a specific element."""
+        a higher-resolution view of a specific element.
+        """
         return self._session.call_tool("zoom", {
             "window_id": int(window_id),
             "x": float(x), "y": float(y), "w": float(w), "h": float(h),
@@ -1568,21 +1584,22 @@ class CuaDriverBackend(ComputerUseBackend):
     # session id.
 
     def set_agent_cursor_enabled(self, enabled: bool, *,
-                                 cursor_id: Optional[str] = None) -> ActionResult:
+                                 cursor_id: str | None = None) -> ActionResult:
         """Toggle the agent cursor overlay's visibility for this run."""
-        args: Dict[str, Any] = {"enabled": bool(enabled)}
+        args: dict[str, Any] = {"enabled": bool(enabled)}
         if cursor_id:
             args["cursor_id"] = cursor_id
         return self._action("set_agent_cursor_enabled", args)
 
     def set_agent_cursor_motion(self, *,
-                                glide_ms: Optional[float] = None,
-                                dwell_ms: Optional[float] = None,
-                                idle_hide_ms: Optional[float] = None,
-                                cursor_id: Optional[str] = None) -> ActionResult:
+                                glide_ms: float | None = None,
+                                dwell_ms: float | None = None,
+                                idle_hide_ms: float | None = None,
+                                cursor_id: str | None = None) -> ActionResult:
         """Tune the overlay's motion timings — glide duration, post-click
-        dwell, idle-hide delay. Each None means "leave at current value"."""
-        args: Dict[str, Any] = {}
+        dwell, idle-hide delay. Each None means "leave at current value".
+        """
+        args: dict[str, Any] = {}
         if glide_ms is not None:
             args["glide_ms"] = float(glide_ms)
         if dwell_ms is not None:
@@ -1594,15 +1611,16 @@ class CuaDriverBackend(ComputerUseBackend):
         return self._action("set_agent_cursor_motion", args)
 
     def set_agent_cursor_style(self, *,
-                               gradient_colors: Optional[List[str]] = None,
-                               bloom_color: Optional[str] = None,
-                               image_path: Optional[str] = None,
-                               cursor_id: Optional[str] = None) -> ActionResult:
+                               gradient_colors: list[str] | None = None,
+                               bloom_color: str | None = None,
+                               image_path: str | None = None,
+                               cursor_id: str | None = None) -> ActionResult:
         """Customise the cursor body. ``gradient_colors`` are CSS hex
         strings tip→tail; ``bloom_color`` is the radial halo; an
         ``image_path`` (.svg/.png/.ico) replaces the silhouette
-        entirely. Empty values revert to the palette default."""
-        args: Dict[str, Any] = {}
+        entirely. Empty values revert to the palette default.
+        """
+        args: dict[str, Any] = {}
         if gradient_colors is not None:
             args["gradient_colors"] = list(gradient_colors)
         if bloom_color is not None:
@@ -1614,10 +1632,11 @@ class CuaDriverBackend(ComputerUseBackend):
         return self._action("set_agent_cursor_style", args)
 
     def get_agent_cursor_state(self, *,
-                               cursor_id: Optional[str] = None) -> Dict[str, Any]:
+                               cursor_id: str | None = None) -> dict[str, Any]:
         """Return ``{x, y, config: {cursor_color, cursor_icon, ...},
-        enabled}`` for this run's cursor (or the named ``cursor_id``)."""
-        args: Dict[str, Any] = {"session": self._session_id}
+        enabled}`` for this run's cursor (or the named ``cursor_id``).
+        """
+        args: dict[str, Any] = {"session": self._session_id}
         if cursor_id:
             args["cursor_id"] = cursor_id
         out = self._session.call_tool("get_agent_cursor_state", args)
@@ -1626,12 +1645,13 @@ class CuaDriverBackend(ComputerUseBackend):
     # ── Recording / replay ──────────────────────────────────────────
 
     def start_recording(self, *, output_dir: str,
-                        record_video: bool = False) -> Dict[str, Any]:
+                        record_video: bool = False) -> dict[str, Any]:
         """Enable trajectory recording (per-turn screenshots + action
         JSON) to ``output_dir``. ``record_video=True`` ALSO captures
         the main display to ``<output_dir>/recording.mp4`` (H.264).
         Recording ownership is keyed by this run's session id so
-        concurrent runs don't fight over the recorder."""
+        concurrent runs don't fight over the recorder.
+        """
         out = self._session.call_tool("start_recording", {
             "output_dir": output_dir,
             "record_video": bool(record_video),
@@ -1639,29 +1659,32 @@ class CuaDriverBackend(ComputerUseBackend):
         })
         return out.get("structuredContent") or {}
 
-    def stop_recording(self) -> Dict[str, Any]:
+    def stop_recording(self) -> dict[str, Any]:
         """Disable recording and finalise the mp4 (if video was on).
-        Returns the recorder's final state including ``last_video_path``."""
+        Returns the recorder's final state including ``last_video_path``.
+        """
         out = self._session.call_tool("stop_recording", {
             "session": self._session_id,
         })
         return out.get("structuredContent") or {}
 
-    def get_recording_state(self) -> Dict[str, Any]:
+    def get_recording_state(self) -> dict[str, Any]:
         """Return the current recorder state without changing it.
         Shape: ``{recording, enabled, output_dir, next_turn,
-        last_video_path, last_error, owner, video_active}``."""
+        last_video_path, last_error, owner, video_active}``.
+        """
         out = self._session.call_tool(
-            "get_recording_state", {"session": self._session_id}
+            "get_recording_state", {"session": self._session_id},
         )
         return out.get("structuredContent") or {}
 
     def replay_trajectory(self, *, trajectory_dir: str,
                           dry_run: bool = False,
-                          speed_factor: float = 1.0) -> Dict[str, Any]:
+                          speed_factor: float = 1.0) -> dict[str, Any]:
         """Replay a prior recording's turn stream by re-invoking each
         turn's tool call in lexical order. ``dry_run=True`` logs without
-        actually firing the tools."""
+        actually firing the tools.
+        """
         return self._session.call_tool("replay_trajectory", {
             "trajectory_dir": trajectory_dir,
             "dry_run": bool(dry_run),
@@ -1669,20 +1692,21 @@ class CuaDriverBackend(ComputerUseBackend):
             "session": self._session_id,
         })
 
-    def install_ffmpeg(self) -> Dict[str, Any]:
+    def install_ffmpeg(self) -> dict[str, Any]:
         """Bootstrap ffmpeg for ``start_recording(record_video=True)``
         on Linux / Windows. macOS records natively via ScreenCaptureKit
-        and doesn't need ffmpeg."""
+        and doesn't need ffmpeg.
+        """
         return self._session.call_tool(
-            "install_ffmpeg", {"session": self._session_id}
+            "install_ffmpeg", {"session": self._session_id},
         )
 
     # ── Config ──────────────────────────────────────────────────────
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Return the current cua-driver runtime config."""
         out = self._session.call_tool(
-            "get_config", {"session": self._session_id}
+            "get_config", {"session": self._session_id},
         )
         return out.get("structuredContent") or {}
 
@@ -1690,33 +1714,36 @@ class CuaDriverBackend(ComputerUseBackend):
         """Set cua-driver config keys. Common keys include
         ``max_image_dimension`` (image-output resizing), recording
         flags, etc. Unknown keys are passed through verbatim — cua-driver
-        validates against its own schema."""
+        validates against its own schema.
+        """
         return self._action("set_config", dict(config))
 
     # ── Lower-level introspection ───────────────────────────────────
 
-    def get_accessibility_tree(self) -> Dict[str, Any]:
+    def get_accessibility_tree(self) -> dict[str, Any]:
         """Return a lightweight snapshot of running regular apps +
         on-screen visible windows with bounds, z-order, owner pid.
         Roughly the data ``list_windows`` exposes, in one call. Most
         callers should prefer ``capture()`` / ``focus_app()`` which
-        already use this shape internally."""
+        already use this shape internally.
+        """
         out = self._session.call_tool(
-            "get_accessibility_tree", {"session": self._session_id}
+            "get_accessibility_tree", {"session": self._session_id},
         )
         return out.get("structuredContent") or {"data": out["data"]}
 
     # ── Browser page tool ───────────────────────────────────────────
 
     def page(self, *, pid: int, action: str,
-             **page_args: Any) -> Dict[str, Any]:
+             **page_args: Any) -> dict[str, Any]:
         """Interact with a browser page loaded in a running app (Chrome,
         Safari, Edge, ...). cua-driver routes through CDP / Apple Events
         / AX tree depending on the target. ``action`` + ``page_args``
         shape depends on the requested operation (e.g. ``action="eval"``
         takes ``js: str``); see cua-driver's ``page`` tool description
-        for the full grammar."""
-        args: Dict[str, Any] = {
+        for the full grammar.
+        """
+        args: dict[str, Any] = {
             "pid": int(pid),
             "action": action,
             "session": self._session_id,
@@ -1726,20 +1753,21 @@ class CuaDriverBackend(ComputerUseBackend):
 
     # ── Generic escape hatch ────────────────────────────────────────
 
-    def call_tool(self, name: str, args: Optional[Dict[str, Any]] = None,
-                  *, timeout: float = 30.0) -> Dict[str, Any]:
+    def call_tool(self, name: str, args: dict[str, Any] | None = None,
+                  *, timeout: float = 30.0) -> dict[str, Any]:
         """Call any cua-driver MCP tool by name with arbitrary args.
         ``session`` is injected (preserves the caller's explicit one
         via setdefault). For tools the wrapper doesn't already type-
         wrap, this is the supported escape hatch — preferred over
         reaching for ``self._session.call_tool`` directly because it
-        keeps the session-id contract consistent with everything else."""
+        keeps the session-id contract consistent with everything else.
+        """
         payload = dict(args) if args else {}
         payload.setdefault("session", self._session_id)
         return self._session.call_tool(name, payload, timeout=timeout)
 
     # ── Internal ───────────────────────────────────────────────────
-    def _maybe_attach_element_token(self, tool: str, args: Dict[str, Any]) -> None:
+    def _maybe_attach_element_token(self, tool: str, args: dict[str, Any]) -> None:
         """Surface 6: when the wrapper is about to call a token-capable
         tool with `element_index`, look up the matching `element_token`
         from the last snapshot and attach it. cua-driver-rs's contract
@@ -1760,12 +1788,12 @@ class CuaDriverBackend(ComputerUseBackend):
         if not token:
             return
         if not self._session.supports_capability(
-            "accessibility.element_tokens", tool=tool
+            "accessibility.element_tokens", tool=tool,
         ):
             return
         args["element_token"] = token
 
-    def _action(self, name: str, args: Dict[str, Any]) -> ActionResult:
+    def _action(self, name: str, args: dict[str, Any]) -> ActionResult:
         # Attach the snapshot's element_token whenever the call carries
         # an element_index and the target tool advertises support.
         self._maybe_attach_element_token(name, args)

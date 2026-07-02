@@ -1,5 +1,4 @@
-"""
-Contextual first-touch onboarding hints.
+"""Contextual first-touch onboarding hints.
 
 Instead of blocking first-run questionnaires, show a one-time hint the *first*
 time a user hits a behavior fork — message-while-running, first long-running
@@ -13,8 +12,9 @@ it without pulling in heavy modules.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def openclaw_residue_hint_cli() -> str:
     )
 
 
-def detect_openclaw_residue(home: Optional[Path] = None) -> bool:
+def detect_openclaw_residue(home: Path | None = None) -> bool:
     """Return True if an OpenClaw workspace directory is present in ``$HOME``.
 
     Pure filesystem check — no side effects. ``home`` override exists for tests.
@@ -177,7 +177,7 @@ def profile_build_directive() -> str:
         "  3. With consent, you may use web_search to confirm public details "
         "(e.g. employer, public profiles) from the data points they gave.\n"
         "  4. Save each confirmed, durable fact with the memory tool using "
-        "target=\"user\" — keep entries compact and high-signal.\n"
+        'target="user" — keep entries compact and high-signal.\n'
         "If they decline at any point, stop immediately and continue normally. "
         "Keep the whole exchange light and conversational, not an interrogation.]"
     )
@@ -209,6 +209,7 @@ def mark_seen(config_path: Path, flag: str) -> bool:
     """
     try:
         import yaml
+
         from utils import atomic_yaml_write
     except Exception as e:  # pragma: no cover — dependency issue
         logger.debug("onboarding: failed to import yaml/utils: %s", e)
@@ -217,7 +218,7 @@ def mark_seen(config_path: Path, flag: str) -> bool:
     try:
         cfg: dict = {}
         if config_path.exists():
-            with open(config_path, encoding="utf-8") as f:
+            with Path(config_path).open(encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
         if not isinstance(cfg.get("onboarding"), dict):
             cfg["onboarding"] = {}
@@ -237,17 +238,17 @@ def mark_seen(config_path: Path, flag: str) -> bool:
 
 __all__ = [
     "BUSY_INPUT_FLAG",
-    "TOOL_PROGRESS_FLAG",
     "OPENCLAW_RESIDUE_FLAG",
     "PROFILE_BUILD_FLAG",
-    "busy_input_hint_gateway",
+    "TOOL_PROGRESS_FLAG",
     "busy_input_hint_cli",
-    "tool_progress_hint_gateway",
-    "tool_progress_hint_cli",
-    "openclaw_residue_hint_cli",
+    "busy_input_hint_gateway",
     "detect_openclaw_residue",
-    "profile_build_mode",
-    "profile_build_directive",
     "is_seen",
     "mark_seen",
+    "openclaw_residue_hint_cli",
+    "profile_build_directive",
+    "profile_build_mode",
+    "tool_progress_hint_cli",
+    "tool_progress_hint_gateway",
 ]

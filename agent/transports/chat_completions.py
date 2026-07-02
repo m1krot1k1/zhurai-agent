@@ -10,7 +10,7 @@ reasoning configuration, temperature handling, and extra_body assembly.
 """
 
 import copy
-from typing import Any, Dict
+from typing import Any
 
 from agent.lmstudio_reasoning import resolve_lmstudio_effort
 from agent.moonshot_schema import is_moonshot_model, sanitize_moonshot_tools
@@ -45,7 +45,7 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
     if effort == "none":
         return {"includeThoughts": False}
 
-    thinking_config: Dict[str, Any] = {"includeThoughts": True}
+    thinking_config: dict[str, Any] = {"includeThoughts": True}
 
     # Gemini 2.5 accepts thinkingBudget; don't guess a budget from Hermes'
     # coarse effort levels. ``includeThoughts`` alone is enough to surface
@@ -80,7 +80,7 @@ def _snake_case_gemini_thinking_config(config: dict | None) -> dict | None:
     if not isinstance(config, dict) or not config:
         return None
 
-    translated: Dict[str, Any] = {}
+    translated: dict[str, Any] = {}
     if isinstance(config.get("includeThoughts"), bool):
         translated["include_thoughts"] = config["includeThoughts"]
     if isinstance(config.get("thinkingLevel"), str) and config["thinkingLevel"].strip():
@@ -126,7 +126,7 @@ class ChatCompletionsTransport(ProviderTransport):
         return "chat_completions"
 
     def convert_messages(
-        self, messages: list[dict[str, Any]], **kwargs
+        self, messages: list[dict[str, Any]], **kwargs,
     ) -> list[dict[str, Any]]:
         """Messages are already in OpenAI format — strip internal fields
         that strict chat-completions providers reject with HTTP 400/422
@@ -162,7 +162,7 @@ class ChatCompletionsTransport(ProviderTransport):
           which then poisons every subsequent request in the session.
         """
         strip_extra_content = not _model_consumes_thought_signature(
-            kwargs.get("model")
+            kwargs.get("model"),
         )
         needs_sanitize = False
         for msg in messages:
@@ -282,7 +282,7 @@ class ChatCompletionsTransport(ProviderTransport):
         _profile = params.get("provider_profile")
         if _profile:
             return self._build_kwargs_from_profile(
-                _profile, model, sanitized, tools, params
+                _profile, model, sanitized, tools, params,
             )
 
         # ── Legacy fallback (unregistered / unknown provider) ───────────
@@ -340,7 +340,7 @@ class ChatCompletionsTransport(ProviderTransport):
             _kimi_thinking_off = bool(
                 reasoning_config
                 and isinstance(reasoning_config, dict)
-                and reasoning_config.get("enabled") is False
+                and reasoning_config.get("enabled") is False,
             )
             if not _kimi_thinking_off:
                 _kimi_effort = "medium"
@@ -355,7 +355,7 @@ class ChatCompletionsTransport(ProviderTransport):
             _tokenhub_thinking_off = bool(
                 reasoning_config
                 and isinstance(reasoning_config, dict)
-                and reasoning_config.get("enabled") is False
+                and reasoning_config.get("enabled") is False,
             )
             if not _tokenhub_thinking_off:
                 _tokenhub_effort = "high"
@@ -369,7 +369,7 @@ class ChatCompletionsTransport(ProviderTransport):
         # declares reasoning support via /api/v1/models capabilities (gated
         # upstream by params["supports_reasoning"]). resolve_lmstudio_effort
         # is shared with run_agent's summary path so both stay in sync.
-        if params.get("is_lmstudio", False) and params.get("supports_reasoning", False):
+        if params.get("is_lmstudio") and params.get("supports_reasoning"):
             _lm_effort = resolve_lmstudio_effort(
                 reasoning_config,
                 params.get("lmstudio_reasoning_options"),
@@ -402,7 +402,7 @@ class ChatCompletionsTransport(ProviderTransport):
                     _pareto_score_f = None
                 if _pareto_score_f is not None and 0.0 <= _pareto_score_f <= 1.0:
                     extra_body["plugins"] = [
-                        {"id": "pareto-router", "min_coding_score": _pareto_score_f}
+                        {"id": "pareto-router", "min_coding_score": _pareto_score_f},
                     ]
 
         # Kimi extra_body.thinking
@@ -417,7 +417,7 @@ class ChatCompletionsTransport(ProviderTransport):
 
         # Reasoning. LM Studio is handled above via top-level reasoning_effort,
         # so skip emitting extra_body.reasoning for it.
-        if params.get("supports_reasoning", False) and not params.get("is_lmstudio", False):
+        if params.get("supports_reasoning") and not params.get("is_lmstudio"):
             if is_github_models:
                 gh_reasoning = params.get("github_reasoning_extra")
                 if gh_reasoning is not None:
@@ -633,7 +633,7 @@ class ChatCompletionsTransport(ProviderTransport):
                         name=tc.function.name,
                         arguments=tc.function.arguments,
                         provider_data=tc_provider_data or None,
-                    )
+                    ),
                 )
 
         usage = None
@@ -656,7 +656,7 @@ class ChatCompletionsTransport(ProviderTransport):
             if isinstance(model_extra, dict) and "reasoning_content" in model_extra:
                 reasoning_content = model_extra["reasoning_content"]
 
-        provider_data: Dict[str, Any] = {}
+        provider_data: dict[str, Any] = {}
         if reasoning_content is not None:
             provider_data["reasoning_content"] = reasoning_content
         rd = getattr(msg, "reasoning_details", None)

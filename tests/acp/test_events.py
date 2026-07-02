@@ -6,9 +6,8 @@ import warnings
 from concurrent.futures import Future
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 import acp
+import pytest
 from acp.schema import AgentPlanUpdate
 
 from acp_adapter.events import (
@@ -21,7 +20,7 @@ from acp_adapter.events import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_conn():
     """Mock ACP Client connection."""
     conn = MagicMock(spec=acp.Client)
@@ -29,7 +28,7 @@ def mock_conn():
     return conn
 
 
-@pytest.fixture()
+@pytest.fixture
 def event_loop_fixture():
     """Create a real event loop for testing threadsafe coroutine submission."""
     loop = asyncio.new_event_loop()
@@ -232,7 +231,7 @@ class TestStepCallback:
             cb(1, [{"name": "terminal", "result": '{"output": "hello"}'}])
 
         mock_btc.assert_called_once_with(
-            "tc-xyz789", "terminal", result='{"output": "hello"}', function_args=None, snapshot=None
+            "tc-xyz789", "terminal", result='{"output": "hello"}', function_args=None, snapshot=None,
         )
 
     def test_none_result_passed_through(self, mock_conn, event_loop_fixture):

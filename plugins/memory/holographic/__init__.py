@@ -19,14 +19,16 @@ from __future__ import annotations
 
 import json
 import logging
+import pathlib
 import re
 from typing import Any, Dict, List
 
 from agent.memory_provider import MemoryProvider
-from tools.registry import tool_error
-from .store import MemoryStore
-from .retrieval import FactRetriever
 from hermes_cli.config import cfg_get
+from tools.registry import tool_error
+
+from .retrieval import FactRetriever
+from .store import MemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,7 @@ def _load_plugin_config() -> dict:
         return {}
     try:
         import yaml
-        with open(config_path, encoding="utf-8-sig") as f:
+        with pathlib.Path(config_path).open(encoding="utf-8-sig") as f:
             all_config = yaml.safe_load(f) or {}
         return cfg_get(all_config, "plugins", "hermes-memory-store", default={}) or {}
     except Exception:
@@ -136,11 +138,11 @@ class HolographicMemoryProvider(MemoryProvider):
             import yaml
             existing = {}
             if config_path.exists():
-                with open(config_path, encoding="utf-8-sig") as f:
+                with Path(config_path).open(encoding="utf-8-sig") as f:
                     existing = yaml.safe_load(f) or {}
             existing.setdefault("plugins", {})
             existing["plugins"]["hermes-memory-store"] = values
-            with open(config_path, "w", encoding="utf-8") as f:
+            with Path(config_path).open("w", encoding="utf-8") as f:
                 yaml.dump(existing, f, default_flow_style=False)
         except Exception:
             pass
@@ -185,7 +187,7 @@ class HolographicMemoryProvider(MemoryProvider):
             return ""
         try:
             total = self._store._conn.execute(
-                "SELECT COUNT(*) FROM facts"
+                "SELECT COUNT(*) FROM facts",
             ).fetchone()[0]
         except Exception:
             total = 0
@@ -224,17 +226,17 @@ class HolographicMemoryProvider(MemoryProvider):
         # The on_session_end hook handles auto-extraction if configured.
         pass
 
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         return [FACT_STORE_SCHEMA, FACT_FEEDBACK_SCHEMA]
 
-    def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
+    def handle_tool_call(self, tool_name: str, args: dict[str, Any], **kwargs) -> str:
         if tool_name == "fact_store":
             return self._handle_fact_store(args)
-        elif tool_name == "fact_feedback":
+        if tool_name == "fact_feedback":
             return self._handle_fact_feedback(args)
         return tool_error(f"Unknown tool: {tool_name}")
 
-    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+    def on_session_end(self, messages: list[dict[str, Any]]) -> None:
         if not self._config.get("auto_extract", False):
             return
         if not self._store or not messages:
@@ -270,7 +272,7 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"fact_id": fact_id, "status": "added"})
 
-            elif action == "search":
+            if action == "search":
                 results = retriever.search(
                     args["query"],
                     category=args.get("category"),
@@ -279,7 +281,7 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"results": results, "count": len(results)})
 
-            elif action == "probe":
+            if action == "probe":
                 results = retriever.probe(
                     args["entity"],
                     category=args.get("category"),
@@ -287,7 +289,7 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"results": results, "count": len(results)})
 
-            elif action == "related":
+            if action == "related":
                 results = retriever.related(
                     args["entity"],
                     category=args.get("category"),
@@ -295,7 +297,7 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"results": results, "count": len(results)})
 
-            elif action == "reason":
+            if action == "reason":
                 entities = args.get("entities", [])
                 if not entities:
                     return tool_error("reason requires 'entities' list")
@@ -306,14 +308,14 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"results": results, "count": len(results)})
 
-            elif action == "contradict":
+            if action == "contradict":
                 results = retriever.contradict(
                     category=args.get("category"),
                     limit=int(args.get("limit", 10)),
                 )
                 return json.dumps({"results": results, "count": len(results)})
 
-            elif action == "update":
+            if action == "update":
                 updated = store.update_fact(
                     int(args["fact_id"]),
                     content=args.get("content"),
@@ -323,11 +325,11 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"updated": updated})
 
-            elif action == "remove":
+            if action == "remove":
                 removed = store.remove_fact(int(args["fact_id"]))
                 return json.dumps({"removed": removed})
 
-            elif action == "list":
+            if action == "list":
                 facts = store.list_facts(
                     category=args.get("category"),
                     min_trust=float(args.get("min_trust", 0.0)),
@@ -335,8 +337,7 @@ class HolographicMemoryProvider(MemoryProvider):
                 )
                 return json.dumps({"facts": facts, "count": len(facts)})
 
-            else:
-                return tool_error(f"Unknown action: {action}")
+            return tool_error(f"Unknown action: {action}")
 
         except KeyError as exc:
             return tool_error(f"Missing required argument: {exc}")
@@ -358,13 +359,13 @@ class HolographicMemoryProvider(MemoryProvider):
 
     def _auto_extract_facts(self, messages: list) -> None:
         _PREF_PATTERNS = [
-            re.compile(r'\bI\s+(?:prefer|like|love|use|want|need)\s+(.+)', re.IGNORECASE),
-            re.compile(r'\bmy\s+(?:favorite|preferred|default)\s+\w+\s+is\s+(.+)', re.IGNORECASE),
-            re.compile(r'\bI\s+(?:always|never|usually)\s+(.+)', re.IGNORECASE),
+            re.compile(r"\bI\s+(?:prefer|like|love|use|want|need)\s+(.+)", re.IGNORECASE),
+            re.compile(r"\bmy\s+(?:favorite|preferred|default)\s+\w+\s+is\s+(.+)", re.IGNORECASE),
+            re.compile(r"\bI\s+(?:always|never|usually)\s+(.+)", re.IGNORECASE),
         ]
         _DECISION_PATTERNS = [
-            re.compile(r'\bwe\s+(?:decided|agreed|chose)\s+(?:to\s+)?(.+)', re.IGNORECASE),
-            re.compile(r'\bthe\s+project\s+(?:uses|needs|requires)\s+(.+)', re.IGNORECASE),
+            re.compile(r"\bwe\s+(?:decided|agreed|chose)\s+(?:to\s+)?(.+)", re.IGNORECASE),
+            re.compile(r"\bthe\s+project\s+(?:uses|needs|requires)\s+(.+)", re.IGNORECASE),
         ]
 
         extracted = 0

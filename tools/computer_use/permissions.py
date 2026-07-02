@@ -1,5 +1,4 @@
-"""
-Cross-platform Computer Use readiness + macOS permission helpers.
+"""Cross-platform Computer Use readiness + macOS permission helpers.
 
 cua-driver runs on macOS, Windows, and Linux, but "ready to drive" means
 something different on each:
@@ -28,14 +27,14 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Platforms with a cua-driver runtime backend (mirrors the toolset platform_gate).
 _RUNTIME_PLATFORMS = frozenset({"darwin", "win32", "linux"})
 _BOOLS = ("accessibility", "screen_recording", "screen_recording_capturable")
 
 
-def _driver_cmd(override: Optional[str]) -> str:
+def _driver_cmd(override: str | None) -> str:
     if override:
         return override
     try:
@@ -46,7 +45,7 @@ def _driver_cmd(override: Optional[str]) -> str:
         return os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip() or "cua-driver"
 
 
-def _child_env() -> Dict[str, str]:
+def _child_env() -> dict[str, str]:
     """cua-driver child env honoring the Hermes telemetry opt-in policy."""
     try:
         from tools.computer_use.cua_backend import cua_driver_child_env
@@ -73,7 +72,7 @@ def _json_out(binary: str, *args: str, timeout: float) -> Any:
     return json.loads(raw) if raw else None
 
 
-def _doctor(binary: str) -> Optional[Dict[str, Any]]:
+def _doctor(binary: str) -> dict[str, Any] | None:
     """``cua-driver doctor --json`` → ``{ok, checks:[{label,status,message}]}``."""
     try:
         data = _json_out(binary, "doctor", "--json", timeout=12)
@@ -81,7 +80,7 @@ def _doctor(binary: str) -> Optional[Dict[str, Any]]:
         return None
     if not isinstance(data, dict):
         return None
-    checks: List[Dict[str, str]] = [
+    checks: list[dict[str, str]] = [
         {
             "label": str(p.get("label", "")),
             "status": str(p.get("status", "")),
@@ -93,7 +92,7 @@ def _doctor(binary: str) -> Optional[Dict[str, Any]]:
     return {"ok": bool(data.get("ok")), "checks": checks}
 
 
-def _mac_permissions(binary: str, out: Dict[str, Any]) -> None:
+def _mac_permissions(binary: str, out: dict[str, Any]) -> None:
     """Fold ``cua-driver permissions status --json`` booleans into ``out``."""
     try:
         data = _json_out(binary, "permissions", "status", "--json", timeout=10)
@@ -109,7 +108,7 @@ def _mac_permissions(binary: str, out: Dict[str, Any]) -> None:
             out["source"] = data["source"]
 
 
-def computer_use_status(driver_cmd: Optional[str] = None) -> Dict[str, Any]:
+def computer_use_status(driver_cmd: str | None = None) -> dict[str, Any]:
     """Unified, OS-aware Computer Use readiness for the desktop card.
 
     ``ready`` is the single signal the UI keys off: on macOS it's both TCC
@@ -118,7 +117,7 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> Dict[str, Any]:
     """
     plat = sys.platform
     binary = shutil.which(_driver_cmd(driver_cmd))
-    out: Dict[str, Any] = {
+    out: dict[str, Any] = {
         "platform": plat,
         "platform_supported": plat in _RUNTIME_PLATFORMS,
         "installed": bool(binary),
@@ -128,7 +127,7 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> Dict[str, Any]:
         "checks": [],
         "source": None,
         "error": None,
-        **{k: None for k in _BOOLS},
+        **dict.fromkeys(_BOOLS),
     }
     if not binary:
         return out
@@ -152,7 +151,7 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> Dict[str, Any]:
     return out
 
 
-def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
+def request_permissions_grant(driver_cmd: str | None = None) -> int:
     """Run ``cua-driver permissions grant`` (macOS); stream its output.
 
     Launches CuaDriver via LaunchServices so the TCC dialog is attributed to
@@ -172,7 +171,7 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
     print(
         "Requesting Accessibility + Screen Recording for CuaDriver.\n"
         "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — "
-        "approve it, then return here."
+        "approve it, then return here.",
     )
     try:
         return int(
@@ -180,7 +179,7 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
                 [binary, "permissions", "grant"],
                 env=_child_env(),
                 stdin=subprocess.DEVNULL,
-            ).returncode
+            ).returncode,
         )
     except KeyboardInterrupt:  # pragma: no cover - interactive
         return 130

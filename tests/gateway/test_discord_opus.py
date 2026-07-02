@@ -32,7 +32,7 @@ class TestOpusFindLibrary:
 
     def test_windows_bundled_discord_opus_dll_is_discovered(self, monkeypatch, tmp_path):
         """Native Windows installs should try discord.py's bundled opus DLL."""
-        import plugins.platforms.discord.adapter as adapter
+        from plugins.platforms.discord import adapter
 
         opus_py = tmp_path / "discord" / "opus.py"
         bundled = opus_py.parent / "bin" / "libopus-0.x64.dll"
@@ -41,13 +41,13 @@ class TestOpusFindLibrary:
         bundled.write_bytes(b"fake dll")
 
         discord_stub = types.SimpleNamespace(
-            opus=types.SimpleNamespace(__file__=str(opus_py))
+            opus=types.SimpleNamespace(__file__=str(opus_py)),
         )
         monkeypatch.setattr(adapter.sys, "platform", "win32")
         monkeypatch.setattr(adapter.struct, "calcsize", lambda _fmt: 8)
 
         assert adapter._find_discord_windows_bundled_opus(discord_stub) == str(
-            bundled.resolve()
+            bundled.resolve(),
         )
 
     def test_opus_decode_error_logged(self):
@@ -64,4 +64,4 @@ class TestOpusFindLibrary:
             if "except Exception" in line and i + 1 < len(lines):
                 next_line = lines[i + 1].strip()
                 assert next_line != "return", \
-                    f"_on_packet has bare 'except Exception: return' at line {i+1}"
+                    f"_on_packet has bare 'except Exception: return' at line {i + 1}"

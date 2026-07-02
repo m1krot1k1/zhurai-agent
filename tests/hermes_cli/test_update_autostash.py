@@ -39,6 +39,7 @@ def _patch_managed_uv(request):
          patch("hermes_cli.managed_uv.update_managed_uv", side_effect=_fake_update_managed_uv):
         yield
 
+
 def test_stash_local_changes_if_needed_returns_none_when_tree_clean(monkeypatch, tmp_path):
     calls = []
 
@@ -92,7 +93,6 @@ def test_resolve_stash_selector_returns_matching_entry(monkeypatch, tmp_path):
     monkeypatch.setattr(hermes_main.subprocess, "run", fake_run)
 
     assert hermes_main._resolve_stash_selector(["git"], tmp_path, "abc123") == "stash@{1}"
-
 
 
 def test_restore_stashed_changes_prompts_before_applying(monkeypatch, tmp_path, capsys):
@@ -174,7 +174,6 @@ def test_restore_stashed_changes_applies_without_prompt_when_disabled(monkeypatc
     assert "Restore local changes now?" not in capsys.readouterr().out
 
 
-
 def test_print_stash_cleanup_guidance_with_selector(capsys):
     hermes_main._print_stash_cleanup_guidance("abc123", "stash@{2}")
 
@@ -182,7 +181,6 @@ def test_print_stash_cleanup_guidance_with_selector(capsys):
     assert "Check `git status` first" in out
     assert "git stash list --format='%gd %H %s'" in out
     assert "git stash drop stash@{2}" in out
-
 
 
 def test_restore_stashed_changes_keeps_going_when_stash_entry_cannot_be_resolved(monkeypatch, tmp_path, capsys):
@@ -212,7 +210,6 @@ def test_restore_stashed_changes_keeps_going_when_stash_entry_cannot_be_resolved
     assert "Check `git status` first" in out
     assert "git stash list --format='%gd %H %s'" in out
     assert "Look for commit abc123" in out
-
 
 
 def test_restore_stashed_changes_keeps_going_when_drop_fails(monkeypatch, tmp_path, capsys):
@@ -280,7 +277,8 @@ def test_restore_stashed_changes_always_resets_on_conflict(monkeypatch, tmp_path
 
 def test_restore_stashed_changes_auto_resets_non_interactive(monkeypatch, tmp_path, capsys):
     """Non-interactive mode auto-resets without prompting and returns False
-    instead of sys.exit(1) so the update can continue (gateway /update path)."""
+    instead of sys.exit(1) so the update can continue (gateway /update path).
+    """
     calls = []
 
     def fake_run(cmd, **kwargs):
@@ -332,7 +330,7 @@ def test_discard_lockfile_churn_skips_lock_when_package_json_dirty(tmp_path):
 
     def git(*args):
         return subprocess.run(
-            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True
+            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True,
         )
 
     git("init", "-q")
@@ -361,7 +359,7 @@ def test_discard_lockfile_churn_restores_lock_when_package_json_clean(tmp_path):
 
     def git(*args):
         return subprocess.run(
-            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True
+            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True,
         )
 
     git("init", "-q")
@@ -390,7 +388,7 @@ def _setup_update_mocks(monkeypatch, tmp_path):
     monkeypatch.setattr(hermes_main, "_stash_local_changes_if_needed", lambda *a, **kw: None)
     monkeypatch.setattr(hermes_main, "_restore_stashed_changes", lambda *a, **kw: True)
     monkeypatch.setattr(hermes_config, "get_missing_env_vars", lambda required_only=True: [])
-    monkeypatch.setattr(hermes_config, "get_missing_config_fields", lambda: [])
+    monkeypatch.setattr(hermes_config, "get_missing_config_fields", list)
     monkeypatch.setattr(hermes_config, "check_config_version", lambda: (5, 5))
     monkeypatch.setattr(hermes_config, "migrate_config", lambda **kw: {"env_added": [], "config_added": []})
     monkeypatch.setattr(hermes_main, "_refresh_active_lazy_features", lambda: None)
@@ -488,7 +486,6 @@ def test_install_with_optional_fallback_honors_custom_group(monkeypatch):
         calls.append(cmd)
         if cmd[-1] == ".[termux-all]":
             raise CalledProcessError(returncode=1, cmd=cmd)
-        return None
 
     monkeypatch.setattr(hermes_main, "_run_install_with_heartbeat", fake_run_with_heartbeat)
 
@@ -690,7 +687,8 @@ def test_cmd_update_no_checkout_when_already_on_main(monkeypatch, tmp_path):
 def test_cmd_update_fetch_is_scoped_to_target_branch(monkeypatch, tmp_path):
     """The update fetch must name the target branch. A bare `git fetch origin`
     pulls every ref, and this repo has thousands of auto-generated branches, so
-    an unscoped fetch can stall for minutes on a non-single-branch checkout."""
+    an unscoped fetch can stall for minutes on a non-single-branch checkout.
+    """
     _setup_update_mocks(monkeypatch, tmp_path)
     monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/uv" if name == "uv" else None)
 
@@ -783,7 +781,8 @@ def test_cmd_update_skips_stash_restore_when_reset_fails(monkeypatch, tmp_path, 
 def _setup_setting_test(monkeypatch, tmp_path, mode):
     """Common wiring: real stash returns a ref, restore + discard are
     recorded, and load_config reports the given non_interactive_local_changes
-    mode."""
+    mode.
+    """
     _setup_update_mocks(monkeypatch, tmp_path)
     monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/uv" if name == "uv" else None)
     monkeypatch.setattr(
@@ -831,7 +830,8 @@ def test_non_interactive_stash_restores_changes(monkeypatch, tmp_path):
 
 def test_interactive_update_ignores_discard_setting(monkeypatch, tmp_path):
     """An interactive (TTY) terminal update always restores — the discard
-    setting only governs non-interactive updates."""
+    setting only governs non-interactive updates.
+    """
     restore_calls, discard_calls, _ = _setup_setting_test(monkeypatch, tmp_path, "discard")
     # Force an interactive TTY so _non_interactive_update is False even though
     # the config says discard.
@@ -875,7 +875,7 @@ def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
 
     def git(*args):
         return subprocess.run(
-            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True
+            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True,
         )
 
     git("init", "-q")
@@ -898,6 +898,6 @@ def test_bootstrap_marker_not_autostashed_by_update(tmp_path):
     )
     # It must not even register as a dirty/untracked change.
     status = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=tmp_path, capture_output=True, text=True
+        ["git", "status", "--porcelain"], cwd=tmp_path, capture_output=True, text=True,
     ).stdout
     assert ".hermes-bootstrap-complete" not in status

@@ -13,10 +13,10 @@ Example:
 Templates with custom text positioning are in templates.json (10 curated).
 Any of the ~100 popular imgflip templates can also be used by name or ID —
 unknown templates get smart default text positioning based on their box_count.
+
 """
 
 import json
-import os
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -48,7 +48,7 @@ def _fetch_url(url: str, timeout: int = 15) -> bytes:
 
 def load_curated_templates() -> dict:
     """Load templates with hand-tuned text field positions."""
-    with open(TEMPLATES_FILE) as f:
+    with Path(TEMPLATES_FILE).open() as f:
         return json.load(f)
 
 
@@ -68,7 +68,7 @@ def _default_fields(box_count: int) -> list:
     for i in range(box_count):
         y = 0.08 + (0.84 * i / (box_count - 1)) if box_count > 1 else 0.5
         fields.append({
-            "name": f"text{i+1}",
+            "name": f"text{i + 1}",
             "x_pct": 0.5,
             "y_pct": round(y, 2),
             "w_pct": 0.90,
@@ -86,19 +86,19 @@ def fetch_imgflip_templates() -> list:
     if IMGFLIP_CACHE_FILE.exists():
         age = time.time() - IMGFLIP_CACHE_FILE.stat().st_mtime
         if age < IMGFLIP_CACHE_MAX_AGE:
-            with open(IMGFLIP_CACHE_FILE) as f:
+            with Path(IMGFLIP_CACHE_FILE).open() as f:
                 return json.load(f)
 
     try:
         data = json.loads(_fetch_url(IMGFLIP_API))
         memes = data.get("data", {}).get("memes", [])
-        with open(IMGFLIP_CACHE_FILE, "w") as f:
+        with Path(IMGFLIP_CACHE_FILE).open("w") as f:
             json.dump(memes, f)
         return memes
     except Exception as e:
         # If fetch fails and we have stale cache, use it
         if IMGFLIP_CACHE_FILE.exists():
-            with open(IMGFLIP_CACHE_FILE) as f:
+            with Path(IMGFLIP_CACHE_FILE).open() as f:
                 return json.load(f)
         print(f"Warning: could not fetch imgflip templates: {e}", file=sys.stderr)
         return []
@@ -106,7 +106,7 @@ def fetch_imgflip_templates() -> list:
 
 def _slugify(name: str) -> str:
     """Convert a template name to a slug for matching."""
-    return name.lower().replace(" ", "-").replace("'", "").replace("\"", "")
+    return name.lower().replace(" ", "-").replace("'", "").replace('"', "")
 
 
 def resolve_template(identifier: str) -> dict:
@@ -155,7 +155,7 @@ def get_template_image(url: str) -> Image.Image:
     """Download a template image, caching it locally."""
     CACHE_DIR.mkdir(exist_ok=True)
     # Use URL hash as cache key
-    cache_name = url.split("/")[-1]
+    cache_name = url.rsplit("/", maxsplit=1)[-1]
     cache_path = CACHE_DIR / cache_name
 
     # Always cache as PNG to avoid JPEG/RGBA conflicts
@@ -182,15 +182,15 @@ def find_font(size: int) -> ImageFont.FreeTypeFont:
         "/System/Library/Fonts/SFCompact.ttf",
     ]
     for path in candidates:
-        if os.path.exists(path):
+        if Path(path).exists():
             try:
                 return ImageFont.truetype(path, size)
-            except (OSError, IOError):
+            except OSError:
                 continue
     # Last resort: Pillow default
     try:
         return ImageFont.truetype("DejaVuSans-Bold", size)
-    except (OSError, IOError):
+    except OSError:
         return ImageFont.load_default()
 
 
@@ -254,7 +254,7 @@ def draw_outlined_text(
             if dx == 0 and dy == 0:
                 continue
             draw.multiline_text(
-                (tx + dx, ty + dy), wrapped, font=font, fill="black", align=align
+                (tx + dx, ty + dy), wrapped, font=font, fill="black", align=align,
             )
     # Draw main text (white)
     draw.multiline_text((tx, ty), wrapped, font=font, fill="white", align=align)
@@ -299,7 +299,7 @@ def _add_bars(img: Image.Image, texts: list) -> Image.Image:
             return 0
         wrapped = _wrap_text(text, font, int(w * 0.92))
         bbox = ImageDraw.Draw(Image.new("RGB", (1, 1))).multiline_textbbox(
-            (0, 0), wrapped, font=font, align="center"
+            (0, 0), wrapped, font=font, align="center",
         )
         return (bbox[3] - bbox[1]) + padding * 2
 
@@ -364,7 +364,7 @@ def generate_meme(template_id: str, texts: list[str], output_path: str) -> str:
 
 
 def generate_from_image(
-    image_path: str, texts: list[str], output_path: str, use_bars: bool = False
+    image_path: str, texts: list[str], output_path: str, use_bars: bool = False,
 ) -> str:
     """Generate a meme from a custom image (e.g. AI-generated). Returns the path."""
     img = Image.open(image_path).convert("RGBA")

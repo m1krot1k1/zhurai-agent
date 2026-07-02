@@ -18,7 +18,6 @@ import pytest
 
 from tests.tools.conftest import register_all_web_providers
 
-
 # ---------------------------------------------------------------------------
 # SearXNGWebSearchProvider unit tests
 # ---------------------------------------------------------------------------
@@ -58,7 +57,7 @@ class TestSearXNGSearchProviderSearch:
             {"title": "Result A", "url": "https://a.example.com", "content": "Desc A", "score": 0.9},
             {"title": "Result B", "url": "https://b.example.com", "content": "Desc B", "score": 0.7},
             {"title": "Result C", "url": "https://c.example.com", "content": "Desc C", "score": 0.5},
-        ]
+        ],
     }
 
     def _make_mock_response(self, json_data, status_code=200):
@@ -90,10 +89,10 @@ class TestSearXNGSearchProviderSearch:
         from plugins.web.searxng.provider import SearXNGWebSearchProvider
         unordered = {
             "results": [
-                {"title": "Low",  "url": "https://low.example.com",  "content": "", "score": 0.1},
+                {"title": "Low", "url": "https://low.example.com", "content": "", "score": 0.1},
                 {"title": "High", "url": "https://high.example.com", "content": "", "score": 0.99},
-                {"title": "Mid",  "url": "https://mid.example.com",  "content": "", "score": 0.5},
-            ]
+                {"title": "Mid", "url": "https://mid.example.com", "content": "", "score": 0.5},
+            ],
         }
         mock_resp = self._make_mock_response(unordered)
 
@@ -146,7 +145,7 @@ class TestSearXNGSearchProviderSearch:
             "results": [
                 {"title": "No score", "url": "https://noscore.example.com", "content": ""},
                 {"title": "Has score", "url": "https://scored.example.com", "content": "", "score": 0.8},
-            ]
+            ],
         }
         mock_resp = self._make_mock_response(data)
 
@@ -198,6 +197,7 @@ class TestSearXNGSearchProviderSearch:
         mock_resp = self._make_mock_response({"results": []})
 
         calls = []
+
         def capture_get(url, **kwargs):
             calls.append(url)
             return mock_resp
@@ -244,7 +244,7 @@ class TestGetBackendSearXNG:
     def test_auto_detect_picks_searxng_when_only_url_set(self, monkeypatch):
         """When no backend is configured but SEARXNG_URL is set, auto-detect returns it."""
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
         monkeypatch.delenv("FIRECRAWL_API_URL", raising=False)
         monkeypatch.delenv("PARALLEL_API_KEY", raising=False)
@@ -258,7 +258,7 @@ class TestGetBackendSearXNG:
     def test_searxng_does_not_override_higher_priority_provider(self, monkeypatch):
         """Tavily (higher priority than searxng) should win in auto-detect."""
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
         monkeypatch.delenv("FIRECRAWL_API_URL", raising=False)
         monkeypatch.delenv("PARALLEL_API_KEY", raising=False)
@@ -269,10 +269,11 @@ class TestGetBackendSearXNG:
 
     def test_auto_detect_picks_searxng_when_url_only_in_hermes_config(self, monkeypatch):
         """#34290 follow-up: a config-only SEARXNG_URL (absent from process env)
-        must still drive auto-detect via the now config-aware ``_has_env``."""
+        must still drive auto-detect via the now config-aware ``_has_env``.
+        """
         from hermes_cli import config as hermes_config
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
         monkeypatch.delenv("FIRECRAWL_API_URL", raising=False)
         monkeypatch.delenv("PARALLEL_API_KEY", raising=False)
@@ -315,7 +316,7 @@ class TestCheckWebApiKey:
 
     def test_no_credentials_fails(self, monkeypatch):
         from tools import web_tools
-        monkeypatch.setattr(web_tools, "_load_web_config", lambda: {})
+        monkeypatch.setattr(web_tools, "_load_web_config", dict)
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
         monkeypatch.delenv("FIRECRAWL_API_URL", raising=False)
         monkeypatch.delenv("PARALLEL_API_KEY", raising=False)
@@ -347,11 +348,13 @@ class TestSearXNGOnlyExtractCrawlErrors:
 
     def test_web_extract_searxng_returns_clear_error(self, monkeypatch):
         import asyncio
+
         from tools import web_tools
 
         monkeypatch.setattr(web_tools, "_load_web_config", lambda: {"backend": "searxng"})
         monkeypatch.setenv("SEARXNG_URL", "http://localhost:8080")
         monkeypatch.setattr(web_tools, "_is_tool_gateway_ready", lambda: False)
+
         async def _allow_ssrf(_url: str) -> bool:
             return True
 
@@ -359,7 +362,7 @@ class TestSearXNGOnlyExtractCrawlErrors:
         monkeypatch.setattr("tools.interrupt.is_interrupted", lambda: False, raising=False)
 
         result_str = asyncio.get_event_loop().run_until_complete(
-            web_tools.web_extract_tool(["https://example.com"])
+            web_tools.web_extract_tool(["https://example.com"]),
         )
         result = json.loads(result_str)
         assert result["success"] is False

@@ -19,7 +19,6 @@ appear in ``/model`` without a Hermes release.
 
 from unittest.mock import patch
 
-
 from hermes_cli.models import (
     _MODELS_DEV_PREFERRED,
     _PROVIDER_MODELS,
@@ -125,7 +124,6 @@ class TestProviderModelIdsPreferred:
 
         def fake_select(model_list, **_kwargs):
             captured["models"] = model_list
-            return None
 
         with (
             patch("hermes_cli.main._prompt_api_key", return_value=("sk-kimi-test", False)),
@@ -149,7 +147,7 @@ class TestOpenRouterAndNousUnchanged:
         assert "nous" not in _MODELS_DEV_PREFERRED
 
     def test_openrouter_does_not_call_merge(self):
-        """openrouter takes its own live path — merge helper must NOT run."""
+        """Openrouter takes its own live path — merge helper must NOT run."""
         with patch(
             "hermes_cli.models._merge_with_models_dev",
             side_effect=AssertionError("merge should not be called for openrouter"),

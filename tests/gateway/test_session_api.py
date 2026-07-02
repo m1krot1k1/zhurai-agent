@@ -367,7 +367,7 @@ async def test_session_chat_stream_run_completed_carries_turn_transcript(adapter
                             "id": "call_1",
                             "type": "function",
                             "function": {"name": "web_search", "arguments": "{}"},
-                        }
+                        },
                     ],
                 },
                 {"role": "tool", "content": "results", "tool_call_id": "call_1", "tool_name": "web_search"},
@@ -406,7 +406,6 @@ async def test_session_chat_stream_run_completed_carries_turn_transcript(adapter
     assert all(m.get("role") in ("assistant", "tool") for m in messages)
     # The tool call is preserved alongside the intermediate text.
     assert any(m.get("tool_calls") for m in messages)
-
 
 
 @pytest.mark.asyncio

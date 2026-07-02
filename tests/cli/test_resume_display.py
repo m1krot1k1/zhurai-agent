@@ -161,7 +161,7 @@ class TestDisplayResumedHistory:
         # CLI_CONFIG is read at call-time inside _display_resumed_history, so
         # apply the override for the duration of the capture, not just at init.
         with patch.dict(_cli_mod.__dict__, {"CLI_CONFIG": {
-            "display": {"resume_skip_tool_only": False, "resume_display": "full"}
+            "display": {"resume_skip_tool_only": False, "resume_display": "full"},
         }}):
             output = self._capture_display(cli)
 
@@ -237,7 +237,8 @@ class TestDisplayResumedHistory:
 
     def test_last_assistant_response_shown_in_full(self):
         """The last assistant response is shown un-truncated so the user
-        knows where they left off without wasting tokens re-asking."""
+        knows where they left off without wasting tokens re-asking.
+        """
         cli = _make_cli()
         long_text = "X" * 500
         cli.conversation_history = [
@@ -323,7 +324,8 @@ class TestDisplayResumedHistory:
 
     def test_assistant_with_no_content_no_tools_skipped(self):
         """Assistant messages with no visible output (e.g. pure reasoning)
-        are skipped in the recap."""
+        are skipped in the recap.
+        """
         cli = _make_cli()
         cli.conversation_history = [
             {"role": "user", "content": "Hello"},
@@ -513,7 +515,7 @@ class TestDisplayResumedHistory:
                         "id": "call_1",
                         "type": "function",
                         "function": {"name": "terminal", "arguments": '{"command":"ls"}'},
-                    }
+                    },
                 ],
             },
         ]
@@ -687,7 +689,8 @@ class TestInitAgentSkipsPreloaded:
 
     def test_init_agent_skips_db_when_preloaded(self):
         """If conversation_history is already set, _init_agent should not
-        reload from the DB."""
+        reload from the DB.
+        """
         cli = _make_cli(resume="preloaded_session")
         cli.conversation_history = _simple_history()
 

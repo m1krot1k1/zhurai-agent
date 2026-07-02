@@ -28,7 +28,7 @@ class TestRenderNoticeLine:
         )
         assert (
             render_notice_line(
-                AgentNotice(text="✕ Credit access paused · run /credits to top up", level="error")
+                AgentNotice(text="✕ Credit access paused · run /credits to top up", level="error"),
             )
             == "✕ Credit access paused · run /credits to top up"
         )
@@ -59,7 +59,8 @@ class TestRenderNoticeLine:
 def test_real_policy_notices_render_without_doubling():
     """End-to-end regression: every notice evaluate_credits_notices emits already
     carries its glyph, so render_notice_line must return it unchanged (no second
-    glyph prepended) for the messaging push."""
+    glyph prepended) for the messaging push.
+    """
     from agent.credits_tracker import CreditsState, evaluate_credits_notices
 
     def _emitted(uf=None, paid=True, purchased=0):
@@ -94,7 +95,6 @@ def test_real_policy_notices_render_without_doubling():
 
 # ── Delivery seam: a rendered notice line goes out via _deliver_platform_notice ──
 
-import threading
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -137,7 +137,7 @@ class TestDeliverNoticeLine:
         runner = _make_runner_with_adapter(source, adapter)
 
         line = render_notice_line(
-            AgentNotice(text="⚠ Credits 90% used · $20.00 cap", level="warn")
+            AgentNotice(text="⚠ Credits 90% used · $20.00 cap", level="warn"),
         )
         await runner._deliver_platform_notice(source, line)
 
@@ -157,7 +157,7 @@ class TestDeliverNoticeLine:
         runner.config.get_notice_delivery = MagicMock(return_value="private")
 
         line = render_notice_line(
-            AgentNotice(text="✓ Credit access restored", level="success")
+            AgentNotice(text="✓ Credit access restored", level="success"),
         )
         await runner._deliver_platform_notice(source, line)
 
@@ -171,4 +171,3 @@ class TestDeliverNoticeLine:
         runner.adapters = {}
         # Must not raise when the platform has no registered adapter.
         await runner._deliver_platform_notice(source, "• anything")
-

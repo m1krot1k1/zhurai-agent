@@ -102,7 +102,7 @@ class TestEnvFileParsing:
             'QUOTED="quoted-value"\n'
             "SINGLE='single'\n"
             "\n"
-            "BAD_LINE_NO_EQUALS\n"
+            "BAD_LINE_NO_EQUALS\n",
         )
         out = ss.load_env_file(env)
         assert out == {
@@ -126,5 +126,5 @@ class TestEnvFileParsing:
     def test_build_profile_secret_scope(self, tmp_path):
         (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=sk-profile\n")
         assert ss.build_profile_secret_scope(tmp_path) == {
-            "ANTHROPIC_API_KEY": "sk-profile"
+            "ANTHROPIC_API_KEY": "sk-profile",
         }

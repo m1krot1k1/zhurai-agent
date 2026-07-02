@@ -9,14 +9,14 @@ import threading
 from pathlib import Path
 
 from agent.file_safety import get_read_block_error
+from agent.redact import redact_sensitive_text
+from tools import file_state
 from tools.binary_extensions import has_binary_extension
 from tools.file_operations import (
     ShellFileOperations,
     normalize_read_pagination,
     normalize_search_pagination,
 )
-from tools import file_state
-from agent.redact import redact_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,7 @@ def _get_max_read_chars() -> int:
     _max_read_chars_cached = _DEFAULT_MAX_READ_CHARS
     return _max_read_chars_cached
 
+
 # If the total file size exceeds this AND the caller didn't specify a narrow
 # range (limit <= 200), we include a hint encouraging targeted reads.
 _LARGE_FILE_HINT_BYTES = 512_000  # 512 KB
@@ -131,7 +132,7 @@ def _sentinel_free_abs_cwd(raw: str | None) -> str | None:
     if raw.lower() in _TERMINAL_CWD_SENTINELS:
         return None
     expanded = _expand_tilde(raw)
-    if not os.path.isabs(expanded):
+    if not Path(expanded).is_absolute():
         return None
     return expanded
 
@@ -178,7 +179,7 @@ def _get_live_tracking_cwd(task_id: str = "default") -> str | None:
         cached = _file_ops_cache.get(container_key) or _file_ops_cache.get(task_id)
     if cached is not None:
         live_cwd = getattr(getattr(cached, "env", None), "cwd", None) or getattr(
-            cached, "cwd", None
+            cached, "cwd", None,
         )
         if live_cwd:
             return live_cwd
@@ -313,13 +314,13 @@ def _is_blocked_device_path(path: str) -> bool:
         return True
     # /proc/self/fd/0-2 and /proc/<pid>/fd/0-2 are Linux aliases for stdio
     if normalized.startswith("/proc/") and normalized.endswith(
-        ("/fd/0", "/fd/1", "/fd/2")
+        ("/fd/0", "/fd/1", "/fd/2"),
     ):
         return True
     # /proc/*/environ, /proc/*/cmdline, /proc/*/maps can leak secrets,
     # command-line args, and memory layout from the host process (issue #4427)
     if normalized.startswith("/proc/") and normalized.endswith(
-        ("/environ", "/cmdline", "/maps")
+        ("/environ", "/cmdline", "/maps"),
     ):
         return True
     return False
@@ -333,7 +334,7 @@ def _is_blocked_device(filepath: str, base_dir: str | Path | None = None) -> boo
     the final resolved path so aliases to devices cannot bypass the guard.
     """
     expanded = _expand_tilde(filepath)
-    if base_dir is not None and not os.path.isabs(expanded):
+    if base_dir is not None and not Path(expanded).is_absolute():
         expanded = os.path.join(os.fspath(base_dir), expanded)
     normalized = os.path.normpath(expanded)
     if _is_blocked_device_path(normalized):
@@ -346,7 +347,7 @@ def _is_blocked_device(filepath: str, base_dir: str | Path | None = None) -> boo
             target = os.readlink(current)
         except OSError:
             break
-        if not os.path.isabs(target):
+        if not Path(target).is_absolute():
             target = os.path.join(os.path.dirname(current), target)
         target = os.path.normpath(target)
         if _is_blocked_device_path(target):
@@ -444,7 +445,7 @@ def _get_container_mirror_prefix_for_task(task_id: str = "default") -> str | Non
 
         if env is not None:
             if env.__class__.__name__ == "DockerEnvironment" and bool(
-                getattr(env, "_persistent", False)
+                getattr(env, "_persistent", False),
             ):
                 return "/root/.hermes"
             return None
@@ -584,6 +585,7 @@ def _reset_patch_failures(task_id: str, resolved_paths: list) -> None:
             return
         for rp in resolved_paths:
             task_failures.pop(rp, None)
+
 
 # Per-task bounds for the containers inside each _read_tracker[task_id].
 # A CLI session uses one stable task_id for its lifetime; without these
@@ -741,14 +743,19 @@ def _get_file_ops(task_id: str = "default") -> ShellFileOperations:
     parent's container and its cached file_ops. RL/benchmark task_ids with
     a registered env override keep their isolation.
     """
+    import time
+
     from tools.terminal_tool import (
-        _active_environments, _env_lock, _create_environment,
-        _get_env_config, _last_activity, _start_cleanup_thread,
+        _active_environments,
+        _create_environment,
         _creation_locks,
         _creation_locks_lock,
+        _env_lock,
+        _get_env_config,
+        _last_activity,
         _resolve_container_task_id,
+        _start_cleanup_thread,
     )
-    import time
 
     raw_task_id = task_id or "default"
     task_id = _resolve_container_task_id(raw_task_id)
@@ -762,10 +769,9 @@ def _get_file_ops(task_id: str = "default") -> ShellFileOperations:
             if task_id in _active_environments:
                 _last_activity[task_id] = time.time()
                 return cached
-            else:
-                # Environment was cleaned up -- invalidate stale cache entry
-                with _file_ops_lock:
-                    _file_ops_cache.pop(task_id, None)
+            # Environment was cleaned up -- invalidate stale cache entry
+            with _file_ops_lock:
+                _file_ops_cache.pop(task_id, None)
 
     # Need to ensure the environment exists before building file_ops.
     # Acquire per-task lock so only one thread creates the sandbox.
@@ -890,7 +896,11 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
         # ── Structured-document extraction ────────────────────────────
         # Try before the binary-extension guard so .docx/.xlsx can render as text.
         # Malformed documents fall through to the normal path/binary guard.
-        from tools.read_extract import ExtractionError, extract_document_text, is_extractable_document
+        from tools.read_extract import (
+            ExtractionError,
+            extract_document_text,
+            is_extractable_document,
+        )
 
         if is_extractable_document(str(_resolved)):
             try:
@@ -906,7 +916,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
                 result_dict = {
                     "content": file_ops._add_line_numbers(page_text, offset) if page_text else "",
                     "total_lines": total_lines,
-                    "file_size": os.path.getsize(_resolved),
+                    "file_size": Path(_resolved).stat().st_size,
                     "truncated": total_lines > end_line,
                     "extracted_document": True,
                 }
@@ -978,7 +988,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
 
         if cached_mtime is not None:
             try:
-                current_mtime = os.path.getmtime(resolved_str)
+                current_mtime = Path(resolved_str).stat().st_mtime
                 if current_mtime == cached_mtime:
                     # Count repeated stub returns so weak tool-followers that
                     # ignore the "refer to earlier result" hint don't burn
@@ -1086,7 +1096,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
             # 2. Staleness: warn on write/patch if the file changed since
             #    the agent last read it (external edit, concurrent agent, etc.).
             try:
-                _mtime_now = os.path.getmtime(resolved_str)
+                _mtime_now = Path(resolved_str).stat().st_mtime
                 task_data["dedup"][dedup_key] = _mtime_now
                 task_data.setdefault("read_timestamps", {})[resolved_str] = _mtime_now
             except OSError:
@@ -1120,7 +1130,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
                 "path": path,
                 "already_read": count,
             }, ensure_ascii=False)
-        elif count >= 3:
+        if count >= 3:
             result_dict["_warning"] = (
                 f"You have read this exact file region {count} times consecutively. "
                 "The content has not changed since your last read. Use the information you already have. "
@@ -1130,8 +1140,6 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
         return json.dumps(result_dict, ensure_ascii=False)
     except Exception as e:
         return tool_error(str(e))
-
-
 
 
 def reset_file_dedup(task_id: str = None):
@@ -1225,7 +1233,7 @@ def _update_read_timestamp(filepath: str, task_id: str) -> None:
     _invalidate_dedup_for_path(filepath, task_id)
     try:
         resolved = str(_resolve_path_for_task(filepath, task_id))
-        current_mtime = os.path.getmtime(resolved)
+        current_mtime = Path(resolved).stat().st_mtime
     except (OSError, ValueError):
         return
     with _read_tracker_lock:
@@ -1254,7 +1262,7 @@ def _check_file_staleness(filepath: str, task_id: str) -> str | None:
     if read_mtime is None:
         return None  # File was never read — nothing to compare against
     try:
-        current_mtime = os.path.getmtime(resolved)
+        current_mtime = Path(resolved).stat().st_mtime
     except OSError:
         return None  # Can't stat — file may have been deleted, let write handle it
     if current_mtime != read_mtime:
@@ -1287,7 +1295,7 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
         return tool_error(
             "Refusing to write internal read_file display text as file content. "
             "Strip read_file line-number prefixes or reconstruct the intended "
-            "file contents before writing."
+            "file contents before writing.",
         )
     try:
         # Resolve once for the registry lock + stale check.  Failures here
@@ -1360,8 +1368,9 @@ def patch_tool(mode: str = "replace", path: str = None, old_string: str = None,
         _paths_to_check.append(path)
     if mode == "patch" and patch:
         import re as _re
+
         from tools.path_security import has_traversal_component
-        for _m in _re.finditer(r'^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$', patch, _re.MULTILINE):
+        for _m in _re.finditer(r"^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s*(.+)$", patch, _re.MULTILINE):
             v4a_path = _m.group(1).strip()
             # V4A path headers come from patch CONTENT, not the explicit
             # ``path=`` arg — so they're more attacker-influenceable (skill
@@ -1375,7 +1384,7 @@ def patch_tool(mode: str = "replace", path: str = None, old_string: str = None,
                 return tool_error(
                     f"V4A patch header contains '..' traversal: {v4a_path!r}. "
                     "Use the agent's cwd-relative path (no '..') or an absolute "
-                    "path in '*** Update File:' / '*** Add File:' / '*** Delete File:' headers."
+                    "path in '*** Update File:' / '*** Add File:' / '*** Delete File:' headers.",
                 )
             _paths_to_check.append(v4a_path)
     for _p in _paths_to_check:
@@ -1561,11 +1570,11 @@ def search_tool(pattern: str, target: str = "content", path: str = ".",
         file_ops = _get_file_ops(task_id)
         result = file_ops.search(
             pattern=pattern, path=path, target=target, file_glob=file_glob,
-            limit=limit, offset=offset, output_mode=output_mode, context=context
+            limit=limit, offset=offset, output_mode=output_mode, context=context,
         )
-        if hasattr(result, 'matches'):
+        if hasattr(result, "matches"):
             for m in result.matches:
-                if hasattr(m, 'content') and m.content:
+                if hasattr(m, "content") and m.content:
                     m.content = redact_sensitive_text(m.content, code_file=True)
         result_dict = result.to_dict(densify=True)
 
@@ -1586,8 +1595,6 @@ def search_tool(pattern: str, target: str = "content", path: str = ".",
         return tool_error(str(e))
 
 
-
-
 # ---------------------------------------------------------------------------
 # Schemas + Registry
 # ---------------------------------------------------------------------------
@@ -1599,6 +1606,7 @@ def _check_file_reqs():
     from tools import check_file_requirements
     return check_file_requirements()
 
+
 READ_FILE_SCHEMA = {
     "name": "read_file",
     "description": "Read a text file with line numbers and pagination. Use this instead of cat/head/tail in terminal. Output format: 'LINE_NUM|CONTENT'. Suggests similar filenames if not found. Use offset and limit for large files. Reads exceeding ~100K characters are rejected; use offset and limit to read specific sections of large files. Jupyter notebooks (.ipynb), Word documents (.docx), and Excel workbooks (.xlsx) are auto-extracted to readable text. NOTE: Cannot read images or other binary files — use vision_analyze for images.",
@@ -1607,10 +1615,10 @@ READ_FILE_SCHEMA = {
         "properties": {
             "path": {"type": "string", "description": "Path to the file to read (absolute, relative, or ~/path)"},
             "offset": {"type": "integer", "description": "Line number to start reading from (1-indexed, default: 1)", "default": 1, "minimum": 1},
-            "limit": {"type": "integer", "description": "Maximum number of lines to read (default: 500, max: 2000)", "default": 500, "maximum": 2000}
+            "limit": {"type": "integer", "description": "Maximum number of lines to read (default: 500, max: 2000)", "default": 500, "maximum": 2000},
         },
-        "required": ["path"]
-    }
+        "required": ["path"],
+    },
 }
 
 WRITE_FILE_SCHEMA = {
@@ -1627,8 +1635,8 @@ WRITE_FILE_SCHEMA = {
                 "default": False,
             },
         },
-        "required": ["path", "content"]
-    }
+        "required": ["path", "content"],
+    },
 }
 
 PATCH_SCHEMA = {
@@ -1695,10 +1703,10 @@ SEARCH_FILES_SCHEMA = {
             "limit": {"type": "integer", "description": "Maximum number of results to return (default: 50)", "default": 50},
             "offset": {"type": "integer", "description": "Skip first N results for pagination (default: 0)", "default": 0},
             "output_mode": {"type": "string", "enum": ["content", "files_only", "count"], "description": "Output format for grep mode: 'content' shows matching lines with line numbers, 'files_only' lists file paths, 'count' shows match counts per file", "default": "content"},
-            "context": {"type": "integer", "description": "Number of context lines before and after each match (grep mode only)", "default": 0}
+            "context": {"type": "integer", "description": "Number of context lines before and after each match (grep mode only)", "default": 0},
         },
-        "required": ["pattern"]
-    }
+        "required": ["pattern"],
+    },
 }
 
 
@@ -1712,7 +1720,7 @@ def _handle_write_file(args, **kw):
     if not args.get("path") or not isinstance(args.get("path"), str):
         return tool_error(
             "write_file: missing required field 'path'. Re-emit the tool call with "
-            "both 'path' and 'content' set."
+            "both 'path' and 'content' set.",
         )
     if "content" not in args:
         return tool_error(
@@ -1720,12 +1728,12 @@ def _handle_write_file(args, **kw):
             "path but no content argument — this is almost always a dropped-arg bug "
             "under context pressure. Re-emit the tool call with the full content "
             "payload, or use execute_code with hermes_tools.write_file() for very "
-            "large files."
+            "large files.",
         )
     if not isinstance(args["content"], str):
         return tool_error(
             f"write_file: 'content' must be a string, got "
-            f"{type(args['content']).__name__}."
+            f"{type(args['content']).__name__}.",
         )
     return write_file_tool(
         path=args["path"], content=args["content"], task_id=tid,

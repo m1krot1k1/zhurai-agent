@@ -9,11 +9,11 @@ so we can see exactly where the interrupt gets lost.
 """
 
 import logging
+import os
 import queue
 import sys
 import threading
 import time
-import os
 
 # Force stderr logging so redirect_stdout doesn't swallow it
 logging.basicConfig(level=logging.DEBUG, stream=sys.stderr,
@@ -23,15 +23,17 @@ log = logging.getLogger("interrupt_test")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from unittest.mock import MagicMock, patch
+
 from run_agent import AIAgent, IterationBudget
 from tools.interrupt import set_interrupt
+
 
 def make_slow_response(delay=2.0):
     """API response that takes a while."""
     def create(**kwargs):
-        log.info(f"   🌐 Mock API call starting (will take {delay}s)...")
+        log.info("   🌐 Mock API call starting (will take %ss)...", delay)
         time.sleep(delay)
-        log.info(f"   🌐 Mock API call completed")
+        log.info("   🌐 Mock API call completed")
         resp = MagicMock()
         resp.choices = [MagicMock()]
         resp.choices[0].message.content = "Done with the task"
@@ -115,7 +117,7 @@ def main() -> int:
                 original_init(self_agent, *a, **kw)
                 child_running.set()
                 log.info(
-                    f"🟡 Child started, parent._active_children = {len(parent._active_children)}"
+                    f"🟡 Child started, parent._active_children = {len(parent._active_children)}",
                 )
 
             with patch.object(AIAgent, "__init__", patched_init):
@@ -169,7 +171,7 @@ def main() -> int:
         except queue.Empty:
             poll_count += 1
             if poll_count % 20 == 0:  # Log every 2s
-                log.info(f"   Still polling ({poll_count} iterations)...")
+                log.info("   Still polling (%s iterations)...", poll_count)
 
     # ─── Wait for agent to finish ───
     log.info("⏳ Waiting for agent_thread to join...")

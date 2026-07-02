@@ -8,7 +8,7 @@ from cron.jobs import create_job, get_job, list_jobs
 from hermes_cli.cron import cron_command
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_cron_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("cron.jobs.CRON_DIR", tmp_path / "cron")
     monkeypatch.setattr("cron.jobs.JOBS_FILE", tmp_path / "cron" / "jobs.json")
@@ -56,7 +56,7 @@ class TestCronCommandLifecycle:
                 skill=None,
                 skills=["maps", "blogwatcher"],
                 clear_skills=False,
-            )
+            ),
         )
         updated = get_job(job["id"])
         assert updated["skills"] == ["maps", "blogwatcher"]
@@ -76,7 +76,7 @@ class TestCronCommandLifecycle:
                 skill=None,
                 skills=None,
                 clear_skills=True,
-            )
+            ),
         )
         cleared = get_job(job["id"])
         assert cleared["skills"] == []
@@ -96,7 +96,7 @@ class TestCronCommandLifecycle:
                 repeat=None,
                 skill=None,
                 skills=["blogwatcher", "maps"],
-            )
+            ),
         )
         out = capsys.readouterr().out
         assert "Created job" in out
@@ -108,7 +108,8 @@ class TestCronCommandLifecycle:
 
     def test_list_does_not_crash_when_repeat_is_null(self, tmp_cron_dir, capsys):
         """A one-shot job can be persisted with ``"repeat": null``. `cron
-        list` must render it as ∞ rather than crashing on .get(...)\\.get."""
+        list` must render it as ∞ rather than crashing on .get(...)\\.get.
+        """
         from cron.jobs import load_jobs, save_jobs
 
         create_job(prompt="One shot", schedule="every 1h")

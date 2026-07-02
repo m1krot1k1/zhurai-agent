@@ -3,7 +3,7 @@
 import json
 from types import SimpleNamespace
 
-import tools.terminal_tool as terminal_tool
+from tools import terminal_tool
 
 
 def _minimal_terminal_config(cwd="/default"):
@@ -69,7 +69,7 @@ def test_explicit_workdir_still_wins_over_registered_task_cwd(monkeypatch):
             command="pwd",
             task_id=task_id,
             workdir="/explicit/workdir",
-        )
+        ),
     )
 
     assert result["exit_code"] == 0
@@ -145,7 +145,7 @@ def test_background_command_prefers_live_env_cwd_over_init_time_cwd(monkeypatch)
             command="sleep 1",
             task_id=task_id,
             background=True,
-        )
+        ),
     )
 
     assert result["exit_code"] == 0
@@ -186,13 +186,14 @@ def test_registering_cwd_override_updates_live_env_cwd(monkeypatch):
 
     # A subsequent command resolves to the new cwd (env.cwd precedence).
     assert terminal_tool._resolve_command_cwd(
-        workdir=None, env=fake_env, default_cwd="/workspace/config"
+        workdir=None, env=fake_env, default_cwd="/workspace/config",
     ) == "/workspace/new"
 
 
 def test_registering_cwd_override_noop_when_no_live_env(monkeypatch):
     """Registering an override before the env exists must not crash; the cwd
-    is applied at env creation time instead."""
+    is applied at env creation time instead.
+    """
     monkeypatch.setattr(terminal_tool, "_active_environments", {})
     monkeypatch.setattr(terminal_tool, "_task_env_overrides", {})
 
@@ -204,7 +205,8 @@ def test_registering_cwd_override_noop_when_no_live_env(monkeypatch):
 
 def test_registering_non_cwd_override_leaves_live_env_cwd_untouched(monkeypatch):
     """A non-cwd override (e.g. a per-task Modal image) must not disturb the
-    live env's cwd."""
+    live env's cwd.
+    """
 
     class FakeEnv:
         env = {}
@@ -236,7 +238,7 @@ def test_safe_getcwd_falls_back_to_terminal_cwd_when_cwd_deleted(monkeypatch):
 
 def test_safe_getcwd_falls_back_to_home_when_no_terminal_cwd(monkeypatch):
     def _boom():
-        raise FileNotFoundError()
+        raise FileNotFoundError
 
     monkeypatch.setattr(terminal_tool.os, "getcwd", _boom)
     monkeypatch.delenv("TERMINAL_CWD", raising=False)

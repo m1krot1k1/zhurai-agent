@@ -58,7 +58,7 @@ def test_inline_noqa_marker_exempts_a_call():
     """The guard honors an inline 'noqa: subprocess-stdin' exemption marker."""
     guard = _load_guard()
     flagged = guard.find_subprocess_calls(
-        "import subprocess\nsubprocess.run(['ls'])\n", "x.py"
+        "import subprocess\nsubprocess.run(['ls'])\n", "x.py",
     )
     assert len(flagged) == 1, "unmarked missing-stdin call should be flagged"
 
@@ -67,4 +67,3 @@ def test_inline_noqa_marker_exempts_a_call():
         "x.py",
     )
     assert exempt == [], "inline marker should exempt the call"
-

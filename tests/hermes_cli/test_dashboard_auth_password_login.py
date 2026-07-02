@@ -38,7 +38,6 @@ from hermes_cli.dashboard_auth.login_page import render_login_html
 from hermes_cli.dashboard_auth.routes import _reset_password_rate_limit
 from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
 
-
 # ---------------------------------------------------------------------------
 # Test password provider — minimal, in-memory, signed tokens.
 # ---------------------------------------------------------------------------
@@ -68,7 +67,7 @@ def _unsign(secret: bytes, token: str):
         blob = base64.urlsafe_b64decode(token.encode())
         raw, sig = blob[:-32], blob[-32:]
         if not hmac.compare_digest(
-            sig, hmac.new(secret, raw, hashlib.sha256).digest()
+            sig, hmac.new(secret, raw, hashlib.sha256).digest(),
         ):
             return None
         return json.loads(raw)
@@ -187,7 +186,7 @@ class TestProtocolExtension:
         # rather than silently accepting any credentials.
         with pytest.raises(NotImplementedError):
             StubAuthProvider().complete_password_login(
-                username="x", password="y"
+                username="x", password="y",
             )
 
 
@@ -210,7 +209,7 @@ class TestProviderListFlag:
         web_server.app.state.auth_required = True
         try:
             client = TestClient(
-                web_server.app, base_url="https://fly-app.fly.dev"
+                web_server.app, base_url="https://fly-app.fly.dev",
             )
             resp = client.get("/api/auth/providers")
             prov = {p["name"]: p for p in resp.json()["providers"]}
@@ -227,7 +226,7 @@ class TestProviderListFlag:
 
 class TestPasswordLoginRoute:
     def test_valid_credentials_set_session_cookies_and_return_next(
-        self, gated_app
+        self, gated_app,
     ):
         resp = gated_app.post(
             "/auth/password-login",
@@ -295,7 +294,7 @@ class TestPasswordLoginRoute:
         web_server.app.state.auth_required = True
         try:
             client = TestClient(
-                web_server.app, base_url="https://fly-app.fly.dev"
+                web_server.app, base_url="https://fly-app.fly.dev",
             )
             resp = client.post(
                 "/auth/password-login",
@@ -357,7 +356,7 @@ class TestPasswordSessionRefresh:
         web_server.app.state.auth_required = True
         try:
             client = TestClient(
-                web_server.app, base_url="https://fly-app.fly.dev"
+                web_server.app, base_url="https://fly-app.fly.dev",
             )
             login = client.post(
                 "/auth/password-login",

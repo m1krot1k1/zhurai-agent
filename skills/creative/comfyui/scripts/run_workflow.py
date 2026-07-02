@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-run_workflow.py — Inject parameters into a ComfyUI workflow, submit it, monitor
+"""run_workflow.py — Inject parameters into a ComfyUI workflow, submit it, monitor
 execution, and download outputs.
 
 Improvements over v1:
@@ -59,18 +58,30 @@ from urllib.parse import urlencode, urlparse
 
 # Local import — _common.py sits next to this script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DEFAULT_LOCAL_HOST, ENV_API_KEY,
-    coerce_seed, emit_json, http_get, http_post, http_request,
-    is_cloud_host, is_link, log, looks_like_video_workflow,
-    media_type_from_filename, new_client_id, resolve_api_key, resolve_url,
-    safe_path_join, unwrap_workflow,
+from _common import (
+    DEFAULT_LOCAL_HOST,
+    ENV_API_KEY,
+    coerce_seed,
+    emit_json,
+    http_get,
+    http_post,
+    http_request,
+    is_cloud_host,
+    is_link,
+    log,
+    looks_like_video_workflow,
+    media_type_from_filename,
+    new_client_id,
+    resolve_api_key,
+    resolve_url,
+    safe_path_join,
+    unwrap_workflow,
 )
-
 
 # =============================================================================
 # Runner
 # =============================================================================
+
 
 class WorkflowRunError(Exception):
     """Raised when a workflow run fails (validation, execution, timeout)."""
@@ -204,7 +215,7 @@ class ComfyRunner:
                     s = data.get("status")
                     if s == "completed":
                         return {"status": "success", "data": data}
-                    if s in {"failed",}:
+                    if s in {"failed"}:
                         return {"status": "error", "data": data}
                     if s == "cancelled":
                         return {"status": "cancelled", "data": data}
@@ -444,13 +455,13 @@ class ComfyRunner:
 
 def _inline_schema(workflow: dict) -> dict:
     """Generate schema using the sibling extract_schema module."""
-    from extract_schema import extract_schema  # noqa: WPS433
+    from extract_schema import extract_schema
     return extract_schema(workflow)
 
 
 def load_schema(schema_path: str | None, workflow: dict) -> dict:
     if schema_path:
-        with open(schema_path) as f:
+        with Path(schema_path).open() as f:
             return json.load(f)
     return _inline_schema(workflow)
 
@@ -491,7 +502,7 @@ def inject_params(
         if is_link(cur):
             warnings.append(
                 f"parameter '{name}' targets {nid}.{field} which is currently a link; "
-                f"refusing to overwrite (set the schema to point at the source node instead)"
+                f"refusing to overwrite (set the schema to point at the source node instead)",
             )
             continue
         node["inputs"][field] = value
@@ -508,7 +519,8 @@ def download_outputs(
     *, preserve_subfolder: bool = True, overwrite: bool = False,
 ) -> list[dict]:
     """Walk the outputs dict and download every file. Cloud uses `video` (singular);
-    local uses `videos` (plural). We accept both."""
+    local uses `videos` (plural). We accept both.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     downloaded: list[dict] = []
 

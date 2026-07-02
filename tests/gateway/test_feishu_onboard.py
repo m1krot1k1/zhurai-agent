@@ -1,7 +1,8 @@
 """Tests for plugins.platforms.feishu.adapter — Feishu scan-to-create registration."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -136,7 +137,7 @@ class TestPollRegistration:
             "user_info": {"open_id": "ou_owner", "tenant_brand": "feishu"},
         })
         result = _poll_registration(
-            device_code="dc_123", interval=1, expire_in=60, domain="feishu"
+            device_code="dc_123", interval=1, expire_in=60, domain="feishu",
         )
         assert result is not None
         assert result["app_id"] == "cli_app123"
@@ -164,7 +165,7 @@ class TestPollRegistration:
         mock_urlopen_fn.side_effect = [pending_resp, success_resp]
 
         result = _poll_registration(
-            device_code="dc_123", interval=0, expire_in=60, domain="feishu"
+            device_code="dc_123", interval=0, expire_in=60, domain="feishu",
         )
         assert result is not None
         assert result["domain"] == "lark"
@@ -184,7 +185,7 @@ class TestPollRegistration:
             "user_info": {"open_id": "ou_lark_direct", "tenant_brand": "lark"},
         })
         result = _poll_registration(
-            device_code="dc_123", interval=1, expire_in=60, domain="feishu"
+            device_code="dc_123", interval=1, expire_in=60, domain="feishu",
         )
         assert result is not None
         assert result["app_id"] == "cli_lark_direct"
@@ -203,7 +204,7 @@ class TestPollRegistration:
             "error": "access_denied",
         })
         result = _poll_registration(
-            device_code="dc_123", interval=1, expire_in=60, domain="feishu"
+            device_code="dc_123", interval=1, expire_in=60, domain="feishu",
         )
         assert result is None
 
@@ -219,7 +220,7 @@ class TestPollRegistration:
             "error": "authorization_pending",
         })
         result = _poll_registration(
-            device_code="dc_123", interval=1, expire_in=1, domain="feishu"
+            device_code="dc_123", interval=1, expire_in=1, domain="feishu",
         )
         assert result is None
 
@@ -236,7 +237,7 @@ class TestPollRegistration:
             "error": "authorization_pending",
         })
         result = _poll_registration(
-            device_code="dc_123", interval=1, expire_in=1, domain="feishu"
+            device_code="dc_123", interval=1, expire_in=1, domain="feishu",
         )
 
         assert result is None
@@ -306,8 +307,9 @@ class TestProbeBot:
     @patch("plugins.platforms.feishu.adapter.FEISHU_AVAILABLE", False)
     @patch("plugins.platforms.feishu.adapter.urlopen")
     def test_http_fallback_returns_none_on_network_error(self, mock_urlopen_fn):
-        from plugins.platforms.feishu.adapter import probe_bot
         from urllib.error import URLError
+
+        from plugins.platforms.feishu.adapter import probe_bot
 
         mock_urlopen_fn.side_effect = URLError("connection refused")
         result = probe_bot("cli_app", "secret", "feishu")
@@ -323,7 +325,7 @@ class TestQrRegister:
     @patch("plugins.platforms.feishu.adapter._begin_registration")
     @patch("plugins.platforms.feishu.adapter._init_registration")
     def test_qr_register_success_flow(
-        self, mock_init, mock_begin, mock_poll, mock_render, mock_probe
+        self, mock_init, mock_begin, mock_poll, mock_render, mock_probe,
     ):
         from plugins.platforms.feishu.adapter import qr_register
 
@@ -363,7 +365,7 @@ class TestQrRegister:
     @patch("plugins.platforms.feishu.adapter._begin_registration")
     @patch("plugins.platforms.feishu.adapter._init_registration")
     def test_qr_register_returns_none_on_poll_failure(
-        self, mock_init, mock_begin, mock_poll, mock_render
+        self, mock_init, mock_begin, mock_poll, mock_render,
     ):
         from plugins.platforms.feishu.adapter import qr_register
 
@@ -384,8 +386,9 @@ class TestQrRegister:
     @patch("plugins.platforms.feishu.adapter._init_registration")
     def test_qr_register_returns_none_on_network_error(self, mock_init):
         """URLError (network down) is an expected failure → None."""
-        from plugins.platforms.feishu.adapter import qr_register
         from urllib.error import URLError
+
+        from plugins.platforms.feishu.adapter import qr_register
 
         mock_init.side_effect = URLError("DNS resolution failed")
         result = qr_register()
@@ -415,7 +418,7 @@ class TestQrRegister:
     @patch("plugins.platforms.feishu.adapter._begin_registration")
     @patch("plugins.platforms.feishu.adapter._init_registration")
     def test_qr_register_returns_none_when_begin_missing_device_code(
-        self, mock_init, mock_begin, mock_render
+        self, mock_init, mock_begin, mock_render,
     ):
         """Server returns begin response without device_code → RuntimeError → None."""
         from plugins.platforms.feishu.adapter import qr_register
@@ -430,7 +433,7 @@ class TestQrRegister:
     @patch("plugins.platforms.feishu.adapter._begin_registration")
     @patch("plugins.platforms.feishu.adapter._init_registration")
     def test_qr_register_succeeds_even_when_probe_fails(
-        self, mock_init, mock_begin, mock_poll, mock_render, mock_probe
+        self, mock_init, mock_begin, mock_poll, mock_render, mock_probe,
     ):
         """Registration succeeds but probe fails → result with bot_name=None."""
         from plugins.platforms.feishu.adapter import qr_register

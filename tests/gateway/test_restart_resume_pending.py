@@ -48,7 +48,6 @@ from tests.gateway.restart_test_helpers import (
     make_restart_source,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -136,12 +135,12 @@ def _simulate_note_injection(
     is_resume_pending = bool(
         resume_entry is not None
         and getattr(resume_entry, "resume_pending", False)
-        and interruption_is_fresh
+        and interruption_is_fresh,
     )
     has_fresh_tool_tail = bool(
         agent_history
         and agent_history[-1].get("role") == "tool"
-        and interruption_is_fresh
+        and interruption_is_fresh,
     )
 
     if is_resume_pending:
@@ -280,7 +279,7 @@ class TestMarkResumePending:
         assert store.mark_resume_pending("no-such-key") is False
 
     def test_does_not_override_suspended(self, tmp_path):
-        """suspended wins — mark_resume_pending is a no-op on a suspended entry."""
+        """Suspended wins — mark_resume_pending is a no-op on a suspended entry."""
         store = _make_store(tmp_path)
         source = _make_source()
         entry = store.get_or_create_session(source)
@@ -366,7 +365,8 @@ class TestGetOrCreateResumePending:
 
     def test_suspended_overrides_resume_pending(self, tmp_path):
         """Terminal escalation: a session that somehow has BOTH flags must
-        behave like ``suspended`` — forced wipe + auto_reset_reason."""
+        behave like ``suspended`` — forced wipe + auto_reset_reason.
+        """
         store = _make_store(tmp_path)
         source = _make_source()
         first = store.get_or_create_session(source)
@@ -469,7 +469,8 @@ class TestResumePendingSystemNote:
 
     def test_resume_pending_fires_without_tool_tail(self):
         """Key improvement over PR #9934: the restart-resume note fires
-        even when the transcript's last role is NOT ``tool``."""
+        even when the transcript's last role is NOT ``tool``.
+        """
         entry = self._pending_entry()
         history = [
             {"role": "user", "content": "run a long thing", "timestamp": time.time() - 10},
@@ -482,7 +483,8 @@ class TestResumePendingSystemNote:
 
     def test_resume_pending_subsumes_tool_tail_note(self):
         """When BOTH conditions are true, the restart-resume note wins —
-        no duplicate notes."""
+        no duplicate notes.
+        """
         entry = self._pending_entry()
         history = [
             {"role": "assistant", "content": None, "tool_calls": [
@@ -644,7 +646,8 @@ class TestResumePendingSystemNote:
 
     def test_legacy_history_without_timestamps_still_injects(self):
         """Transcripts predating timestamp persistence must keep the old
-        behaviour — freshness unknown → treat as fresh."""
+        behaviour — freshness unknown → treat as fresh.
+        """
         history = [
             {"role": "assistant", "content": None, "tool_calls": [
                 {"id": "c1", "function": {"name": "x", "arguments": "{}"}},
@@ -789,7 +792,8 @@ class TestFreshnessHelpers:
 
     def test_last_transcript_timestamp_row_without_timestamp(self):
         """Legacy transcript row (no timestamp) returns None → caller
-        treats as fresh."""
+        treats as fresh.
+        """
         history = [
             {"role": "user", "content": "hi"},
             {"role": "assistant", "content": "hey"},
@@ -823,7 +827,8 @@ class TestFreshnessHelpers:
 async def test_drain_timeout_marks_resume_pending():
     """End-to-end: a drain timeout during gateway stop should flag every
     active session as resume_pending BEFORE the interrupt fires, so the
-    next startup's suspend_recently_active() does not destroy them."""
+    next startup's suspend_recently_active() does not destroy them.
+    """
     runner, adapter = make_restart_runner()
     adapter.disconnect = AsyncMock()
     runner._restart_drain_timeout = 0.05
@@ -842,7 +847,7 @@ async def test_drain_timeout_marks_resume_pending():
     runner.session_store = session_store
 
     with patch("gateway.status.remove_pid_file"), patch(
-        "gateway.status.write_runtime_status"
+        "gateway.status.write_runtime_status",
     ):
         await runner.stop()
 
@@ -869,7 +874,7 @@ async def test_drain_timeout_uses_restart_reason_when_restarting():
     runner.session_store = session_store
 
     with patch("gateway.status.remove_pid_file"), patch(
-        "gateway.status.write_runtime_status"
+        "gateway.status.write_runtime_status",
     ):
         await runner.stop(restart=True, detached_restart=False, service_restart=True)
 
@@ -904,7 +909,7 @@ async def test_drain_timeout_skips_pending_sentinel_sessions():
     runner.session_store = session_store
 
     with patch("gateway.status.remove_pid_file"), patch(
-        "gateway.status.write_runtime_status"
+        "gateway.status.write_runtime_status",
     ):
         await runner.stop()
 
@@ -997,7 +1002,7 @@ async def test_startup_auto_resume_skips_stale_entries():
     runner, adapter = make_restart_runner()
     source = make_restart_source(chat_id="stale-chat")
     stale_marker = datetime.now() - timedelta(
-        seconds=_auto_continue_freshness_window() + 60
+        seconds=_auto_continue_freshness_window() + 60,
     )
     stale_entry = SessionEntry(
         session_key="agent:main:telegram:dm:stale-chat",
@@ -1022,7 +1027,7 @@ async def test_startup_auto_resume_skips_stale_entries():
 
 @pytest.mark.asyncio
 async def test_startup_auto_resume_skips_suspended_and_originless():
-    """suspended entries and entries with no origin are excluded."""
+    """Suspended entries and entries with no origin are excluded."""
     runner, adapter = make_restart_runner()
     source = make_restart_source(chat_id="ok")
     suspended_entry = SessionEntry(
@@ -1170,11 +1175,12 @@ async def test_reconnect_reschedules_pending_after_late_platform_connect():
 @pytest.mark.asyncio
 async def test_reconnect_reschedule_is_platform_scoped():
     """The platform filter limits the pass to that platform's sessions, so
-    reconnecting one platform never resumes another's pending session."""
+    reconnecting one platform never resumes another's pending session.
+    """
     runner, adapter = make_restart_runner()
     tg_source = make_restart_source(chat_id="tg-chat")
     discord_source = SessionSource(
-        platform=Platform.DISCORD, chat_id="dc-chat", chat_type="dm", user_id="u1"
+        platform=Platform.DISCORD, chat_id="dc-chat", chat_type="dm", user_id="u1",
     )
     tg_entry = SessionEntry(
         session_key="agent:main:telegram:dm:tg-chat",
@@ -1222,7 +1228,8 @@ async def test_reconnect_reschedule_is_platform_scoped():
 async def test_auto_resume_skips_sessions_with_running_agent():
     """A session already being resumed (agent in-flight) is not scheduled
     again — guards against a double resume when a platform reconnects while a
-    startup-scheduled resume is still running."""
+    startup-scheduled resume is still running.
+    """
     runner, adapter = make_restart_runner()
     source = make_restart_source(chat_id="inflight-chat")
     pending_entry = SessionEntry(
@@ -1336,7 +1343,8 @@ async def test_startup_restore_waits_for_resume_before_draining_inbound():
 async def test_restart_banner_uses_try_to_resume_wording():
     """The notification sent before drain should hedge the resume promise
     — the session-continuity fix is best-effort (stuck-loop counter can
-    still escalate to suspended)."""
+    still escalate to suspended).
+    """
     runner, adapter = make_restart_runner()
     runner._restart_requested = True
     runner._running_agents["agent:main:telegram:dm:999"] = MagicMock()
@@ -1363,7 +1371,7 @@ async def test_restart_notifies_home_channel_even_without_active_sessions():
 
     assert adapter.sent == [
         "⚠️ Gateway restarting — Your current task will be interrupted. "
-        "Send any message after restart and I'll try to resume where you left off."
+        "Send any message after restart and I'll try to resume where you left off.",
     ]
 
 
@@ -1395,7 +1403,7 @@ async def test_restart_home_channel_notification_not_deduped_across_threads():
             chat_type="group",
             user_id="u1",
             thread_id="topic-7",
-        )
+        ),
     )
     runner._running_agents[session_key] = MagicMock()
     runner.config.platforms[Platform.TELEGRAM].home_channel = HomeChannel(
@@ -1436,14 +1444,16 @@ class TestStuckLoopEscalation:
     """The existing .restart_failure_counts counter (PR #7536) remains the
     single source of terminal escalation — no parallel counter on
     SessionEntry was added.  After the configured threshold, the startup
-    path flips suspended=True which overrides resume_pending."""
+    path flips suspended=True which overrides resume_pending.
+    """
 
     def test_escalation_via_stuck_loop_counter_overrides_resume_pending(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Simulate a session that keeps getting restart-interrupted and
         hits the stuck-loop threshold: next startup should force it to
-        fresh-session despite resume_pending being set."""
+        fresh-session despite resume_pending being set.
+        """
         import json
 
         from gateway.run import GatewayRunner
@@ -1472,10 +1482,11 @@ class TestStuckLoopEscalation:
         assert second.auto_reset_reason == "suspended"
 
     def test_successful_turn_flow_clears_both_counter_and_resume_pending(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """The gateway's post-turn cleanup should clear both signals so a
-        future restart-interrupt starts with a fresh counter."""
+        future restart-interrupt starts with a fresh counter.
+        """
         import json
 
         from gateway.run import GatewayRunner
@@ -1499,7 +1510,7 @@ class TestStuckLoopEscalation:
         assert not counts_file.exists()
 
     def test_increment_restart_failure_counts_uses_atomic_json_write(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         from gateway.run import GatewayRunner
 
@@ -1522,11 +1533,11 @@ class TestStuckLoopEscalation:
                 tmp_path / ".restart_failure_counts",
                 {session_key: 1},
                 {"indent": None},
-            )
+            ),
         ]
 
     def test_clear_restart_failure_count_uses_atomic_json_write_when_entries_remain(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         import json
 
@@ -1557,7 +1568,7 @@ class TestStuckLoopEscalation:
                 tmp_path / ".restart_failure_counts",
                 {other_key: 1},
                 {"indent": None},
-            )
+            ),
         ]
 
 
@@ -1699,7 +1710,7 @@ async def test_auto_resume_runs_agent_exactly_once_through_full_path():
     from gateway.run import GatewayRunner
 
     runner._handle_message = GatewayRunner._handle_message.__get__(
-        runner, GatewayRunner
+        runner, GatewayRunner,
     )
     runner._release_running_agent_state = (
         GatewayRunner._release_running_agent_state.__get__(runner, GatewayRunner)
@@ -1730,7 +1741,7 @@ async def test_auto_resume_runs_agent_exactly_once_through_full_path():
     adapter._keep_typing = AsyncMock()
     adapter._stop_typing_refresh = AsyncMock()
     adapter._send_with_retry = AsyncMock(
-        return_value=SendResult(success=True, message_id="1")
+        return_value=SendResult(success=True, message_id="1"),
     )
     adapter._run_processing_hook = AsyncMock()
 

@@ -6,7 +6,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-import hermes_cli.gateway as gateway
+from hermes_cli import gateway
 
 
 def _install_fake_gateway_run(monkeypatch, start_gateway):
@@ -26,7 +26,7 @@ def _install_fake_gateway_run(monkeypatch, start_gateway):
     # for the developer).
     monkeypatch.setattr(gateway, "supports_systemd_services", lambda: False)
     monkeypatch.setattr(
-        gateway, "refresh_systemd_unit_if_needed", lambda system=False: False
+        gateway, "refresh_systemd_unit_if_needed", lambda system=False: False,
     )
     # Neutralize the supervised-gateway conflict guard by default so these
     # end-to-end tests don't trip over a launchd/systemd gateway that happens
@@ -125,7 +125,7 @@ def _clear_supervisor_markers(monkeypatch):
 
 def _running_snapshot(manager="systemd (user)"):
     return gateway.GatewayRuntimeSnapshot(
-        manager=manager, service_installed=True, service_running=True
+        manager=manager, service_installed=True, service_running=True,
     )
 
 
@@ -170,7 +170,7 @@ def test_run_gateway_force_overrides_supervised_conflict(monkeypatch):
 
 
 def test_run_gateway_allows_service_managed_startup(monkeypatch):
-    """systemd's own ExecStart (INVOCATION_ID set) must not be blocked."""
+    """Systemd's own ExecStart (INVOCATION_ID set) must not be blocked."""
     calls = []
 
     def fake_start_gateway(*, replace, verbosity):
@@ -203,7 +203,7 @@ def test_run_gateway_allows_when_service_not_running(monkeypatch):
         gateway,
         "get_gateway_runtime_snapshot",
         lambda: gateway.GatewayRuntimeSnapshot(
-            manager="systemd (user)", service_installed=True, service_running=False
+            manager="systemd (user)", service_installed=True, service_running=False,
         ),
     )
     monkeypatch.setattr(gateway.asyncio, "run", lambda coro: True)
@@ -507,7 +507,7 @@ def test_gateway_restart_on_windows_without_service_uses_detached_backend(monkey
     down. The Windows backend restarts via detached pythonw.exe even when no
     Scheduled Task / Startup item is installed.
     """
-    import hermes_cli.gateway_windows as gateway_windows
+    from hermes_cli import gateway_windows
 
     calls = []
 
@@ -535,7 +535,7 @@ def test_gateway_restart_on_windows_without_service_uses_detached_backend(monkey
 
 def test_gateway_restart_on_windows_preserves_failure_fallback(monkeypatch):
     """If the Windows backend cannot launch, keep the existing fallback."""
-    import hermes_cli.gateway_windows as gateway_windows
+    from hermes_cli import gateway_windows
 
     calls = []
 
@@ -801,6 +801,7 @@ def test_find_gateway_pids_falls_back_to_pid_file_when_process_scan_fails(monkey
     # /proc walk is the first path tried (#22693). Force os.listdir on /proc
     # to raise so the function falls back to ps, where fake_run takes over.
     _real_listdir = gateway.os.listdir
+
     def _no_proc_listdir(path):
         if path == "/proc":
             raise OSError("test stub: /proc unavailable")
@@ -875,9 +876,9 @@ class TestWaitForGatewayExit:
 
     def test_force_kills_after_grace_period(self, monkeypatch):
         """When the process doesn't exit, force-kill the saved PID."""
-
         # Simulate monotonic time advancing past force_after
         call_num = 0
+
         def fake_monotonic():
             nonlocal call_num
             call_num += 1
@@ -886,6 +887,7 @@ class TestWaitForGatewayExit:
             return call_num * 2.0  # 2, 4, 6, 8, ...
 
         kills = []
+
         def mock_terminate(pid, force=False):
             kills.append((pid, force))
 
@@ -903,8 +905,8 @@ class TestWaitForGatewayExit:
 
     def test_handles_process_already_gone_on_kill(self, monkeypatch):
         """ProcessLookupError during force-kill is not fatal."""
-
         call_num = 0
+
         def fake_monotonic():
             nonlocal call_num
             call_num += 1
@@ -958,7 +960,7 @@ class TestStopProfileGateway:
 
         assert gateway.stop_profile_gateway() is True
         assert calls["kill"] == 1          # one SIGTERM
-        assert calls["alive_probes"] == 20 # 20 liveness polls over the 2s window
+        assert calls["alive_probes"] == 20  # 20 liveness polls over the 2s window
         assert calls["remove"] == 0
 
 

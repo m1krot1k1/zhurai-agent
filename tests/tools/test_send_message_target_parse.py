@@ -31,7 +31,7 @@ def test_e164_target_still_requires_phone_platform() -> None:
 
 def test_whatsapp_group_jid_target_is_explicit() -> None:
     chat_id, thread_id, is_explicit = _parse_target_ref(
-        "whatsapp", "120363408391911677@g.us"
+        "whatsapp", "120363408391911677@g.us",
     )
 
     assert chat_id == "120363408391911677@g.us"
@@ -74,8 +74,8 @@ def test_send_message_routes_whatsapp_group_jid_without_home_fallback() -> None:
                     "action": "send",
                     "target": "whatsapp:120363408391911677@g.us",
                     "message": "hello group",
-                }
-            )
+                },
+            ),
         )
 
     assert result["success"] is True
@@ -89,4 +89,3 @@ def test_send_message_routes_whatsapp_group_jid_without_home_fallback() -> None:
         media_files=[],
         force_document=False,
     )
-

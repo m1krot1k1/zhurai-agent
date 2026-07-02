@@ -1,6 +1,7 @@
 """Tests for SSH bulk upload via tar pipe."""
 
 import os
+import pathlib
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -114,9 +115,9 @@ class TestSSHBulkUpload:
                 expected = os.path.join(staging_dir, "skills/my_skill.md")
                 staging_paths.append(expected)
                 # File must exist (either as symlink or copy)
-                assert os.path.exists(expected), f"Expected staged file at {expected}"
+                assert pathlib.Path(expected).exists(), f"Expected staged file at {expected}"
                 # Content must match the source
-                with open(expected, "r") as fh:
+                with pathlib.Path(expected).open("r") as fh:
                     assert fh.read() == "content a"
 
             mock = MagicMock()
@@ -189,9 +190,9 @@ class TestSSHBulkUpload:
             if cmd[0] == "tar":
                 c_idx = cmd.index("-C")
                 staging_dir = cmd[c_idx + 1]
-                assert not os.path.exists(os.path.join(staging_dir, "home"))
+                assert not pathlib.Path(os.path.join(staging_dir, "home")).exists()
                 expected = os.path.join(staging_dir, "cache/nested.txt")
-                assert os.path.islink(expected)
+                assert pathlib.Path(expected).is_symlink()
 
             mock = MagicMock()
             mock.stdout = MagicMock()
@@ -208,7 +209,7 @@ class TestSSHBulkUpload:
             mock_env._ssh_bulk_upload(files)
 
     def test_mkdir_failure_raises(self, mock_env, tmp_path):
-        """mkdir failure should raise RuntimeError before tar pipe."""
+        """Mkdir failure should raise RuntimeError before tar pipe."""
         f1 = tmp_path / "y.txt"
         f1.write_text("y")
         files = [(str(f1), "/home/testuser/.hermes/skills/y.txt")]
@@ -219,7 +220,7 @@ class TestSSHBulkUpload:
                 mock_env._ssh_bulk_upload(files)
 
     def test_tar_create_failure_raises(self, mock_env, tmp_path):
-        """tar create failure should raise RuntimeError."""
+        """Tar create failure should raise RuntimeError."""
         f1 = tmp_path / "z.txt"
         f1.write_text("z")
         files = [(str(f1), "/home/testuser/.hermes/skills/z.txt")]

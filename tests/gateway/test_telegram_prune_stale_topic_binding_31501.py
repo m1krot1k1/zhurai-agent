@@ -29,10 +29,7 @@ from __future__ import annotations
 import inspect
 from types import SimpleNamespace
 
-import pytest
-
 from hermes_state import SessionDB
-
 
 # ---------------------------------------------------------------------------
 # SessionDB.delete_telegram_topic_binding
@@ -128,7 +125,7 @@ class TestDeleteTelegramTopicBinding:
             row[0]
             for row in db._conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' "
-                "AND name LIKE 'telegram_dm%'"
+                "AND name LIKE 'telegram_dm%'",
             ).fetchall()
         }
         assert "telegram_dm_topic_bindings" not in tables
@@ -159,7 +156,8 @@ class TestPruneClearsTopicModeWhenLastBindingGone:
     """Proactive cleanup (#31501 follow-up): pruning the chat's final
     binding must also flip ``telegram_dm_topic_mode.enabled`` to 0 so
     recovery fully stands down — covers the user who disabled topics in
-    the Telegram client without ever running ``/topic off``."""
+    the Telegram client without ever running ``/topic off``.
+    """
 
     def test_clears_enabled_when_last_binding_pruned(self, tmp_path):
         db = SessionDB(db_path=tmp_path / "state.db")
@@ -347,7 +345,7 @@ class TestThreadNotFoundFallbackSitesPruneBinding:
         from plugins.platforms.telegram import adapter as telegram_mod
 
         src = inspect.getsource(
-            telegram_mod.TelegramAdapter._send_message_with_thread_fallback
+            telegram_mod.TelegramAdapter._send_message_with_thread_fallback,
         )
         # The helper has a single retry path; the prune call
         # must sit inside it, not in dead code outside the
@@ -419,7 +417,7 @@ class TestRecoveryAfterPrune:
         runner.config = GatewayConfig(
             platforms={
                 Platform.TELEGRAM: PlatformConfig(enabled=True, token="***"),
-            }
+            },
         )
         runner._session_db = db
         runner._telegram_topic_mode_enabled = lambda _src: True

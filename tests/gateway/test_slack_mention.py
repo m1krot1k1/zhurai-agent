@@ -1,5 +1,4 @@
-"""
-Tests for Slack mention gating (require_mention / free_response_channels).
+"""Tests for Slack mention gating (require_mention / free_response_channels).
 
 Follows the same pattern as test_whatsapp_group_gating.py.
 """
@@ -9,10 +8,10 @@ from unittest.mock import MagicMock
 
 from gateway.config import Platform, PlatformConfig
 
-
 # ---------------------------------------------------------------------------
 # Mock slack-bolt if not installed (same as test_slack.py)
 # ---------------------------------------------------------------------------
+
 
 def _ensure_slack_mock():
     if "slack_bolt" in sys.modules and hasattr(sys.modules["slack_bolt"], "__file__"):
@@ -41,10 +40,10 @@ def _ensure_slack_mock():
 _ensure_slack_mock()
 
 import plugins.platforms.slack.adapter as _slack_mod
+
 _slack_mod.SLACK_AVAILABLE = True
 
 from plugins.platforms.slack.adapter import SlackAdapter  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -254,7 +253,7 @@ def _would_process(adapter, *, is_dm=False, channel_id=CHANNEL_ID,
         text = f"<@{bot_uid}> {text}"
     is_mentioned = bool(
         (bot_uid and f"<@{bot_uid}>" in text)
-        or adapter._slack_message_matches_mention_patterns(text)
+        or adapter._slack_message_matches_mention_patterns(text),
     )
 
     if not is_dm and bot_uid:
@@ -263,15 +262,12 @@ def _would_process(adapter, *, is_dm=False, channel_id=CHANNEL_ID,
         if allowed and channel_id not in allowed:
             return False
 
-        if channel_id in adapter._slack_free_response_channels():
+        if channel_id in adapter._slack_free_response_channels() or not adapter._slack_require_mention():
             return True
-        elif not adapter._slack_require_mention():
-            return True
-        elif not is_mentioned:
+        if not is_mentioned:
             if thread_reply and active_session:
                 return True
-            else:
-                return False
+            return False
     return True
 
 

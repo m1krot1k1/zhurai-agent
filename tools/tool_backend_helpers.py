@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from utils import is_truthy_value
-
 
 _DEFAULT_BROWSER_PROVIDER = "local"
 _DEFAULT_MODAL_MODE = "auto"
@@ -95,7 +94,7 @@ def has_direct_modal_credentials() -> bool:
         modal_file_exists = False
     return bool(
         (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET"))
-        or modal_file_exists
+        or modal_file_exists,
     )
 
 
@@ -105,7 +104,7 @@ def resolve_modal_backend_state(
     has_direct: bool,
     managed_ready: bool,
     managed_enabled: bool | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Resolve direct vs managed Modal backend selection.
 
     Semantics:

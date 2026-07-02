@@ -80,7 +80,7 @@ def _hard_stop_config(**overrides) -> dict:
                 "same_tool_failure": 8,
                 "idempotent_no_progress": 5,
             },
-        }
+        },
     }
     cfg["tool_loop_guardrails"].update(overrides)
     return cfg
@@ -155,7 +155,7 @@ def test_sequential_after_call_appends_guidance_to_tool_result_without_extra_mes
 
 def test_same_tool_failure_warning_tells_model_to_recover_with_tools():
     agent = _make_agent("terminal")
-    guardrails = getattr(agent, "_tool_guardrails")
+    guardrails = agent._tool_guardrails
     guardrails.after_call(
         "terminal",
         {"command": "bad-1"},

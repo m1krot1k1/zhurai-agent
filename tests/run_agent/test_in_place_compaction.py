@@ -14,8 +14,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 
 def _make_agent(session_db, session_id, *, in_place):
     with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}):
@@ -34,6 +32,7 @@ def _make_agent(session_db, session_id, *, in_place):
     agent.compression_in_place = in_place
     # Mock the compressor to return a deterministic shrunk transcript so the
     # test exercises the DB-mutation path, not summarization quality.
+
     def _fake_compress(messages, current_tokens=None, focus_topic=None, force=False):
         return [
             {"role": "user", "content": "[CONTEXT COMPACTION] summary of prior turns"},
@@ -61,8 +60,8 @@ def _seed(db, sid, title, n=8):
 class TestInPlaceCompaction:
     def test_in_place_keeps_same_session_id(self):
         """In-place mode: id unchanged, no child row, no rename, history kept."""
-        from hermes_state import SessionDB
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -73,14 +72,14 @@ class TestInPlaceCompaction:
 
             messages = [{"role": "user", "content": f"m{i}"} for i in range(8)]
             compressed, _sp = compress_context(
-                agent, messages, approx_tokens=100_000, system_message="sys"
+                agent, messages, approx_tokens=100_000, system_message="sys",
             )
 
             # Identity never moved.
             assert agent.session_id == sid
             # No continuation row forked.
             child = db._conn.execute(
-                "SELECT id FROM sessions WHERE parent_session_id = ?", (sid,)
+                "SELECT id FROM sessions WHERE parent_session_id = ?", (sid,),
             ).fetchall()
             assert child == []
             # Session not ended; title untouched (no "#2").
@@ -126,8 +125,8 @@ class TestInPlaceCompaction:
 
     def test_in_place_alternation_preserved(self):
         """The compacted list must not introduce consecutive same-role messages."""
-        from hermes_state import SessionDB
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -136,7 +135,7 @@ class TestInPlaceCompaction:
             agent = _make_agent(db, sid, in_place=True)
             messages = [{"role": "user", "content": f"m{i}"} for i in range(8)]
             compressed, _ = compress_context(
-                agent, messages, approx_tokens=100_000, system_message="sys"
+                agent, messages, approx_tokens=100_000, system_message="sys",
             )
             roles = [m["role"] for m in compressed if m.get("role") != "system"]
             assert all(roles[i] != roles[i + 1] for i in range(len(roles) - 1))
@@ -145,9 +144,10 @@ class TestInPlaceCompaction:
         """In-place must NOT pre-flush current-turn messages: replace_messages
         rewrites the whole row, so a flush would INSERT rows it immediately
         deletes (wasted writes). The current-turn tail survives via the
-        compressor's `compressed` output, not the flush."""
-        from hermes_state import SessionDB
+        compressor's `compressed` output, not the flush.
+        """
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -155,7 +155,7 @@ class TestInPlaceCompaction:
             agent = _make_agent(db, "ip_flush", in_place=True)
             calls = {"n": 0}
             agent._flush_messages_to_session_db = lambda *a, **k: calls.__setitem__(
-                "n", calls["n"] + 1
+                "n", calls["n"] + 1,
             )
             compress_context(
                 agent, [{"role": "user", "content": "x"}] * 8,
@@ -165,9 +165,10 @@ class TestInPlaceCompaction:
 
     def test_rotation_still_preflushes(self):
         """Rotation MUST pre-flush so current-turn messages survive in the
-        preserved old (parent) session before it is ended (#47202)."""
-        from hermes_state import SessionDB
+        preserved old (parent) session before it is ended (#47202).
+        """
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -175,7 +176,7 @@ class TestInPlaceCompaction:
             agent = _make_agent(db, "rot_flush", in_place=False)
             calls = {"n": 0}
             agent._flush_messages_to_session_db = lambda *a, **k: calls.__setitem__(
-                "n", calls["n"] + 1
+                "n", calls["n"] + 1,
             )
             compress_context(
                 agent, [{"role": "user", "content": "x"}] * 8,
@@ -187,8 +188,8 @@ class TestInPlaceCompaction:
 class TestRotationStillDefault:
     def test_rotation_when_flag_off(self):
         """Regression guard: flag off => legacy rotation is unchanged."""
-        from hermes_state import SessionDB
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -199,7 +200,7 @@ class TestRotationStillDefault:
 
             messages = [{"role": "user", "content": f"m{i}"} for i in range(8)]
             compress_context(
-                agent, messages, approx_tokens=100_000, system_message="sys"
+                agent, messages, approx_tokens=100_000, system_message="sys",
             )
 
             # Identity rotated to a fresh id.
@@ -207,7 +208,7 @@ class TestRotationStillDefault:
             # Old session ended via compression; continuation forked + renamed.
             assert db.get_session(sid)["end_reason"] == "compression"
             child = db._conn.execute(
-                "SELECT id, title FROM sessions WHERE parent_session_id = ?", (sid,)
+                "SELECT id, title FROM sessions WHERE parent_session_id = ?", (sid,),
             ).fetchall()
             assert len(child) == 1
             assert child[0]["title"] == "my-research #2"
@@ -219,11 +220,12 @@ class TestRotationStillDefault:
 
 class TestInPlaceSignalForGateway:
     """compress_context must expose a rotation-independent flag the gateway can
-    read (instead of an id-change diff) to re-baseline transcript handling."""
+    read (instead of an id-change diff) to re-baseline transcript handling.
+    """
 
     def test_signal_set_on_in_place_unset_on_rotation(self):
-        from hermes_state import SessionDB
         from agent.conversation_compression import compress_context
+        from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
             db = SessionDB(db_path=Path(tmp) / "t.db")
@@ -258,7 +260,8 @@ class TestCompactedTurnsStaySearchable:
     DISCOVERABLE after in-place compaction. Compaction-archived rows
     (active=0, compacted=1) must surface in session_search by default, while
     rewind/undo rows (active=0, compacted=0) must stay hidden. The two share
-    the active flag but are distinguished by the compacted flag."""
+    the active flag but are distinguished by the compacted flag.
+    """
 
     def test_compacted_turns_found_by_default_search(self):
         from hermes_state import SessionDB
@@ -297,7 +300,8 @@ class TestCompactedTurnsStaySearchable:
 
     def test_rewound_turns_stay_hidden(self):
         """Rewind/undo (active=0, compacted=0) must NOT leak into default
-        search — the distinction the compacted flag preserves."""
+        search — the distinction the compacted flag preserves.
+        """
         from hermes_state import SessionDB
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -310,7 +314,6 @@ class TestCompactedTurnsStaySearchable:
 
             assert db.search_messages("ZEBRAWORD", role_filter=["user", "assistant"]) == []
             recovered = db.search_messages(
-                "ZEBRAWORD", role_filter=["user", "assistant"], include_inactive=True
+                "ZEBRAWORD", role_filter=["user", "assistant"], include_inactive=True,
             )
             assert len(recovered) == 1
-

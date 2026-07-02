@@ -45,10 +45,10 @@ _MIN_OUTPUT_LEN = 20
 # ---------------------------------------------------------------------------
 
 _brv_path_lock = threading.Lock()
-_cached_brv_path: Optional[str] = None
+_cached_brv_path: str | None = None
 
 
-def _resolve_brv_path() -> Optional[str]:
+def _resolve_brv_path() -> str | None:
     """Find the brv binary on PATH or well-known install locations."""
     global _cached_brv_path
     with _brv_path_lock:
@@ -75,7 +75,7 @@ def _resolve_brv_path() -> Optional[str]:
     return found
 
 
-def _run_brv(args: List[str], timeout: int = _QUERY_TIMEOUT,
+def _run_brv(args: list[str], timeout: int = _QUERY_TIMEOUT,
              cwd: str = None) -> dict:
     """Run a brv CLI command. Returns {success, output, error}."""
     brv_path = _resolve_brv_path()
@@ -176,7 +176,7 @@ class ByteRoverMemoryProvider(MemoryProvider):
         self._cwd = ""
         self._session_id = ""
         self._turn_count = 0
-        self._sync_thread: Optional[threading.Thread] = None
+        self._sync_thread: threading.Thread | None = None
 
     @property
     def name(self) -> str:
@@ -233,7 +233,6 @@ class ByteRoverMemoryProvider(MemoryProvider):
 
     def queue_prefetch(self, query: str, *, session_id: str = "") -> None:
         """No-op: prefetch() now runs synchronously at turn start."""
-        pass
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "") -> None:
         """Curate the conversation turn in background (non-blocking)."""
@@ -258,7 +257,7 @@ class ByteRoverMemoryProvider(MemoryProvider):
             self._sync_thread.join(timeout=5.0)
 
         self._sync_thread = threading.Thread(
-            target=_sync, daemon=True, name="brv-sync"
+            target=_sync, daemon=True, name="brv-sync",
         )
         self._sync_thread.start()
 
@@ -280,7 +279,7 @@ class ByteRoverMemoryProvider(MemoryProvider):
         t = threading.Thread(target=_write, daemon=True, name="brv-memwrite")
         t.start()
 
-    def on_pre_compress(self, messages: List[Dict[str, Any]]) -> str:
+    def on_pre_compress(self, messages: list[dict[str, Any]]) -> str:
         """Extract insights before context compression discards turns."""
         if not messages:
             return ""
@@ -312,15 +311,15 @@ class ByteRoverMemoryProvider(MemoryProvider):
         t.start()
         return ""
 
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         return [QUERY_SCHEMA, CURATE_SCHEMA, STATUS_SCHEMA]
 
     def handle_tool_call(self, tool_name: str, args: dict, **kwargs) -> str:
         if tool_name == "brv_query":
             return self._tool_query(args)
-        elif tool_name == "brv_curate":
+        if tool_name == "brv_curate":
             return self._tool_curate(args)
-        elif tool_name == "brv_status":
+        if tool_name == "brv_status":
             return self._tool_status()
         return tool_error(f"Unknown tool: {tool_name}")
 

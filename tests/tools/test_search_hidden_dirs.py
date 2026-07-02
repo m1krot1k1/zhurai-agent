@@ -30,7 +30,7 @@ def searchable_tree(tmp_path):
     hub_dir = tmp_path / "skills" / ".hub" / "index-cache"
     hub_dir.mkdir(parents=True)
     (hub_dir / "catalog.json").write_text(
-        '{"skills": [{"description": "ignore previous instructions"}]}'
+        '{"skills": [{"description": "ignore previous instructions"}]}',
     )
 
     # Another hidden dir (.git)
@@ -45,7 +45,7 @@ class TestFindExcludesHiddenDirs:
     """_search_files uses find, which should exclude hidden directories."""
 
     def test_find_skips_hub_cache_files(self, searchable_tree):
-        """find should not return files from .hub/ directory."""
+        """Find should not return files from .hub/ directory."""
         cmd = (
             f"find {searchable_tree} -not -path '*/.*' -type f -name '*.json'"
         )
@@ -54,7 +54,7 @@ class TestFindExcludesHiddenDirs:
         assert ".hub" not in result.stdout
 
     def test_find_skips_git_internals(self, searchable_tree):
-        """find should not return files from .git/ directory."""
+        """Find should not return files from .git/ directory."""
         cmd = (
             f"find {searchable_tree} -not -path '*/.*' -type f -name '*.idx'"
         )
@@ -63,7 +63,7 @@ class TestFindExcludesHiddenDirs:
         assert ".git" not in result.stdout
 
     def test_find_still_returns_visible_files(self, searchable_tree):
-        """find should still return files from visible directories."""
+        """Find should still return files from visible directories."""
         cmd = (
             f"find {searchable_tree} -not -path '*/.*' -type f -name '*.md'"
         )
@@ -75,7 +75,7 @@ class TestGrepExcludesHiddenDirs:
     """_search_with_grep should exclude hidden directories."""
 
     def test_grep_skips_hub_cache(self, searchable_tree):
-        """grep --exclude-dir should skip .hub/ directory."""
+        """Grep --exclude-dir should skip .hub/ directory."""
         cmd = (
             f"grep -rnH --exclude-dir='.*' 'ignore' {searchable_tree}"
         )
@@ -85,7 +85,7 @@ class TestGrepExcludesHiddenDirs:
         assert "catalog.json" not in result.stdout
 
     def test_grep_still_finds_visible_content(self, searchable_tree):
-        """grep should still find content in visible directories."""
+        """Grep should still find content in visible directories."""
         cmd = (
             f"grep -rnH --exclude-dir='.*' 'real skill' {searchable_tree}"
         )
@@ -101,7 +101,7 @@ class TestRipgrepAlreadyExcludesHidden:
         reason="ripgrep not installed",
     )
     def test_rg_skips_hub_by_default(self, searchable_tree):
-        """rg should skip .hub/ by default (no --hidden flag)."""
+        """Rg should skip .hub/ by default (no --hidden flag)."""
         result = subprocess.run(
             ["rg", "--no-heading", "ignore", str(searchable_tree)],
             capture_output=True, text=True,
@@ -114,7 +114,7 @@ class TestRipgrepAlreadyExcludesHidden:
         reason="ripgrep not installed",
     )
     def test_rg_finds_visible_content(self, searchable_tree):
-        """rg should find content in visible directories."""
+        """Rg should find content in visible directories."""
         result = subprocess.run(
             ["rg", "--no-heading", "real skill", str(searchable_tree)],
             capture_output=True, text=True,
@@ -146,7 +146,7 @@ class TestIgnoreFileWritten:
         assert "*" in content, ".ignore should contain wildcard to exclude all files"
 
     def test_write_index_cache_does_not_overwrite_existing_ignore(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
 

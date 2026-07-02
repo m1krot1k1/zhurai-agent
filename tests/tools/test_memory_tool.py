@@ -1,20 +1,21 @@
 """Tests for tools/memory_tool.py — MemoryStore, security scanning, and tool dispatcher."""
 
 import json
-import pytest
 from pathlib import Path
 
-from tools.memory_tool import (
-    MemoryStore,
-    memory_tool,
-    _scan_memory_content,
-    MEMORY_SCHEMA,
-)
+import pytest
 
+from tools.memory_tool import (
+    MEMORY_SCHEMA,
+    MemoryStore,
+    _scan_memory_content,
+    memory_tool,
+)
 
 # =========================================================================
 # Tool schema guidance
 # =========================================================================
+
 
 class TestMemorySchema:
     def test_discourages_diary_style_task_logs(self):
@@ -259,7 +260,7 @@ class TestScanMemoryContent:
 # MemoryStore core operations
 # =========================================================================
 
-@pytest.fixture()
+@pytest.fixture
 def store(tmp_path, monkeypatch):
     """Create a MemoryStore with temp storage."""
     monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
@@ -708,7 +709,7 @@ class TestLoadTimeSnapshotSanitization:
         assert "[BLOCKED:" not in snapshot
 
     def test_poisoned_entry_blocked_in_snapshot_kept_in_live_state(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
         (tmp_path / "MEMORY.md").write_text(
@@ -733,7 +734,7 @@ class TestLoadTimeSnapshotSanitization:
         )
 
     def test_brainworm_payload_in_memory_blocked_at_load_time(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """The Brainworm payload, planted directly on disk, must not enter
         the system prompt even though it bypasses classic injection patterns.
@@ -760,7 +761,7 @@ class TestLoadTimeSnapshotSanitization:
         monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
         existing_block = "[BLOCKED: MEMORY.md entry contained threat pattern(s): prompt_injection. Removed from system prompt.]"
         (tmp_path / "MEMORY.md").write_text(
-            f"{existing_block}\n§\nClean fact.\n", encoding="utf-8"
+            f"{existing_block}\n§\nClean fact.\n", encoding="utf-8",
         )
         s = MemoryStore()
         s.load_from_disk()

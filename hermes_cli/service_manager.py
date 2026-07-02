@@ -42,11 +42,11 @@ def validate_profile_name(name: str) -> None:
         raise ValueError("profile name must not be empty")
     if len(name) > _MAX_PROFILE_LEN:
         raise ValueError(
-            f"profile name too long ({len(name)} > {_MAX_PROFILE_LEN})"
+            f"profile name too long ({len(name)} > {_MAX_PROFILE_LEN})",
         )
     if not _VALID_PROFILE_RE.match(name):
         raise ValueError(
-            f"profile name must match [a-z0-9][a-z0-9_-]*, got {name!r}"
+            f"profile name must match [a-z0-9][a-z0-9_-]*, got {name!r}",
         )
 
 
@@ -98,6 +98,7 @@ def detect_service_manager() -> ServiceManagerKind:
     host call sites continue to use that. It exists for new backend-
     agnostic code (profile create/delete hooks, the s6 dispatch path
     in ``hermes gateway start/stop/restart``).
+
     """
     # Imports deferred so importing this module doesn't drag in the
     # whole gateway dependency graph for callers that only need the
@@ -187,13 +188,13 @@ class _RegistrationUnsupportedMixin:
     ) -> None:
         raise NotImplementedError(
             f"{type(self).__name__} does not support runtime profile "
-            "gateway registration (container-only feature)"
+            "gateway registration (container-only feature)",
         )
 
     def unregister_profile_gateway(self, profile: str) -> None:
         raise NotImplementedError(
             f"{type(self).__name__} does not support runtime profile "
-            "gateway unregistration (container-only feature)"
+            "gateway unregistration (container-only feature)",
         )
 
     def list_profile_gateways(self) -> list[str]:
@@ -305,6 +306,7 @@ def get_service_manager() -> ServiceManager:
 
     Raises:
         RuntimeError: when no supported backend is available.
+
     """
     kind = detect_service_manager()
     if kind == "systemd":
@@ -346,7 +348,7 @@ def _profile_dir_for_gateway_service(name: str) -> Path:
     """
     import os
 
-    profile = name[len(S6_SERVICE_PREFIX):] if name.startswith(S6_SERVICE_PREFIX) else name
+    profile = name.removeprefix(S6_SERVICE_PREFIX)
     validate_profile_name(profile)
     hermes_home = Path(os.environ.get("HERMES_HOME", "/opt/data"))
     if hermes_home.parent.name == "profiles":
@@ -805,9 +807,7 @@ class S6ServiceManager:
             # Strip the gateway- prefix back off so the message
             # matches what the user typed on the CLI (``-p <profile>``).
             profile = (
-                name[len(S6_SERVICE_PREFIX):]
-                if name.startswith(S6_SERVICE_PREFIX)
-                else name
+                name.removeprefix(S6_SERVICE_PREFIX)
             )
             raise GatewayNotRegisteredError(profile)
 
@@ -831,6 +831,7 @@ class S6ServiceManager:
             GatewayNotRegisteredError: no service directory for ``name``.
             S6CommandError: s6-svc exited non-zero for any other reason
                 (permission denied on the supervise FIFO, timeout, etc.).
+
         """
         self._run_svc("-u", "start", name)
         _write_gateway_desired_state(name, "running")
@@ -875,6 +876,7 @@ class S6ServiceManager:
         Raises:
             GatewayNotRegisteredError: no service directory for ``name``.
             S6CommandError: s6-svc exited non-zero for any other reason.
+
         """
         pid = self._supervised_pid(name)
         if pid is not None:
@@ -893,6 +895,7 @@ class S6ServiceManager:
         Raises:
             GatewayNotRegisteredError: no service directory for ``name``.
             S6CommandError: s6-svc exited non-zero for any other reason.
+
         """
         self._run_svc("-t", "restart", name)
         _write_gateway_desired_state(name, "running")
@@ -930,6 +933,7 @@ class S6ServiceManager:
             ValueError: if the profile name is invalid or the service
                 directory already exists.
             RuntimeError: if ``s6-svscanctl`` fails.
+
         """
         import shutil
         import subprocess
@@ -937,7 +941,7 @@ class S6ServiceManager:
         svc_dir = self._service_dir(profile)
         if svc_dir.exists():
             raise ValueError(
-                f"profile gateway {profile!r} already registered at {svc_dir}"
+                f"profile gateway {profile!r} already registered at {svc_dir}",
             )
 
         # Build the service directory atomically: write to a sibling
@@ -994,7 +998,7 @@ class S6ServiceManager:
             # be confusing (no supervisor watching it).
             shutil.rmtree(svc_dir, ignore_errors=True)
             raise RuntimeError(
-                f"s6-svscanctl failed: {result.stderr or result.stdout}"
+                f"s6-svscanctl failed: {result.stderr or result.stdout}",
             )
 
     def unregister_profile_gateway(self, profile: str) -> None:

@@ -7,6 +7,7 @@ tests verify the config-driven prelude that fixes that.
 """
 
 import os
+import pathlib
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +22,7 @@ from tools.environments.local import (
 class TestResolveShellInitFiles:
     def test_auto_sources_bashrc_when_present(self, tmp_path, monkeypatch):
         bashrc = tmp_path / ".bashrc"
-        bashrc.write_text('export MARKER=seen\n')
+        bashrc.write_text("export MARKER=seen\n")
         monkeypatch.setenv("HOME", str(tmp_path))
 
         # Default config: auto_source_bashrc on, no explicit list.
@@ -52,7 +53,7 @@ class TestResolveShellInitFiles:
 
     def test_auto_sources_bash_profile_when_present(self, tmp_path, monkeypatch):
         bash_profile = tmp_path / ".bash_profile"
-        bash_profile.write_text('export MARKER=bp\n')
+        bash_profile.write_text("export MARKER=bp\n")
         monkeypatch.setenv("HOME", str(tmp_path))
 
         with patch(
@@ -69,11 +70,11 @@ class TestResolveShellInitFiles:
         non-interactive ``case $- in *i*) ;; *) return;; esac`` guard.
         """
         profile = tmp_path / ".profile"
-        profile.write_text('export FROM_PROFILE=1\n')
+        profile.write_text("export FROM_PROFILE=1\n")
         bash_profile = tmp_path / ".bash_profile"
-        bash_profile.write_text('export FROM_BASH_PROFILE=1\n')
+        bash_profile.write_text("export FROM_BASH_PROFILE=1\n")
         bashrc = tmp_path / ".bashrc"
-        bashrc.write_text('export FROM_BASHRC=1\n')
+        bashrc.write_text("export FROM_BASHRC=1\n")
         monkeypatch.setenv("HOME", str(tmp_path))
 
         with patch(
@@ -98,9 +99,9 @@ class TestResolveShellInitFiles:
 
     def test_auto_source_bashrc_off_suppresses_default(self, tmp_path, monkeypatch):
         bashrc = tmp_path / ".bashrc"
-        bashrc.write_text('export MARKER=seen\n')
+        bashrc.write_text("export MARKER=seen\n")
         profile = tmp_path / ".profile"
-        profile.write_text('export MARKER=p\n')
+        profile.write_text("export MARKER=p\n")
         monkeypatch.setenv("HOME", str(tmp_path))
 
         with patch(
@@ -113,9 +114,9 @@ class TestResolveShellInitFiles:
 
     def test_explicit_list_wins_over_auto(self, tmp_path, monkeypatch):
         bashrc = tmp_path / ".bashrc"
-        bashrc.write_text('export FROM_BASHRC=1\n')
+        bashrc.write_text("export FROM_BASHRC=1\n")
         custom = tmp_path / "custom.sh"
-        custom.write_text('export FROM_CUSTOM=1\n')
+        custom.write_text("export FROM_CUSTOM=1\n")
         monkeypatch.setenv("HOME", str(tmp_path))
 
         # auto_source_bashrc stays True but the explicit list takes precedence.
@@ -131,7 +132,7 @@ class TestResolveShellInitFiles:
     def test_expands_home_and_env_vars(self, tmp_path, monkeypatch):
         target = tmp_path / "rc" / "custom.sh"
         target.parent.mkdir()
-        target.write_text('export A=1\n')
+        target.write_text("export A=1\n")
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("CUSTOM_RC_DIR", str(tmp_path / "rc"))
 
@@ -183,12 +184,13 @@ class TestPrependShellInit:
 
 
 @pytest.mark.skipif(
-    os.environ.get("CI") == "true" and not os.path.isfile("/bin/bash"),
+    os.environ.get("CI") == "true" and not pathlib.Path("/bin/bash").is_file(),
     reason="Requires bash; CI sandbox may strip it.",
 )
 class TestSnapshotEndToEnd:
     """Spin up a real LocalEnvironment and confirm the snapshot sources
-    extra init files."""
+    extra init files.
+    """
 
     def test_exported_env_changes_persist_between_commands(self, tmp_path):
         env = LocalEnvironment(cwd=str(tmp_path), timeout=15)
@@ -196,10 +198,10 @@ class TestSnapshotEndToEnd:
             first = env.execute(
                 'export HERMES_SESSION_ENV_PROBE="sticky"; '
                 'export PATH="/tmp/hermes-session-bin:$PATH"; '
-                'echo "first=$HERMES_SESSION_ENV_PROBE"'
+                'echo "first=$HERMES_SESSION_ENV_PROBE"',
             )
             second = env.execute(
-                'echo "second=$HERMES_SESSION_ENV_PROBE"; echo "PATH=$PATH"'
+                'echo "second=$HERMES_SESSION_ENV_PROBE"; echo "PATH=$PATH"',
             )
         finally:
             env.cleanup()
@@ -217,7 +219,7 @@ class TestSnapshotEndToEnd:
         activate = venv_bin / "activate"
         activate.write_text(
             f'export VIRTUAL_ENV="{tmp_path / ".venv"}"\n'
-            f'export PATH="{venv_bin}:$PATH"\n'
+            f'export PATH="{venv_bin}:$PATH"\n',
         )
 
         env = LocalEnvironment(cwd=str(tmp_path), timeout=15)
@@ -237,7 +239,7 @@ class TestSnapshotEndToEnd:
         init_file = tmp_path / "custom-init.sh"
         init_file.write_text(
             'export HERMES_SHELL_INIT_PROBE="probe-ok"\n'
-            'export PATH="/opt/shell-init-probe/bin:$PATH"\n'
+            'export PATH="/opt/shell-init-probe/bin:$PATH"\n',
         )
 
         with patch(
@@ -247,7 +249,7 @@ class TestSnapshotEndToEnd:
             env = LocalEnvironment(cwd=str(tmp_path), timeout=15)
             try:
                 result = env.execute(
-                    'echo "PROBE=$HERMES_SHELL_INIT_PROBE"; echo "PATH=$PATH"'
+                    'echo "PROBE=$HERMES_SHELL_INIT_PROBE"; echo "PATH=$PATH"',
                 )
             finally:
                 env.cleanup()
@@ -257,7 +259,7 @@ class TestSnapshotEndToEnd:
         assert "/opt/shell-init-probe/bin" in output
 
     def test_profile_path_export_survives_bashrc_interactive_guard(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Reproduces the Debian/Ubuntu + ``n``/``nvm`` case.
 
@@ -278,15 +280,15 @@ class TestSnapshotEndToEnd:
         profile = tmp_path / ".profile"
         profile.write_text(
             f'export PATH="{fake_n_bin}:$PATH"\n'
-            'export FROM_PROFILE=profile-ok\n'
+            'export FROM_PROFILE=profile-ok\n',
         )
         bashrc = tmp_path / ".bashrc"
         bashrc.write_text(
-            'case $- in\n'
-            '    *i*) ;;\n'
-            '      *) return;;\n'
-            'esac\n'
-            'export FROM_BASHRC=bashrc-should-not-appear\n'
+            "case $- in\n"
+            "    *i*) ;;\n"
+            "      *) return;;\n"
+            "esac\n"
+            "export FROM_BASHRC=bashrc-should-not-appear\n",
         )
 
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -300,7 +302,7 @@ class TestSnapshotEndToEnd:
                 result = env.execute(
                     'echo "PATH=$PATH"; '
                     'echo "FROM_PROFILE=$FROM_PROFILE"; '
-                    'echo "FROM_BASHRC=$FROM_BASHRC"'
+                    'echo "FROM_BASHRC=$FROM_BASHRC"',
                 )
             finally:
                 env.cleanup()

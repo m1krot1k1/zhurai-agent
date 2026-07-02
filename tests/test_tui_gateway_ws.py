@@ -8,7 +8,8 @@ from tui_gateway import ws as ws_mod
 
 def _run_disconnect(monkeypatch, seed):
     """Drive handle_ws to its disconnect `finally`, seeding sessions against the
-    live WSTransport the moment it exists. Returns nothing; inspect _sessions."""
+    live WSTransport the moment it exists. Returns nothing; inspect _sessions.
+    """
     # Disable the grace-reap Timer: detached sessions normally schedule a
     # threading.Timer via _schedule_ws_orphan_reap, which would outlive the test
     # and fire _reap during interpreter teardown — touching _sessions/DB and
@@ -68,7 +69,7 @@ def test_ws_disconnect_reaps_flagged_session_and_closes_worker(monkeypatch):
                     "close_on_disconnect": True,
                     "slash_worker": FakeWorker(),
                     "session_key": "k",
-                }
+                },
             ),
         )
         assert "flagged" not in server._sessions
@@ -83,7 +84,7 @@ def test_ws_disconnect_preserves_and_repoints_reconnectable_session(monkeypatch)
         _run_disconnect(
             monkeypatch,
             lambda t: server._sessions.update(
-                plain={"transport": t, "close_on_disconnect": False, "session_key": "k"}
+                plain={"transport": t, "close_on_disconnect": False, "session_key": "k"},
             ),
         )
         assert server._sessions["plain"]["transport"] is server._detached_ws_transport
@@ -95,7 +96,8 @@ def test_ws_write_loop_stall_does_not_latch_transport(monkeypatch):
     """A write that times out because the event loop is stalled (GIL-heavy
     agent turn) must NOT latch the transport closed — the frame is already
     scheduled and flushes when the loop recovers. Latching here permanently
-    silenced live watch windows after one slow write."""
+    silenced live watch windows after one slow write.
+    """
     monkeypatch.setattr(ws_mod, "_WS_WRITE_TIMEOUT_S", 0.05)
     sent = []
 

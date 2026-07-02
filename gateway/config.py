@@ -1,5 +1,4 @@
-"""
-Gateway configuration management.
+"""Gateway configuration management.
 
 Handles loading and validating configuration for:
 - Connected platforms (Telegram, Discord, WhatsApp, Weixin, and more)
@@ -8,13 +7,14 @@ Handles loading and validating configuration for:
 - Delivery preferences
 """
 
+import json
 import logging
 import os
-import json
-from pathlib import Path
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Callable
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from hermes_cli.config import get_hermes_home
 from utils import env_int, is_truthy_value
@@ -56,7 +56,7 @@ def _coerce_int(value: Any, default: int) -> int:
         return default
 
 
-def _coerce_optional_positive_int(value: Any, key: str) -> Optional[int]:
+def _coerce_optional_positive_int(value: Any, key: str) -> int | None:
     """Coerce an optional positive integer config value.
 
     ``None``/0/negative disable the setting. Malformed values are ignored with
@@ -130,7 +130,7 @@ def _ensure_platform_extra_dict(platforms_data: dict, name: str) -> tuple[dict, 
 
 # Module-level cache for bundled platform plugin names (lives outside the
 # enum so it doesn't become an accidental enum member).
-_Platform__bundled_plugin_names: Optional[set] = None
+_Platform__bundled_plugin_names: set | None = None
 
 
 class Platform(Enum):
@@ -141,6 +141,7 @@ class Platform(Enum):
     ``Platform("irc")`` works without modifying this enum.  Dynamic members
     are cached in ``_value2member_map_`` for identity-stable comparisons.
     """
+
     LOCAL = "local"
     TELEGRAM = "telegram"
     DISCORD = "discord"
@@ -165,6 +166,7 @@ class Platform(Enum):
     QQBOT = "qqbot"
     YUANBAO = "yuanbao"
     RELAY = "relay"  # generic relay adapter fronted by the connector (EXPERIMENTAL)
+
     @classmethod
     def _missing_(cls, value):
         """Accept unknown platform names only for known plugin adapters.
@@ -239,20 +241,20 @@ _BUILTIN_PLATFORM_VALUES = frozenset(m.value for m in Platform.__members__.value
 
 @dataclass
 class HomeChannel:
-    """
-    Default destination for a platform.
+    """Default destination for a platform.
     
     When a cron job specifies deliver="telegram" without a specific chat ID,
     messages are sent to this home channel. Thread-aware platforms may also
     store a thread/topic ID so the bare platform target routes to the exact
     conversation where /sethome was run.
     """
+
     platform: Platform
     chat_id: str
     name: str  # Human-readable name for display
-    thread_id: Optional[str] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
+    thread_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "platform": self.platform.value,
             "chat_id": self.chat_id,
@@ -261,9 +263,9 @@ class HomeChannel:
         if self.thread_id:
             result["thread_id"] = self.thread_id
         return result
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HomeChannel":
+    def from_dict(cls, data: dict[str, Any]) -> "HomeChannel":
         return cls(
             platform=Platform(data["platform"]),
             chat_id=str(data["chat_id"]),
@@ -274,8 +276,7 @@ class HomeChannel:
 
 @dataclass
 class SessionResetPolicy:
-    """
-    Controls when sessions reset (lose context).
+    """Controls when sessions reset (lose context).
     
     Modes:
     - "daily": Reset at a specific hour each day
@@ -283,13 +284,14 @@ class SessionResetPolicy:
     - "both": Whichever triggers first (daily boundary OR idle timeout)
     - "none": Never auto-reset (context managed only by compression)
     """
+
     mode: str = "both"  # "daily", "idle", "both", or "none"
     at_hour: int = 4  # Hour for daily reset (0-23, local time)
     idle_minutes: int = 1440  # Minutes of inactivity before reset (24 hours)
     notify: bool = True  # Send a notification to the user when auto-reset occurs
     notify_exclude_platforms: tuple = ("api_server", "webhook")  # Platforms that don't get reset notifications
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "mode": self.mode,
             "at_hour": self.at_hour,
@@ -297,9 +299,9 @@ class SessionResetPolicy:
             "notify": self.notify,
             "notify_exclude_platforms": list(self.notify_exclude_platforms),
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionResetPolicy":
+    def from_dict(cls, data: dict[str, Any]) -> "SessionResetPolicy":
         # Handle both missing keys and explicit null values (YAML null → None)
         mode = data.get("mode")
         at_hour = data.get("at_hour")
@@ -318,11 +320,12 @@ class SessionResetPolicy:
 @dataclass
 class PlatformConfig:
     """Configuration for a single messaging platform."""
+
     enabled: bool = False
-    token: Optional[str] = None  # Bot token (Telegram, Discord)
-    api_key: Optional[str] = None  # API key if different from token
-    home_channel: Optional[HomeChannel] = None
-    
+    token: str | None = None  # Bot token (Telegram, Discord)
+    api_key: str | None = None  # API key if different from token
+    home_channel: HomeChannel | None = None
+
     # Reply threading mode (Telegram/Slack)
     # - "off": Never thread replies to original message
     # - "first": Only first chunk threads to user's message (default)
@@ -337,9 +340,9 @@ class PlatformConfig:
     gateway_restart_notification: bool = True
 
     # Platform-specific settings
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "enabled": self.enabled,
             "extra": self.extra,
@@ -355,7 +358,7 @@ class PlatformConfig:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PlatformConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "PlatformConfig":
         home_channel = None
         if "home_channel" in data:
             home_channel = HomeChannel.from_dict(data["home_channel"])
@@ -392,6 +395,7 @@ DEFAULT_STREAMING_CURSOR: str = " ▉"
 @dataclass
 class StreamingConfig:
     """Configuration for real-time token streaming to messaging platforms."""
+
     enabled: bool = False
     # Transport selection:
     #   "auto"  — prefer native streaming-draft updates when the platform
@@ -422,7 +426,7 @@ class StreamingConfig:
     # the fresh-message replacement path; set >0 to opt in.
     fresh_final_after_seconds: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "enabled": self.enabled,
             "transport": self.transport,
@@ -433,7 +437,7 @@ class StreamingConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StreamingConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "StreamingConfig":
         if not data:
             return cls()
         return cls(
@@ -447,7 +451,7 @@ class StreamingConfig:
             ),
             cursor=data.get("cursor", DEFAULT_STREAMING_CURSOR),
             fresh_final_after_seconds=_coerce_float(
-                data.get("fresh_final_after_seconds"), 0.0
+                data.get("fresh_final_after_seconds"), 0.0,
             ),
         )
 
@@ -461,60 +465,60 @@ class StreamingConfig:
 # Slack, Matrix, Mattermost, HomeAssistant) do not need an entry here.
 _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] = {
     Platform.WEIXIN: lambda cfg: bool(
-        cfg.extra.get("account_id") and (cfg.token or cfg.extra.get("token"))
+        cfg.extra.get("account_id") and (cfg.token or cfg.extra.get("token")),
     ),
     Platform.WHATSAPP_CLOUD: lambda cfg: bool(
-        cfg.extra.get("phone_number_id") and cfg.extra.get("access_token")
+        cfg.extra.get("phone_number_id") and cfg.extra.get("access_token"),
     ),
     Platform.SIGNAL: lambda cfg: bool(cfg.extra.get("http_url")),
     Platform.API_SERVER: lambda cfg: True,
     Platform.WEBHOOK: lambda cfg: True,
     Platform.MSGRAPH_WEBHOOK: lambda cfg: bool(
-        str(cfg.extra.get("client_state") or "").strip()
+        str(cfg.extra.get("client_state") or "").strip(),
     ),
     Platform.BLUEBUBBLES: lambda cfg: bool(
-        cfg.extra.get("server_url") and cfg.extra.get("password")
+        cfg.extra.get("server_url") and cfg.extra.get("password"),
     ),
     Platform.QQBOT: lambda cfg: bool(
-        cfg.extra.get("app_id") and cfg.extra.get("client_secret")
+        cfg.extra.get("app_id") and cfg.extra.get("client_secret"),
     ),
     Platform.YUANBAO: lambda cfg: bool(
-        cfg.extra.get("app_id") and cfg.extra.get("app_secret")
+        cfg.extra.get("app_id") and cfg.extra.get("app_secret"),
     ),
     # Relay dials OUT to a connector; it is "connected" once an endpoint URL is
     # configured (extra["relay_url"] or extra["url"]). The capability descriptor
     # is negotiated at handshake time, so the URL is the only config-level
     # signal in the experimental phase. EXPERIMENTAL — may change.
     Platform.RELAY: lambda cfg: bool(
-        cfg.extra.get("relay_url") or cfg.extra.get("url")
+        cfg.extra.get("relay_url") or cfg.extra.get("url"),
     ),
 }
 
 
 @dataclass
 class GatewayConfig:
-    """
-    Main gateway configuration.
+    """Main gateway configuration.
     
     Manages all platform connections, session policies, and delivery settings.
     """
+
     # Platform configurations
-    platforms: Dict[Platform, PlatformConfig] = field(default_factory=dict)
-    
+    platforms: dict[Platform, PlatformConfig] = field(default_factory=dict)
+
     # Session reset policies by type
     default_reset_policy: SessionResetPolicy = field(default_factory=SessionResetPolicy)
-    reset_by_type: Dict[str, SessionResetPolicy] = field(default_factory=dict)
-    reset_by_platform: Dict[Platform, SessionResetPolicy] = field(default_factory=dict)
-    
+    reset_by_type: dict[str, SessionResetPolicy] = field(default_factory=dict)
+    reset_by_platform: dict[Platform, SessionResetPolicy] = field(default_factory=dict)
+
     # Reset trigger commands
-    reset_triggers: List[str] = field(default_factory=lambda: ["/new", "/reset"])
+    reset_triggers: list[str] = field(default_factory=lambda: ["/new", "/reset"])
 
     # User-defined quick commands (slash commands that bypass the agent loop)
-    quick_commands: Dict[str, Any] = field(default_factory=dict)
-    
+    quick_commands: dict[str, Any] = field(default_factory=dict)
+
     # Storage paths
     sessions_dir: Path = field(default_factory=lambda: get_hermes_home() / "sessions")
-    
+
     # Delivery settings
     always_log_local: bool = True  # Always save cron outputs to local files
     # Drop outbound "silence narration" messages (e.g. *(silent)*, 🔇, a bare
@@ -531,7 +535,7 @@ class GatewayConfig:
     # Session isolation in shared chats
     group_sessions_per_user: bool = True  # Isolate group/channel sessions per participant when user IDs are available
     thread_sessions_per_user: bool = False  # When False (default), threads are shared across all participants
-    max_concurrent_sessions: Optional[int] = None  # Positive int caps simultaneous active chat sessions
+    max_concurrent_sessions: int | None = None  # Positive int caps simultaneous active chat sessions
 
     # Multi-profile multiplexing (opt-in; default off preserves one-gateway-per-profile).
     # When True, the default profile's gateway serves inbound messages for every
@@ -553,7 +557,7 @@ class GatewayConfig:
     # fresh session exactly as if the reset policy had fired.  0 = disabled.
     session_store_max_age_days: int = 90
 
-    def get_connected_platforms(self) -> List[Platform]:
+    def get_connected_platforms(self) -> list[Platform]:
         """Return list of platforms that are enabled and configured."""
         connected = []
         for platform, config in self.platforms.items():
@@ -570,7 +574,7 @@ class GatewayConfig:
         if platform == Platform.WEIXIN:
             return bool(
                 config.extra.get("account_id")
-                and (config.token or config.extra.get("token"))
+                and (config.token or config.extra.get("token")),
             )
 
         # Generic token/api_key auth covers Telegram, Discord, Slack, etc.
@@ -604,35 +608,34 @@ class GatewayConfig:
             pass  # Registry not yet initialised during early import
 
         return False
-    
-    def get_home_channel(self, platform: Platform) -> Optional[HomeChannel]:
+
+    def get_home_channel(self, platform: Platform) -> HomeChannel | None:
         """Get the home channel for a platform."""
         config = self.platforms.get(platform)
         if config:
             return config.home_channel
         return None
-    
+
     def get_reset_policy(
-        self, 
-        platform: Optional[Platform] = None,
-        session_type: Optional[str] = None
+        self,
+        platform: Platform | None = None,
+        session_type: str | None = None,
     ) -> SessionResetPolicy:
-        """
-        Get the appropriate reset policy for a session.
+        """Get the appropriate reset policy for a session.
         
         Priority: platform override > type override > default
         """
         # Platform-specific override takes precedence
         if platform and platform in self.reset_by_platform:
             return self.reset_by_platform[platform]
-        
+
         # Type-specific override (dm, group, thread)
         if session_type and session_type in self.reset_by_type:
             return self.reset_by_type[session_type]
-        
+
         return self.default_reset_policy
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "platforms": {
                 p.value: c.to_dict() for p, c in self.platforms.items()
@@ -658,9 +661,9 @@ class GatewayConfig:
             "streaming": self.streaming.to_dict(),
             "session_store_max_age_days": self.session_store_max_age_days,
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GatewayConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "GatewayConfig":
         platforms = {}
         for platform_name, platform_data in data.get("platforms", {}).items():
             try:
@@ -668,11 +671,11 @@ class GatewayConfig:
                 platforms[platform] = PlatformConfig.from_dict(platform_data)
             except ValueError:
                 pass  # Skip unknown platforms
-        
+
         reset_by_type = {}
         for type_name, policy_data in data.get("reset_by_type", {}).items():
             reset_by_type[type_name] = SessionResetPolicy.from_dict(policy_data)
-        
+
         reset_by_platform = {}
         for platform_name, policy_data in data.get("reset_by_platform", {}).items():
             try:
@@ -680,15 +683,15 @@ class GatewayConfig:
                 reset_by_platform[platform] = SessionResetPolicy.from_dict(policy_data)
             except ValueError:
                 pass
-        
+
         default_policy = SessionResetPolicy()
         if "default_reset_policy" in data:
             default_policy = SessionResetPolicy.from_dict(data["default_reset_policy"])
-        
+
         sessions_dir = get_hermes_home() / "sessions"
         if "sessions_dir" in data:
             sessions_dir = Path(data["sessions_dir"])
-        
+
         quick_commands = data.get("quick_commands", {})
         if not isinstance(quick_commands, dict):
             quick_commands = {}
@@ -736,7 +739,7 @@ class GatewayConfig:
             sessions_dir=sessions_dir,
             always_log_local=_coerce_bool(data.get("always_log_local"), True),
             filter_silence_narration=_coerce_bool(
-                data.get("filter_silence_narration"), True
+                data.get("filter_silence_narration"), True,
             ),
             stt_enabled=_coerce_bool(stt_enabled, True),
             group_sessions_per_user=_coerce_bool(group_sessions_per_user, True),
@@ -748,7 +751,7 @@ class GatewayConfig:
             session_store_max_age_days=session_store_max_age_days,
         )
 
-    def get_unauthorized_dm_behavior(self, platform: Optional[Platform] = None) -> str:
+    def get_unauthorized_dm_behavior(self, platform: Platform | None = None) -> str:
         """Return the effective unauthorized-DM behavior for a platform.
 
         Email is inbox-shaped, not chat-shaped, so it defaults to ``"ignore"``
@@ -766,7 +769,7 @@ class GatewayConfig:
                 return "ignore"
         return self.unauthorized_dm_behavior
 
-    def get_notice_delivery(self, platform: Optional[Platform] = None) -> str:
+    def get_notice_delivery(self, platform: Platform | None = None) -> str:
         """Return the effective notice-delivery mode for a platform."""
         if platform:
             platform_cfg = self.platforms.get(platform)
@@ -779,8 +782,7 @@ class GatewayConfig:
 
 
 def load_gateway_config() -> GatewayConfig:
-    """
-    Load gateway configuration from multiple sources.
+    """Load gateway configuration from multiple sources.
 
     Priority (highest to lowest):
     1. Environment variables
@@ -796,7 +798,7 @@ def load_gateway_config() -> GatewayConfig:
     gateway_json_path = _home / "gateway.json"
     if gateway_json_path.exists():
         try:
-            with open(gateway_json_path, "r", encoding="utf-8") as f:
+            with Path(gateway_json_path).open(encoding="utf-8") as f:
                 gw_data = json.load(f) or {}
             logger.info(
                 "Loaded legacy %s — consider moving settings to config.yaml",
@@ -810,7 +812,7 @@ def load_gateway_config() -> GatewayConfig:
         import yaml
         config_yaml_path = _home / "config.yaml"
         if config_yaml_path.exists():
-            with open(config_yaml_path, encoding="utf-8") as f:
+            with Path(config_yaml_path).open(encoding="utf-8") as f:
                 yaml_cfg = yaml.safe_load(f) or {}
 
             # Managed scope: overlay administrator-pinned values so the gateway
@@ -1140,7 +1142,7 @@ def load_gateway_config() -> GatewayConfig:
 
     # Override with environment variables
     _apply_env_overrides(config)
-    
+
     # --- Validate loaded values ---
     _validate_gateway_config(config)
 
@@ -1157,7 +1159,7 @@ def _validate_gateway_config(config: "GatewayConfig") -> None:
 
     if not (0 <= policy.at_hour <= 23):
         logger.warning(
-            "Invalid at_hour=%s (must be 0-23). Using default 4.", policy.at_hour
+            "Invalid at_hour=%s (must be 0-23). Using default 4.", policy.at_hour,
         )
         policy.at_hour = 4
 
@@ -1235,20 +1237,20 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
         if not platform_config.enabled and not enabled_was_explicit:
             platform_config.enabled = True
         return platform_config
-    
+
     # Telegram
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
     if telegram_token:
         telegram_config = _enable_from_env(Platform.TELEGRAM)
         telegram_config.token = telegram_token
-    
+
     # Reply threading mode for Telegram (off/first/all)
     telegram_reply_mode = os.getenv("TELEGRAM_REPLY_TO_MODE", "").lower()
     if telegram_reply_mode in {"off", "first", "all"}:
         if Platform.TELEGRAM not in config.platforms:
             config.platforms[Platform.TELEGRAM] = PlatformConfig()
         config.platforms[Platform.TELEGRAM].reply_to_mode = telegram_reply_mode
-    
+
     telegram_fallback_ips = os.getenv("TELEGRAM_FALLBACK_IPS", "")
     if telegram_fallback_ips:
         if Platform.TELEGRAM not in config.platforms:
@@ -1265,13 +1267,13 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
             name=os.getenv("TELEGRAM_HOME_CHANNEL_NAME", "Home"),
             thread_id=os.getenv("TELEGRAM_HOME_CHANNEL_THREAD_ID") or None,
         )
-    
+
     # Discord
     discord_token = os.getenv("DISCORD_BOT_TOKEN")
     if discord_token:
         discord_config = _enable_from_env(Platform.DISCORD)
         discord_config.token = discord_token
-    
+
     discord_home = os.getenv("DISCORD_HOME_CHANNEL")
     if discord_home and Platform.DISCORD in config.platforms:
         config.platforms[Platform.DISCORD].home_channel = HomeChannel(
@@ -1280,14 +1282,14 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
             name=os.getenv("DISCORD_HOME_CHANNEL_NAME", "Home"),
             thread_id=os.getenv("DISCORD_HOME_CHANNEL_THREAD_ID") or None,
         )
-    
+
     # Reply threading mode for Discord (off/first/all)
     discord_reply_mode = os.getenv("DISCORD_REPLY_TO_MODE", "").lower()
     if discord_reply_mode in {"off", "first", "all"}:
         if Platform.DISCORD not in config.platforms:
             config.platforms[Platform.DISCORD] = PlatformConfig()
         config.platforms[Platform.DISCORD].reply_to_mode = discord_reply_mode
-    
+
     # WhatsApp (typically uses different auth mechanism)
     whatsapp_enabled = os.getenv("WHATSAPP_ENABLED", "").lower() in {"true", "1", "yes"}
     whatsapp_disabled_explicitly = os.getenv("WHATSAPP_ENABLED", "").lower() in {"false", "0", "no"}
@@ -1397,7 +1399,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
             name=os.getenv("SLACK_HOME_CHANNEL_NAME", ""),
             thread_id=os.getenv("SLACK_HOME_CHANNEL_THREAD_ID") or None,
         )
-    
+
     # Signal
     signal_url = os.getenv("SIGNAL_HTTP_URL")
     signal_account = os.getenv("SIGNAL_ACCOUNT")
@@ -1574,7 +1576,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
     msgraph_webhook_client_state = os.getenv("MSGRAPH_WEBHOOK_CLIENT_STATE", "")
     msgraph_webhook_resources = os.getenv("MSGRAPH_WEBHOOK_ACCEPTED_RESOURCES", "")
     msgraph_webhook_allowed_cidrs = os.getenv(
-        "MSGRAPH_WEBHOOK_ALLOWED_SOURCE_CIDRS", ""
+        "MSGRAPH_WEBHOOK_ALLOWED_SOURCE_CIDRS", "",
     )
     if (
         msgraph_webhook_enabled
@@ -1591,7 +1593,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
         if msgraph_webhook_port:
             try:
                 config.platforms[Platform.MSGRAPH_WEBHOOK].extra["port"] = int(
-                    msgraph_webhook_port
+                    msgraph_webhook_port,
                 )
             except ValueError:
                 pass
@@ -1818,7 +1820,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
                 qq_home_name_env = "QQ_HOME_CHANNEL_NAME"
                 logging.getLogger(__name__).warning(
                     "QQ_HOME_CHANNEL is deprecated; rename to QQBOT_HOME_CHANNEL "
-                    "in your .env for consistency with the platform key."
+                    "in your .env for consistency with the platform key.",
                 )
         if qq_home:
             config.platforms[Platform.QQBOT].home_channel = HomeChannel(
@@ -1882,7 +1884,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
             config.default_reset_policy.idle_minutes = int(idle_minutes)
         except ValueError:
             pass
-    
+
     reset_hour = os.getenv("SESSION_RESET_HOUR")
     if reset_hour:
         try:
@@ -1947,7 +1949,7 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
                     seed_for_probe = entry.env_enablement_fn()
                 except Exception as e:
                     logger.debug(
-                        "env_enablement_fn for %s raised: %s", entry.name, e
+                        "env_enablement_fn for %s raised: %s", entry.name, e,
                     )
                     seed_for_probe = None
 

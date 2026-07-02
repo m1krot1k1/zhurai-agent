@@ -8,11 +8,11 @@ import pytest
 import gateway.run as gateway_run
 from gateway.config import GatewayConfig, Platform
 from gateway.platforms.base import MessageEvent
-from gateway.session import SessionEntry, SessionSource
 from gateway.response_filters import (
     is_intentional_silence_agent_result,
     is_intentional_silence_response,
 )
+from gateway.session import SessionEntry, SessionSource
 
 
 def _source():
@@ -67,7 +67,7 @@ def _runner(monkeypatch, tmp_path):
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
     monkeypatch.setattr(
-        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
+        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"},
     )
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",
@@ -109,7 +109,7 @@ async def test_silence_token_suppresses_delivery_but_preserves_transcript(monkey
     })
 
     response = await runner._handle_message_with_agent(
-        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1
+        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1,
     )
 
     assert response == ""
@@ -135,7 +135,7 @@ async def test_empty_success_still_gets_empty_response_warning(monkeypatch, tmp_
     })
 
     response = await runner._handle_message_with_agent(
-        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1
+        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1,
     )
 
     assert "no response was generated" in response
@@ -159,7 +159,7 @@ async def test_prose_mentioning_silence_token_is_delivered(monkeypatch, tmp_path
     })
 
     response = await runner._handle_message_with_agent(
-        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1
+        _event(), _source(), "agent:main:telegram:group:-1001:12345", 1,
     )
 
     assert response == text

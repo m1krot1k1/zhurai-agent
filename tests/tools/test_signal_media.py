@@ -3,7 +3,7 @@
 import asyncio
 import sys
 from types import ModuleType
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -21,16 +21,20 @@ def _make_httpx_mock():
 
     class MockResp:
         status_code = 200
+
         def json(self):
             return {"timestamp": 1234567890}
+
         def raise_for_status(self):
             pass
 
     class MockClient:
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, *a):
             pass
+
         async def post(self, *args, **kwargs):
             return MockResp()
 
@@ -72,7 +76,7 @@ class TestSendSignalMediaFiles:
         extra = {"http_url": "http://localhost:8080", "account": "+155****4567"}
 
         result = asyncio.run(
-            _send_signal(extra, "+155****9999", "Check this out", media_files=[(str(img_path), False)])
+            _send_signal(extra, "+155****9999", "Check this out", media_files=[(str(img_path), False)]),
         )
 
         assert result["success"] is True
@@ -85,7 +89,7 @@ class TestSendSignalMediaFiles:
         extra = {"http_url": "http://localhost:8080", "account": "+155****4567"}
 
         result = asyncio.run(
-            _send_signal(extra, "+155****9999", "File missing?", media_files=[("/nonexistent.png", False)])
+            _send_signal(extra, "+155****9999", "File missing?", media_files=[("/nonexistent.png", False)]),
         )
 
         assert result["success"] is True  # Should succeed despite missing file
@@ -99,7 +103,7 @@ class TestSendSignalMediaRestrictions:
     def test_signal_allows_text_only_media_via_send_to_platform(self):
         """Signal should accept text-only media files (no message) via _send_to_platform."""
         import httpx
-        if not hasattr(httpx, 'Proxy') or not hasattr(httpx, 'URL'):
+        if not hasattr(httpx, "Proxy") or not hasattr(httpx, "URL"):
             pytest.skip("httpx type annotations incompatible with telegram library")
         from tools.send_message_tool import _send_to_platform
 
@@ -115,8 +119,8 @@ class TestSendSignalMediaRestrictions:
                     config,
                     "+155****9999",
                     "",  # Empty message - media is the message
-                    media_files=[("/tmp/test.png", False)]
-                )
+                    media_files=[("/tmp/test.png", False)],
+                ),
             )
 
             assert result["success"] is True
@@ -124,7 +128,7 @@ class TestSendSignalMediaRestrictions:
     def test_non_media_platforms_reject_text_only_media(self):
         """Slack should reject text-only media (no MESSAGE content)."""
         import httpx
-        if not hasattr(httpx, 'Proxy') or not hasattr(httpx, 'URL'):
+        if not hasattr(httpx, "Proxy") or not hasattr(httpx, "URL"):
             pytest.skip("httpx type annotations incompatible with telegram library")
         from tools.send_message_tool import _send_to_platform
 
@@ -139,8 +143,8 @@ class TestSendSignalMediaRestrictions:
                 config,
                 "C012AB3CD",
                 "",  # Empty message - media is the only content
-                media_files=[("/tmp/test.png", False)]
-            )
+                media_files=[("/tmp/test.png", False)],
+            ),
         )
 
         assert "error" in result
@@ -153,11 +157,11 @@ class TestSendSignalMediaWarningMessages:
     def test_warning_includes_signal_when_media_omitted(self):
         """Non-media platforms should show a warning mentioning signal in the supported list."""
         import httpx
-        if not hasattr(httpx, 'Proxy') or not hasattr(httpx, 'URL'):
+        if not hasattr(httpx, "Proxy") or not hasattr(httpx, "URL"):
             pytest.skip("httpx type annotations incompatible with telegram library")
-        from tools.send_message_tool import _send_to_platform
-        from hermes_cli.plugins import discover_plugins
         from gateway.platform_registry import platform_registry
+        from hermes_cli.plugins import discover_plugins
+        from tools.send_message_tool import _send_to_platform
 
         config = MagicMock()
         config.platforms = {Platform.SLACK: MagicMock(enabled=True)}
@@ -179,8 +183,8 @@ class TestSendSignalMediaWarningMessages:
                     config,
                     "C012AB3CD",
                     "Test message with media",
-                    media_files=[("/tmp/test.png", False)]
-                )
+                    media_files=[("/tmp/test.png", False)],
+                ),
             )
         finally:
             slack_entry.standalone_sender_fn = original_sender
@@ -204,7 +208,7 @@ class TestSendSignalGroupChats:
         extra = {"http_url": "http://localhost:8080", "account": "+155****4567"}
 
         result = asyncio.run(
-            _send_signal(extra, "group:abc123==", "Group file", media_files=[(str(img_path), False)])
+            _send_signal(extra, "group:abc123==", "Group file", media_files=[(str(img_path), False)]),
         )
 
         assert result["success"] is True

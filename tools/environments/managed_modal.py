@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import requests
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
+
+import requests
 
 from tools.environments.modal_utils import (
     BaseModalExecutionEnvironment,
@@ -48,7 +49,7 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
         image: str,
         cwd: str = "/root",
         timeout: int = 60,
-        modal_sandbox_kwargs: Optional[Dict[str, Any]] = None,
+        modal_sandbox_kwargs: dict[str, Any] | None = None,
         persistent_filesystem: bool = True,
         task_id: str = "default",
     ):
@@ -71,7 +72,7 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
 
     def _start_modal_exec(self, prepared: PreparedModalExec) -> ModalExecStart:
         exec_id = str(uuid.uuid4())
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "execId": exec_id,
             "command": prepared.command,
             "cwd": prepared.cwd,
@@ -89,14 +90,14 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
             )
         except Exception as exc:
             return ModalExecStart(
-                immediate_result=self._error_result(f"Managed Modal exec failed: {exc}")
+                immediate_result=self._error_result(f"Managed Modal exec failed: {exc}"),
             )
 
         if response.status_code >= 400:
             return ModalExecStart(
                 immediate_result=self._error_result(
-                    self._format_error("Managed Modal exec failed", response)
-                )
+                    self._format_error("Managed Modal exec failed", response),
+                ),
             )
 
         body = response.json()
@@ -106,14 +107,14 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
                 immediate_result=self._result(
                     body.get("output", ""),
                     body.get("returncode", 1),
-                )
+                ),
             )
 
         if body.get("execId") != exec_id:
             return ModalExecStart(
                 immediate_result=self._error_result(
-                    "Managed Modal exec start did not return the expected exec id"
-                )
+                    "Managed Modal exec start did not return the expected exec id",
+                ),
             )
 
         return ModalExecStart(handle=_ManagedModalExecHandle(exec_id=exec_id))
@@ -133,7 +134,7 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
 
         if status_response.status_code >= 400:
             return self._error_result(
-                self._format_error("Managed Modal exec poll failed", status_response)
+                self._format_error("Managed Modal exec poll failed", status_response),
             )
 
         status_body = status_response.json()
@@ -223,13 +224,13 @@ class ManagedModalEnvironment(BaseModalExecutionEnvironment):
             raise ValueError(
                 "Managed Modal does not support host credential-file passthrough. "
                 "Use TERMINAL_MODAL_MODE=direct when skills or config require "
-                "credential files inside the sandbox."
+                "credential files inside the sandbox.",
             )
 
     def _request(self, method: str, path: str, *,
-                 json: Dict[str, Any] | None = None,
+                 json: dict[str, Any] | None = None,
                  timeout: int = 30,
-                 extra_headers: Dict[str, str] | None = None) -> requests.Response:
+                 extra_headers: dict[str, str] | None = None) -> requests.Response:
         headers = {
             "Authorization": f"Bearer {self._nous_user_token}",
             "Content-Type": "application/json",

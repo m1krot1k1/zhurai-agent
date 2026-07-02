@@ -12,8 +12,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from tools.environments.base import BaseEnvironment, _pipe_stdin
 from hermes_cli._subprocess_compat import windows_hide_flags
+from tools.environments.base import BaseEnvironment, _pipe_stdin
 
 _IS_WINDOWS = platform.system() == "Windows"
 
@@ -32,11 +32,11 @@ def _msys_to_windows_path(cwd: str) -> str:
     if not _IS_WINDOWS or not cwd:
         return cwd
     # Match leading "/<single letter>/" or exactly "/<letter>" (bare drive root).
-    m = re.match(r'^/([a-zA-Z])(/.*)?$', cwd)
+    m = re.match(r"^/([a-zA-Z])(/.*)?$", cwd)
     if not m:
         return cwd
     drive = m.group(1).upper()
-    tail = (m.group(2) or "").replace('/', '\\')
+    tail = (m.group(2) or "").replace("/", "\\")
     return f"{drive}:{tail or chr(92)}"  # chr(92) = backslash, avoid raw-string escape
 
 
@@ -58,11 +58,11 @@ def _resolve_safe_cwd(cwd: str) -> str:
     terminal call until the gateway restarts.
     """
     cwd = _msys_to_windows_path(cwd) if _IS_WINDOWS else cwd
-    if cwd and os.path.isdir(cwd):
+    if cwd and Path(cwd).is_dir():
         return cwd
     parent = os.path.dirname(cwd) if cwd else ""
     while parent:
-        if os.path.isdir(parent):
+        if Path(parent).is_dir():
             return parent
         next_parent = os.path.dirname(parent)
         if next_parent == parent:
@@ -117,9 +117,7 @@ def _build_provider_env_blocklist() -> frozenset:
         from hermes_cli.config import OPTIONAL_ENV_VARS
         for name, metadata in OPTIONAL_ENV_VARS.items():
             category = metadata.get("category")
-            if category in {"tool", "messaging"}:
-                blocked.add(name)
-            elif category == "setting" and metadata.get("password"):
+            if category in {"tool", "messaging"} or (category == "setting" and metadata.get("password")):
                 blocked.add(name)
     except ImportError:
         pass
@@ -240,14 +238,14 @@ def _find_bash() -> str:
     if not _IS_WINDOWS:
         return (
             shutil.which("bash")
-            or ("/usr/bin/bash" if os.path.isfile("/usr/bin/bash") else None)
-            or ("/bin/bash" if os.path.isfile("/bin/bash") else None)
+            or ("/usr/bin/bash" if Path("/usr/bin/bash").is_file() else None)
+            or ("/bin/bash" if Path("/bin/bash").is_file() else None)
             or os.environ.get("SHELL")
             or "/bin/sh"
         )
 
     custom = os.environ.get("HERMES_GIT_BASH_PATH")
-    if custom and os.path.isfile(custom):
+    if custom and Path(custom).is_file():
         return custom
 
     # Prefer our own portable Git install first — this way a broken or
@@ -264,9 +262,9 @@ def _find_bash() -> str:
     if _hermes_portable_git:
         for candidate in (
             os.path.join(_hermes_portable_git, "bin", "bash.exe"),        # PortableGit (primary)
-            os.path.join(_hermes_portable_git, "usr", "bin", "bash.exe"), # MinGit fallback
+            os.path.join(_hermes_portable_git, "usr", "bin", "bash.exe"),  # MinGit fallback
         ):
-            if os.path.isfile(candidate):
+            if Path(candidate).is_file():
                 return candidate
 
     found = shutil.which("bash")
@@ -278,13 +276,13 @@ def _find_bash() -> str:
         os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Git", "bin", "bash.exe"),
         os.path.join(_local_appdata, "Programs", "Git", "bin", "bash.exe"),
     ):
-        if candidate and os.path.isfile(candidate):
+        if candidate and Path(candidate).is_file():
             return candidate
 
     raise RuntimeError(
         "Git Bash not found. Hermes Agent requires Git for Windows on Windows.\n"
         "Install it from: https://git-scm.com/download/win\n"
-        "Or set HERMES_GIT_BASH_PATH to your bash.exe location."
+        "Or set HERMES_GIT_BASH_PATH to your bash.exe location.",
     )
 
 
@@ -341,9 +339,9 @@ def _resolve_hermes_bin_dir() -> str | None:
         argv0 = sys.argv[0] if sys.argv else ""
         base = os.path.basename(argv0).lower()
         if (
-            os.path.isabs(argv0)
+            Path(argv0).is_absolute()
             and (base == "hermes" or base.startswith("hermes."))
-            and os.path.isfile(argv0)
+            and Path(argv0).is_file()
         ):
             candidate = os.path.dirname(argv0)
 
@@ -351,10 +349,10 @@ def _resolve_hermes_bin_dir() -> str | None:
         exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
         if exe_dir:
             shim = "hermes.exe" if _IS_WINDOWS else "hermes"
-            if os.path.isfile(os.path.join(exe_dir, shim)):
+            if Path(os.path.join(exe_dir, shim)).is_file():
                 candidate = exe_dir
 
-    if candidate and not os.path.isdir(candidate):
+    if candidate and not Path(candidate).is_dir():
         candidate = None
 
     _HERMES_BIN_DIR = candidate
@@ -543,7 +541,7 @@ def _resolve_shell_init_files() -> list[str]:
             path = os.path.expandvars(os.path.expanduser(raw))
         except Exception:
             continue
-        if path and os.path.isfile(path):
+        if path and Path(path).is_file():
             resolved.append(path)
     return resolved
 
@@ -622,7 +620,7 @@ class LocalEnvironment(BaseEnvironment):
             if candidate and candidate.startswith("/"):
                 return candidate.rstrip("/") or "/"
 
-        if os.path.isdir("/tmp") and os.access("/tmp", os.W_OK | os.X_OK):
+        if Path("/tmp").is_dir() and os.access("/tmp", os.W_OK | os.X_OK):
             return "/tmp"
 
         candidate = tempfile.gettempdir()
@@ -787,11 +785,11 @@ class LocalEnvironment(BaseEnvironment):
         missing" warning on every command.
         """
         try:
-            with open(self._cwd_file, encoding="utf-8") as f:
+            with Path(self._cwd_file).open(encoding="utf-8") as f:
                 cwd_path = f.read().strip()
             if _IS_WINDOWS:
                 cwd_path = _msys_to_windows_path(cwd_path)
-            if cwd_path and os.path.isdir(cwd_path):
+            if cwd_path and Path(cwd_path).is_dir():
                 self.cwd = cwd_path
         except (OSError, FileNotFoundError):
             pass
@@ -816,7 +814,7 @@ class LocalEnvironment(BaseEnvironment):
         super()._extract_cwd_from_output(result)
         if self.cwd != prev_cwd:
             normalized = _msys_to_windows_path(self.cwd) if _IS_WINDOWS else self.cwd
-            if normalized and os.path.isdir(normalized):
+            if normalized and Path(normalized).is_dir():
                 self.cwd = normalized
             else:
                 # Stale / non-existent path — keep previous cwd; _run_bash
@@ -827,6 +825,6 @@ class LocalEnvironment(BaseEnvironment):
         """Clean up temp files."""
         for f in (self._snapshot_path, self._cwd_file):
             try:
-                os.unlink(f)
+                Path(f).unlink()
             except OSError:
                 pass

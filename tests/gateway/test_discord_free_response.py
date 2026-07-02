@@ -1,9 +1,9 @@
 """Tests for Discord free-response defaults and mention gating."""
 
-from datetime import datetime, timezone
+import sys
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
-import sys
 
 import pytest
 
@@ -135,7 +135,7 @@ def make_message(*, channel, content: str, mentions=None, msg_type=None):
         mentions=list(mentions or []),
         attachments=[],
         reference=None,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         channel=channel,
         author=author,
         type=msg_type if msg_type is not None else discord_platform.discord.MessageType.default,
@@ -550,8 +550,6 @@ async def test_discord_free_response_channel_skips_auto_thread(adapter, monkeypa
     assert event.source.chat_type == "group"
 
 
-
-
 @pytest.mark.asyncio
 async def test_discord_voice_linked_parent_thread_still_requires_mention(adapter, monkeypatch):
     """Threads under a voice-linked channel should still require @mention."""
@@ -637,7 +635,6 @@ async def test_discord_thread_require_mention_via_config_extra(adapter, monkeypa
     await adapter._handle_message(message)
 
     adapter.handle_message.assert_not_awaited()
-
 
 
 @pytest.mark.asyncio
@@ -803,10 +800,10 @@ async def test_fetch_channel_context_reply_target_in_primary_window_not_duplicat
 
 def test_nonconversational_fallback_requires_self_improvement_emoji():
     assert discord_platform._looks_like_nonconversational_history_message(
-        "💾 Self-improvement review: Memory updated"
+        "💾 Self-improvement review: Memory updated",
     )
     assert not discord_platform._looks_like_nonconversational_history_message(
-        "Self-improvement review: this is a normal assistant heading"
+        "Self-improvement review: this is a normal assistant heading",
     )
 
 
@@ -999,7 +996,8 @@ async def test_discord_shared_channel_backfill_prepends_context(adapter, monkeyp
 @pytest.mark.asyncio
 async def test_discord_per_user_channel_backfills_too(adapter, monkeypatch):
     """Per-user sessions also benefit from backfill: Alice's session is missing
-    other-channel-participants' context and her own pre-mention messages."""
+    other-channel-participants' context and her own pre-mention messages.
+    """
     monkeypatch.setenv("DISCORD_REQUIRE_MENTION", "true")
     monkeypatch.delenv("DISCORD_FREE_RESPONSE_CHANNELS", raising=False)
     monkeypatch.setenv("DISCORD_AUTO_THREAD", "false")
@@ -1113,7 +1111,7 @@ async def test_discord_reply_in_free_channel_triggers_backfill(adapter, monkeypa
     monkeypatch.setenv("DISCORD_AUTO_THREAD", "false")
     adapter.config.extra["history_backfill"] = True
     adapter._fetch_channel_context = AsyncMock(
-        return_value="[Context around the replied-to message]\n[Hermes [bot]] earlier answer"
+        return_value="[Context around the replied-to message]\n[Hermes [bot]] earlier answer",
     )
 
     message = make_message(channel=FakeTextChannel(channel_id=321), content="what about edge cases?")
@@ -1153,4 +1151,3 @@ async def test_discord_non_reply_free_channel_skips_backfill(adapter, monkeypatc
     await adapter._handle_message(message)
 
     adapter._fetch_channel_context.assert_not_awaited()
-

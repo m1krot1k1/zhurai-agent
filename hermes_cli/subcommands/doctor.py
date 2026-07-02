@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_doctor_parser(subparsers, *, cmd_doctor: Callable) -> None:
@@ -20,7 +20,7 @@ def build_doctor_parser(subparsers, *, cmd_doctor: Callable) -> None:
         description="Diagnose issues with Hermes Agent setup",
     )
     doctor_parser.add_argument(
-        "--fix", action="store_true", help="Attempt to fix issues automatically"
+        "--fix", action="store_true", help="Attempt to fix issues automatically",
     )
     doctor_parser.add_argument(
         "--ack",

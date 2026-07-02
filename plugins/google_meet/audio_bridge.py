@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import platform
 import subprocess
-from typing import Optional
-
 
 _BLACKHOLE_DEVICE = "BlackHole 2ch"
 
@@ -36,9 +34,9 @@ class AudioBridge:
 
     def __init__(self, name_prefix: str = "hermes_meet") -> None:
         self._name_prefix = name_prefix
-        self._platform: Optional[str] = None
-        self._device_name: Optional[str] = None
-        self._write_target: Optional[str] = None
+        self._platform: str | None = None
+        self._device_name: str | None = None
+        self._write_target: str | None = None
         self._module_ids: list[int] = []
         self._torn_down = False
 
@@ -107,7 +105,7 @@ class AudioBridge:
                     "load-module",
                     "module-null-sink",
                     f"sink_name={sink_name}",
-                    f"sink_properties=device.description=HermesMeetSink",
+                    "sink_properties=device.description=HermesMeetSink",
                 ],
                 check=True,
                 capture_output=True,
@@ -116,11 +114,11 @@ class AudioBridge:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
-                "pactl not found — install PulseAudio/pipewire-pulse"
+                "pactl not found — install PulseAudio/pipewire-pulse",
             ) from exc
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(
-                f"pactl load-module null-sink failed: {exc.stderr or exc}"
+                f"pactl load-module null-sink failed: {exc.stderr or exc}",
             ) from exc
 
         sink_mod_id = self._parse_module_id(sink_out.stdout)
@@ -148,7 +146,7 @@ class AudioBridge:
                 stdin=subprocess.DEVNULL,
             )
             raise RuntimeError(
-                f"pactl load-module virtual-source failed: {exc.stderr or exc}"
+                f"pactl load-module virtual-source failed: {exc.stderr or exc}",
             ) from exc
 
         src_mod_id = self._parse_module_id(src_out.stdout)
@@ -177,17 +175,17 @@ class AudioBridge:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(
-                "system_profiler not found (macOS-only command)"
+                "system_profiler not found (macOS-only command)",
             ) from exc
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(
-                f"system_profiler failed: {exc.output}"
+                f"system_profiler failed: {exc.output}",
             ) from exc
 
         if "BlackHole" not in out:
             raise RuntimeError(
                 "BlackHole virtual audio device not installed. "
-                "Install via: brew install blackhole-2ch"
+                "Install via: brew install blackhole-2ch",
             )
 
         self._platform = "darwin"
@@ -209,7 +207,7 @@ class AudioBridge:
 
     @staticmethod
     def _parse_module_id(stdout: str) -> int:
-        """pactl load-module prints the new module ID to stdout."""
+        """Pactl load-module prints the new module ID to stdout."""
         text = (stdout or "").strip()
         if not text:
             raise RuntimeError("pactl load-module returned empty stdout")
@@ -220,7 +218,7 @@ class AudioBridge:
             return int(token)
         except ValueError as exc:
             raise RuntimeError(
-                f"could not parse pactl module id from: {stdout!r}"
+                f"could not parse pactl module id from: {stdout!r}",
             ) from exc
 
 

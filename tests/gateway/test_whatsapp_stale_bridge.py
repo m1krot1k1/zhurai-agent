@@ -98,7 +98,7 @@ def _fresh_node_modules(bridge_dir: Path) -> None:
     nm = bridge_dir / "node_modules"
     nm.mkdir()
     (nm / ".hermes-pkg-hash").write_text(
-        _file_content_hash(bridge_dir / "package.json")
+        _file_content_hash(bridge_dir / "package.json"),
     )
 
 
@@ -174,7 +174,7 @@ class TestStaleBridgeHandshake:
             session_path=tmp_path / "session",
         )
         mock_client = _mock_health(
-            {"status": "connected", "scriptHash": "deadbeefdeadbeef"}
+            {"status": "connected", "scriptHash": "deadbeefdeadbeef"},
         )
         # Spawned bridge dies immediately → connect() returns False, but the
         # assertion that matters is that the stale bridge was NOT reused and

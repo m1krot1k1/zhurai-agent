@@ -48,7 +48,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +108,13 @@ EXPOSED_TOOLS: tuple[str, ...] = (
 def _build_server() -> Any:
     """Create the FastMCP server with Hermes tools attached. Lazy imports
     so the module can be imported without the mcp package installed
-    (we degrade to a clear error only when actually run)."""
+    (we degrade to a clear error only when actually run).
+    """
     try:
         from mcp.server.fastmcp import FastMCP
     except ImportError as exc:  # pragma: no cover - install hint
         raise ImportError(
-            f"hermes-tools MCP server requires the 'mcp' package: {exc}"
+            f"hermes-tools MCP server requires the 'mcp' package: {exc}",
         ) from exc
 
     # Discover Hermes tools so dispatch works.
@@ -147,7 +148,7 @@ def _build_server() -> Any:
         spec = all_defs.get(name)
         if spec is None:
             logger.debug(
-                "skipping %s — not registered in this Hermes process", name
+                "skipping %s — not registered in this Hermes process", name,
             )
             continue
 
@@ -194,7 +195,7 @@ def _build_server() -> Any:
     return mcp
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Entry point for `python -m agent.transports.hermes_tools_mcp_server`."""
     argv = argv or sys.argv[1:]
     verbose = "--verbose" in argv or "-v" in argv

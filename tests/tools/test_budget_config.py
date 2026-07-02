@@ -21,7 +21,6 @@ from tools.budget_config import (
     budget_for_context_window,
 )
 
-
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
@@ -77,7 +76,7 @@ class TestBudgetConfigDefaults:
 
     def test_default_budget_singleton_matches(self):
         """DEFAULT_BUDGET should equal a freshly constructed BudgetConfig."""
-        assert DEFAULT_BUDGET == BudgetConfig()
+        assert BudgetConfig() == DEFAULT_BUDGET
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +156,7 @@ class TestResolveThreshold:
         cfg = BudgetConfig()
         result = cfg.resolve_threshold("some_tool")
         mock_registry.get_max_result_size.assert_called_once_with(
-            "some_tool", default=DEFAULT_RESULT_SIZE_CHARS
+            "some_tool", default=DEFAULT_RESULT_SIZE_CHARS,
         )
         assert result == 77_777
 
@@ -168,7 +167,7 @@ class TestResolveThreshold:
         cfg = BudgetConfig(default_result_size=50_000)
         cfg.resolve_threshold("unknown_tool")
         mock_registry.get_max_result_size.assert_called_once_with(
-            "unknown_tool", default=50_000
+            "unknown_tool", default=50_000,
         )
 
     def test_pinned_read_file_returns_inf(self):
@@ -249,7 +248,8 @@ class TestBudgetForContextWindow:
 
     def test_scaled_budget_constrains_oversized_result(self):
         """A 279K-char result against a 65K model exceeds the scaled per-result
-        threshold, so it will be persisted/truncated rather than sent whole."""
+        threshold, so it will be persisted/truncated rather than sent whole.
+        """
         cfg = budget_for_context_window(65_536)
         huge_len = 279_549
         threshold = cfg.resolve_threshold("mcp_firecrawl_firecrawl_search")

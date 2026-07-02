@@ -2,15 +2,16 @@
 
 import json
 import os
-import pytest
 import stat
 from argparse import Namespace
 
+import pytest
+
 from hermes_cli.webhook import (
-    webhook_command,
     _load_subscriptions,
     _save_subscriptions,
     _subscriptions_path,
+    webhook_command,
 )
 
 
@@ -19,7 +20,7 @@ def _isolate(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     # Default: webhooks enabled (most tests need this)
     monkeypatch.setattr(
-        "hermes_cli.webhook._is_webhook_enabled", lambda: True
+        "hermes_cli.webhook._is_webhook_enabled", lambda: True,
     )
 
 
@@ -68,7 +69,7 @@ class TestSubscribe:
 
     def test_custom_secret(self):
         webhook_command(_make_args(
-            webhook_action="subscribe", name="s", secret="my-secret"
+            webhook_action="subscribe", name="s", secret="my-secret",
         ))
         assert _load_subscriptions()["s"]["secret"] == "my-secret"
 
@@ -195,7 +196,7 @@ class TestWebhookEnabledGate:
     def test_real_check_disabled(self, monkeypatch):
         monkeypatch.setattr(
             "hermes_cli.webhook._get_webhook_config",
-            lambda: {},
+            dict,
         )
         monkeypatch.setattr(
             "hermes_cli.webhook._is_webhook_enabled",

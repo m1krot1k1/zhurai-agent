@@ -25,14 +25,14 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from agent.web_search_provider import WebSearchProvider
 
 logger = logging.getLogger(__name__)
 
 
-def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def _tavily_request(endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
     """POST to the Tavily API and return the parsed JSON response.
 
     Mirrors :func:`tools.web_tools._tavily_request`. Raises ``ValueError``
@@ -45,7 +45,7 @@ def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if not api_key:
         raise ValueError(
             "TAVILY_API_KEY environment variable not set. "
-            "Get your API key at https://app.tavily.com/home"
+            "Get your API key at https://app.tavily.com/home",
         )
 
     base_url = os.getenv("TAVILY_BASE_URL", "https://api.tavily.com")
@@ -59,7 +59,7 @@ def _tavily_request(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     return response.json()
 
 
-def _normalize_tavily_search_results(response: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_tavily_search_results(response: dict[str, Any]) -> dict[str, Any]:
     """Map Tavily ``/search`` response to ``{success, data: {web: [...]}}``."""
     web_results = []
     for i, result in enumerate(response.get("results", [])):
@@ -69,14 +69,14 @@ def _normalize_tavily_search_results(response: Dict[str, Any]) -> Dict[str, Any]
                 "url": result.get("url", ""),
                 "description": result.get("content", ""),
                 "position": i + 1,
-            }
+            },
         )
     return {"success": True, "data": {"web": web_results}}
 
 
 def _normalize_tavily_documents(
-    response: Dict[str, Any], fallback_url: str = ""
-) -> List[Dict[str, Any]]:
+    response: dict[str, Any], fallback_url: str = "",
+) -> list[dict[str, Any]]:
     """Map Tavily ``/extract`` response to standard documents.
 
     Documents follow the legacy LLM post-processing shape::
@@ -86,7 +86,7 @@ def _normalize_tavily_documents(
     Failures (``failed_results``, ``failed_urls``) become result entries
     with an ``error`` field rather than raising.
     """
-    documents: List[Dict[str, Any]] = []
+    documents: list[dict[str, Any]] = []
     for result in response.get("results", []):
         url = result.get("url", fallback_url)
         raw = result.get("raw_content", "") or result.get("content", "")
@@ -97,7 +97,7 @@ def _normalize_tavily_documents(
                 "content": raw,
                 "raw_content": raw,
                 "metadata": {"sourceURL": url, "title": result.get("title", "")},
-            }
+            },
         )
     for fail in response.get("failed_results", []):
         documents.append(
@@ -108,7 +108,7 @@ def _normalize_tavily_documents(
                 "raw_content": "",
                 "error": fail.get("error", "extraction failed"),
                 "metadata": {"sourceURL": fail.get("url", fallback_url)},
-            }
+            },
         )
     for fail_url in response.get("failed_urls", []):
         url_str = fail_url if isinstance(fail_url, str) else str(fail_url)
@@ -120,7 +120,7 @@ def _normalize_tavily_documents(
                 "raw_content": "",
                 "error": "extraction failed",
                 "metadata": {"sourceURL": url_str},
-            }
+            },
         )
     return documents
 
@@ -146,7 +146,7 @@ class TavilyWebSearchProvider(WebSearchProvider):
     def supports_extract(self) -> bool:
         return True
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Execute a Tavily search."""
         try:
             from tools.interrupt import is_interrupted
@@ -171,7 +171,7 @@ class TavilyWebSearchProvider(WebSearchProvider):
             logger.warning("Tavily search error: %s", exc)
             return {"success": False, "error": f"Tavily search failed: {exc}"}
 
-    def extract(self, urls: List[str], **kwargs: Any) -> List[Dict[str, Any]]:
+    def extract(self, urls: list[str], **kwargs: Any) -> list[dict[str, Any]]:
         """Extract content from one or more URLs via Tavily.
 
         Sync — the underlying call is httpx.post(...). Returns the legacy
@@ -194,7 +194,7 @@ class TavilyWebSearchProvider(WebSearchProvider):
                 },
             )
             return _normalize_tavily_documents(
-                raw, fallback_url=urls[0] if urls else ""
+                raw, fallback_url=urls[0] if urls else "",
             )
         except ValueError as exc:
             return [{"url": u, "title": "", "content": "", "error": str(exc)} for u in urls]
@@ -205,7 +205,7 @@ class TavilyWebSearchProvider(WebSearchProvider):
                 for u in urls
             ]
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Tavily",
             "badge": "paid",

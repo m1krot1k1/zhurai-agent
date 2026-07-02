@@ -407,7 +407,7 @@ def _hermetic_environment(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def _isolate_hermes_home(_hermetic_environment):
     """Alias preserved for any test that yields this name explicitly."""
-    return None
+    return
 
 
 # ── Module-level state reset — replaced by per-file process isolation ──────
@@ -427,13 +427,13 @@ def _isolate_hermes_home(_hermetic_environment):
 # approvals from one test's session into another's.
 
 
-@pytest.fixture()
+@pytest.fixture
 def tmp_dir(tmp_path):
     """Provide a temporary directory that is cleaned up automatically."""
     return tmp_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_config():
     """Return a minimal hermes config dict suitable for unit tests."""
     return {
@@ -534,7 +534,7 @@ def _ensure_current_event_loop(request):
 _LIVE_SYSTEM_GUARD_BYPASS_MARK = "live_system_guard_bypass"
 
 
-def pytest_configure(config):  # noqa: D401 — pytest hook
+def pytest_configure(config):
     """Register markers used by hermetic conftest."""
     config.addinivalue_line(
         "markers",
@@ -634,7 +634,7 @@ def _live_system_guard(request, monkeypatch):
             "code path without mocking find_gateway_pids and os.kill. "
             "Mock both, or mark the test with "
             "@pytest.mark.live_system_guard_bypass if real signal "
-            "delivery is genuinely required."
+            "delivery is genuinely required.",
         )
 
     monkeypatch.setattr(_os, "kill", _guarded_kill)
@@ -654,7 +654,7 @@ def _live_system_guard(request, monkeypatch):
             raise RuntimeError(
                 f"tests/conftest.py live-system guard: blocked "
                 f"os.killpg({pgid}, {sig}) — PGID is outside the test "
-                "process group. See _live_system_guard for the why."
+                "process group. See _live_system_guard for the why.",
             )
 
         monkeypatch.setattr(_os, "killpg", _guarded_killpg)
@@ -738,7 +738,7 @@ def _live_system_guard(request, monkeypatch):
                 f"subprocess.{name}({cmd!r}) — would mutate the "
                 "live hermes-gateway systemd unit. Mock "
                 "subprocess.run / _run_systemctl in the test, or "
-                "mark with @pytest.mark.live_system_guard_bypass."
+                "mark with @pytest.mark.live_system_guard_bypass.",
             )
         if _is_process_killer(cmd):
             raise RuntimeError(
@@ -746,7 +746,7 @@ def _live_system_guard(request, monkeypatch):
                 f"subprocess.{name}({cmd!r}) — process-killer command "
                 "targeting hermes/python could hit the live gateway. "
                 "Mark with @pytest.mark.live_system_guard_bypass if "
-                "intentional."
+                "intentional.",
             )
         # Block any subprocess that would run `hermes update` (or the
         # equivalent `python -m hermes_cli.main update`).  These commands
@@ -781,7 +781,7 @@ def _live_system_guard(request, monkeypatch):
                 "in the test instead, or mark with "
                 "@pytest.mark.live_system_guard_bypass if genuinely "
                 "needed (e.g. an integration test testing the update "
-                "flow against a dedicated throwaway repo)."
+                "flow against a dedicated throwaway repo).",
             )
 
     def _wrap_subprocess(name, real):
@@ -823,7 +823,7 @@ def _live_system_guard(request, monkeypatch):
     monkeypatch.setattr(_subprocess, "Popen", _wrap_popen())
     monkeypatch.setattr(_subprocess, "call", _wrap_subprocess("call", real_call))
     monkeypatch.setattr(
-        _subprocess, "check_call", _wrap_subprocess("check_call", real_check_call)
+        _subprocess, "check_call", _wrap_subprocess("check_call", real_check_call),
     )
     monkeypatch.setattr(
         _subprocess,
@@ -831,7 +831,7 @@ def _live_system_guard(request, monkeypatch):
         _wrap_subprocess("check_output", real_check_output),
     )
     monkeypatch.setattr(
-        _subprocess, "getoutput", _wrap_subprocess("getoutput", real_getoutput)
+        _subprocess, "getoutput", _wrap_subprocess("getoutput", real_getoutput),
     )
     monkeypatch.setattr(
         _subprocess,
@@ -876,7 +876,7 @@ def _live_system_guard(request, monkeypatch):
 
         async def _guarded_async_exec(program, *args, **kwargs):
             _check_subprocess_cmd(
-                "asyncio.create_subprocess_exec", [program, *args]
+                "asyncio.create_subprocess_exec", [program, *args],
             )
             return await real_async_exec(program, *args, **kwargs)
 
@@ -886,7 +886,7 @@ def _live_system_guard(request, monkeypatch):
 
         monkeypatch.setattr(_asyncio, "create_subprocess_exec", _guarded_async_exec)
         monkeypatch.setattr(
-            _asyncio, "create_subprocess_shell", _guarded_async_shell
+            _asyncio, "create_subprocess_shell", _guarded_async_shell,
         )
     except Exception:
         pass

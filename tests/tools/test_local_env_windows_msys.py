@@ -18,8 +18,8 @@ and ``os.path.isdir`` so the MSYS path tests as "missing" exactly like
 on the real OS.
 """
 
+import pathlib
 from unittest.mock import patch
-
 
 from tools.environments import local as local_mod
 from tools.environments.local import (
@@ -28,10 +28,10 @@ from tools.environments.local import (
     _resolve_safe_cwd,
 )
 
-
 # ---------------------------------------------------------------------------
 # _msys_to_windows_path — pure-function unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestMsysToWindowsPath:
     def test_noop_on_non_windows(self, monkeypatch):
@@ -60,7 +60,8 @@ class TestMsysToWindowsPath:
     def test_does_not_translate_multi_char_first_segment(self, monkeypatch):
         """``/tmp/foo`` and ``/home/x`` must NOT be misread as drive paths
         just because they start with ``/`` and a single letter — the regex
-        only matches when the first segment is exactly one character."""
+        only matches when the first segment is exactly one character.
+        """
         monkeypatch.setattr(local_mod, "_IS_WINDOWS", True)
         assert _msys_to_windows_path("/tmp/foo") == "/tmp/foo"
         assert _msys_to_windows_path("/home/x") == "/home/x"
@@ -80,7 +81,8 @@ class TestResolveSafeCwdWindows:
     ):
         """The whole point of this fix: a Git Bash ``/c/Users/x`` value
         should resolve to its native equivalent if that native dir exists,
-        WITHOUT falling back to the temp dir."""
+        WITHOUT falling back to the temp dir.
+        """
         monkeypatch.setattr(local_mod, "_IS_WINDOWS", True)
 
         # tmp_path is a real native dir on the test host. Build a fake
@@ -91,7 +93,7 @@ class TestResolveSafeCwdWindows:
         # try to translate that (regex won't match), so emulate the
         # mapping by pointing the translator at the real native dir.
         with patch.object(
-            local_mod, "_msys_to_windows_path", return_value=native
+            local_mod, "_msys_to_windows_path", return_value=native,
         ):
             assert _resolve_safe_cwd("/c/whatever") == native
 
@@ -107,7 +109,8 @@ class TestUpdateCwdWindowsMsys:
         """When Git Bash writes ``/c/Users/x`` to the cwd marker file on
         Windows, ``_update_cwd`` must translate to native form before
         validating and storing — otherwise ``os.path.isdir`` rejects a
-        perfectly real directory."""
+        perfectly real directory.
+        """
         original = tmp_path / "starting"
         original.mkdir()
 
@@ -115,7 +118,7 @@ class TestUpdateCwdWindowsMsys:
         monkeypatch.setattr(local_mod, "_IS_WINDOWS", True)
 
         with patch.object(
-            LocalEnvironment, "init_session", autospec=True, return_value=None
+            LocalEnvironment, "init_session", autospec=True, return_value=None,
         ):
             env = LocalEnvironment(cwd=str(original), timeout=10)
 
@@ -123,8 +126,7 @@ class TestUpdateCwdWindowsMsys:
         new_dir = tmp_path / "next"
         new_dir.mkdir()
 
-        with open(env._cwd_file, "w") as f:
-            f.write("/c/whatever/from/bash")
+        pathlib.Path(env._cwd_file).write_text("/c/whatever/from/bash")
 
         # Translate the synthetic MSYS string to the real native dir.
         def fake_translate(p):
@@ -146,14 +148,15 @@ class TestExtractCwdFromOutputWindowsMsys:
     def test_stale_msys_marker_does_not_clobber_cwd(self, monkeypatch, tmp_path):
         """When the cwd marker in stdout points at a non-existent path,
         ``LocalEnvironment._extract_cwd_from_output`` must roll back to
-        the previous cwd instead of propagating a bad value."""
+        the previous cwd instead of propagating a bad value.
+        """
         original = tmp_path / "starting"
         original.mkdir()
 
         monkeypatch.setattr(local_mod, "_IS_WINDOWS", True)
 
         with patch.object(
-            LocalEnvironment, "init_session", autospec=True, return_value=None
+            LocalEnvironment, "init_session", autospec=True, return_value=None,
         ):
             env = LocalEnvironment(cwd=str(original), timeout=10)
 
@@ -182,7 +185,7 @@ class TestExtractCwdFromOutputWindowsMsys:
         monkeypatch.setattr(local_mod, "_IS_WINDOWS", True)
 
         with patch.object(
-            LocalEnvironment, "init_session", autospec=True, return_value=None
+            LocalEnvironment, "init_session", autospec=True, return_value=None,
         ):
             env = LocalEnvironment(cwd=str(original), timeout=10)
 

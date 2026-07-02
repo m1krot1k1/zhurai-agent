@@ -28,8 +28,6 @@ import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-
-
 # ---------------------------------------------------------------------------
 # Prong 1: force_close_tcp_sockets must NOT release file descriptors.
 # ---------------------------------------------------------------------------
@@ -160,7 +158,8 @@ def _make_agent_mock():
 
 def _call_inside_owner_thread(callable_):
     """Run callable_ on a separate thread so its ``threading.get_ident()``
-    differs from the test thread."""
+    differs from the test thread.
+    """
     result = {"value": None, "exc": None}
 
     def runner():
@@ -184,7 +183,6 @@ def test_close_from_stranger_thread_aborts_only_no_close():
     the worker's eventual ``finally`` must still see the client in the
     holder so IT can be the one releasing the FD.
     """
-
     # We can't easily invoke just `_close_request_client_once` because it's
     # a closure local to ``interruptible_api_call``. Re-extract the same
     # logic by exercising it through a fake worker that lets us drive the

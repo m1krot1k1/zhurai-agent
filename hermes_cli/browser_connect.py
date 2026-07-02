@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import platform
 import shlex
 import shutil
 import subprocess
 
 from hermes_constants import get_hermes_home
-
 
 DEFAULT_BROWSER_CDP_PORT = 9222
 DEFAULT_BROWSER_CDP_URL = f"http://127.0.0.1:{DEFAULT_BROWSER_CDP_PORT}"
@@ -78,7 +78,7 @@ def get_chrome_debug_candidates(system: str) -> list[str]:
         if not path:
             return
         normalized = os.path.normcase(os.path.normpath(path))
-        if normalized in seen or not os.path.isfile(path):
+        if normalized in seen or not pathlib.Path(path).is_file():
             return
         candidates.append(path)
         seen.add(normalized)
@@ -191,7 +191,7 @@ def _detach_kwargs(system: str) -> dict:
     if system != "Windows":
         return {"start_new_session": True}
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-        subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        subprocess, "CREATE_NEW_PROCESS_GROUP", 0,
     )
     return {"creationflags": flags} if flags else {}
 
@@ -202,7 +202,7 @@ def try_launch_chrome_debug(port: int = DEFAULT_BROWSER_CDP_PORT, system: str | 
     if not candidates:
         return False
 
-    os.makedirs(chrome_debug_data_dir(), exist_ok=True)
+    pathlib.Path(chrome_debug_data_dir()).mkdir(exist_ok=True, parents=True)
     for candidate in candidates:
         try:
             subprocess.Popen(

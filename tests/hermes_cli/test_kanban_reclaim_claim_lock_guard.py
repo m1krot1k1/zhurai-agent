@@ -45,7 +45,8 @@ def conn(kanban_home):
 
 def test_stale_crash_reset_rejected_for_reclaimed_task(conn):
     """A reset carrying an OLD worker's claim_lock must NOT clobber a task
-    that has since been re-claimed by a new worker."""
+    that has since been re-claimed by a new worker.
+    """
     host = kb._claimer_id().split(":", 1)[0]
     tid = kb.create_task(conn, title="desync", assignee="w")
 
@@ -55,7 +56,7 @@ def test_stale_crash_reset_rejected_for_reclaimed_task(conn):
     dead.wait()
     kb._set_worker_pid(conn, tid, dead.pid)
     old = conn.execute(
-        "SELECT claim_lock, worker_pid FROM tasks WHERE id=?", (tid,)
+        "SELECT claim_lock, worker_pid FROM tasks WHERE id=?", (tid,),
     ).fetchone()
 
     # Reclaim + re-claim by worker B (alive).
@@ -82,7 +83,7 @@ def test_stale_crash_reset_rejected_for_reclaimed_task(conn):
         assert cur.rowcount == 0, "stale reclaim wrongly clobbered the re-claimed task"
 
         final = conn.execute(
-            "SELECT status, claim_lock FROM tasks WHERE id=?", (tid,)
+            "SELECT status, claim_lock FROM tasks WHERE id=?", (tid,),
         ).fetchone()
         assert final["status"] == "running"
         assert final["claim_lock"] == f"{host}:B"
@@ -92,7 +93,8 @@ def test_stale_crash_reset_rejected_for_reclaimed_task(conn):
 
 def test_genuine_crash_still_reclaims(conn):
     """When the claim_lock still matches the dead worker, the crash reclaim
-    fires normally — the guard must not break the legitimate path."""
+    fires normally — the guard must not break the legitimate path.
+    """
     host = kb._claimer_id().split(":", 1)[0]
     tid = kb.create_task(conn, title="legit", assignee="w")
     kb.claim_task(conn, tid, claimer=f"{host}:A")
@@ -102,7 +104,7 @@ def test_genuine_crash_still_reclaims(conn):
     # Rewind started_at so the launch grace window doesn't skip the check.
     conn.execute("UPDATE tasks SET started_at = started_at - 9999 WHERE id=?", (tid,))
     conn.execute(
-        "UPDATE task_runs SET started_at = started_at - 9999 WHERE task_id=?", (tid,)
+        "UPDATE task_runs SET started_at = started_at - 9999 WHERE task_id=?", (tid,),
     )
     conn.commit()
     kb._record_worker_exit(dead.pid, 1 << 8)  # nonzero exit → crash

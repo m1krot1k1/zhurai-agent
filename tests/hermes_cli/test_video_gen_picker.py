@@ -8,7 +8,7 @@ path already handled it; the reconfigure path forgot to mirror it.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pytest
 
@@ -21,8 +21,8 @@ class _FakeVideoProvider(VideoGenProvider):
         self,
         name: str,
         available: bool = True,
-        schema: Optional[Dict[str, Any]] = None,
-        models: Optional[List[Dict[str, Any]]] = None,
+        schema: dict[str, Any] | None = None,
+        models: list[dict[str, Any]] | None = None,
     ):
         self._name = name
         self._available = available
@@ -81,10 +81,11 @@ class TestReconfigureWritesProvider:
     """
 
     def test_reconfigure_with_env_vars_already_set_writes_provider(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """Env vars present and user accepts current value → still writes
-        video_gen.provider via the post-env-vars branch."""
+        video_gen.provider via the post-env-vars branch.
+        """
         from hermes_cli import tools_config
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
@@ -116,10 +117,11 @@ class TestReconfigureWritesProvider:
         assert config["video_gen"]["use_gateway"] is False
 
     def test_reconfigure_with_no_env_vars_writes_provider(
-        self, monkeypatch, tmp_path
+        self, monkeypatch, tmp_path,
     ):
         """No env vars at all (managed-style plugin) → writes
-        video_gen.provider via the no-env-vars early-return branch."""
+        video_gen.provider via the no-env-vars early-return branch.
+        """
         from hermes_cli import tools_config
 
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))

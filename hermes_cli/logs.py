@@ -22,11 +22,11 @@ Usage examples::
 import re
 import sys
 import time
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Sequence
 
-from hermes_constants import get_hermes_home, display_hermes_home
+from hermes_constants import display_hermes_home, get_hermes_home
 
 # Known log files (name → filename)
 LOG_FILES = {
@@ -50,14 +50,14 @@ _LEVEL_RE = re.compile(r"\s(DEBUG|INFO|WARNING|ERROR|CRITICAL)\s")
 _LOGGER_NAME_RE = re.compile(
     r"\s(?:DEBUG|INFO|WARNING|ERROR|CRITICAL)"  # level
     r"(?:\s+\[.*?\])?"                           # optional session tag
-    r"\s+(\S+):"                                 # logger name
+    r"\s+(\S+):",                                 # logger name
 )
 
 # Level ordering for >= filtering
 _LEVEL_ORDER = {"DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4}
 
 
-def _parse_since(since_str: str) -> Optional[datetime]:
+def _parse_since(since_str: str) -> datetime | None:
     """Parse a relative time string like '1h', '30m', '2d' into a datetime cutoff.
 
     Returns None if the string can't be parsed.
@@ -77,7 +77,7 @@ def _parse_since(since_str: str) -> Optional[datetime]:
     return datetime.now() - delta
 
 
-def _parse_line_timestamp(line: str) -> Optional[datetime]:
+def _parse_line_timestamp(line: str) -> datetime | None:
     """Extract timestamp from a log line. Returns None if not parseable."""
     m = _TS_RE.match(line)
     if not m:
@@ -88,13 +88,13 @@ def _parse_line_timestamp(line: str) -> Optional[datetime]:
         return None
 
 
-def _extract_level(line: str) -> Optional[str]:
+def _extract_level(line: str) -> str | None:
     """Extract the log level from a line."""
     m = _LEVEL_RE.search(line)
     return m.group(1) if m else None
 
 
-def _extract_logger_name(line: str) -> Optional[str]:
+def _extract_logger_name(line: str) -> str | None:
     """Extract the logger name from a log line."""
     m = _LOGGER_NAME_RE.search(line)
     return m.group(1) if m else None
@@ -111,10 +111,10 @@ def _line_matches_component(line: str, prefixes: Sequence[str]) -> bool:
 def _matches_filters(
     line: str,
     *,
-    min_level: Optional[str] = None,
-    session_filter: Optional[str] = None,
-    since: Optional[datetime] = None,
-    component_prefixes: Optional[Sequence[str]] = None,
+    min_level: str | None = None,
+    session_filter: str | None = None,
+    since: datetime | None = None,
+    component_prefixes: Sequence[str] | None = None,
 ) -> bool:
     """Check if a log line passes all active filters."""
     if since is not None:
@@ -128,9 +128,8 @@ def _matches_filters(
             if _LEVEL_ORDER.get(level, 0) < _LEVEL_ORDER.get(min_level, 0):
                 return False
 
-    if session_filter is not None:
-        if session_filter not in line:
-            return False
+    if session_filter is not None and session_filter not in line:
+        return False
 
     if component_prefixes is not None:
         if not _line_matches_component(line, component_prefixes):
@@ -144,10 +143,10 @@ def tail_log(
     *,
     num_lines: int = 50,
     follow: bool = False,
-    level: Optional[str] = None,
-    session: Optional[str] = None,
-    since: Optional[str] = None,
-    component: Optional[str] = None,
+    level: str | None = None,
+    session: str | None = None,
+    since: str | None = None,
+    component: str | None = None,
 ) -> None:
     """Read and display log lines, optionally following in real time.
 
@@ -167,6 +166,7 @@ def tail_log(
         Relative time string (e.g. ``"1h"``, ``"30m"``).
     component
         Component name to filter by (e.g. ``"gateway"``, ``"tools"``).
+
     """
     filename = LOG_FILES.get(log_name)
     if filename is None:
@@ -176,7 +176,7 @@ def tail_log(
     log_path = get_hermes_home() / "logs" / filename
     if not log_path.exists():
         print(f"Log file not found: {log_path}")
-        print(f"(Logs are created when Hermes runs — try 'hermes chat' first)")
+        print("(Logs are created when Hermes runs — try 'hermes chat' first)")
         sys.exit(1)
 
     # Parse --since into a datetime cutoff
@@ -255,10 +255,10 @@ def _read_tail(
     num_lines: int,
     *,
     has_filters: bool = False,
-    min_level: Optional[str] = None,
-    session_filter: Optional[str] = None,
-    since: Optional[datetime] = None,
-    component_prefixes: Optional[Sequence[str]] = None,
+    min_level: str | None = None,
+    session_filter: str | None = None,
+    since: datetime | None = None,
+    component_prefixes: Sequence[str] | None = None,
 ) -> list:
     """Read the last *num_lines* matching lines from a log file.
 
@@ -275,8 +275,7 @@ def _read_tail(
                                 component_prefixes=component_prefixes)
         ]
         return filtered[-num_lines:]
-    else:
-        return _read_last_n_lines(path, num_lines)
+    return _read_last_n_lines(path, num_lines)
 
 
 def _read_last_n_lines(path: Path, n: int) -> list:
@@ -292,12 +291,12 @@ def _read_last_n_lines(path: Path, n: int) -> list:
 
         # For files up to 1MB, just read the whole thing — simple and correct.
         if size <= 1_048_576:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with Path(path).open(encoding="utf-8", errors="replace") as f:
                 all_lines = f.readlines()
             return all_lines[-n:]
 
         # For large files, read chunks from the end.
-        with open(path, "rb") as f:
+        with Path(path).open("rb") as f:
             chunk_size = 8192
             lines = []
             pos = size
@@ -330,7 +329,7 @@ def _read_last_n_lines(path: Path, n: int) -> list:
 
     except Exception:
         # Fallback: read entire file
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with Path(path).open(encoding="utf-8", errors="replace") as f:
             all_lines = f.readlines()
         return all_lines[-n:]
 
@@ -338,13 +337,13 @@ def _read_last_n_lines(path: Path, n: int) -> list:
 def _follow_log(
     path: Path,
     *,
-    min_level: Optional[str] = None,
-    session_filter: Optional[str] = None,
-    since: Optional[datetime] = None,
-    component_prefixes: Optional[Sequence[str]] = None,
+    min_level: str | None = None,
+    session_filter: str | None = None,
+    since: datetime | None = None,
+    component_prefixes: Sequence[str] | None = None,
 ) -> None:
     """Poll a log file for new content and print matching lines."""
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with Path(path).open(encoding="utf-8", errors="replace") as f:
         # Seek to end
         f.seek(0, 2)
         while True:

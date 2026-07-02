@@ -8,7 +8,6 @@ from gateway.message_timestamps import (
 )
 from run_agent import AIAgent
 
-
 BERLIN = ZoneInfo("Europe/Berlin")
 
 
@@ -77,7 +76,7 @@ def test_persist_user_message_override_keeps_clean_content_and_timestamp_metadat
         {
             "role": "user",
             "content": "[Tue 2026-04-28 13:40:53 CEST] [Example User] Clean content",
-        }
+        },
     ]
 
     agent._apply_persist_user_message_override(messages)
@@ -87,7 +86,7 @@ def test_persist_user_message_override_keeps_clean_content_and_timestamp_metadat
             "role": "user",
             "content": "[Example User] Clean content",
             "timestamp": _epoch(2026, 4, 28, 13, 40, 53),
-        }
+        },
     ]
 
 
@@ -111,7 +110,7 @@ def test_message_timestamps_enabled_when_opted_in():
     from gateway.run import _message_timestamps_enabled
 
     assert _message_timestamps_enabled(
-        {"gateway": {"message_timestamps": {"enabled": True}}}
+        {"gateway": {"message_timestamps": {"enabled": True}}},
     ) is True
     # Bare shorthand also accepted.
     assert _message_timestamps_enabled({"gateway": {"message_timestamps": True}}) is True

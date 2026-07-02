@@ -63,7 +63,8 @@ def test_abstract_methods_are_the_known_set():
 def test_message_len_fn_defaults_to_len():
     """message_len_fn is the per-platform length-unit hook (Telegram overrides
     it for UTF-16). The default is plain ``len``; the relay adapter will
-    override it from its negotiated descriptor's ``len_unit``."""
+    override it from its negotiated descriptor's ``len_unit``.
+    """
     inst = _make()
     assert inst.message_len_fn("hello") == 5
 
@@ -71,7 +72,8 @@ def test_message_len_fn_defaults_to_len():
 def test_supports_draft_streaming_defaults_false():
     """Draft streaming is opt-in per platform; the consumer falls back to the
     edit-based path when False. The relay adapter flips this from its
-    descriptor's ``supports_draft_streaming`` flag."""
+    descriptor's ``supports_draft_streaming`` flag.
+    """
     inst = _make()
     assert inst.supports_draft_streaming() is False
 

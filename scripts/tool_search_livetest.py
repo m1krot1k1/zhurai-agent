@@ -30,7 +30,7 @@ import tempfile
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 # Force-isolate the test environment BEFORE any hermes imports.
 ORIGINAL_HOME = os.environ.get("HERMES_HOME")
@@ -44,7 +44,7 @@ sys.path.insert(0, str(_WORKTREE_ROOT))
 # Fake MCP tools — realistic shape, varied difficulty for retrieval
 # ---------------------------------------------------------------------------
 
-FAKE_MCP_TOOLS: List[Dict[str, Any]] = [
+FAKE_MCP_TOOLS: list[dict[str, Any]] = [
     # GitHub cluster
     {
         "name": "github_create_issue",
@@ -52,7 +52,7 @@ FAKE_MCP_TOOLS: List[Dict[str, Any]] = [
         "params": {"repo": ("string", "Repository in owner/name form"),
                    "title": ("string", "Issue title"),
                    "body": ("string", "Issue body in Markdown")},
-        "returns": lambda args: {"ok": True, "issue_url": f"https://github.com/{args.get('repo','x/y')}/issues/42"},
+        "returns": lambda args: {"ok": True, "issue_url": f"https://github.com/{args.get('repo', 'x/y')}/issues/42"},
     },
     {
         "name": "github_search_repos",
@@ -194,7 +194,7 @@ FAKE_MCP_TOOLS: List[Dict[str, Any]] = [
 # Scenario definitions
 # ---------------------------------------------------------------------------
 
-SCENARIOS: List[Dict[str, Any]] = [
+SCENARIOS: list[dict[str, Any]] = [
     {
         "id": "A_obvious_single",
         "description": "Single tool, obvious name in the user request",
@@ -349,7 +349,7 @@ def reset_module_state():
         del sys.modules[k]
 
 
-def run_one_scenario(scenario: Dict[str, Any], enabled: bool, out_dir: Path) -> Dict[str, Any]:
+def run_one_scenario(scenario: dict[str, Any], enabled: bool, out_dir: Path) -> dict[str, Any]:
     """Run one (scenario, enabled) combination. Returns the recorded transcript."""
     reset_module_state()
     home = setup_isolated_home(enabled=enabled)
@@ -366,7 +366,7 @@ def run_one_scenario(scenario: Dict[str, Any], enabled: bool, out_dir: Path) -> 
     # which is already cached by tool_executor) because the dispatch call is
     # the one place every underlying tool call lands. Bridge calls are
     # extracted from the message transcript after the run.
-    tool_call_log: List[Dict[str, Any]] = []
+    tool_call_log: list[dict[str, Any]] = []
 
     from tools.registry import registry
     original_dispatch = registry.dispatch
@@ -472,20 +472,20 @@ def _trim_args(args: Any, max_chars: int = 300) -> Any:
     out = {}
     for k, v in args.items():
         if isinstance(v, str) and len(v) > max_chars:
-            out[k] = v[:max_chars] + f"...[{len(v)-max_chars} chars trimmed]"
+            out[k] = v[:max_chars] + f"...[{len(v) - max_chars} chars trimmed]"
         else:
             out[k] = v
     return out
 
 
-def _count_assistant_turns(messages: List[Dict[str, Any]]) -> int:
+def _count_assistant_turns(messages: list[dict[str, Any]]) -> int:
     return sum(1 for m in messages if isinstance(m, dict) and m.get("role") == "assistant")
 
 
-def _extract_bridge_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _extract_bridge_calls(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Pull out every tool_search / tool_describe / tool_call from a transcript."""
     bridges = ("tool_search", "tool_describe", "tool_call")
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for m in messages or []:
         if not isinstance(m, dict) or m.get("role") != "assistant":
             continue
@@ -514,7 +514,7 @@ def main():
     for scenario in SCENARIOS:
         for enabled in (True, False):
             label = "enabled" if enabled else "disabled"
-            print(f"\n{'='*72}\nScenario {scenario['id']} (tool_search={label})\n{'='*72}")
+            print(f"\n{'=' * 72}\nScenario {scenario['id']} (tool_search={label})\n{'=' * 72}")
             record = run_one_scenario(scenario, enabled, out_dir)
             n_bridge = len(record["bridge_calls"])
             n_under = len(record["underlying_tool_calls"])

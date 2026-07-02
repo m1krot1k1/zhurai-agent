@@ -13,10 +13,10 @@ import pytest
 
 from gateway.config import Platform
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_adapter():
     """Create a WhatsAppAdapter with test attributes (bypass __init__)."""
@@ -93,7 +93,8 @@ class TestFormatMessage:
 
     def test_bold_header_does_not_double_wrap(self):
         """"# **Title**" must become *Title*, not **Title** (WhatsApp would
-        render the doubled asterisks literally)."""
+        render the doubled asterisks literally).
+        """
         adapter = _make_adapter()
         assert adapter.format_message("# **Title**") == "*Title*"
         assert adapter.format_message("## __Strong__") == "*Strong*"

@@ -15,8 +15,9 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 # Match the logger run.py uses (logging.getLogger(__name__) where __name__ ==
 # "gateway.run") so extracted log records keep their original logger name.
@@ -25,7 +26,7 @@ logger = logging.getLogger("gateway.run")
 
 def _resolve_auto_decompose_settings(
     load_config: Callable[[], Any],
-) -> "tuple[bool, int]":
+) -> tuple[bool, int]:
     """Resolve the live (enabled, per_tick) auto-decompose settings.
 
     Read fresh from config on every dispatcher tick (#49638) so that flipping
@@ -50,12 +51,11 @@ def _resolve_auto_decompose_settings(
         per_tick = int(kcfg.get("auto_decompose_per_tick", 3) or 3)
     except (TypeError, ValueError):
         per_tick = 3
-    if per_tick < 1:
-        per_tick = 1
+    per_tick = max(per_tick, 1)
     return enabled, per_tick
 
 
-def _acquire_singleton_lock(lock_path) -> "tuple[Optional[object], str]":
+def _acquire_singleton_lock(lock_path) -> tuple[object | None, str]:
     """Take an exclusive, non-blocking advisory lock for the sole dispatcher.
 
     Only one gateway process machine-wide may run the embedded kanban
@@ -83,7 +83,7 @@ def _acquire_singleton_lock(lock_path) -> "tuple[Optional[object], str]":
         return None, "unavailable"
     try:
         Path(lock_path).parent.mkdir(parents=True, exist_ok=True)
-        handle = open(str(lock_path), "a+", encoding="utf-8")
+        handle = Path(str(lock_path)).open("a+", encoding="utf-8")
     except OSError:
         return None, "unavailable"
     if not _try_acquire_file_lock(handle):
@@ -150,7 +150,7 @@ class GatewayKanbanWatchersMixin:
         kanban_cfg = cfg.get("kanban", {}) if isinstance(cfg, dict) else {}
         if not kanban_cfg.get("dispatch_in_gateway", True):
             logger.info(
-                "kanban notifier: disabled via config kanban.dispatch_in_gateway=false"
+                "kanban notifier: disabled via config kanban.dispatch_in_gateway=false",
             )
             return
         from gateway.config import Platform as _Platform
@@ -179,7 +179,7 @@ class GatewayKanbanWatchersMixin:
         # against a dead chat every 5 seconds forever.
         MAX_SEND_FAILURES = 3
         sub_fail_counts: dict[tuple, int] = getattr(
-            self, "_kanban_sub_fail_counts", {}
+            self, "_kanban_sub_fail_counts", {},
         )
         self._kanban_sub_fail_counts = sub_fail_counts
         notifier_profile = getattr(self, "_kanban_notifier_profile", None)
@@ -473,7 +473,7 @@ class GatewayKanbanWatchersMixin:
                 await asyncio.sleep(1)
 
     def _kanban_advance(
-        self, sub: dict, cursor: int, board: Optional[str] = None,
+        self, sub: dict, cursor: int, board: str | None = None,
     ) -> None:
         """Sync helper: advance a subscription's cursor. Runs in to_thread.
 
@@ -494,7 +494,7 @@ class GatewayKanbanWatchersMixin:
         finally:
             conn.close()
 
-    def _kanban_unsub(self, sub: dict, board: Optional[str] = None) -> None:
+    def _kanban_unsub(self, sub: dict, board: str | None = None) -> None:
         from hermes_cli import kanban_db as _kb
         conn = _kb.connect(board=board)
         try:
@@ -513,7 +513,7 @@ class GatewayKanbanWatchersMixin:
         sub: dict,
         claimed_cursor: int,
         old_cursor: int,
-        board: Optional[str] = None,
+        board: str | None = None,
     ) -> None:
         """Sync helper: undo a claimed notification cursor after send failure."""
         from hermes_cli import kanban_db as _kb
@@ -537,7 +537,7 @@ class GatewayKanbanWatchersMixin:
         adapter,
         chat_id: str,
         metadata: dict,
-        event_payload: Optional[dict],
+        event_payload: dict | None,
         task,
     ) -> None:
         """Upload artifact files referenced by a completed kanban task.
@@ -567,7 +567,7 @@ class GatewayKanbanWatchersMixin:
             expanded = os.path.expanduser(path)
             if expanded in seen:
                 return
-            if not os.path.isfile(expanded):
+            if not _Path(expanded).is_file():
                 return
             seen.add(expanded)
             candidates.append(expanded)
@@ -680,7 +680,7 @@ class GatewayKanbanWatchersMixin:
         kanban_cfg = cfg.get("kanban", {}) if isinstance(cfg, dict) else {}
         if not kanban_cfg.get("dispatch_in_gateway", True):
             logger.info(
-                "kanban dispatcher: disabled via config kanban.dispatch_in_gateway=false"
+                "kanban dispatcher: disabled via config kanban.dispatch_in_gateway=false",
             )
             return
 
@@ -728,7 +728,7 @@ class GatewayKanbanWatchersMixin:
         # Read max_spawn config to limit concurrent kanban tasks
         max_spawn = kanban_cfg.get("max_spawn", None)
         if max_spawn is not None:
-            logger.info(f"kanban dispatcher: max_spawn={max_spawn}")
+            logger.info("kanban dispatcher: max_spawn=%s", max_spawn)
 
         # Cap the number of simultaneously running tasks so slow workers
         # (local LLMs, resource-constrained hosts) don't pile up and time
@@ -753,7 +753,7 @@ class GatewayKanbanWatchersMixin:
                     )
                     max_in_progress = None
                 else:
-                    logger.info(f"kanban dispatcher: max_in_progress={max_in_progress}")
+                    logger.info("kanban dispatcher: max_in_progress=%s", max_in_progress)
 
         raw_failure_limit = kanban_cfg.get("failure_limit", _kb.DEFAULT_FAILURE_LIMIT)
         try:
@@ -844,7 +844,7 @@ class GatewayKanbanWatchersMixin:
         # surface as "database disk image is malformed" for one tick.
         CORRUPT_BOARD_RETRY_AFTER_SECONDS = 300
         disabled_corrupt_boards: dict[
-            str, tuple[tuple[str, int | None, int | None], float]
+            str, tuple[tuple[str, int | None, int | None], float],
         ] = {}
 
         def _board_db_fingerprint(slug: str) -> tuple[str, int | None, int | None]:
@@ -871,7 +871,7 @@ class GatewayKanbanWatchersMixin:
                 or "database disk image is malformed" in msg
             )
 
-        def _tick_once_for_board(slug: str) -> "Optional[object]":
+        def _tick_once_for_board(slug: str) -> object | None:
             """Run one dispatch_once for a specific board.
 
             Runs in a worker thread via `asyncio.to_thread`. `board=slug`
@@ -959,7 +959,7 @@ class GatewayKanbanWatchersMixin:
                     except Exception:
                         pass
 
-        def _tick_once() -> "list[tuple[str, Optional[object]]]":
+        def _tick_once() -> list[tuple[str, object | None]]:
             """Run one dispatch_once per board. Returns (slug, result) pairs.
 
             Enumerating boards on every tick keeps the dispatcher honest
@@ -970,7 +970,7 @@ class GatewayKanbanWatchersMixin:
                 boards = _kb.list_boards(include_archived=False)
             except Exception:
                 boards = [_kb.read_board_metadata(_kb.DEFAULT_BOARD)]
-            out: list[tuple[str, "Optional[object]"]] = []
+            out: list[tuple[str, object | None]] = []
             for b in boards:
                 slug = b.get("slug") or _kb.DEFAULT_BOARD
                 out.append((slug, _tick_once_for_board(slug)))
@@ -1108,7 +1108,7 @@ class GatewayKanbanWatchersMixin:
             return successes
 
         logger.info(
-            "kanban dispatcher: embedded in gateway (interval=%.1fs)", interval
+            "kanban dispatcher: embedded in gateway (interval=%.1fs)", interval,
         )
         while self._running:
             try:

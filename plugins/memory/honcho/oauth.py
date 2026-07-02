@@ -20,7 +20,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def _config_refresh_lock(path: Path):
     fh = None
     try:
         lock_path.parent.mkdir(parents=True, exist_ok=True)
-        fh = open(lock_path, "a+b")
+        fh = Path(lock_path).open("a+b")
         if os.name == "nt":
             import msvcrt
 
@@ -88,6 +88,7 @@ def _config_refresh_lock(path: Path):
             except Exception:
                 pass
             fh.close()
+
 
 # In-memory expiry cache keyed by (config path, host) → (expires_at, access).
 # Lets the hot path (every memory access calls this) skip the honcho.json read
@@ -124,7 +125,7 @@ class OAuthCredential:
     consent_peer_name: str | None = None
 
     @classmethod
-    def from_host_block(cls, block: dict[str, Any]) -> "OAuthCredential | None":
+    def from_host_block(cls, block: dict[str, Any]) -> OAuthCredential | None:
         """Build a credential from a honcho.json host block, or None if incomplete."""
         oauth = block.get("oauth")
         access = block.get("apiKey")
@@ -227,7 +228,7 @@ def _atomic_write_config(path: Path, raw: dict[str, Any]) -> None:
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
-    os.replace(tmp, path)
+    Path(tmp).replace(path)
 
 
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -248,7 +249,7 @@ def _persist_credential(path: Path, host: str, cred: OAuthCredential) -> None:
     block["apiKey"] = cred.access_token
     block["oauth"] = cred.oauth_block()
     _atomic_write_config(path, raw)
-    _expiry_cache[(str(path), host)] = (cred.expires_at, cred.access_token)
+    _expiry_cache[str(path), host] = (cred.expires_at, cred.access_token)
 
 
 def ensure_fresh_token(
@@ -347,7 +348,7 @@ def install_grant(
         cred.consent_peer_name = granted_config.get("peerName")
         if apply_config:
             _deep_merge(raw, granted_config)
-    _expiry_cache[(str(path), host)] = (cred.expires_at, cred.access_token)
+    _expiry_cache[str(path), host] = (cred.expires_at, cred.access_token)
     hosts = raw.setdefault("hosts", {})
     block = hosts.setdefault(host, {})
     block["apiKey"] = cred.access_token

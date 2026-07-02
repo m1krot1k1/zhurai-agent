@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from extract_schema import (
     extract_schema,
     find_negative_prompt_node,
@@ -10,10 +9,10 @@ from extract_schema import (
     trace_to_node,
 )
 
-
 # =============================================================================
 # Connection tracing
 # =============================================================================
+
 
 class TestConnectionTracing:
     def test_direct_link(self):
@@ -128,12 +127,12 @@ class TestEmbeddingDeps:
             "6": {"class_type": "CLIPTextEncode",
                   "inputs": {
                       "text": "a cat, embedding:goodvibes, embedding:art:1.2",
-                      "clip": ["1", 1]
+                      "clip": ["1", 1],
                   }},
             "7": {"class_type": "CLIPTextEncode",
                   "inputs": {
                       "text": "ugly, embedding:badhands",
-                      "clip": ["1", 1]
+                      "clip": ["1", 1],
                   }},
             "3": {"class_type": "KSampler",
                   "inputs": {

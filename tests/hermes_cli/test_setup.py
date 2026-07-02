@@ -2,9 +2,8 @@
 import sys
 import types
 
-
-from hermes_cli.config import load_config, save_config
 from hermes_cli import setup as setup_mod
+from hermes_cli.config import load_config, save_config
 from hermes_cli.setup import setup_model_provider
 
 
@@ -75,7 +74,8 @@ def test_setup_delegates_to_select_provider_and_model(tmp_path, monkeypatch):
 
 def test_setup_syncs_openrouter_from_disk(tmp_path, monkeypatch):
     """When select_provider_and_model saves OpenRouter config to disk,
-    the wizard's config dict picks it up."""
+    the wizard's config dict picks it up.
+    """
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     _clear_provider_env(monkeypatch)
     _stub_tts(monkeypatch)
@@ -311,7 +311,7 @@ def test_setup_keyboard_interrupt_gracefully_handled(tmp_path, monkeypatch):
     config = load_config()
 
     def fake_select():
-        raise KeyboardInterrupt()
+        raise KeyboardInterrupt
 
     monkeypatch.setattr("hermes_cli.main.select_provider_and_model", fake_select)
 
@@ -319,7 +319,7 @@ def test_setup_keyboard_interrupt_gracefully_handled(tmp_path, monkeypatch):
 
 
 def test_select_provider_and_model_warns_if_named_custom_provider_disappears(
-    tmp_path, monkeypatch, capsys
+    tmp_path, monkeypatch, capsys,
 ):
     """If a saved custom provider is deleted mid-selection, show a warning instead of silently doing nothing."""
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
@@ -351,7 +351,7 @@ def test_select_provider_and_model_warns_if_named_custom_provider_disappears(
 
 
 def test_select_provider_and_model_accepts_named_provider_from_providers_section(
-    tmp_path, monkeypatch, capsys
+    tmp_path, monkeypatch, capsys,
 ):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     _clear_provider_env(monkeypatch)
@@ -367,7 +367,7 @@ def test_select_provider_and_model_accepts_named_provider_from_providers_section
             "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
             "default_model": "doubao-seed-2.0-code",
             "models": {"doubao-seed-2.0-code": {}},
-        }
+        },
     }
     save_config(cfg)
 
@@ -493,4 +493,3 @@ def test_modal_setup_persists_direct_mode_when_user_chooses_their_own_account(tm
 
 # test_setup_slack_* moved to tests/gateway/test_slack_plugin_setup.py — the
 # _setup_slack wizard migrated to the slack plugin's interactive_setup (#41112).
-

@@ -46,8 +46,8 @@ def _ensure_telegram_mock():
 
 _ensure_telegram_mock()
 
-from plugins.platforms.telegram.adapter import TelegramAdapter
 from gateway.config import Platform, PlatformConfig
+from plugins.platforms.telegram.adapter import TelegramAdapter
 
 
 def _make_adapter(extra=None):
@@ -173,7 +173,7 @@ class TestTelegramExecApproval:
         adapter = _make_adapter()
         adapter._bot = None
         result = await adapter.send_exec_approval(
-            chat_id="12345", command="ls", session_key="s"
+            chat_id="12345", command="ls", session_key="s",
         )
         assert result.success is False
 
@@ -185,7 +185,7 @@ class TestTelegramExecApproval:
         adapter._bot.send_message = AsyncMock(return_value=mock_msg)
 
         await adapter.send_exec_approval(
-            chat_id="12345", command="ls", session_key="s"
+            chat_id="12345", command="ls", session_key="s",
         )
 
         kwargs = adapter._bot.send_message.call_args[1]
@@ -226,7 +226,7 @@ class TestTelegramExecApproval:
 
         long_cmd = "x" * 5000
         await adapter.send_exec_approval(
-            chat_id="12345", command=long_cmd, session_key="s"
+            chat_id="12345", command=long_cmd, session_key="s",
         )
 
         kwargs = adapter._bot.send_message.call_args[1]
@@ -234,6 +234,7 @@ class TestTelegramExecApproval:
         assert len(kwargs["text"]) < 5000
 # _handle_callback_query — approval button clicks
 # ===========================================================================
+
 
 class TestTelegramApprovalCallback:
     """Test the approval callback handling in _handle_callback_query."""
@@ -306,7 +307,8 @@ class TestTelegramApprovalCallback:
     @pytest.mark.asyncio
     async def test_typing_stays_paused_when_resolve_returns_zero(self):
         """If resolve_gateway_approval reports 0 resolves, the agent thread
-        was never unblocked, so typing should NOT be force-resumed."""
+        was never unblocked, so typing should NOT be force-resumed.
+        """
         adapter = _make_adapter()
         adapter._approval_state[6] = "agent:main:telegram:group:12345:99"
         adapter.pause_typing_for_chat("12345")

@@ -9,7 +9,6 @@ import gateway.run as gateway_run
 from gateway.config import Platform
 from gateway.session import SessionSource
 
-
 SESSION_KEY = "agent:main:telegram:dm:12345"
 
 
@@ -125,10 +124,10 @@ def test_failed_turn_still_syncs_compression_session_split(monkeypatch):
     monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "off")
     monkeypatch.setenv("HERMES_AGENT_TIMEOUT", "0")
-    monkeypatch.setattr(gateway_run, "_load_gateway_config", lambda: {})
+    monkeypatch.setattr(gateway_run, "_load_gateway_config", dict)
     monkeypatch.setattr("gateway.stream_consumer.GatewayStreamConsumer", _StreamConsumer)
 
-    import hermes_cli.tools_config as tools_config
+    from hermes_cli import tools_config
 
     monkeypatch.setattr(tools_config, "_get_platform_tools", lambda *_args, **_kwargs: {"core"})
 
@@ -147,7 +146,7 @@ def test_failed_turn_still_syncs_compression_session_split(monkeypatch):
                 session_key=SESSION_KEY,
             ),
             timeout=2,
-        )
+        ),
     )
 
     assert result["failed"] is True
@@ -156,5 +155,5 @@ def test_failed_turn_still_syncs_compression_session_split(monkeypatch):
     assert session_store.entry.session_id == "session-after-compression"
     assert session_store.save_calls == 1
     runner._sync_telegram_topic_binding.assert_called_once_with(
-        source, session_store.entry, reason="agent-run-compression"
+        source, session_store.entry, reason="agent-run-compression",
     )

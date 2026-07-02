@@ -4,16 +4,13 @@ All functions are stateless. AIAgent._build_system_prompt() calls these to
 assemble pieces, then combines them with memory and ephemeral prompts.
 """
 
+import contextvars
 import json
 import logging
 import os
 import threading
-import contextvars
 from collections import OrderedDict
 from pathlib import Path
-
-from hermes_constants import get_hermes_home, get_skills_dir, is_wsl
-from typing import Optional
 
 from agent.runtime_cwd import resolve_agent_cwd
 from agent.skill_utils import (
@@ -26,6 +23,7 @@ from agent.skill_utils import (
     skill_matches_environment,
     skill_matches_platform,
 )
+from hermes_constants import get_hermes_home, get_skills_dir, is_wsl
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
@@ -62,7 +60,7 @@ def _scan_context_content(content: str, filename: str) -> str:
     return content
 
 
-def _find_git_root(start: Path) -> Optional[Path]:
+def _find_git_root(start: Path) -> Path | None:
     """Walk *start* and its parents looking for a ``.git`` directory.
 
     Returns the directory containing ``.git``, or ``None`` if we hit the
@@ -78,7 +76,7 @@ def _find_git_root(start: Path) -> Optional[Path]:
 _HERMES_MD_NAMES = (".hermes.md", "HERMES.md")
 
 
-def _find_hermes_md(cwd: Path) -> Optional[Path]:
+def _find_hermes_md(cwd: Path) -> Path | None:
     """Discover the nearest ``.hermes.md`` or ``HERMES.md``.
 
     Search order: *cwd* first, then each parent directory up to (and
@@ -112,7 +110,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
         if end != -1:
             # Skip past the closing --- and any trailing newline
             body = content[end + 4:].lstrip("\n")
-            return body if body else content
+            return body or content
     return content
 
 
@@ -220,7 +218,7 @@ KANBAN_GUIDANCE = (
     "before counting as merged/done (most coding tasks), drop the "
     "structured metadata (changed_files / tests_run / diff_path) into a "
     "`kanban_comment` first, then end with "
-    "`kanban_block(reason=\"review-required: <one-line summary>\")` so a "
+    '`kanban_block(reason="review-required: <one-line summary>")` so a '
     "reviewer can approve+unblock or request changes. Reviewing-then-"
     "completing is more honest than auto-completing work that still needs "
     "eyes on it.\n"
@@ -461,7 +459,7 @@ GOOGLE_MODEL_OPERATIONAL_GUIDANCE = (
 # don't get macOS-only wording ("Mac", "Space", cmd+s). The module-level
 # COMPUTER_USE_GUIDANCE constant renders the macOS variant for backwards
 # compatibility; system_prompt.py selects the host-appropriate variant.
-def computer_use_guidance(platform_name: Optional[str] = None) -> str:
+def computer_use_guidance(platform_name: str | None = None) -> str:
     """Return platform-aware computer-use guidance for the system prompt.
 
     ``platform_name`` is an ``sys.platform``-style string ("darwin",
@@ -897,8 +895,8 @@ def _probe_remote_backend(env_type: str) -> str | None:
     try:
         # Import locally: tools/ imports are heavy and only relevant when a
         # non-local backend is actually configured.
-        from tools.terminal_tool import _get_env_config  # type: ignore
         from tools.environments import get_environment  # type: ignore
+        from tools.terminal_tool import _get_env_config  # type: ignore
     except Exception as e:
         logger.debug("Backend probe unavailable (import failed): %s", e)
         _BACKEND_PROBE_CACHE[cache_key] = ""
@@ -911,9 +909,9 @@ def _probe_remote_backend(env_type: str) -> str | None:
         # `2>/dev/null` so a missing binary doesn't pollute the output.
         probe_cmd = (
             "printf 'os=%s\\nkernel=%s\\nhome=%s\\ncwd=%s\\nuser=%s\\n' "
-            "\"$(uname -s 2>/dev/null || echo unknown)\" "
-            "\"$(uname -r 2>/dev/null || echo unknown)\" "
-            "\"$HOME\" \"$(pwd)\" \"$(whoami 2>/dev/null || id -un 2>/dev/null || echo unknown)\""
+            '"$(uname -s 2>/dev/null || echo unknown)" '
+            '"$(uname -r 2>/dev/null || echo unknown)" '
+            '"$HOME" "$(pwd)" "$(whoami 2>/dev/null || id -un 2>/dev/null || echo unknown)"'
         )
         result = env.execute(probe_cmd, timeout=4)
         if result.get("returncode") != 0:
@@ -1009,7 +1007,7 @@ def build_environment_hints() -> str:
                 "Note: on Windows, the machine hostname (e.g. from `hostname` "
                 "or uname) is NOT the username. Use the 'User home directory' "
                 "above to construct paths under C:\\Users\\<user>\\, never the "
-                "hostname."
+                "hostname.",
             )
         hints.append("\n".join(host_lines))
 
@@ -1027,11 +1025,11 @@ def build_environment_hints() -> str:
                 f"inside this {backend} environment — NOT on the machine "
                 f"where Hermes itself is running. The host OS, home, and cwd "
                 f"of the Hermes process are irrelevant; only the following "
-                f"backend state matters:\n{probe}"
+                f"backend state matters:\n{probe}",
             )
         else:
             description = _BACKEND_FALLBACK_DESCRIPTIONS.get(
-                backend, f"a {backend} environment (likely Linux)"
+                backend, f"a {backend} environment (likely Linux)",
             )
             hints.append(
                 f"Terminal backend: {backend}. Your `terminal`, `read_file`, "
@@ -1041,7 +1039,7 @@ def build_environment_hints() -> str:
                 f"prompt-build time, so the sandbox's current user, $HOME, "
                 f"and working directory are unknown from here. If you need "
                 f"them, probe directly with a terminal call like "
-                f"`uname -a && whoami && pwd`."
+                f"`uname -a && whoami && pwd`.",
             )
 
     # Hermes desktop GUI — any agent running under the desktop app should know
@@ -1076,7 +1074,7 @@ def build_environment_hints() -> str:
             from hermes_cli.config import load_config
 
             extra = str(
-                (load_config().get("agent", {}) or {}).get("environment_hint", "")
+                (load_config().get("agent", {}) or {}).get("environment_hint", ""),
             ).strip()
         except Exception as e:
             logger.debug("Could not read agent.environment_hint from config: %s", e)
@@ -1101,7 +1099,7 @@ _CONTEXT_FILE_WINDOW_FRACTION = 0.06
 _CONTEXT_FILE_DYNAMIC_CEILING = 500_000
 
 
-def _dynamic_context_file_max_chars(context_length: Optional[int]) -> int:
+def _dynamic_context_file_max_chars(context_length: int | None) -> int:
     """Derive a char cap from the model's context window.
 
     Returns at least ``CONTEXT_FILE_MAX_CHARS`` (the historical 20K floor) and
@@ -1111,12 +1109,12 @@ def _dynamic_context_file_max_chars(context_length: Optional[int]) -> int:
     if not isinstance(context_length, int) or context_length <= 0:
         return CONTEXT_FILE_MAX_CHARS
     budget = int(
-        context_length * _CONTEXT_FILE_CHARS_PER_TOKEN * _CONTEXT_FILE_WINDOW_FRACTION
+        context_length * _CONTEXT_FILE_CHARS_PER_TOKEN * _CONTEXT_FILE_WINDOW_FRACTION,
     )
     return max(CONTEXT_FILE_MAX_CHARS, min(budget, _CONTEXT_FILE_DYNAMIC_CEILING))
 
 
-def _get_context_file_max_chars(context_length: Optional[int] = None) -> int:
+def _get_context_file_max_chars(context_length: int | None = None) -> int:
     """Return the context-file truncation limit.
 
     Resolution order:
@@ -1136,13 +1134,14 @@ def _get_context_file_max_chars(context_length: Optional[int] = None) -> int:
         logger.debug("Could not read context_file_max_chars from config: %s", e)
     return _dynamic_context_file_max_chars(context_length)
 
+
 # Collect truncation warnings so the caller (run_agent) can surface them.
 # A ContextVar (not a module-global list) isolates accumulation per thread /
 # per async task, so concurrent gateway-session prompt builds can't drain or
 # clear each other's pending warnings (cross-session leak). Each build runs in
 # its own context, collects its own warnings, and drains them synchronously.
-_truncation_warnings: "contextvars.ContextVar[Optional[list]]" = contextvars.ContextVar(
-    "context_file_truncation_warnings", default=None
+_truncation_warnings: "contextvars.ContextVar[list | None]" = contextvars.ContextVar(
+    "context_file_truncation_warnings", default=None,
 )
 
 
@@ -1203,7 +1202,7 @@ def _build_skills_manifest(skills_dir: Path) -> dict[str, list[int]]:
     return manifest
 
 
-def _load_skills_snapshot(skills_dir: Path) -> Optional[dict]:
+def _load_skills_snapshot(skills_dir: Path) -> dict | None:
     """Load the disk snapshot if it exists and its manifest still matches."""
     snapshot_path = _skills_prompt_snapshot_path()
     if not snapshot_path.exists():
@@ -1413,7 +1412,7 @@ def build_skills_system_prompt(
             ):
                 continue
             skills_by_category.setdefault(category, []).append(
-                (frontmatter_name, entry.get("description", ""))
+                (frontmatter_name, entry.get("description", "")),
             )
         category_descriptions = {
             str(k): str(v)
@@ -1438,7 +1437,7 @@ def build_skills_system_prompt(
             ):
                 continue
             skills_by_category.setdefault(entry["category"], []).append(
-                (entry["frontmatter_name"], entry["description"])
+                (entry["frontmatter_name"], entry["description"]),
             )
 
         # Read category-level DESCRIPTION.md files
@@ -1468,8 +1467,7 @@ def build_skills_system_prompt(
     # precedence: we track seen names and skip duplicates from external dirs.
     seen_skill_names: set[str] = set()
     for cat_skills in skills_by_category.values():
-        for name, _desc in cat_skills:
-            seen_skill_names.add(name)
+        seen_skill_names.update(name for name, _desc in cat_skills)
 
     for ext_dir in external_dirs:
         if not ext_dir.exists():
@@ -1494,7 +1492,7 @@ def build_skills_system_prompt(
                     continue
                 seen_skill_names.add(frontmatter_name)
                 skills_by_category.setdefault(entry["category"], []).append(
-                    (frontmatter_name, entry["description"])
+                    (frontmatter_name, entry["description"]),
                 )
             except Exception as e:
                 logger.debug("Error reading external skill %s: %s", skill_file, e)
@@ -1661,7 +1659,7 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
             "If the user is not subscribed and asks for a capability that Nous subscription would unlock or simplify, suggest Nous subscription as one option alongside direct setup or local alternatives.",
             "Do not mention subscription unless the user asks about it or it directly solves the current missing capability.",
             "Useful commands: hermes setup, hermes setup tools, hermes setup terminal, hermes status.",
-        ]
+        ],
     )
     return "\n".join(lines)
 
@@ -1673,9 +1671,9 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
 def _truncate_content(
     content: str,
     filename: str,
-    max_chars: Optional[int] = None,
-    context_length: Optional[int] = None,
-    read_path: Optional[str] = None,
+    max_chars: int | None = None,
+    context_length: int | None = None,
+    read_path: str | None = None,
 ) -> str:
     """Head/tail truncation with a marker in the middle.
 
@@ -1710,7 +1708,7 @@ def _truncate_content(
     return head + marker + tail
 
 
-def load_soul_md(context_length: Optional[int] = None) -> Optional[str]:
+def load_soul_md(context_length: int | None = None) -> str | None:
     """Load SOUL.md from HERMES_HOME and return its content, or None.
 
     Used as the agent identity (slot #1 in the system prompt).  When this
@@ -1741,7 +1739,7 @@ def load_soul_md(context_length: Optional[int] = None) -> Optional[str]:
         return None
 
 
-def _load_hermes_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
+def _load_hermes_md(cwd_path: Path, context_length: int | None = None) -> str:
     """.hermes.md / HERMES.md — walk to git root."""
     hermes_md_path = _find_hermes_md(cwd_path)
     if not hermes_md_path:
@@ -1767,7 +1765,7 @@ def _load_hermes_md(cwd_path: Path, context_length: Optional[int] = None) -> str
         return ""
 
 
-def _load_agents_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
+def _load_agents_md(cwd_path: Path, context_length: int | None = None) -> str:
     """AGENTS.md — top-level only (no recursive walk)."""
     for name in ["AGENTS.md", "agents.md"]:
         candidate = cwd_path / name
@@ -1786,7 +1784,7 @@ def _load_agents_md(cwd_path: Path, context_length: Optional[int] = None) -> str
     return ""
 
 
-def _load_claude_md(cwd_path: Path, context_length: Optional[int] = None) -> str:
+def _load_claude_md(cwd_path: Path, context_length: int | None = None) -> str:
     """CLAUDE.md / claude.md — cwd only."""
     for name in ["CLAUDE.md", "claude.md"]:
         candidate = cwd_path / name
@@ -1805,7 +1803,7 @@ def _load_claude_md(cwd_path: Path, context_length: Optional[int] = None) -> str
     return ""
 
 
-def _load_cursorrules(cwd_path: Path, context_length: Optional[int] = None) -> str:
+def _load_cursorrules(cwd_path: Path, context_length: int | None = None) -> str:
     """.cursorrules + .cursor/rules/*.mdc — cwd only."""
     cursorrules_content = ""
     cursorrules_file = cwd_path / ".cursorrules"
@@ -1839,9 +1837,9 @@ def _load_cursorrules(cwd_path: Path, context_length: Optional[int] = None) -> s
 
 
 def build_context_files_prompt(
-    cwd: Optional[str] = None,
+    cwd: str | None = None,
     skip_soul: bool = False,
-    context_length: Optional[int] = None,
+    context_length: int | None = None,
 ) -> str:
     """Discover and load context files for the system prompt.
 

@@ -66,33 +66,33 @@ def generate_bash(parser: argparse.ArgumentParser) -> str:
             profile_actions = "use delete show alias rename export"
             cases.append(
                 f"        profile)\n"
-                f"            case \"$prev\" in\n"
+                f'            case "$prev" in\n'
                 f"                profile)\n"
-                f"                    COMPREPLY=($(compgen -W \"{subcmds}\" -- \"$cur\"))\n"
+                f'                    COMPREPLY=($(compgen -W "{subcmds}" -- "$cur"))\n'
                 f"                    return\n"
                 f"                    ;;\n"
                 f"                {profile_actions.replace(' ', '|')})\n"
-                f"                    COMPREPLY=($(compgen -W \"$(_hermes_profiles)\" -- \"$cur\"))\n"
+                f'                    COMPREPLY=($(compgen -W "$(_hermes_profiles)" -- "$cur"))\n'
                 f"                    return\n"
                 f"                    ;;\n"
                 f"            esac\n"
-                f"            ;;"
+                f"            ;;",
             )
         elif info["subcommands"]:
             subcmds = " ".join(sorted(info["subcommands"]))
             cases.append(
                 f"        {cmd})\n"
-                f"            COMPREPLY=($(compgen -W \"{subcmds}\" -- \"$cur\"))\n"
+                f'            COMPREPLY=($(compgen -W "{subcmds}" -- "$cur"))\n'
                 f"            return\n"
-                f"            ;;"
+                f"            ;;",
             )
         elif info["flags"]:
             flags = " ".join(info["flags"])
             cases.append(
                 f"        {cmd})\n"
-                f"            COMPREPLY=($(compgen -W \"{flags}\" -- \"$cur\"))\n"
+                f'            COMPREPLY=($(compgen -W "{flags}" -- "$cur"))\n'
                 f"            return\n"
-                f"            ;;"
+                f"            ;;",
             )
 
     cases_str = "\n".join(cases)
@@ -179,7 +179,7 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
                 f"                            _describe 'profile command' profile_cmds\n"
                 f"                            ;;\n"
                 f"                    esac\n"
-                f"                    ;;"
+                f"                    ;;",
             )
         else:
             sub_lines = []
@@ -195,7 +195,7 @@ def generate_zsh(parser: argparse.ArgumentParser) -> str:
                 f"{sub_str}\n"
                 f"                    )\n"
                 f"                    _describe '{cmd} command' {safe}_cmds\n"
-                f"                    ;;"
+                f"                    ;;",
             )
     sub_cases_str = "\n".join(sub_cases)
 
@@ -284,7 +284,7 @@ def generate_fish(parser: argparse.ArgumentParser) -> str:
         lines.append(
             f"complete -c hermes -f "
             f"-n 'not __fish_seen_subcommand_from {top_cmds_str}' "
-            f"-a {cmd} -d '{help_text}'"
+            f"-a {cmd} -d '{help_text}'",
         )
 
     lines.append("")
@@ -303,7 +303,7 @@ def generate_fish(parser: argparse.ArgumentParser) -> str:
             lines.append(
                 f"complete -c hermes -f "
                 f"-n '__fish_seen_subcommand_from {cmd}' "
-                f"-a {sc} -d '{sh}'"
+                f"-a {sc} -d '{sh}'",
             )
         # For profile subcommand, complete profile names for relevant actions
         if cmd == "profile":
@@ -312,7 +312,7 @@ def generate_fish(parser: argparse.ArgumentParser) -> str:
                     f"complete -c hermes -f "
                     f"-n '__fish_seen_subcommand_from {action}; "
                     f"and __fish_seen_subcommand_from profile' "
-                    f"-a '(__hermes_profiles)' -d 'Profile name'"
+                    f"-a '(__hermes_profiles)' -d 'Profile name'",
                 )
 
     lines.append("")

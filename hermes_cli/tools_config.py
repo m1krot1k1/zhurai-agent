@@ -1,5 +1,4 @@
-"""
-Unified tool configuration for Hermes Agent.
+"""Unified tool configuration for Hermes Agent.
 
 `hermes tools` and `hermes setup tools` both enter this module.
 Select a platform → toggle toolsets on/off → for newly enabled tools
@@ -16,19 +15,20 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
-
+from hermes_cli.colors import Colors, color
 from hermes_cli.config import (
     cfg_get,
-    load_config, save_config, get_env_value, save_env_value,
+    get_env_value,
+    load_config,
+    save_config,
+    save_env_value,
 )
-from hermes_cli.colors import Colors, color
+from hermes_cli.nous_account import format_nous_portal_entitlement_message
 from hermes_cli.nous_subscription import (
     apply_nous_managed_defaults,
     get_nous_subscription_features,
 )
-from hermes_cli.nous_account import format_nous_portal_entitlement_message
 from tools.tool_backend_helpers import fal_key_is_configured
 from utils import base_url_hostname, is_truthy_value
 
@@ -41,9 +41,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 from hermes_cli.cli_output import (  # noqa: E402 — late import block
     print_error as _print_error,
+)
+from hermes_cli.cli_output import (
     print_info as _print_info,
+)
+from hermes_cli.cli_output import (
     print_success as _print_success,
+)
+from hermes_cli.cli_output import (
     print_warning as _print_warning,
+)
+from hermes_cli.cli_output import (
     prompt as _prompt,
 )
 
@@ -53,32 +61,32 @@ from hermes_cli.cli_output import (  # noqa: E402 — late import block
 # Each entry: (toolset_name, label, description)
 # These map to keys in toolsets.py TOOLSETS dict.
 CONFIGURABLE_TOOLSETS = [
-    ("web",             "🔍 Web Search & Scraping",    "web_search, web_extract"),
-    ("browser",         "🌐 Browser Automation",       "navigate, click, type, scroll"),
-    ("terminal",        "💻 Terminal & Processes",      "terminal, process"),
-    ("file",            "📁 File Operations",           "read, write, patch, search"),
-    ("code_execution",  "⚡ Code Execution",            "execute_code"),
-    ("vision",          "👁️  Vision / Image Analysis",  "vision_analyze"),
-    ("video",           "🎬 Video Analysis",            "video_analyze (requires video-capable model)"),
-    ("image_gen",       "🎨 Image Generation",          "image_generate"),
-    ("video_gen",       "🎬 Video Generation",          "video_generate (text-to-video + image-to-video)"),
-    ("x_search",        "🐦 X (Twitter) Search",        "x_search (requires xAI OAuth or XAI_API_KEY)"),
-    ("moa",             "🧠 Mixture of Agents",         "mixture_of_agents"),
-    ("tts",             "🔊 Text-to-Speech",            "text_to_speech"),
-    ("skills",          "📚 Skills",                    "list, view, manage"),
-    ("todo",            "📋 Task Planning",             "todo"),
-    ("memory",          "💾 Memory",                    "persistent memory across sessions"),
-    ("context_engine",  "🧩 Context Engine",            "runtime tools from the active context engine"),
-    ("session_search",  "🔎 Session Search",            "search past conversations"),
-    ("clarify",         "❓ Clarifying Questions",      "clarify"),
-    ("delegation",      "👥 Task Delegation",           "delegate_task"),
-    ("cronjob",         "⏰ Cron Jobs",                 "create/list/update/pause/resume/run, with optional attached skills"),
-    ("homeassistant",    "🏠 Home Assistant",           "smart home device control"),
-    ("spotify",          "🎵 Spotify",                  "playback, search, playlists, library"),
-    ("discord",         "💬 Discord (read/participate)", "fetch messages, search members, create thread"),
-    ("discord_admin",   "🛡️  Discord Server Admin",    "list channels/roles, pin, assign roles"),
-    ("yuanbao",          "🤖 Yuanbao",                  "group info, member queries, DM"),
-    ("computer_use",     "🖱️  Computer Use (macOS/Windows/Linux)", "background desktop control via cua-driver"),
+    ("web", "🔍 Web Search & Scraping", "web_search, web_extract"),
+    ("browser", "🌐 Browser Automation", "navigate, click, type, scroll"),
+    ("terminal", "💻 Terminal & Processes", "terminal, process"),
+    ("file", "📁 File Operations", "read, write, patch, search"),
+    ("code_execution", "⚡ Code Execution", "execute_code"),
+    ("vision", "👁️  Vision / Image Analysis", "vision_analyze"),
+    ("video", "🎬 Video Analysis", "video_analyze (requires video-capable model)"),
+    ("image_gen", "🎨 Image Generation", "image_generate"),
+    ("video_gen", "🎬 Video Generation", "video_generate (text-to-video + image-to-video)"),
+    ("x_search", "🐦 X (Twitter) Search", "x_search (requires xAI OAuth or XAI_API_KEY)"),
+    ("moa", "🧠 Mixture of Agents", "mixture_of_agents"),
+    ("tts", "🔊 Text-to-Speech", "text_to_speech"),
+    ("skills", "📚 Skills", "list, view, manage"),
+    ("todo", "📋 Task Planning", "todo"),
+    ("memory", "💾 Memory", "persistent memory across sessions"),
+    ("context_engine", "🧩 Context Engine", "runtime tools from the active context engine"),
+    ("session_search", "🔎 Session Search", "search past conversations"),
+    ("clarify", "❓ Clarifying Questions", "clarify"),
+    ("delegation", "👥 Task Delegation", "delegate_task"),
+    ("cronjob", "⏰ Cron Jobs", "create/list/update/pause/resume/run, with optional attached skills"),
+    ("homeassistant", "🏠 Home Assistant", "smart home device control"),
+    ("spotify", "🎵 Spotify", "playback, search, playlists, library"),
+    ("discord", "💬 Discord (read/participate)", "fetch messages, search members, create thread"),
+    ("discord_admin", "🛡️  Discord Server Admin", "list channels/roles, pin, assign roles"),
+    ("yuanbao", "🤖 Yuanbao", "group info, member queries, DM"),
+    ("computer_use", "🖱️  Computer Use (macOS/Windows/Linux)", "background desktop control via cua-driver"),
 ]
 
 
@@ -139,6 +147,7 @@ def _xai_credentials_present() -> bool:
         pass
     return bool(str(os.environ.get("XAI_API_KEY") or "").strip())
 
+
 # Platform-scoped toolsets: only appear in the `hermes tools` checklist for
 # these platforms, and only resolve/save for these platforms.  A toolset
 # absent from this map is available on every platform (current behaviour).
@@ -146,7 +155,7 @@ def _xai_credentials_present() -> bool:
 # Use this for tools whose APIs only make sense on one platform (Discord
 # server admin, Slack workspace admin, etc.).  Keeps every other platform's
 # checklist from filling up with irrelevant toggles.
-_TOOLSET_PLATFORM_RESTRICTIONS: Dict[str, Set[str]] = {
+_TOOLSET_PLATFORM_RESTRICTIONS: dict[str, set[str]] = {
     "discord": {"discord"},
     "discord_admin": {"discord"},
 }
@@ -197,7 +206,7 @@ def _get_plugin_toolset_keys() -> set:
         return set()
 
 
-def _checklist_toolset_keys(platform: str) -> Set[str]:
+def _checklist_toolset_keys(platform: str) -> set[str]:
     """Return the toolset keys the ``hermes tools`` checklist actually offers
     for ``platform``.
 
@@ -219,6 +228,7 @@ def _checklist_toolset_keys(platform: str) -> Set[str]:
         for ts_key, _, _ in _get_effective_configurable_toolsets()
         if _toolset_allowed_for_platform(ts_key, platform)
     }
+
 
 # Platform display config — derived from the canonical registry so every
 # module shares the same data.  Kept as dict-of-dicts for backward
@@ -569,8 +579,8 @@ TOOL_CATEGORIES = {
 # Simple env-var requirements for toolsets NOT in TOOL_CATEGORIES.
 # Used as a fallback for tools like vision/moa that just need an API key.
 TOOLSET_ENV_REQUIREMENTS = {
-    "vision":     [("OPENROUTER_API_KEY",   "https://openrouter.ai/keys")],
-    "moa":        [("OPENROUTER_API_KEY",   "https://openrouter.ai/keys")],
+    "vision":     [("OPENROUTER_API_KEY", "https://openrouter.ai/keys")],
+    "moa":        [("OPENROUTER_API_KEY", "https://openrouter.ai/keys")],
 }
 
 
@@ -599,7 +609,7 @@ def _cua_driver_env() -> dict:
 
 
 def _pip_install(
-    args: List[str],
+    args: list[str],
     *,
     timeout: int = 300,
     capture_output: bool = True,
@@ -664,7 +674,6 @@ def _pip_install(
         pip_cmd + ["install", *args],
         capture_output=capture_output, text=True, timeout=timeout,
     )
-
 
 
 # The asset-probe that lived here used to hit `/releases/latest` on
@@ -787,7 +796,7 @@ def install_cua_driver(upgrade: bool = False) -> bool:
             if _state is not None and not _state.get("update_available"):
                 _print_success(
                     f"    {driver_cmd} is already on the latest release "
-                    f"({_state.get('current_version') or 'unknown'})."
+                    f"({_state.get('current_version') or 'unknown'}).",
                 )
                 return True
         except Exception:
@@ -856,9 +865,9 @@ def _run_cua_driver_installer(label: str = "Installing", verbose: bool = True) -
         )
     else:
         install_cmd = (
-            "/bin/bash -c \"$(curl -fsSL "
+            '/bin/bash -c "$(curl -fsSL '
             "https://raw.githubusercontent.com/trycua/cua/main/"
-            "libs/cua-driver/scripts/install.sh)\""
+            'libs/cua-driver/scripts/install.sh)"'
         )
         use_shell = True
         manual_hint = install_cmd
@@ -915,7 +924,7 @@ def _run_post_setup(post_setup_key: str):
                 # only, avoiding the apps/* glob which would pull in
                 # apps/desktop (Electron + node-pty) unnecessarily. See #38772.
                 [npm_bin, "install", "--silent", "--workspaces=false"],
-                capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+                capture_output=True, text=True, cwd=str(PROJECT_ROOT),
             )
             if result.returncode == 0:
                 _print_success("    Node.js dependencies installed")
@@ -956,19 +965,19 @@ def _run_post_setup(post_setup_key: str):
 
         if _running_in_docker():
             _print_warning(
-                "    Chromium is missing but you're running in Docker."
+                "    Chromium is missing but you're running in Docker.",
             )
             _print_info(
-                "    Pull the latest image to get the bundled Chromium:"
+                "    Pull the latest image to get the bundled Chromium:",
             )
             _print_info(
-                "      docker pull ghcr.io/nousresearch/hermes-agent:latest"
+                "      docker pull ghcr.io/nousresearch/hermes-agent:latest",
             )
             return
 
         if not npx_bin:
             _print_warning(
-                "    npx not found - install Chromium manually: npx agent-browser install --with-deps"
+                "    npx not found - install Chromium manually: npx agent-browser install --with-deps",
             )
             return
 
@@ -1021,7 +1030,7 @@ def _run_post_setup(post_setup_key: str):
             result = subprocess.run(
                 # --workspaces=false avoids resolving apps/desktop. See #38772.
                 [_npm_bin, "install", "--silent", "--workspaces=false"],
-                capture_output=True, text=True, cwd=str(PROJECT_ROOT)
+                capture_output=True, text=True, cwd=str(PROJECT_ROOT),
             )
             if result.returncode == 0:
                 _print_success("    Camofox installed")
@@ -1185,7 +1194,7 @@ def _run_post_setup(post_setup_key: str):
 
         if oauth_logged_in:
             _print_success(
-                "    xAI will use your xAI Grok OAuth (SuperGrok / Premium+) credentials"
+                "    xAI will use your xAI Grok OAuth (SuperGrok / Premium+) credentials",
             )
             return
         if existing_api_key:
@@ -1194,12 +1203,14 @@ def _run_post_setup(post_setup_key: str):
 
         _print_info("    xAI needs credentials. Choose one:")
         try:
+            from hermes_cli.config import save_env_value
             from hermes_cli.setup import (
                 _run_xai_oauth_login_from_setup,
                 prompt_choice,
+            )
+            from hermes_cli.setup import (
                 prompt as _setup_prompt,
             )
-            from hermes_cli.config import save_env_value
         except Exception as exc:
             _print_warning(f"    Could not load setup helpers: {exc}")
             _print_info("    Run later: hermes auth add xai-oauth   (or set XAI_API_KEY)")
@@ -1217,12 +1228,12 @@ def _run_post_setup(post_setup_key: str):
         if idx == 0:
             if _run_xai_oauth_login_from_setup():
                 _print_success(
-                    "    Logged in — xAI will use these OAuth credentials"
+                    "    Logged in — xAI will use these OAuth credentials",
                 )
             else:
                 _print_warning(
                     "    xAI Grok OAuth login did not complete. "
-                    "Run later: hermes auth add xai-oauth"
+                    "Run later: hermes auth add xai-oauth",
                 )
         elif idx == 1:
             api_key = _setup_prompt("    xAI API key", password=True)
@@ -1231,13 +1242,13 @@ def _run_post_setup(post_setup_key: str):
                 _print_success("    XAI_API_KEY saved")
             else:
                 _print_warning(
-                    "    No API key provided. Run later: hermes auth add xai-oauth"
+                    "    No API key provided. Run later: hermes auth add xai-oauth",
                 )
         else:
             _print_info("    xAI will remain inactive until credentials are configured.")
 
 
-def valid_post_setup_keys() -> Set[str]:
+def valid_post_setup_keys() -> set[str]:
     """Return the set of post-setup keys declared by any visible provider.
 
     Collected from ``TOOL_CATEGORIES`` plus the plugin-registered web /
@@ -1246,7 +1257,7 @@ def valid_post_setup_keys() -> Set[str]:
     command and the dashboard post-setup endpoint validate against, so a
     caller can't drive ``_run_post_setup`` with an arbitrary key.
     """
-    keys: Set[str] = set()
+    keys: set[str] = set()
     for cat in TOOL_CATEGORIES.values():
         for prov in cat.get("providers", []):
             ps = prov.get("post_setup")
@@ -1286,7 +1297,7 @@ def run_post_setup_command(args) -> int:
     if key not in valid:
         _print_error(
             f"Unknown post-setup key: {key!r}. "
-            f"Valid keys: {', '.join(sorted(valid)) or '(none)'}"
+            f"Valid keys: {', '.join(sorted(valid)) or '(none)'}",
         )
         return 2
     _print_info(f"Running post-setup hook: {key}")
@@ -1301,7 +1312,7 @@ def run_post_setup_command(args) -> int:
 
 # ─── Platform / Toolset Helpers ───────────────────────────────────────────────
 
-def _get_enabled_platforms() -> List[str]:
+def _get_enabled_platforms() -> list[str]:
     """Return platform keys that are configured (have tokens or are CLI)."""
     enabled = ["cli"]
     if get_env_value("TELEGRAM_BOT_TOKEN"):
@@ -1317,7 +1328,7 @@ def _get_enabled_platforms() -> List[str]:
     return enabled
 
 
-def _platform_toolset_summary(config: dict, platforms: Optional[List[str]] = None) -> Dict[str, Set[str]]:
+def _platform_toolset_summary(config: dict, platforms: list[str] | None = None) -> dict[str, set[str]]:
     """Return a summary of enabled toolsets per platform.
 
     When ``platforms`` is None, this uses ``_get_enabled_platforms`` to
@@ -1327,7 +1338,7 @@ def _platform_toolset_summary(config: dict, platforms: Optional[List[str]] = Non
     if platforms is None:
         platforms = _get_enabled_platforms()
 
-    summary: Dict[str, Set[str]] = {}
+    summary: dict[str, set[str]] = {}
     for pkey in platforms:
         summary[pkey] = _get_platform_tools(config, pkey)
     return summary
@@ -1350,7 +1361,7 @@ def _parse_enabled_flag(value, default: bool = True) -> bool:
     return default
 
 
-def enabled_mcp_server_names(config: dict) -> Set[str]:
+def enabled_mcp_server_names(config: dict) -> set[str]:
     """Names of MCP servers globally enabled in config.yaml.
 
     Shared by the gateway/CLI platform resolver (``_get_platform_tools``) and
@@ -1373,9 +1384,9 @@ def _get_platform_tools(
     platform: str,
     *,
     include_default_mcp_servers: bool = True,
-) -> Set[str]:
+) -> set[str]:
     """Resolve which individual toolset names are enabled for a platform."""
-    from toolsets import resolve_toolset, TOOLSETS
+    from toolsets import TOOLSETS, resolve_toolset
 
     platform_toolsets = config.get("platform_toolsets") or {}
     toolset_names = platform_toolsets.get(platform)
@@ -1616,7 +1627,7 @@ def _get_platform_tools(
     return enabled_toolsets
 
 
-def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: Set[str]):
+def _save_platform_tools(config: dict, platform: str, enabled_toolset_keys: set[str]):
     """Save the selected toolset keys for a platform to config.
 
     Preserves any non-configurable toolset entries (like MCP server names)
@@ -1726,10 +1737,10 @@ def _prompt_choice(question: str, choices: list, default: int = 0) -> int:
 # ─── Token Estimation ────────────────────────────────────────────────────────
 
 # Module-level cache so discovery + tokenization runs at most once per process.
-_tool_token_cache: Optional[Dict[str, int]] = None
+_tool_token_cache: dict[str, int] | None = None
 
 
-def _estimate_tool_tokens() -> Dict[str, int]:
+def _estimate_tool_tokens() -> dict[str, int]:
     """Return estimated token counts per individual tool name.
 
     Uses tiktoken (cl100k_base) to count tokens in the JSON-serialised
@@ -1759,7 +1770,7 @@ def _estimate_tool_tokens() -> Dict[str, int]:
         _tool_token_cache = {}
         return _tool_token_cache
 
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for name in registry.get_all_tool_names():
         schema = registry.get_schema(name)
         if schema:
@@ -1773,11 +1784,11 @@ def _estimate_tool_tokens() -> Dict[str, int]:
 
 def _prompt_toolset_checklist(
     platform_label: str,
-    enabled: Set[str],
+    enabled: set[str],
     platform: str = "cli",
     *,
     force_fresh: bool = True,
-) -> Set[str]:
+) -> set[str]:
     """Multi-select checklist of toolsets. Returns set of selected toolset keys."""
     from hermes_cli.curses_ui import curses_checklist
     from toolsets import resolve_toolset
@@ -2126,7 +2137,7 @@ def _visible_providers(
         acct
         and acct.logged_in
         and acct.paid_service_access is not True
-        and acct.tool_gateway_entitled
+        and acct.tool_gateway_entitled,
     )
     visible = []
     for provider in cat.get("providers", []):
@@ -2367,7 +2378,7 @@ def _configure_tool_category(
                 get_nous_subscription_features(
                     config,
                     force_fresh=force_fresh,
-                ).nous_auth_present
+                ).nous_auth_present,
             )
         except Exception:
             _nous_logged_in = False
@@ -2525,7 +2536,7 @@ def _detect_active_provider_index(
 
 def _fal_model_catalog():
     """Lazy-load the FAL model catalog from the tool module."""
-    from tools.image_generation_tool import FAL_MODELS, DEFAULT_MODEL
+    from tools.image_generation_tool import DEFAULT_MODEL, FAL_MODELS
     return FAL_MODELS, DEFAULT_MODEL
 
 
@@ -2931,7 +2942,7 @@ def _configure_provider(
             coverage_category=MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature),
         ):
             _print_warning(
-                "  Not enabled — Nous Portal access is required for this backend."
+                "  Not enabled — Nous Portal access is required for this backend.",
             )
             return
 
@@ -2941,7 +2952,7 @@ def _configure_provider(
     if provider.get("requires_nous_auth") and not managed_feature:
         features = get_nous_subscription_features(config, force_fresh=force_fresh)
         entitled = bool(
-            features.account_info and features.account_info.paid_service_access is True
+            features.account_info and features.account_info.paid_service_access is True,
         )
         if not features.nous_auth_present or not entitled:
             message = format_nous_portal_entitlement_message(
@@ -2949,7 +2960,7 @@ def _configure_provider(
                 capability=f"{provider.get('name', 'Nous Subscription')}",
             )
             _print_warning(
-                f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}"
+                f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}",
             )
             return
 
@@ -3156,12 +3167,11 @@ def _reconfigure_tool(
     for ts_key, ts_label, _ in _get_effective_configurable_toolsets():
         cat = TOOL_CATEGORIES.get(ts_key)
         reqs = TOOLSET_ENV_REQUIREMENTS.get(ts_key)
-        if cat or reqs:
-            if (
-                _toolset_has_keys(ts_key, config, force_fresh=force_fresh)
-                or _toolset_enabled_for_reconfigure(ts_key, config)
-            ):
-                configurable.append((ts_key, ts_label))
+        if (cat or reqs) and (
+            _toolset_has_keys(ts_key, config, force_fresh=force_fresh)
+            or _toolset_enabled_for_reconfigure(ts_key, config)
+        ):
+            configurable.append((ts_key, ts_label))
 
     if not configurable:
         _print_info("No configured tools to reconfigure.")
@@ -3299,7 +3309,7 @@ def _reconfigure_provider(
             coverage_category=MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature),
         ):
             _print_warning(
-                "  Not enabled — Nous Portal access is required for this backend."
+                "  Not enabled — Nous Portal access is required for this backend.",
             )
             return
 
@@ -3308,7 +3318,7 @@ def _reconfigure_provider(
     if provider.get("requires_nous_auth") and not managed_feature:
         features = get_nous_subscription_features(config, force_fresh=force_fresh)
         entitled = bool(
-            features.account_info and features.account_info.paid_service_access is True
+            features.account_info and features.account_info.paid_service_access is True,
         )
         if not features.nous_auth_present or not entitled:
             message = format_nous_portal_entitlement_message(
@@ -3316,7 +3326,7 @@ def _reconfigure_provider(
                 capability=f"{provider.get('name', 'Nous Subscription')}",
             )
             _print_warning(
-                f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}"
+                f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}",
             )
             return
 
@@ -3460,6 +3470,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
         config: Optional config dict to use.  When called from the setup
             wizard, the wizard passes its own dict so that platform_toolsets
             are written into it and survive the wizard's final save_config().
+
     """
     if config is None:
         config = load_config()
@@ -3792,7 +3803,7 @@ def _configure_mcp_tools_interactive(config: dict):
                 labels.append(tool_name)
 
         # Determine which tools are currently enabled
-        pre_selected: Set[int] = set()
+        pre_selected: set[int] = set()
         tool_names = [t[0] for t in tools]
         for i, tool_name in enumerate(tool_names):
             if include_list:
@@ -3842,7 +3853,7 @@ def _configure_mcp_tools_interactive(config: dict):
         enabled_count = len(chosen)
         disabled_count = len(tools) - enabled_count
         _print_success(
-            f"  {server_name}: {enabled_count} enabled, {disabled_count} disabled"
+            f"  {server_name}: {enabled_count} enabled, {disabled_count} disabled",
         )
         any_changes = True
 
@@ -3857,7 +3868,7 @@ def _configure_mcp_tools_interactive(config: dict):
 # ─── Non-interactive disable/enable ──────────────────────────────────────────
 
 
-def _apply_toolset_change(config: dict, platform: str, toolset_names: List[str], action: str):
+def _apply_toolset_change(config: dict, platform: str, toolset_names: list[str], action: str):
     """Add or remove built-in toolsets for a platform."""
     enabled = _get_platform_tools(config, platform, include_default_mcp_servers=False)
     if action == "disable":
@@ -3867,12 +3878,12 @@ def _apply_toolset_change(config: dict, platform: str, toolset_names: List[str],
     _save_platform_tools(config, platform, updated)
 
 
-def _apply_mcp_change(config: dict, targets: List[str], action: str) -> Set[str]:
+def _apply_mcp_change(config: dict, targets: list[str], action: str) -> set[str]:
     """Add or remove specific MCP tools from a server's exclude list.
 
     Returns the set of server names that were not found in config.
     """
-    failed_servers: Set[str] = set()
+    failed_servers: set[str] = set()
     mcp_servers = config.get("mcp_servers") or {}
 
     for target in targets:
@@ -3953,7 +3964,7 @@ def tools_disable_enable_command(args):
                           config.get("mcp_servers") or {}, platform)
         return
 
-    targets: List[str] = args.names
+    targets: list[str] = args.names
     toolset_targets = [t for t in targets if ":" not in t]
     mcp_targets = [t for t in targets if ":" in t]
 
@@ -3974,14 +3985,14 @@ def tools_disable_enable_command(args):
             allowed = sorted(_TOOLSET_PLATFORM_RESTRICTIONS.get(name) or set())
             _print_error(
                 f"Toolset '{name}' is not available on platform '{platform}' "
-                f"(only: {', '.join(allowed)})"
+                f"(only: {', '.join(allowed)})",
             )
         toolset_targets = [t for t in toolset_targets if t not in restricted_targets]
 
     if toolset_targets:
         _apply_toolset_change(config, platform, toolset_targets, action)
 
-    failed_servers: Set[str] = set()
+    failed_servers: set[str] = set()
     if mcp_targets:
         failed_servers = _apply_mcp_change(config, mcp_targets, action)
         for srv in failed_servers:

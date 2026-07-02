@@ -26,7 +26,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tools import delegate_tool
-from tools.delegate_tool import delegate_task, _strip_blocked_tools
+from tools.delegate_tool import _strip_blocked_tools, delegate_task
 
 
 def _make_parent(depth: int = 0, enabled_toolsets=None) -> MagicMock:
@@ -138,7 +138,8 @@ def _orchestrator_config_on(monkeypatch):
 
 def _run_single_orchestrator(goal="plan the work and fan out"):
     """Patch _run_single_child with a canned success payload so no real
-    LLM / agent loop spins up. Returns the patch context manager."""
+    LLM / agent loop spins up. Returns the patch context manager.
+    """
     return patch(
         "tools.delegate_tool._run_single_child",
         return_value={
@@ -154,10 +155,11 @@ def _run_single_orchestrator(goal="plan the work and fan out"):
 
 def test_orchestrator_role_propagates_to_child(monkeypatch):
     """role='orchestrator' → child._delegate_role == 'orchestrator' and the
-    'delegation' toolset is retained on the child."""
+    'delegation' toolset is retained on the child.
+    """
     captured: list = []
     monkeypatch.setattr(
-        delegate_tool, "_build_child_agent", _make_capturing_builder(captured)
+        delegate_tool, "_build_child_agent", _make_capturing_builder(captured),
     )
 
     with _run_single_orchestrator():
@@ -190,10 +192,11 @@ def test_orchestrator_role_propagates_to_child(monkeypatch):
 def test_leaf_role_strips_delegation_toolset(monkeypatch):
     """Counter-invariant: role='leaf' (the default) must NOT retain
     'delegation' — otherwise the leaf could escalate itself to orchestrator
-    by simply calling delegate_task, defeating the depth cap."""
+    by simply calling delegate_task, defeating the depth cap.
+    """
     captured: list = []
     monkeypatch.setattr(
-        delegate_tool, "_build_child_agent", _make_capturing_builder(captured)
+        delegate_tool, "_build_child_agent", _make_capturing_builder(captured),
     )
 
     with patch("tools.delegate_tool._run_single_child") as mock_run:
@@ -224,12 +227,13 @@ def test_leaf_role_strips_delegation_toolset(monkeypatch):
 def test_orchestrator_degrades_to_leaf_when_kill_switch_off(monkeypatch):
     """When delegation.orchestrator_enabled=False, role='orchestrator' is
     silently coerced to 'leaf' AND 'delegation' is stripped. This is the
-    operator kill switch — flipping it must flatten the whole tree."""
+    operator kill switch — flipping it must flatten the whole tree.
+    """
     monkeypatch.setattr(delegate_tool, "_get_orchestrator_enabled", lambda: False)
 
     captured: list = []
     monkeypatch.setattr(
-        delegate_tool, "_build_child_agent", _make_capturing_builder(captured)
+        delegate_tool, "_build_child_agent", _make_capturing_builder(captured),
     )
 
     with patch("tools.delegate_tool._run_single_child") as mock_run:
@@ -267,7 +271,7 @@ def test_orchestrator_degrades_to_leaf_at_depth_floor(monkeypatch):
     # parent depth 1 → child at depth 2 == max_spawn_depth(2) → floor.
     captured: list = []
     monkeypatch.setattr(
-        delegate_tool, "_build_child_agent", _make_capturing_builder(captured)
+        delegate_tool, "_build_child_agent", _make_capturing_builder(captured),
     )
 
     with patch("tools.delegate_tool._run_single_child") as mock_run:

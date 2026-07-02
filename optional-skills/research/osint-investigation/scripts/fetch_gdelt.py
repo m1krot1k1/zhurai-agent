@@ -17,7 +17,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get_json  # noqa: E402
+from _http import get_json
 
 BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
 
@@ -104,11 +104,11 @@ def fetch(
                     "source_country": a.get("sourcecountry") or "",
                     "tone": str(a.get("tone") or ""),
                     "social_image": a.get("socialimage") or "",
-                }
+                },
             )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)
@@ -124,7 +124,7 @@ def fetch(
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--query", required=True, help='Search query (supports GDELT operators: quoted phrases, AND/OR/NOT, sourcecountry:, theme:)')
+    p.add_argument("--query", required=True, help="Search query (supports GDELT operators: quoted phrases, AND/OR/NOT, sourcecountry:, theme:)")
     p.add_argument(
         "--mode",
         default="ArtList",

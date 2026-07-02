@@ -21,8 +21,8 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from gateway.platforms.webhook import WebhookAdapter
 from gateway.config import PlatformConfig
+from gateway.platforms.webhook import WebhookAdapter
 
 
 def _make_adapter(routes, rate_limit=5, **extra_kw) -> WebhookAdapter:
@@ -49,7 +49,7 @@ def _create_app(adapter: WebhookAdapter) -> web.Application:
 def _github_signature(body: bytes, secret: str) -> str:
     """Compute X-Hub-Signature-256 for *body* using *secret*."""
     return "sha256=" + hmac.new(
-        secret.encode(), body, hashlib.sha256
+        secret.encode(), body, hashlib.sha256,
     ).hexdigest()
 
 
@@ -78,7 +78,7 @@ class TestSignatureBeforeRateLimit:
                 "events": ["push"],
                 "prompt": "Event: {event}",
                 "deliver": "log",
-            }
+            },
         }
         rate_limit = 5
         adapter = _make_adapter(routes, rate_limit=rate_limit)
@@ -150,7 +150,7 @@ class TestSignatureBeforeRateLimit:
                 "events": ["push"],
                 "prompt": "Event: {event}",
                 "deliver": "log",
-            }
+            },
         }
         rate_limit = 3
         adapter = _make_adapter(routes, rate_limit=rate_limit)
@@ -201,7 +201,8 @@ class TestSignatureBeforeRateLimit:
     @pytest.mark.asyncio
     async def test_mixed_valid_and_invalid_signatures(self):
         """Interleave invalid and valid requests. Only valid ones count
-        against the rate limit."""
+        against the rate limit.
+        """
         secret = "test-secret-key"
         route_name = "test-route"
         routes = {
@@ -210,7 +211,7 @@ class TestSignatureBeforeRateLimit:
                 "events": ["push"],
                 "prompt": "Event: {event}",
                 "deliver": "log",
-            }
+            },
         }
         rate_limit = 3
         adapter = _make_adapter(routes, rate_limit=rate_limit)

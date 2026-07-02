@@ -16,11 +16,11 @@ import pytest
 
 from hermes_cli.profile_distribution import (
     DEFAULT_DIST_OWNED,
+    MANIFEST_FILENAME,
+    USER_OWNED_EXCLUDE,
     DistributionError,
     DistributionManifest,
     EnvRequirement,
-    MANIFEST_FILENAME,
-    USER_OWNED_EXCLUDE,
     _env_template_from_manifest,
     _looks_like_git_url,
     _parse_semver,
@@ -33,13 +33,12 @@ from hermes_cli.profile_distribution import (
     write_manifest,
 )
 
-
 # ---------------------------------------------------------------------------
 # Isolated profile env (matches tests/hermes_cli/test_profiles.py)
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def profile_env(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     default_home = tmp_path / ".hermes"
@@ -63,7 +62,7 @@ def _make_staging_dir(root: Path, name: str = "src", *, manifest: DistributionMa
     (staged / "skills").mkdir(exist_ok=True)
     (staged / "skills" / "demo").mkdir(exist_ok=True)
     (staged / "skills" / "demo" / "SKILL.md").write_text(
-        "---\nname: demo\ndescription: test\n---\n# Demo skill\n"
+        "---\nname: demo\ndescription: test\n---\n# Demo skill\n",
     )
     (staged / "cron").mkdir(exist_ok=True)
     (staged / "cron" / "daily.json").write_text('{"schedule": "0 9 * * *"}')
@@ -111,7 +110,7 @@ class TestManifestParsing:
             "    default: http://127.0.0.1:8000\n"
             "distribution_owned:\n"
             "  - SOUL.md\n"
-            "  - skills/\n"
+            "  - skills/\n",
         )
         m = read_manifest(tmp_path)
         assert m.name == "telem"
@@ -132,7 +131,7 @@ class TestManifestParsing:
 
     def test_env_requires_not_list_rejected(self, tmp_path):
         (tmp_path / MANIFEST_FILENAME).write_text(
-            "name: bad\nenv_requires:\n  name: FOO\n"
+            "name: bad\nenv_requires:\n  name: FOO\n",
         )
         with pytest.raises(DistributionError, match="env_requires must be a list"):
             read_manifest(tmp_path)
@@ -389,7 +388,7 @@ class TestUpdate:
 
         # User edits config
         (plan.target_dir / "config.yaml").write_text(
-            "model:\n  model: gpt-5\n# user override\n"
+            "model:\n  model: gpt-5\n# user override\n",
         )
 
         # Bump source config
@@ -466,7 +465,8 @@ class TestSecurity:
 
     def test_install_does_not_import_credentials_from_staging(self, profile_env):
         """If an author accidentally ships auth.json or .env in their
-        staging dir, the installer must NOT copy them to the target profile."""
+        staging dir, the installer must NOT copy them to the target profile.
+        """
         staged = _make_staging_dir(profile_env, "src")
         # Author leaks credentials into the staging tree (shouldn't happen, but...)
         (staged / "auth.json").write_text('{"leaked": true}')
@@ -506,7 +506,8 @@ class TestNestedUserOwnedExcludeNotFiltered:
 
     def test_nested_bin_dir_is_preserved(self, profile_env):
         """"A distribution shipping tools/bin/ must not have tools/bin/ dropped
-        during install even though 'bin' is in USER_OWNED_EXCLUDE."""
+        during install even though 'bin' is in USER_OWNED_EXCLUDE.
+        """
         staged = _make_staging_dir(profile_env, "src")
         (staged / "tools" / "bin").mkdir(parents=True)
         (staged / "tools" / "bin" / "tool.py").write_text("# tool\n")
@@ -539,7 +540,8 @@ class TestNestedUserOwnedExcludeNotFiltered:
 
         Note: _bootstrap_user_dirs creates some of these (logs/, sessions/,
         memories/) in every fresh profile, so we check that the *staged content*
-        did not leak through rather than asserting the directory doesn't exist."""
+        did not leak through rather than asserting the directory doesn't exist.
+        """
         staged = _make_staging_dir(profile_env, "src")
         # Add top-level excluded entries alongside the legit ones
         (staged / "bin").mkdir(exist_ok=True)
@@ -595,12 +597,13 @@ class TestInstalledAtStamp:
         # update writes a NEW stamp (installs within the same second otherwise
         # collide at iso-8601 seconds resolution).
         import datetime as _dt
+
         class _FakeDT(_dt.datetime):
             @classmethod
             def now(cls, tz=None):
-                return _dt.datetime(2099, 1, 1, 0, 0, 0, tzinfo=tz or _dt.timezone.utc)
+                return _dt.datetime(2099, 1, 1, 0, 0, 0, tzinfo=tz or _dt.UTC)
         monkeypatch.setattr(
-            "hermes_cli.profile_distribution.datetime", _FakeDT, raising=True
+            "hermes_cli.profile_distribution.datetime", _FakeDT, raising=True,
         )
 
         from hermes_cli.profile_distribution import update_distribution
@@ -640,11 +643,11 @@ class TestProfileInfoDistribution:
         assert rows["plain"].distribution_version is None
 
     def test_malformed_manifest_does_not_break_list(self, profile_env):
-        from hermes_cli.profiles import create_profile, list_profiles, get_profile_dir
+        from hermes_cli.profiles import create_profile, get_profile_dir, list_profiles
         create_profile(name="brokenmeta", no_alias=True)
         # Write a distribution.yaml that isn't a valid mapping
         (get_profile_dir("brokenmeta") / "distribution.yaml").write_text(
-            "not: [a, valid, mapping\n"  # broken YAML
+            "not: [a, valid, mapping\n",  # broken YAML
         )
         # list_profiles must NOT raise; distribution_* stay None for this row.
         rows = {p.name: p for p in list_profiles()}

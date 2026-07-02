@@ -38,7 +38,7 @@ import asyncio
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +69,11 @@ class _ProviderEntry:
     """
 
     server_url: str
-    oauth_config: Optional[dict]
-    provider: Optional[Any] = None
+    oauth_config: dict | None
+    provider: Any | None = None
     last_mtime_ns: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    pending_401: dict[str, "asyncio.Future[bool]"] = field(default_factory=dict)
+    pending_401: dict[str, asyncio.Future[bool]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ class _ProviderEntry:
 # ---------------------------------------------------------------------------
 
 
-def _make_hermes_provider_class() -> Optional[type]:
+def _make_hermes_provider_class() -> type | None:
     """Lazy-import the SDK base class and return our subclass.
 
     Wrapped in a function so this module imports cleanly even when the
@@ -211,7 +211,7 @@ def _make_hermes_provider_class() -> Optional[type]:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 # Step 1: PRM discovery to learn the authorization_server URL.
                 for url in build_protected_resource_metadata_discovery_urls(
-                    None, server_url
+                    None, server_url,
                 ):
                     req = create_oauth_metadata_request(url)
                     try:
@@ -227,14 +227,14 @@ def _make_hermes_provider_class() -> Optional[type]:
                         self.context.protected_resource_metadata = prm
                         if prm.authorization_servers:
                             self.context.auth_server_url = str(
-                                prm.authorization_servers[0]
+                                prm.authorization_servers[0],
                             )
                         break
 
                 # Step 2: ASM discovery against the auth_server_url (or
                 # server_url fallback for legacy providers).
                 for url in build_oauth_authorization_server_metadata_discovery_urls(
-                    self.context.auth_server_url, server_url
+                    self.context.auth_server_url, server_url,
                 ):
                     req = create_oauth_metadata_request(url)
                     try:
@@ -290,7 +290,7 @@ def _make_hermes_provider_class() -> Optional[type]:
             # whatever state the SDK already has.
             try:
                 await get_manager().invalidate_if_disk_changed(
-                    self._hermes_server_name
+                    self._hermes_server_name,
                 )
             except Exception as exc:  # pragma: no cover — defensive
                 logger.debug(
@@ -328,7 +328,7 @@ def _make_hermes_provider_class() -> Optional[type]:
 
 
 # Cached at import time. Tested and used by :class:`MCPOAuthManager`.
-_HERMES_PROVIDER_CLS: Optional[type] = _make_hermes_provider_class()
+_HERMES_PROVIDER_CLS: type | None = _make_hermes_provider_class()
 
 
 # ---------------------------------------------------------------------------
@@ -354,8 +354,8 @@ class MCPOAuthManager:
         self,
         server_name: str,
         server_url: str,
-        oauth_config: Optional[dict],
-    ) -> Optional[Any]:
+        oauth_config: dict | None,
+    ) -> Any | None:
         """Return a cached OAuth provider for ``server_name`` or build one.
 
         Idempotent: repeat calls with the same name return the same instance.
@@ -389,7 +389,7 @@ class MCPOAuthManager:
         self,
         server_name: str,
         entry: _ProviderEntry,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """Build the underlying OAuth provider.
 
         Constructs :class:`HermesMCPOAuthProvider` directly using the helpers
@@ -407,9 +407,9 @@ class MCPOAuthManager:
 
         # Local imports avoid circular deps at module import time.
         from tools.mcp_oauth import (
+            _OAUTH_AVAILABLE,
             HermesTokenStorage,
             OAuthNonInteractiveError,
-            _OAUTH_AVAILABLE,
             _build_client_metadata,
             _configure_callback_port,
             _is_interactive,
@@ -430,7 +430,7 @@ class MCPOAuthManager:
                 f"'{server_name}': non-interactive environment and no "
                 "cached tokens found. Run `hermes mcp login "
                 f"{server_name}` interactively first to complete initial "
-                "authorization."
+                "authorization.",
             )
 
         _configure_callback_port(cfg)
@@ -508,7 +508,7 @@ class MCPOAuthManager:
     async def handle_401(
         self,
         server_name: str,
-        failed_access_token: Optional[str] = None,
+        failed_access_token: str | None = None,
     ) -> bool:
         """Handle a 401 from a tool call, deduplicated across concurrent callers.
 
@@ -522,6 +522,7 @@ class MCPOAuthManager:
         Thundering-herd protection: if N concurrent tool calls hit 401 with
         the same ``failed_access_token``, only one recovery attempt fires.
         Others await the same future.
+
         """
         entry = self._entries.get(server_name)
         if entry is None or entry.provider is None:
@@ -540,7 +541,7 @@ class MCPOAuthManager:
                     try:
                         # Step 1: Did disk change? Picks up external refresh.
                         disk_changed = await self.invalidate_if_disk_changed(
-                            server_name
+                            server_name,
                         )
                         if disk_changed:
                             if not pending.done():
@@ -589,7 +590,7 @@ class MCPOAuthManager:
 # ---------------------------------------------------------------------------
 
 
-_MANAGER: Optional[MCPOAuthManager] = None
+_MANAGER: MCPOAuthManager | None = None
 _MANAGER_LOCK = threading.Lock()
 
 

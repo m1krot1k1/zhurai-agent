@@ -14,7 +14,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
-from typing import Optional
 
 try:
     import aiohttp
@@ -45,20 +44,20 @@ _HOP_BY_HOP_HEADERS = frozenset(
         "transfer-encoding",
         "upgrade",
         "authorization",  # we replace this one
-    }
+    },
 )
 
 DEFAULT_PORT = 8645
 DEFAULT_HOST = "127.0.0.1"
 
 
-def _json_error(status: int, message: str, code: str = "proxy_error") -> "web.Response":
+def _json_error(status: int, message: str, code: str = "proxy_error") -> web.Response:
     """Return an OpenAI-style error JSON response."""
     body = {"error": {"message": message, "type": code, "code": code}}
     return web.json_response(body, status=status)
 
 
-def _filter_request_headers(headers: "aiohttp.typedefs.LooseHeaders") -> dict:
+def _filter_request_headers(headers: aiohttp.typedefs.LooseHeaders) -> dict:
     """Strip hop-by-hop + auth headers from the inbound request."""
     out = {}
     for key, value in headers.items():
@@ -81,12 +80,12 @@ def _filter_response_headers(headers) -> dict:
     return out
 
 
-def create_app(adapter: UpstreamAdapter) -> "web.Application":
+def create_app(adapter: UpstreamAdapter) -> web.Application:
     """Build the aiohttp application bound to a specific upstream adapter."""
     if not AIOHTTP_AVAILABLE:
         raise RuntimeError(
             "aiohttp is required for `hermes proxy`. Install with: "
-            "pip install 'hermes-agent[messaging]' or `pip install aiohttp`."
+            "pip install 'hermes-agent[messaging]' or `pip install aiohttp`.",
         )
 
     app = web.Application()
@@ -95,16 +94,16 @@ def create_app(adapter: UpstreamAdapter) -> "web.Application":
     _adapter_key = web.AppKey("adapter", UpstreamAdapter)
     app[_adapter_key] = adapter
 
-    async def handle_health(request: "web.Request") -> "web.Response":
+    async def handle_health(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
                 "upstream": adapter.display_name,
                 "authenticated": adapter.is_authenticated(),
-            }
+            },
         )
 
-    async def handle_proxy(request: "web.Request") -> "web.StreamResponse":
+    async def handle_proxy(request: web.Request) -> web.StreamResponse:
         # Extract the path *after* /v1
         rel_path = request.match_info.get("tail", "")
         rel_path = "/" + rel_path.lstrip("/")
@@ -155,7 +154,7 @@ def create_app(adapter: UpstreamAdapter) -> "web.Application":
                 upstream_resp = await session.request(
                     request.method,
                     upstream_url,
-                    data=body if body else None,
+                    data=body or None,
                     headers=fwd_headers,
                     allow_redirects=False,
                 )
@@ -179,7 +178,7 @@ def create_app(adapter: UpstreamAdapter) -> "web.Application":
                     ),
                     None,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return (
                     _json_error(
                         504,
@@ -244,7 +243,7 @@ async def run_server(
     adapter: UpstreamAdapter,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
-    shutdown_event: Optional[asyncio.Event] = None,
+    shutdown_event: asyncio.Event | None = None,
 ) -> None:
     """Run the proxy in the current event loop until shutdown_event is set.
 
@@ -253,7 +252,7 @@ async def run_server(
     if not AIOHTTP_AVAILABLE:
         raise RuntimeError(
             "aiohttp is required for `hermes proxy`. Install with: "
-            "pip install 'hermes-agent[messaging]' or `pip install aiohttp`."
+            "pip install 'hermes-agent[messaging]' or `pip install aiohttp`.",
         )
 
     app = create_app(adapter)
@@ -288,9 +287,9 @@ async def run_server(
 
 
 __all__ = [
-    "create_app",
-    "run_server",
+    "AIOHTTP_AVAILABLE",
     "DEFAULT_HOST",
     "DEFAULT_PORT",
-    "AIOHTTP_AVAILABLE",
+    "create_app",
+    "run_server",
 ]

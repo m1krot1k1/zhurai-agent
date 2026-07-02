@@ -8,9 +8,7 @@ Fix: ``_exc_str()`` falls back to ``repr(exc)`` when ``str(exc)`` is empty.
 """
 
 
-
 from tools.mcp_tool import _exc_str, _sanitize_error
-
 
 # ---------------------------------------------------------------------------
 # _exc_str unit tests
@@ -66,7 +64,7 @@ def test_error_message_not_empty_when_exc_has_no_message():
     """The formatted error string should always contain the exception class name."""
     exc = _EmptyMessageError()
     error_msg = _sanitize_error(
-        f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}"
+        f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}",
     )
     assert "ClosedResourceError" not in error_msg or "_EmptyMessageError" in error_msg
     # The key invariant: the message must not end with ": "
@@ -79,7 +77,7 @@ def test_error_message_preserves_normal_exception_text():
     """Normal exceptions should still show their message text."""
     exc = _NormalError("connection refused")
     error_msg = _sanitize_error(
-        f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}"
+        f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}",
     )
     assert "connection refused" in error_msg
     assert "_NormalError" in error_msg

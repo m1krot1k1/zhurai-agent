@@ -7,7 +7,7 @@ tests run fully offline and the curator module doesn't need real credentials.
 from __future__ import annotations
 
 import importlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,14 +23,14 @@ def curator_env(tmp_path, monkeypatch):
 
     import tools.skill_usage as usage
     importlib.reload(usage)
-    import agent.curator as curator
+    from agent import curator
     importlib.reload(curator)
 
     # Neutralize the real LLM pass by default — tests opt in per-case.
     monkeypatch.setattr(curator, "_run_llm_review", lambda prompt: "llm-stub")
 
     # Default: no config file → curator defaults. Tests can override.
-    monkeypatch.setattr(curator, "_load_config", lambda: {})
+    monkeypatch.setattr(curator, "_load_config", dict)
     # Pin prune_builtins OFF by default so transition tests don't pick up
     # built-ins unless they explicitly enable it. Both config-reading paths
     # are pinned (curator reads via _load_config; skill_usage reads config
@@ -111,7 +111,7 @@ def test_first_run_defers(curator_env):
 def test_recent_run_blocks(curator_env):
     c = curator_env["curator"]
     c.save_state({
-        "last_run_at": datetime.now(timezone.utc).isoformat(),
+        "last_run_at": datetime.now(UTC).isoformat(),
         "paused": False,
     })
     assert c.should_run_now() is False
@@ -120,10 +120,11 @@ def test_recent_run_blocks(curator_env):
 def test_old_run_eligible(curator_env):
     """A run older than the configured interval should re-trigger. Use a
     2x-interval cushion so the test doesn't become coupled to the exact
-    default — bumping DEFAULT_INTERVAL_HOURS shouldn't break it."""
+    default — bumping DEFAULT_INTERVAL_HOURS shouldn't break it.
+    """
     c = curator_env["curator"]
-    long_ago = datetime.now(timezone.utc) - timedelta(
-        hours=c.get_interval_hours() * 2
+    long_ago = datetime.now(UTC) - timedelta(
+        hours=c.get_interval_hours() * 2,
     )
     c.save_state({"last_run_at": long_ago.isoformat(), "paused": False})
     assert c.should_run_now() is True
@@ -131,7 +132,7 @@ def test_old_run_eligible(curator_env):
 
 def test_paused_blocks_even_if_stale(curator_env):
     c = curator_env["curator"]
-    long_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    long_ago = datetime.now(UTC) - timedelta(days=30)
     c.save_state({"last_run_at": long_ago.isoformat(), "paused": True})
     assert c.should_run_now() is False
 
@@ -155,7 +156,7 @@ def test_unused_skill_transitions_to_stale(curator_env):
     _write_skill(skills_dir, "old-skill")
 
     # Record last-use well past stale_after_days (30 default)
-    long_ago = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+    long_ago = (datetime.now(UTC) - timedelta(days=45)).isoformat()
     data = u.load_usage()
     data["old-skill"] = u._empty_record()
     data["old-skill"]["created_by"] = "agent"
@@ -174,7 +175,7 @@ def test_very_old_skill_gets_archived(curator_env):
     skills_dir = curator_env["home"] / "skills"
     skill_dir = _write_skill(skills_dir, "ancient")
 
-    super_old = (datetime.now(timezone.utc) - timedelta(days=120)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=120)).isoformat()
     data = u.load_usage()
     data["ancient"] = u._empty_record()
     data["ancient"]["created_by"] = "agent"
@@ -195,7 +196,7 @@ def test_pinned_skill_is_never_touched(curator_env):
     skills_dir = curator_env["home"] / "skills"
     _write_skill(skills_dir, "precious")
 
-    super_old = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=365)).isoformat()
     data = u.load_usage()
     data["precious"] = u._empty_record()
     data["precious"]["created_by"] = "agent"
@@ -218,7 +219,7 @@ def test_stale_skill_reactivates_on_recent_use(curator_env):
     skills_dir = curator_env["home"] / "skills"
     _write_skill(skills_dir, "revived")
 
-    recent = datetime.now(timezone.utc).isoformat()
+    recent = datetime.now(UTC).isoformat()
     data = u.load_usage()
     data["revived"] = u._empty_record()
     data["revived"]["created_by"] = "agent"
@@ -234,7 +235,8 @@ def test_stale_skill_reactivates_on_recent_use(curator_env):
 
 def test_new_skill_without_last_used_not_immediately_archived(curator_env):
     """A freshly-created skill with no use history should not get archived
-    just because last_used_at is None."""
+    just because last_used_at is None.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -250,13 +252,14 @@ def test_new_skill_without_last_used_not_immediately_archived(curator_env):
 
 def test_manual_skill_is_not_auto_archived(curator_env):
     """Manual skills can have usage records, but without the agent-created
-    marker they must stay out of curator transitions."""
+    marker they must stay out of curator transitions.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
     skill_dir = _write_skill(skills_dir, "manual")
 
-    super_old = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=365)).isoformat()
     data = u.load_usage()
     data["manual"] = u._empty_record()
     data["manual"]["last_used_at"] = super_old
@@ -278,7 +281,7 @@ def test_bundled_skill_not_touched_by_transitions(curator_env):
         "bundled:abc\n", encoding="utf-8",
     )
 
-    super_old = (datetime.now(timezone.utc) - timedelta(days=500)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=500)).isoformat()
     data = u.load_usage()
     data["bundled"] = u._empty_record()
     data["bundled"]["last_used_at"] = super_old
@@ -359,7 +362,7 @@ def test_prune_builtins_archives_stale_bundled_and_suppresses(curator_env, monke
     _enable_prune_builtins(curator_env, monkeypatch)
 
     # Seed a record whose last activity is far past the archive cutoff.
-    super_old = (datetime.now(timezone.utc) - timedelta(days=500)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=500)).isoformat()
     data = u.load_usage()
     data["bundled"] = u._empty_record()
     data["bundled"]["last_used_at"] = super_old
@@ -393,7 +396,8 @@ def test_prune_builtins_restore_clears_suppression(curator_env, monkeypatch):
 def test_protected_builtin_never_archived_even_when_stale(curator_env, monkeypatch):
     """A protected built-in (e.g. `plan`) is never archived, even when it is a
     stale bundled skill under prune_builtins — it backs a load-bearing slash
-    command and must survive every curator pass."""
+    command and must survive every curator pass.
+    """
     u = curator_env["usage"]
     c = curator_env["curator"]
     skills_dir = curator_env["home"] / "skills"
@@ -403,7 +407,7 @@ def test_protected_builtin_never_archived_even_when_stale(curator_env, monkeypat
     _enable_prune_builtins(curator_env, monkeypatch)
 
     # Force a record that is far past the archive cutoff.
-    super_old = (datetime.now(timezone.utc) - timedelta(days=500)).isoformat()
+    super_old = (datetime.now(UTC) - timedelta(days=500)).isoformat()
     data = u.load_usage()
     data[name] = u._empty_record()
     data[name]["last_used_at"] = super_old
@@ -419,7 +423,8 @@ def test_protected_builtin_never_archived_even_when_stale(curator_env, monkeypat
 
 def test_protected_builtin_is_not_curation_eligible(curator_env, monkeypatch):
     """is_curation_eligible() returns False for protected built-ins regardless
-    of prune_builtins, and archive_skill() refuses them directly."""
+    of prune_builtins, and archive_skill() refuses them directly.
+    """
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
     name = next(iter(u.PROTECTED_BUILTIN_SKILLS))
@@ -506,7 +511,8 @@ def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
     """The dry-run prompt must carry a banner instructing the LLM not to
     call any mutating tool. This is defense in depth — the caller also
     skips automatic transitions — but the LLM prompt is the only guard
-    against the model calling skill_manage directly."""
+    against the model calling skill_manage directly.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -514,6 +520,7 @@ def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
     u.mark_agent_created("a")
 
     captured = {}
+
     def _stub(prompt):
         captured["prompt"] = prompt
         return {"final": "", "summary": "s", "model": "", "provider": "",
@@ -528,7 +535,8 @@ def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
 def test_dry_run_skips_automatic_transitions(curator_env, monkeypatch):
     """Dry-run must not call apply_automatic_transitions — the auto pass
     archives skills deterministically, and a preview must not touch the
-    filesystem."""
+    filesystem.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -536,6 +544,7 @@ def test_dry_run_skips_automatic_transitions(curator_env, monkeypatch):
     u.mark_agent_created("a")
 
     called = {"n": 0}
+
     def _explode(*_a, **_kw):
         called["n"] += 1
         return {"checked": 0, "marked_stale": 0, "archived": 0, "reactivated": 0}
@@ -558,6 +567,7 @@ def test_run_review_synchronous_invokes_llm_stub(curator_env, monkeypatch):
     u.mark_agent_created("a")
 
     calls = []
+
     def _stub(prompt):
         calls.append(prompt)
         return {
@@ -601,7 +611,8 @@ def test_run_review_skips_llm_when_no_candidates(curator_env, monkeypatch):
 
 def test_consolidate_default_off(curator_env):
     """Consolidation (the LLM umbrella pass) is OFF by default — only the
-    deterministic inactivity prune runs unless the user opts in."""
+    deterministic inactivity prune runs unless the user opts in.
+    """
     c = curator_env["curator"]
     assert c.get_consolidate() is False
 
@@ -616,7 +627,8 @@ def test_run_review_skips_llm_when_consolidate_off(curator_env, monkeypatch):
     """With consolidation off (the default), a run does the deterministic
     prune but never spawns the LLM consolidation fork — even with candidates
     present. The run is still recorded and a 'consolidation off' summary is
-    surfaced."""
+    surfaced.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -642,7 +654,8 @@ def test_run_review_skips_llm_when_consolidate_off(curator_env, monkeypatch):
 
 def test_run_review_consolidate_override_runs_llm(curator_env, monkeypatch):
     """Passing consolidate=True overrides the config default (off) and drives
-    the LLM consolidation pass — mirrors `hermes curator run --consolidate`."""
+    the LLM consolidation pass — mirrors `hermes curator run --consolidate`.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
@@ -685,7 +698,7 @@ def test_maybe_run_curator_runs_when_eligible(curator_env, monkeypatch):
     u.mark_agent_created("a")
     # Seed last_run_at far in the past so the interval gate opens — the
     # "no state" path intentionally defers the first run now (#18373).
-    long_ago = datetime.now(timezone.utc) - timedelta(hours=c.get_interval_hours() * 2)
+    long_ago = datetime.now(UTC) - timedelta(hours=c.get_interval_hours() * 2)
     c.save_state({"last_run_at": long_ago.isoformat(), "paused": False})
     # Force idle over threshold
     result = c.maybe_run_curator(idle_for_seconds=99999.0)
@@ -696,7 +709,8 @@ def test_maybe_run_curator_runs_when_eligible(curator_env, monkeypatch):
 def test_maybe_run_curator_defers_on_fresh_install(curator_env):
     """Fresh install (no curator state file) must NOT fire the curator on
     the first gateway tick. The first observation seeds last_run_at and
-    returns None. Fixes #18373."""
+    returns None. Fixes #18373.
+    """
     c = curator_env["curator"]
     skills_dir = curator_env["home"] / "skills"
     _write_skill(skills_dir, "a")
@@ -773,7 +787,8 @@ def test_curator_review_prompt_has_invariants():
 def test_curator_review_prompt_points_at_existing_tools_only():
     """The review prompt must rely on existing tools (skill_manage + terminal)
     and must NOT reference bespoke curator tools that are not registered
-    model tools."""
+    model tools.
+    """
     from agent.curator import CURATOR_REVIEW_PROMPT
     assert "skill_manage" in CURATOR_REVIEW_PROMPT
     assert "skills_list" in CURATOR_REVIEW_PROMPT
@@ -787,7 +802,8 @@ def test_curator_review_prompt_points_at_existing_tools_only():
 
 def test_curator_does_not_instruct_model_to_pin():
     """Pinning is a user opt-out, not a model decision. The prompt should
-    not tell the reviewer to pin skills autonomously."""
+    not tell the reviewer to pin skills autonomously.
+    """
     from agent.curator import CURATOR_REVIEW_PROMPT
     # "pinned" appears in the invariant ("skip pinned skills"), but "pin"
     # as a decision verb should not.
@@ -804,7 +820,8 @@ def test_curator_does_not_instruct_model_to_pin():
 
 def test_curator_review_prompt_is_umbrella_first():
     """The curator prompt must push umbrella-building / class-level thinking,
-    not pair-level 'are these two the same?' analysis."""
+    not pair-level 'are these two the same?' analysis.
+    """
     from agent.curator import CURATOR_REVIEW_PROMPT
     lower = CURATOR_REVIEW_PROMPT.lower()
     # Must frame the task as active umbrella-building, not a passive audit.
@@ -841,11 +858,11 @@ def test_curator_review_prompt_preserves_skill_package_integrity():
         assert dirname in CURATOR_REVIEW_PROMPT
 
 
-
 def test_curator_review_prompt_offers_support_file_actions():
     """Support-file demotion (references/templates/scripts) must be one of
     the three consolidation methods, alongside merge-into-existing and
-    create-new-umbrella."""
+    create-new-umbrella.
+    """
     from agent.curator import CURATOR_REVIEW_PROMPT
     # skill_manage action=write_file is how references/ are added to an
     # existing skill — this is the create-adjacent action the curator needs
@@ -855,9 +872,8 @@ def test_curator_review_prompt_offers_support_file_actions():
     assert "action=create" in CURATOR_REVIEW_PROMPT or "create a new umbrella" in CURATOR_REVIEW_PROMPT.lower()
 
 
-
 def test_cli_unpin_refuses_bundled_skill(curator_env, capsys):
-    """hermes curator unpin must refuse bundled/hub skills too (matches pin)."""
+    """Hermes curator unpin must refuse bundled/hub skills too (matches pin)."""
     from hermes_cli import curator as cli
     skills_dir = curator_env["home"] / "skills"
     _write_skill(skills_dir, "ship-skill")

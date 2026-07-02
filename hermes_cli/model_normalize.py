@@ -30,7 +30,6 @@ Inspired by Clawdbot's ``normalizeAnthropicModelId`` pattern.
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Vendor prefix mapping
@@ -60,7 +59,6 @@ _VENDOR_PREFIXES: dict[str, str] = {
     "nemotron": "nvidia",
     "llama": "meta-llama",
     "step": "stepfun",
-    "trinity": "arcee-ai",
 }
 
 # Providers whose APIs consume vendor/model slugs.
@@ -162,6 +160,7 @@ def _normalize_for_deepseek(model_name: str) -> str:
 
     Returns:
         A DeepSeek-accepted model identifier.
+
     """
     bare = _strip_vendor_prefix(model_name).lower()
 
@@ -244,7 +243,7 @@ def _strip_matching_provider_prefix(model_name: str, target_provider: str) -> st
     return model_name
 
 
-def detect_vendor(model_name: str) -> Optional[str]:
+def detect_vendor(model_name: str) -> str | None:
     """Detect the vendor slug from a bare model name.
 
     Uses the first hyphen-delimited token of the model name to look up
@@ -269,6 +268,7 @@ def detect_vendor(model_name: str) -> Optional[str]:
         >>> detect_vendor("anthropic/claude-sonnet-4.6")
         'anthropic'
         >>> detect_vendor("my-custom-model")
+
     """
     name = model_name.strip()
     if not name:
@@ -382,6 +382,7 @@ def normalize_model_for_provider(model_input: str, target_provider: str) -> str:
 
         >>> normalize_model_for_provider("MiMo-V2.5-Pro", "xiaomi")
         'mimo-v2.5-pro'
+
     """
     name = (model_input or "").strip()
     if not name:
@@ -470,4 +471,3 @@ def normalize_model_for_provider(model_input: str, target_provider: str) -> str:
 # ---------------------------------------------------------------------------
 # Batch / convenience helpers
 # ---------------------------------------------------------------------------
-

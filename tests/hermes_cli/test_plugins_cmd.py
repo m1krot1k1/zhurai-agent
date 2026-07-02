@@ -22,7 +22,6 @@ from hermes_cli.plugins_cmd import (
     _sanitize_plugin_name,
 )
 
-
 # ── _sanitize_plugin_name ─────────────────────────────────────────────────
 
 
@@ -69,13 +68,13 @@ class TestSanitizePluginName:
 
     def test_allow_subdir_accepts_single_slash(self, tmp_path):
         target = _sanitize_plugin_name(
-            "observability/langfuse", tmp_path, allow_subdir=True
+            "observability/langfuse", tmp_path, allow_subdir=True,
         )
         assert target == (tmp_path / "observability" / "langfuse").resolve()
 
     def test_allow_subdir_strips_leading_trailing_slash(self, tmp_path):
         target = _sanitize_plugin_name(
-            "/image_gen/openai/", tmp_path, allow_subdir=True
+            "/image_gen/openai/", tmp_path, allow_subdir=True,
         )
         assert target == (tmp_path / "image_gen" / "openai").resolve()
 
@@ -153,7 +152,7 @@ class TestResolveGitUrl:
 
     def test_https_url_with_nested_subdir(self):
         url, subdir = _resolve_git_url(
-            "https://github.com/owner/repo.git/path/to/plugin"
+            "https://github.com/owner/repo.git/path/to/plugin",
         )
         assert url == "https://github.com/owner/repo.git"
         assert subdir == "path/to/plugin"
@@ -463,7 +462,7 @@ class TestCmdUpdate:
         mock_target = MagicMock()
         mock_target.exists.return_value = True
         mock_target.__truediv__ = lambda self, x: MagicMock(
-            exists=MagicMock(return_value=True)
+            exists=MagicMock(return_value=True),
         )
         mock_sanitize.return_value = mock_target
 
@@ -556,7 +555,7 @@ class TestCmdList:
         mock_plugin_dir.name = "test-plugin"
         mock_plugin_dir.is_dir.return_value = True
         mock_plugin_dir.__truediv__ = lambda self, x: MagicMock(
-            exists=MagicMock(return_value=False)
+            exists=MagicMock(return_value=False),
         )
         mock_plugins_dir_val.iterdir.return_value = [mock_plugin_dir]
         mock_plugins_dir.return_value = mock_plugins_dir_val
@@ -627,16 +626,18 @@ class TestPromptPluginEnvVars:
     """Tests for _prompt_plugin_env_vars."""
 
     def test_skips_when_no_requires_env(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         _prompt_plugin_env_vars({}, console)
         console.print.assert_not_called()
 
     def test_skips_already_set_vars(self, monkeypatch):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         with patch("hermes_cli.config.get_env_value", return_value="already-set"):
@@ -645,8 +646,9 @@ class TestPromptPluginEnvVars:
         console.print.assert_not_called()
 
     def test_prompts_for_missing_var_simple_format(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         manifest = {
@@ -662,8 +664,9 @@ class TestPromptPluginEnvVars:
         mock_save.assert_called_once_with("MY_API_KEY", "sk-test-123")
 
     def test_prompts_for_missing_var_rich_format(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         manifest = {
@@ -689,8 +692,9 @@ class TestPromptPluginEnvVars:
         assert "langfuse.com" in printed
 
     def test_secret_uses_masked_prompt(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         manifest = {
@@ -706,8 +710,9 @@ class TestPromptPluginEnvVars:
         mock_prompt.assert_called_once()
 
     def test_empty_input_skips(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         manifest = {"name": "test", "requires_env": ["OPTIONAL_VAR"]}
@@ -720,8 +725,9 @@ class TestPromptPluginEnvVars:
         mock_save.assert_not_called()
 
     def test_keyboard_interrupt_skips_gracefully(self):
-        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
         from unittest.mock import MagicMock, patch
+
+        from hermes_cli.plugins_cmd import _prompt_plugin_env_vars
 
         console = MagicMock()
         manifest = {"name": "test", "requires_env": ["KEY1", "KEY2"]}
@@ -833,11 +839,12 @@ class TestNoAutoActivation:
 
     def test_compressor_default_ignores_plugin(self):
         """When context.engine is 'compressor', a plugin-registered engine should NOT
-        be used — only explicit config triggers plugin engines."""
+        be used — only explicit config triggers plugin engines.
+        """
         # This tests the run_agent.py logic indirectly by checking that the
         # code path for default config doesn't call get_plugin_context_engine.
         import run_agent as ra_module
-        source = open(ra_module.__file__).read()
+        source = Path(ra_module.__file__).open().read()
         # The old code had: "Even with default config, check if a plugin registered one"
         # The fix removes this. Verify it's gone.
         assert "Even with default config, check if a plugin registered one" not in source
@@ -852,7 +859,8 @@ class TestSubdirInstallE2E:
     @staticmethod
     def _make_repo_with_subdir_plugin(repo_root: Path) -> None:
         """Create a git repo where the plugin lives in ``./my-plugin/`` and the
-        repo root holds unrelated docs/tests."""
+        repo root holds unrelated docs/tests.
+        """
         import subprocess as sp
 
         repo_root.mkdir(parents=True, exist_ok=True)
@@ -864,7 +872,7 @@ class TestSubdirInstallE2E:
         plugin_dir = repo_root / "my-plugin"
         plugin_dir.mkdir()
         (plugin_dir / "plugin.yaml").write_text(
-            "name: my-plugin\nmanifest_version: 1\ndescription: A subdir plugin\n"
+            "name: my-plugin\nmanifest_version: 1\ndescription: A subdir plugin\n",
         )
         (plugin_dir / "__init__.py").write_text("# plugin entry\n")
 

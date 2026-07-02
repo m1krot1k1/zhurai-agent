@@ -14,10 +14,10 @@ import pytest
 
 from gateway.config import PlatformConfig
 
-
 # ---------------------------------------------------------------------------
 # Mock the telegram package if it's not installed
 # ---------------------------------------------------------------------------
+
 
 def _ensure_telegram_mock():
     if "telegram" in sys.modules and hasattr(sys.modules["telegram"], "__file__"):
@@ -42,12 +42,12 @@ from plugins.platforms.telegram.adapter import (  # noqa: E402
     _wrap_markdown_tables,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
+
+@pytest.fixture
 def adapter():
     config = PlatformConfig(enabled=True, token="fake-token")
     return TelegramAdapter(config)
@@ -60,13 +60,13 @@ def adapter():
 
 class TestEscapeMdv2:
     def test_escapes_all_special_characters(self):
-        special = r'_*[]()~`>#+-=|{}.!\ '
+        special = r"_*[]()~`>#+-=|{}.!\ "
         escaped = _escape_mdv2(special)
         # Every special char should be preceded by backslash
-        for ch in r'_*[]()~`>#+-=|{}.!\  ':
-            if ch == ' ':
+        for ch in r"_*[]()~`>#+-=|{}.!\  ":
+            if ch == " ":
                 continue
-            assert f'\\{ch}' in escaped
+            assert f"\\{ch}" in escaped
 
     def test_empty_string(self):
         assert _escape_mdv2("") == ""
@@ -188,7 +188,7 @@ async def test_legacy_send_keeps_chunk_indicators_outside_fenced_code_lines(adap
     """
     adapter._bot = MagicMock()
     adapter._bot.send_message = AsyncMock(
-        side_effect=[SimpleNamespace(message_id=i) for i in range(1, 20)]
+        side_effect=[SimpleNamespace(message_id=i) for i in range(1, 20)],
     )
     adapter._bot.send_chat_action = AsyncMock()
     object.__setattr__(adapter, "MAX_MESSAGE_LENGTH", 120)
@@ -218,7 +218,8 @@ async def test_final_send_does_not_retrigger_typing(adapter):
     """The final reply (metadata['notify']) must NOT re-arm Telegram's typing
     timer. The gateway has already torn down the refresh loop by then, so a
     re-trigger here would leave the '...typing' bubble lingering after the
-    answer (Telegram has no stop-typing API). See #48678."""
+    answer (Telegram has no stop-typing API). See #48678.
+    """
     adapter._bot = MagicMock()
     adapter._bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=1))
     adapter._bot.send_chat_action = AsyncMock()
@@ -234,7 +235,8 @@ async def test_final_send_does_not_retrigger_typing(adapter):
 async def test_intermediate_send_still_retriggers_typing(adapter):
     """Intermediate/progress sends (no notify marker) keep re-triggering typing
     so the '...typing' bubble survives across progress messages while the agent
-    is still working."""
+    is still working.
+    """
     adapter._bot = MagicMock()
     adapter._bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=1))
     adapter._bot.send_chat_action = AsyncMock()
@@ -629,7 +631,8 @@ class TestStripMdv2:
 
 class TestWrapMarkdownTables:
     """_wrap_markdown_tables rewrites GFM pipe tables into Telegram-friendly
-    row groups instead of leaving noisy pipe syntax in the final message."""
+    row groups instead of leaving noisy pipe syntax in the final message.
+    """
 
     def test_basic_table_rewritten_as_row_groups(self):
         text = (
@@ -732,7 +735,8 @@ class TestWrapMarkdownTables:
     def test_single_column_separator_not_matched(self):
         """Single-column tables (rare) are not detected — we require at
         least one internal pipe in the separator row to avoid false
-        positives on formatting rules."""
+        positives on formatting rules.
+        """
         text = "| a |\n| - |\n| b |"
         assert _wrap_markdown_tables(text) == text
 
@@ -772,7 +776,8 @@ class TestWrapMarkdownTables:
         """When the table has a row-label column (data rows have one more
         cell than the header row), the heading comes from the label cell
         and is distinct from any header — so every header→value bullet is
-        kept, including the first one."""
+        kept, including the first one.
+        """
         text = (
             "|        | Score | Rank |\n"
             "|--------|-------|------|\n"
@@ -789,7 +794,8 @@ class TestWrapMarkdownTables:
 
 class TestFormatMessageTables:
     """End-to-end: pipe tables become readable Telegram-native text instead
-    of escaped pipe syntax or fenced code blocks."""
+    of escaped pipe syntax or fenced code blocks.
+    """
 
     def test_table_rendered_as_bullets(self, adapter):
         text = (
@@ -913,12 +919,14 @@ class TestEditMessageStreamingSafety:
         continuation messages so the user gets the full reply.  Previously
         the adapter best-effort truncated the content with '…' and returned
         success=True, dropping everything past the truncation boundary
-        (#19537)."""
+        (#19537).
+        """
         adapter = TelegramAdapter(PlatformConfig(enabled=True, token="fake-token"))
         adapter._bot = MagicMock()
         adapter._bot.edit_message_text = AsyncMock()
         # Continuation sends return monotonically increasing message ids.
         _next_id = [1000]
+
         async def _fake_send(**kwargs):
             _next_id[0] += 1
             return SimpleNamespace(message_id=_next_id[0])

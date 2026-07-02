@@ -304,7 +304,6 @@ async def test_standalone_send_missing_websockets(monkeypatch):
         def find_spec(name, path=None, target=None):
             if name == "websockets" or name.startswith("websockets."):
                 raise ImportError("websockets blocked for test")
-            return None
 
     sys.meta_path.insert(0, _Blocker())
     try:
@@ -428,7 +427,8 @@ def _make_file_chat_item(file_path: str, file_name: str) -> dict:
 @pytest.mark.asyncio
 async def test_document_file_sets_document_type():
     """A non-image/non-audio file must classify as DOCUMENT, not TEXT,
-    so run.py's document-context injection surfaces the path to the agent."""
+    so run.py's document-context injection surfaces the path to the agent.
+    """
     from gateway.config import PlatformConfig
     from gateway.platforms.base import MessageType
 
@@ -451,7 +451,8 @@ async def test_document_file_sets_document_type():
 @pytest.mark.asyncio
 async def test_image_file_still_sets_photo_type():
     """Regression guard: image files keep classifying as PHOTO after the
-    document catch-all was added."""
+    document catch-all was added.
+    """
     from gateway.config import PlatformConfig
     from gateway.platforms.base import MessageType
 

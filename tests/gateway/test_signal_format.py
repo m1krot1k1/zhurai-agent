@@ -11,10 +11,10 @@ from gateway.config import PlatformConfig
 from gateway.platforms.signal import SignalAdapter
 from gateway.platforms.signal_format import markdown_to_signal
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _m2s(text: str):
     """Shorthand: call the static method and return (plain_text, styles)."""
@@ -115,7 +115,8 @@ class TestMarkdownToSignalBasic:
 
 class TestItalicFalsePositives:
     """Regressions from signal-italic-false-positive-fix.md and
-    signal-italic-bullet-list-fix.md."""
+    signal-italic-bullet-list-fix.md.
+    """
 
     # --- snake_case (original fix) ---
 

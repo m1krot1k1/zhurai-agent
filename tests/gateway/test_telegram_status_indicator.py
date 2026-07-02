@@ -65,7 +65,7 @@ async def test_online_sets_default_text():
     adapter = _make_adapter(extra={"status_indicator": True})
     await adapter._set_status_indicator(online=True)
     adapter._bot.set_my_short_description.assert_awaited_once_with(
-        short_description="Online"
+        short_description="Online",
     )
 
 
@@ -74,7 +74,7 @@ async def test_offline_sets_default_text():
     adapter = _make_adapter(extra={"status_indicator": True})
     await adapter._set_status_indicator(online=False)
     adapter._bot.set_my_short_description.assert_awaited_once_with(
-        short_description="Offline"
+        short_description="Offline",
     )
 
 
@@ -85,18 +85,18 @@ async def test_custom_status_strings():
             "status_indicator": True,
             "status_online": "🟢 Gateway up",
             "status_offline": "🔴 Gateway down",
-        }
+        },
     )
     await adapter._set_status_indicator(online=True)
     adapter._bot.set_my_short_description.assert_awaited_once_with(
-        short_description="🟢 Gateway up"
+        short_description="🟢 Gateway up",
     )
 
 
 @pytest.mark.asyncio
 async def test_text_truncated_to_120_chars():
     adapter = _make_adapter(
-        extra={"status_indicator": True, "status_online": "x" * 200}
+        extra={"status_indicator": True, "status_online": "x" * 200},
     )
     await adapter._set_status_indicator(online=True)
     _, kwargs = adapter._bot.set_my_short_description.call_args

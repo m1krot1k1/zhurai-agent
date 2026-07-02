@@ -130,13 +130,14 @@ def test_background_review_summarizer_receives_captured_messages_after_close(mon
     disappear. The fix snapshots ``_session_messages`` before teardown.
     """
     import json
+
     import agent.background_review as bg_review
 
     review_tool_message = {
         "role": "tool",
         "tool_call_id": "call_bg",
         "content": json.dumps(
-            {"success": True, "message": "Entry added", "target": "memory"}
+            {"success": True, "message": "Entry added", "target": "memory"},
         ),
     }
     captured: dict = {}
@@ -272,9 +273,9 @@ def test_background_review_summary_is_attributed_to_self_improvement_loop(monkey
                     "role": "tool",
                     "tool_call_id": "call_bg",
                     "content": json.dumps(
-                        {"success": True, "message": "Entry added", "target": "memory"}
+                        {"success": True, "message": "Entry added", "target": "memory"},
                     ),
-                }
+                },
             ]
 
         def run_conversation(self, **kwargs):
@@ -385,17 +386,17 @@ def _memory_add_review():
                                 "action": "add",
                                 "target": "memory",
                                 "content": "User prefers terse replies",
-                            }
+                            },
                         ),
                     },
-                }
+                },
             ],
         },
         {
             "role": "tool",
             "tool_call_id": "call_mem1",
             "content": _json.dumps(
-                {"success": True, "message": "Entry added.", "target": "memory"}
+                {"success": True, "message": "Entry added.", "target": "memory"},
             ),
         },
     ]
@@ -411,10 +412,10 @@ def _skill_patch_review():
                     "function": {
                         "name": "skill_manage",
                         "arguments": _json.dumps(
-                            {"action": "patch", "name": "demo", "old_string": "a", "new_string": "b"}
+                            {"action": "patch", "name": "demo", "old_string": "a", "new_string": "b"},
                         ),
                     },
-                }
+                },
             ],
         },
         {
@@ -425,7 +426,7 @@ def _skill_patch_review():
                     "success": True,
                     "message": "Patched SKILL.md in skill 'demo' (1 replacement).",
                     "_change": {"old": "a", "new": "b"},
-                }
+                },
             ),
         },
     ]
@@ -433,21 +434,21 @@ def _skill_patch_review():
 
 def test_memory_notifications_off_returns_nothing():
     actions = summarize_background_review_actions(
-        _memory_add_review(), [], notification_mode="off"
+        _memory_add_review(), [], notification_mode="off",
     )
     assert actions == []
 
 
 def test_memory_notifications_on_returns_generic_line():
     actions = summarize_background_review_actions(
-        _memory_add_review(), [], notification_mode="on"
+        _memory_add_review(), [], notification_mode="on",
     )
     assert actions == ["Memory updated"]
 
 
 def test_memory_notifications_verbose_includes_content_preview():
     actions = summarize_background_review_actions(
-        _memory_add_review(), [], notification_mode="verbose"
+        _memory_add_review(), [], notification_mode="verbose",
     )
     assert len(actions) == 1
     # Verbose surfaces the actual content that was saved.
@@ -464,12 +465,12 @@ def test_memory_notifications_default_is_on():
 def test_skill_patch_off_silent_verbose_shows_diff():
     assert (
         summarize_background_review_actions(
-            _skill_patch_review(), [], notification_mode="off"
+            _skill_patch_review(), [], notification_mode="off",
         )
         == []
     )
     verbose = summarize_background_review_actions(
-        _skill_patch_review(), [], notification_mode="verbose"
+        _skill_patch_review(), [], notification_mode="verbose",
     )
     assert len(verbose) == 1
     assert "demo" in verbose[0] and "→" in verbose[0]

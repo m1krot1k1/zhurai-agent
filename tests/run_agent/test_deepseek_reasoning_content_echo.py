@@ -239,7 +239,7 @@ class TestCopyReasoningContentForApi:
 
     def test_kimi_moonshot_base_url(self) -> None:
         agent = _make_agent(
-            provider="custom", model="kimi-k2", base_url="https://api.moonshot.ai/v1"
+            provider="custom", model="kimi-k2", base_url="https://api.moonshot.ai/v1",
         )
         source = {
             "role": "assistant",
@@ -310,7 +310,7 @@ class TestBuildAssistantMessageDeepSeekReasoningContent:
                     response_item_id=None,
                     type="function",
                     function=SimpleNamespace(name="terminal", arguments="{}"),
-                )
+                ),
             ],
         )
 
@@ -337,7 +337,7 @@ class TestBuildAssistantMessageDeepSeekReasoningContent:
                     response_item_id=None,
                     type="function",
                     function=SimpleNamespace(name="terminal", arguments="{}"),
-                )
+                ),
             ],
         )
 
@@ -361,7 +361,7 @@ class TestBuildAssistantMessageDeepSeekReasoningContent:
                     response_item_id=None,
                     type="function",
                     function=SimpleNamespace(name="terminal", arguments="{}"),
-                )
+                ),
             ],
         )
 
@@ -438,7 +438,8 @@ class TestBuildAssistantMessagePadsStrictProviders:
 
     def test_text_only_turn_not_padded_by_tool_call_branch(self) -> None:
         """Plain-text turns rely on _copy_reasoning_content_for_api at replay
-        time, not on this builder's tool-call pad."""
+        time, not on this builder's tool-call pad.
+        """
         agent = _make_agent(provider="deepseek", model="deepseek-v4-pro")
         msg_in = SimpleNamespace(content="hello", tool_calls=None)
         msg = agent._build_assistant_message(msg_in, finish_reason="stop")
@@ -447,7 +448,8 @@ class TestBuildAssistantMessagePadsStrictProviders:
 
     def test_streamed_reasoning_text_promoted_over_pad(self) -> None:
         """When ``.reasoning`` carries streamed thinking, it must be promoted
-        to reasoning_content rather than overwritten with the empty pad."""
+        to reasoning_content rather than overwritten with the empty pad.
+        """
         agent = _make_agent(provider="deepseek", model="deepseek-v4-pro")
         msg_in = _build_sdk_message(
             reasoning="streamed thoughts",
@@ -501,7 +503,8 @@ class TestReapplyReasoningEchoForProviderSwitch:
     @staticmethod
     def _codex_built_history() -> list[dict]:
         """Assistant turns as built under a Codex primary: some carry a
-        reasoning summary (stored as reasoning_content), some are bare."""
+        reasoning summary (stored as reasoning_content), some are bare.
+        """
         return [
             {"role": "system", "content": "sys"},
             {"role": "user", "content": "do the thing"},
@@ -591,7 +594,8 @@ class TestReasoningPrimaryToStrictFallback:
     @staticmethod
     def _deepseek_built_history() -> list[dict]:
         """Multi-turn history as built under a DeepSeek primary — tool-call
-        turns padded with " " at indices 2 and 6 (matching the report)."""
+        turns padded with " " at indices 2 and 6 (matching the report).
+        """
         return [
             {"role": "system", "content": "sys"},
             {"role": "user", "content": "u1"},
@@ -621,7 +625,8 @@ class TestReasoningPrimaryToStrictFallback:
 
     def test_roundtrip_back_to_deepseek_repads(self) -> None:
         """Strict fallback strips, then switching back to DeepSeek re-pads —
-        no regression on the #15748 echo-back requirement."""
+        no regression on the #15748 echo-back requirement.
+        """
         from agent.agent_runtime_helpers import reapply_reasoning_echo_for_provider
 
         msgs = self._deepseek_built_history()
@@ -637,7 +642,8 @@ class TestReasoningPrimaryToStrictFallback:
 
     def test_copy_strips_space_pad_for_mistral(self) -> None:
         """copy_reasoning_content_for_api strips the " " pad on the rebuild
-        path too (covers fresh api_messages built under the strict provider)."""
+        path too (covers fresh api_messages built under the strict provider).
+        """
         mistral = _make_agent(
             provider="mistral", model="mistral-small-latest",
             base_url="https://api.mistral.ai/v1",

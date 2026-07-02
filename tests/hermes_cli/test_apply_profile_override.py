@@ -17,7 +17,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-
 def _run_apply_profile_override(
     tmp_path, monkeypatch, *, hermes_home: str | None, active_profile: str | None,
     argv: list[str] | None = None,
@@ -59,7 +58,7 @@ class TestApplyProfileOverrideHermesHomeGuard:
     """
 
     def test_hermes_home_at_root_with_active_profile_is_redirected(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """HERMES_HOME=/root/.hermes + active_profile=coder must redirect
         HERMES_HOME to .../profiles/coder.
@@ -126,7 +125,7 @@ class TestApplyProfileOverrideHermesHomeGuard:
         assert "coder" in result
 
     def test_sudo_explicit_profile_resolves_invoking_users_profile(self, tmp_path, monkeypatch):
-        """sudo elias ... should resolve `-p elias` under SUDO_USER, not root."""
+        """Sudo elias ... should resolve `-p elias` under SUDO_USER, not root."""
         root_home = tmp_path / "root"
         user_home = tmp_path / "home" / "hermes"
         profile_dir = user_home / ".hermes" / "profiles" / "elias"
@@ -255,7 +254,7 @@ class TestSupervisedChildIgnoresStickyProfile:
     """
 
     def test_supervised_child_does_not_follow_active_profile(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """HERMES_S6_SUPERVISED_CHILD + active_profile=briefer must NOT redirect.
 
@@ -286,10 +285,11 @@ class TestSupervisedChildIgnoresStickyProfile:
         )
 
     def test_non_supervised_run_still_follows_active_profile(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         """Without the sentinel, a normal `hermes gateway run` still honors
-        active_profile — the guard is scoped strictly to supervised children."""
+        active_profile — the guard is scoped strictly to supervised children.
+        """
         result = _run_apply_profile_override(
             tmp_path,
             monkeypatch,
@@ -304,7 +304,8 @@ class TestSupervisedChildIgnoresStickyProfile:
     def test_supervised_named_profile_flag_still_wins(self, tmp_path, monkeypatch):
         """A supervised named-profile slot passes ``-p <name>`` explicitly;
         that must still resolve (the sentinel guard only skips the sticky
-        active_profile fallback, never an explicit flag)."""
+        active_profile fallback, never an explicit flag).
+        """
         hermes_root = tmp_path / ".hermes"
         hermes_root.mkdir(parents=True, exist_ok=True)
         (hermes_root / "active_profile").write_text("briefer")
@@ -322,4 +323,3 @@ class TestSupervisedChildIgnoresStickyProfile:
         result = os.environ.get("HERMES_HOME")
         assert result is not None
         assert result.endswith("coder")
-

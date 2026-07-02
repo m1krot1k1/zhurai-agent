@@ -52,7 +52,7 @@ def scenario(name):
                 if m.startswith(("hermes_cli", "plugins", "gateway")):
                     del sys.modules[m]
             sys.path.insert(0, str(WT))
-            from hermes_cli import kanban_db as kb  # noqa: F401
+            from hermes_cli import kanban_db as kb
             print(f"\n═══ {name} ═══")
             try:
                 fn(home, kb)
@@ -121,11 +121,11 @@ def _(home, kb):
             metadata=meta,
         )
         run = kb.latest_run(conn, tid)
-        assert run.summary == "完成了 📝 résumé", f"summary round-trip failed"
+        assert run.summary == "完成了 📝 résumé", "summary round-trip failed"
         assert run.metadata == meta, (
             f"metadata round-trip failed: {run.metadata} != {meta}"
         )
-        print(f"  metadata with CJK + emoji round-tripped")
+        print("  metadata with CJK + emoji round-tripped")
     finally:
         conn.close()
 
@@ -153,7 +153,7 @@ def _(home, kb):
         run = kb.latest_run(conn, tid)
         assert run.summary == huge_summary
         assert run.metadata == meta
-        print(f"  1 MB body + 1 MB summary + 50-deep metadata OK")
+        print("  1 MB body + 1 MB summary + 50-deep metadata OK")
     finally:
         conn.close()
 
@@ -161,13 +161,14 @@ def _(home, kb):
 @scenario("sql_injection_attempts")
 def _(home, kb):
     """SQLite parameterized queries should neutralize all of these, but
-    verify empirically across every string field."""
+    verify empirically across every string field.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
         payloads = [
             "'; DROP TABLE tasks; --",
-            "\" OR 1=1 --",
+            '" OR 1=1 --',
             "'; DELETE FROM task_runs; --",
             "Robert'); DROP TABLE students;--",  # Little Bobby Tables
             "\\x00\\x01\\x02",
@@ -195,7 +196,8 @@ def _(home, kb):
     """Summaries with newlines, tabs, and shell metachars.
 
     The notifier truncates to first line — verify that's right, not
-    that the kernel loses data."""
+    that the kernel loses data.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -260,7 +262,8 @@ def _(home, kb):
 @scenario("dependency_cycle")
 def _(home, kb):
     """A → B → A should be refused. If it's allowed, recompute_ready
-    could infinite-loop or never promote."""
+    could infinite-loop or never promote.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -274,6 +277,7 @@ def _(home, kb):
             import threading
             done = threading.Event()
             result = []
+
             def run():
                 try:
                     result.append(kb.recompute_ready(conn))
@@ -286,7 +290,7 @@ def _(home, kb):
             if not done.is_set():
                 assert False, "recompute_ready HUNG on cyclic graph"
             raise AssertionError(
-                "cycle creation was allowed; kernel should reject"
+                "cycle creation was allowed; kernel should reject",
             )
         except (ValueError, RuntimeError, sqlite3.IntegrityError) as e:
             # Expected: kernel refuses the cycle
@@ -314,7 +318,8 @@ def _(home, kb):
 @scenario("diamond_dependency")
 def _(home, kb):
     """Root → (A, B) → leaf. Leaf should promote to ready only when
-    BOTH A and B are done."""
+    BOTH A and B are done.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -341,7 +346,7 @@ def _(home, kb):
             f"leaf should promote with both parents done, got "
             f"{kb.get_task(conn, leaf).status}"
         )
-        print(f"  diamond dependency resolved correctly")
+        print("  diamond dependency resolved correctly")
     finally:
         conn.close()
 
@@ -401,7 +406,7 @@ def _(home, kb):
         kb.complete_task(conn, parents[-1])
         kb.recompute_ready(conn)
         assert kb.get_task(conn, child).status == "ready"
-        print(f"  500 parents → 1 child promotion works")
+        print("  500 parents → 1 child promotion works")
     finally:
         conn.close()
 
@@ -413,7 +418,8 @@ def _(home, kb):
 @scenario("workspace_path_traversal")
 def _(home, kb):
     """`workspace_path='../../../etc/passwd'` or absolute-outside-home
-    should not be silently accepted and then executed in the wrong place."""
+    should not be silently accepted and then executed in the wrong place.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -441,7 +447,7 @@ def _(home, kb):
                 # This is escaping the home dir. Whether that's actually
                 # a problem depends on the threat model. Flag for attention.
                 print(f"  ⚠ workspace resolved OUTSIDE hermes_home: {resolved}")
-                print(f"    (not necessarily a bug — dir: workspaces are intentionally arbitrary, but worth documenting)")
+                print("    (not necessarily a bug — dir: workspaces are intentionally arbitrary, but worth documenting)")
         except Exception as e:
             print(f"  resolve_workspace rejected: {e}")
     finally:
@@ -451,7 +457,8 @@ def _(home, kb):
 @scenario("workspace_nonexistent_path")
 def _(home, kb):
     """Dispatching a task whose workspace can't be resolved should go
-    through the spawn-failure circuit breaker, not crash."""
+    through the spawn-failure circuit breaker, not crash.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -491,7 +498,8 @@ def _(home, kb):
 def _(home, kb):
     """NTP jumps backward. Run.started_at gets written as 1234 but by
     the time complete_task runs, time.time() returned 1230. A human
-    reading run history sees negative elapsed."""
+    reading run history sees negative elapsed.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -515,7 +523,7 @@ def _(home, kb):
             # doesn't produce "-1800s" elapsed.
             elapsed = run.ended_at - run.started_at
             print(f"  clock-skewed run: elapsed = {elapsed}s (negative)")
-            print(f"  ⚠ kernel stores this; UI should clamp to 0 or handle")
+            print("  ⚠ kernel stores this; UI should clamp to 0 or handle")
             # Don't fail — document the behavior.
         else:
             print("  kernel normalized ended_at >= started_at")
@@ -530,7 +538,8 @@ def _(home, kb):
 @scenario("hermes_home_with_spaces")
 def _(home, kb):
     """HERMES_HOME at a path with spaces — should work but catches
-    anyone doing string interpolation without quoting."""
+    anyone doing string interpolation without quoting.
+    """
     # Note: home was already created with a safe prefix. We need to
     # reset to a weird one for this test.
     weird = tempfile.mkdtemp(prefix="hermes with spaces ")
@@ -559,7 +568,7 @@ def _(home, kb):
     """HERMES_HOME with non-ASCII chars."""
     # Pre-create directly since tempfile doesn't love unicode prefixes
     weird = f"/tmp/hermes_héllo_émöji_{os.getpid()}"
-    os.makedirs(weird, exist_ok=True)
+    Path(weird).mkdir(exist_ok=True, parents=True)
     os.environ["HERMES_HOME"] = weird
     os.environ["HOME"] = weird
     kb._INITIALIZED_PATHS.clear()
@@ -580,12 +589,13 @@ def _(home, kb):
 def _(home, kb):
     """HERMES_HOME is a symlink to the real dir. _INITIALIZED_PATHS
     uses Path.resolve() — two different symlink names pointing at the
-    same dir should NOT double-init."""
+    same dir should NOT double-init.
+    """
     real = tempfile.mkdtemp(prefix="hermes_real_")
     link1 = real + "_link1"
     link2 = real + "_link2"
-    os.symlink(real, link1)
-    os.symlink(real, link2)
+    Path(link1).symlink_to(real)
+    Path(link2).symlink_to(real)
     try:
         os.environ["HERMES_HOME"] = link1
         os.environ["HOME"] = link1
@@ -609,7 +619,7 @@ def _(home, kb):
     finally:
         for p in (link1, link2):
             try:
-                os.remove(p)
+                Path(p).unlink()
             except OSError:
                 pass
         shutil.rmtree(real, ignore_errors=True)
@@ -622,7 +632,8 @@ def _(home, kb):
 @scenario("huge_run_count_on_one_task")
 def _(home, kb):
     """1000 reclaim cycles on a single task → 1000 run rows. Verify
-    list_runs still performs, and build_worker_context isn't quadratic."""
+    list_runs still performs, and build_worker_context isn't quadratic.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -658,7 +669,8 @@ def _(home, kb):
 @scenario("hundred_tenants")
 def _(home, kb):
     """100 distinct tenants with 50 tasks each. board_stats + list_tasks
-    should still return quickly."""
+    should still return quickly.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -694,7 +706,7 @@ def _idempotency_race_worker(hermes_home: str, key: str, result_file: str,
     from hermes_cli import kanban_db as kb
 
     # Spin until the barrier file exists (crude sync across processes)
-    while not os.path.exists(barrier_path):
+    while not Path(barrier_path).exists():
         time.sleep(0.001)
 
     conn = kb.connect()
@@ -705,15 +717,15 @@ def _idempotency_race_worker(hermes_home: str, key: str, result_file: str,
         )
     finally:
         conn.close()
-    with open(result_file, "w") as f:
-        f.write(tid)
+    Path(result_file).write_text(tid)
 
 
 @scenario("idempotency_key_race")
 def _(home, kb):
     """Two processes concurrently call create_task with the same
     idempotency_key — should both get back the SAME task id, not two
-    different ones."""
+    different ones.
+    """
     kb.init_db()
     # Spawn workers, then drop the barrier so they fire ~simultaneously.
     key = "race-key-12345"
@@ -731,12 +743,11 @@ def _(home, kb):
         p.start()
     time.sleep(0.1)  # let them hit the spin
     # Fire the gun
-    with open(barrier, "w") as f:
-        f.write("go")
+    Path(barrier).write_text("go")
     for p in procs:
         p.join(timeout=10)
 
-    tids = [open(r).read().strip() for r in results if os.path.exists(r)]
+    tids = [Path(r).open().read().strip() for r in results if Path(r).exists()]
     assert len(tids) == 2, f"only {len(tids)} workers finished"
     assert tids[0] == tids[1], (
         f"idempotency key race produced two different tasks: {tids}"
@@ -754,7 +765,6 @@ def _(home, kb):
     print(f"  idempotency race: both workers got {tids[0]}")
 
 
-
 # =============================================================================
 # MORE EDGE CASES
 # =============================================================================
@@ -762,7 +772,8 @@ def _(home, kb):
 @scenario("assignee_with_special_chars")
 def _(home, kb):
     """Profile names can contain @-signs, dots, hyphens. Some users
-    might try nonsense. Kernel shouldn't break on any of them."""
+    might try nonsense. Kernel shouldn't break on any of them.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -789,7 +800,8 @@ def _(home, kb):
 @scenario("completed_task_reclaim_attempt")
 def _(home, kb):
     """A task in 'done' should NOT be reclaimable — reclaim/claim paths
-    must refuse."""
+    must refuse.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -842,7 +854,8 @@ def _(home, kb):
 @scenario("unassigned_task_never_claims")
 def _(home, kb):
     """Task without an assignee should never be claimed by dispatch_once,
-    even though its status might be 'ready' if it has no parents."""
+    even though its status might be 'ready' if it has no parents.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -861,7 +874,8 @@ def _(home, kb):
 @scenario("comment_storm")
 def _(home, kb):
     """1000 comments on a single task — build_worker_context should still
-    be reasonable."""
+    be reasonable.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -875,7 +889,7 @@ def _(home, kb):
         elapsed = (time.monotonic() - t0) * 1000
         print(f"  1000 comments: list in {elapsed:.0f}ms, context size = {len(ctx)} chars")
         if len(ctx) > 200_000:
-            print(f"  ⚠ comment thread unbounded in worker context")
+            print("  ⚠ comment thread unbounded in worker context")
     finally:
         conn.close()
 
@@ -883,7 +897,8 @@ def _(home, kb):
 @scenario("empty_string_fields")
 def _(home, kb):
     """Empty title should be rejected (we already do this). Empty body,
-    empty summary, etc. should be accepted."""
+    empty summary, etc. should be accepted.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -907,7 +922,7 @@ def _(home, kb):
         kb.complete_task(conn, tid, summary="")
         run = kb.latest_run(conn, tid)
         # Empty summary falls back to result; both empty → None on run
-        print(f"  empty body accepted, empty-title rejected")
+        print("  empty body accepted, empty-title rejected")
     finally:
         conn.close()
 
@@ -916,7 +931,8 @@ def _(home, kb):
 def _(home, kb):
     """Someone pastes a multi-line string into --tenant. Kernel should
     store what it gets — but queries filtering by tenant should still
-    work against the raw value."""
+    work against the raw value.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -926,7 +942,7 @@ def _(home, kb):
         assert back.tenant == weird_tenant
         # board_stats groups by tenant — verify it doesn't fall over
         stats = kb.board_stats(conn)
-        print(f"  multiline tenant stored and stats still work")
+        print("  multiline tenant stored and stats still work")
     finally:
         conn.close()
 
@@ -934,7 +950,8 @@ def _(home, kb):
 @scenario("parent_in_different_status_states")
 def _(home, kb):
     """recompute_ready promotes a todo child only if ALL parents are
-    in 'done'. Verify against parents in every non-done state."""
+    in 'done'. Verify against parents in every non-done state.
+    """
     kb.init_db()
     conn = kb.connect()
     try:
@@ -986,6 +1003,7 @@ def _(home, kb):
 
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
     from plugins.kanban.dashboard.plugin_api import router as kanban_router
     app = FastAPI()
     app.include_router(kanban_router, prefix="/api/plugins/kanban")
@@ -1033,6 +1051,7 @@ def _(home, kb):
 # =============================================================================
 # RUN ALL
 # =============================================================================
+
 
 def main():
     print(f"Running {len(_REGISTERED)} atypical-scenario tests...")

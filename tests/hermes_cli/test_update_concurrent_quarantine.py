@@ -19,7 +19,6 @@ import pytest
 
 from hermes_cli import main as cli_main
 
-
 # Tests in this module either exercise the REAL _detect_concurrent_hermes_instances
 # helper (and need the autouse stub in tests/hermes_cli/conftest.py disabled),
 # or supply their own explicit return value via patch.object. Mark the whole
@@ -380,7 +379,7 @@ def test_quarantine_retries_then_succeeds(_winp, tmp_path, monkeypatch):
     # Speed up the test: avoid actual sleeps in the backoff schedule.
     monkeypatch.setattr(cli_main, "_hermes_exe_shims", lambda d: [shim])
     with patch.object(Path, "rename", flaky_rename), patch(
-        "time.sleep", lambda *_a, **_k: None
+        "time.sleep", lambda *_a, **_k: None,
     ):
         pairs = cli_main._quarantine_running_hermes_exe(tmp_path)
 
@@ -406,7 +405,7 @@ def test_quarantine_falls_back_to_reboot_schedule(_winp, tmp_path, capsys, monke
 
     monkeypatch.setattr(cli_main, "_hermes_exe_shims", lambda d: [shim])
     with patch.object(Path, "rename", always_fails), patch.object(
-        cli_main, "_schedule_replace_on_reboot", fake_schedule
+        cli_main, "_schedule_replace_on_reboot", fake_schedule,
     ), patch("time.sleep", lambda *_a, **_k: None):
         pairs = cli_main._quarantine_running_hermes_exe(tmp_path)
 
@@ -424,7 +423,7 @@ def test_quarantine_falls_back_to_reboot_schedule(_winp, tmp_path, capsys, monke
 
 @patch.object(cli_main, "_is_windows", return_value=True)
 def test_quarantine_actionable_warning_when_everything_fails(
-    _winp, tmp_path, capsys, monkeypatch
+    _winp, tmp_path, capsys, monkeypatch,
 ):
     """When even MoveFileEx fails we should print remediation hints, not a bare error."""
     shim = tmp_path / "hermes.exe"
@@ -435,7 +434,7 @@ def test_quarantine_actionable_warning_when_everything_fails(
 
     monkeypatch.setattr(cli_main, "_hermes_exe_shims", lambda d: [shim])
     with patch.object(Path, "rename", always_fails), patch.object(
-        cli_main, "_schedule_replace_on_reboot", lambda *_a, **_k: False
+        cli_main, "_schedule_replace_on_reboot", lambda *_a, **_k: False,
     ), patch("time.sleep", lambda *_a, **_k: None):
         pairs = cli_main._quarantine_running_hermes_exe(tmp_path)
 
@@ -505,7 +504,7 @@ def test_pause_windows_gateways_for_update_stops_profile_and_unmapped_pids(
             {
                 "pid": 202,
                 "argv": ["pythonw.exe", "-m", "hermes_cli.main", "gateway", "run"],
-            }
+            },
         ],
     }
     assert waited_for == [101]
@@ -561,7 +560,8 @@ def test_resume_windows_gateways_after_update_respawns_unmapped_by_cmdline(
     capsys,
 ):
     """Unmapped gateways (no profile→PID-file mapping, e.g. a Scheduled Task)
-    are respawned by replaying the argv snapshotted before the force-kill."""
+    are respawned by replaying the argv snapshotted before the force-kill.
+    """
     import hermes_cli.gateway as gateway_mod
 
     by_cmdline = []
@@ -685,7 +685,8 @@ def test_resume_cold_start_skips_when_gateway_already_running(
     capsys,
 ):
     """Don't double-start: if a gateway came up between pause and resume
-    (e.g. the autostart entry fired), the cold-start must no-op."""
+    (e.g. the autostart entry fired), the cold-start must no-op.
+    """
     import hermes_cli.gateway as gateway_mod
     from hermes_cli import gateway_windows
 
@@ -719,7 +720,8 @@ def test_resume_cold_start_skips_when_gateway_already_running(
 @patch.object(cli_main, "_is_windows", return_value=True)
 def test_cmd_update_aborts_on_concurrent_instance(_winp, tmp_path, capsys):
     """If another hermes.exe is running, the update bails out before
-    touching the working tree (exit code 2)."""
+    touching the working tree (exit code 2).
+    """
     scripts_dir = tmp_path / "Scripts"
     scripts_dir.mkdir()
 
@@ -733,20 +735,19 @@ def test_cmd_update_aborts_on_concurrent_instance(_winp, tmp_path, capsys):
     )
 
     with patch.object(
-        cli_main, "_venv_scripts_dir", return_value=scripts_dir
+        cli_main, "_venv_scripts_dir", return_value=scripts_dir,
     ), patch.object(
         cli_main,
         "_detect_concurrent_hermes_instances",
         return_value=[(4242, "hermes.exe")],
     ), patch.object(
-        cli_main, "_run_pre_update_backup"
+        cli_main, "_run_pre_update_backup",
     ) as mock_backup, patch.object(
-        cli_main, "_install_hangup_protection", return_value={}
+        cli_main, "_install_hangup_protection", return_value={},
     ), patch.object(
-        cli_main, "_finalize_update_output"
-    ):
-        with pytest.raises(SystemExit) as excinfo:
-            cli_main.cmd_update(args)
+        cli_main, "_finalize_update_output",
+    ), pytest.raises(SystemExit) as excinfo:
+        cli_main.cmd_update(args)
 
     assert excinfo.value.code == 2
     # The pre-update backup runs AFTER the concurrent check; should not have
@@ -761,7 +762,8 @@ def test_cmd_update_aborts_on_concurrent_instance(_winp, tmp_path, capsys):
 @patch.object(cli_main, "_is_windows", return_value=True)
 def test_cmd_update_force_bypasses_concurrent_check(_winp, tmp_path):
     """--force lets the update proceed past the concurrent-instance gate
-    (subsequent steps are mocked so we only verify the gate is skipped)."""
+    (subsequent steps are mocked so we only verify the gate is skipped).
+    """
     scripts_dir = tmp_path / "Scripts"
     scripts_dir.mkdir()
 
@@ -780,18 +782,17 @@ def test_cmd_update_force_bypasses_concurrent_check(_winp, tmp_path):
     # AFTER the gate. _run_pre_update_backup is the first call after the gate.
     sentinel = RuntimeError("reached post-gate body")
     with patch.object(
-        cli_main, "_venv_scripts_dir", return_value=scripts_dir
+        cli_main, "_venv_scripts_dir", return_value=scripts_dir,
     ), patch.object(
-        cli_main, "_detect_concurrent_hermes_instances", detect
+        cli_main, "_detect_concurrent_hermes_instances", detect,
     ), patch.object(
-        cli_main, "_run_pre_update_backup", side_effect=sentinel
+        cli_main, "_run_pre_update_backup", side_effect=sentinel,
     ), patch.object(
-        cli_main, "_install_hangup_protection", return_value={}
+        cli_main, "_install_hangup_protection", return_value={},
     ), patch.object(
-        cli_main, "_finalize_update_output"
-    ):
-        with pytest.raises(RuntimeError, match="reached post-gate body"):
-            cli_main.cmd_update(args)
+        cli_main, "_finalize_update_output",
+    ), pytest.raises(RuntimeError, match="reached post-gate body"):
+        cli_main.cmd_update(args)
 
     # When --force is set, we should not have even consulted psutil.
     detect.assert_not_called()

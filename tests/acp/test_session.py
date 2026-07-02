@@ -5,8 +5,9 @@ import io
 import json
 import time
 from types import SimpleNamespace
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from acp_adapter import session as acp_session
 from acp_adapter.session import SessionManager, SessionState
@@ -17,7 +18,7 @@ def _mock_agent():
     return MagicMock(name="MockAIAgent")
 
 
-@pytest.fixture()
+@pytest.fixture
 def manager():
     """SessionManager with a mock agent factory (avoids needing API keys)."""
     return SessionManager(agent_factory=_mock_agent)
@@ -42,7 +43,6 @@ class TestCreateSession:
         monkeypatch.setattr("acp_adapter.session._register_task_cwd", lambda task_id, cwd: calls.append((task_id, cwd)))
         state = manager.create_session(cwd="/tmp/work")
         assert calls == [(state.session_id, "/tmp/work")]
-
 
     def test_register_task_cwd_translates_windows_drive_for_wsl_tools(self, monkeypatch):
         captured = {}
@@ -120,8 +120,6 @@ class TestCreateSession:
         state = SessionManager(db=None).create_session(cwd="/tmp/project")
 
         assert state.agent.session_cwd == "/tmp/project"
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -586,7 +584,7 @@ class TestPersistence:
             )
 
         monkeypatch.setattr("hermes_cli.config.load_config", lambda: {
-            "model": {"provider": runtime_choice["provider"], "default": "test-model"}
+            "model": {"provider": runtime_choice["provider"], "default": "test-model"},
         })
         monkeypatch.setattr(
             "hermes_cli.runtime_provider.resolve_runtime_provider",
@@ -626,7 +624,7 @@ class TestPersistence:
             return SimpleNamespace(model=kwargs.get("model"), _print_fn=None)
 
         monkeypatch.setattr("hermes_cli.config.load_config", lambda: {
-            "model": {"provider": "openrouter", "default": "test-model"}
+            "model": {"provider": "openrouter", "default": "test-model"},
         })
         monkeypatch.setattr(
             "hermes_cli.runtime_provider.resolve_runtime_provider",

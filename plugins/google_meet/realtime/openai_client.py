@@ -17,9 +17,9 @@ import base64
 import json
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
-
+from typing import Any
 
 REALTIME_URL = "wss://api.openai.com/v1/realtime"
 
@@ -31,7 +31,7 @@ def _require_websockets():
     except ImportError as exc:  # pragma: no cover - exercised via test
         raise RuntimeError(
             "websockets package is required for OpenAI Realtime; "
-            "install with: pip install websockets"
+            "install with: pip install websockets",
         ) from exc
     return _connect
 
@@ -55,7 +55,7 @@ class RealtimeSession:
         model: str = "gpt-realtime",
         voice: str = "alloy",
         instructions: str = "",
-        audio_sink_path: Optional[Path] = None,
+        audio_sink_path: Path | None = None,
         sample_rate: int = 24000,
     ) -> None:
         import threading as _threading
@@ -67,10 +67,10 @@ class RealtimeSession:
         self.sample_rate = sample_rate
         self._ws: Any = None
         self._send_lock = _threading.Lock()
-        self._last_response_id: Optional[str] = None
+        self._last_response_id: str | None = None
         # Public counters for status reporting.
         self.audio_bytes_out: int = 0
-        self.last_audio_out_at: Optional[float] = None
+        self.last_audio_out_at: float | None = None
 
     # ── lifecycle ─────────────────────────────────────────────────────────
 
@@ -100,7 +100,7 @@ class RealtimeSession:
                     "output_audio_format": "pcm16",
                     "input_audio_format": "pcm16",
                 },
-            }
+            },
         )
 
     def close(self) -> None:
@@ -133,27 +133,27 @@ class RealtimeSession:
                     "role": "user",
                     "content": [{"type": "input_text", "text": text}],
                 },
-            }
+            },
         )
         self._send_json(
             {
                 "type": "response.create",
                 "response": {"modalities": ["audio"]},
-            }
+            },
         )
 
         bytes_written = 0
         sink_fp = None
         if self.audio_sink_path is not None:
             self.audio_sink_path.parent.mkdir(parents=True, exist_ok=True)
-            sink_fp = open(self.audio_sink_path, "ab")
+            sink_fp = Path(self.audio_sink_path).open("ab")
 
         try:
             while True:
                 remaining = timeout - (time.monotonic() - start)
                 if remaining <= 0:
                     raise TimeoutError(
-                        f"realtime response did not complete within {timeout}s"
+                        f"realtime response did not complete within {timeout}s",
                     )
                 raw = self._recv(timeout=remaining)
                 if raw is None:
@@ -225,7 +225,7 @@ class RealtimeSession:
         with self._send_lock:
             self._ws.send(json.dumps(payload))
 
-    def _recv(self, timeout: Optional[float] = None):
+    def _recv(self, timeout: float | None = None):
         assert self._ws is not None
         try:
             if timeout is None:
@@ -250,7 +250,7 @@ class RealtimeSpeaker:
         self,
         session: RealtimeSession,
         queue_path: Path,
-        processed_path: Optional[Path] = None,
+        processed_path: Path | None = None,
     ) -> None:
         self.session = session
         self.queue_path = Path(queue_path)
@@ -284,7 +284,7 @@ class RealtimeSpeaker:
             self.queue_path.write_text("")
             return
         self.queue_path.write_text(
-            "\n".join(json.dumps(e) for e in remaining) + "\n"
+            "\n".join(json.dumps(e) for e in remaining) + "\n",
         )
 
     def _append_processed(self, entry: dict, result: dict) -> None:
@@ -292,7 +292,7 @@ class RealtimeSpeaker:
             return
         self.processed_path.parent.mkdir(parents=True, exist_ok=True)
         record = {"id": entry.get("id"), "text": entry.get("text", ""), "result": result}
-        with open(self.processed_path, "a", encoding="utf-8") as fp:
+        with Path(self.processed_path).open("a", encoding="utf-8") as fp:
             fp.write(json.dumps(record) + "\n")
 
     # ── main loop ────────────────────────────────────────────────────────
@@ -328,5 +328,5 @@ class RealtimeSpeaker:
             else:
                 # Fallback: drop-by-id anywhere in the queue.
                 self._rewrite_queue(
-                    [e for e in latest if e.get("id") != head.get("id")]
+                    [e for e in latest if e.get("id") != head.get("id")],
                 )

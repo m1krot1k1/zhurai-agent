@@ -13,8 +13,9 @@ import json
 import os
 import sys
 import types
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 
 class TestFirecrawlClientConfig:
@@ -89,42 +90,39 @@ class TestFirecrawlClientConfig:
         with patch.dict(os.environ, {
             "TOOL_GATEWAY_DOMAIN": "nousresearch.com",
             "TOOL_GATEWAY_SCHEME": "http",
-        }):
-            with patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
-                with patch("tools.web_tools.Firecrawl") as mock_fc:
-                    from tools.web_tools import _get_firecrawl_client
-                    result = _get_firecrawl_client()
-                    mock_fc.assert_called_once_with(
-                        api_key="nous-token",
-                        api_url="http://firecrawl-gateway.nousresearch.com",
-                    )
-                    assert result is mock_fc.return_value
+        }), patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
+            with patch("tools.web_tools.Firecrawl") as mock_fc:
+                from tools.web_tools import _get_firecrawl_client
+                result = _get_firecrawl_client()
+                mock_fc.assert_called_once_with(
+                    api_key="nous-token",
+                    api_url="http://firecrawl-gateway.nousresearch.com",
+                )
+                assert result is mock_fc.return_value
 
     def test_invalid_tool_gateway_scheme_raises(self):
         """Unexpected shared gateway schemes should fail fast."""
         with patch.dict(os.environ, {
             "TOOL_GATEWAY_DOMAIN": "nousresearch.com",
             "TOOL_GATEWAY_SCHEME": "ftp",
-        }):
-            with patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
-                from tools.web_tools import _get_firecrawl_client
-                with pytest.raises(ValueError, match="TOOL_GATEWAY_SCHEME"):
-                    _get_firecrawl_client()
+        }), patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
+            from tools.web_tools import _get_firecrawl_client
+            with pytest.raises(ValueError, match="TOOL_GATEWAY_SCHEME"):
+                _get_firecrawl_client()
 
     def test_explicit_firecrawl_gateway_url_takes_precedence(self):
         """An explicit Firecrawl gateway origin should override the shared domain."""
         with patch.dict(os.environ, {
             "FIRECRAWL_GATEWAY_URL": "https://firecrawl-gateway.localhost:3009/",
             "TOOL_GATEWAY_DOMAIN": "nousresearch.com",
-        }):
-            with patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
-                with patch("tools.web_tools.Firecrawl") as mock_fc:
-                    from tools.web_tools import _get_firecrawl_client
-                    _get_firecrawl_client()
-                    mock_fc.assert_called_once_with(
-                        api_key="nous-token",
-                        api_url="https://firecrawl-gateway.localhost:3009",
-                    )
+        }), patch("tools.web_tools._read_nous_access_token", return_value="nous-token"):
+            with patch("tools.web_tools.Firecrawl") as mock_fc:
+                from tools.web_tools import _get_firecrawl_client
+                _get_firecrawl_client()
+                mock_fc.assert_called_once_with(
+                    api_key="nous-token",
+                    api_url="https://firecrawl-gateway.localhost:3009",
+                )
 
     def test_default_gateway_domain_targets_nous_production_origin(self):
         """Default gateway origin should point at the Firecrawl vendor hostname."""
@@ -148,8 +146,8 @@ class TestFirecrawlClientConfig:
             "providers": {
                 "nous": {
                     "access_token": "nous-token",
-                }
-            }
+                },
+            },
         }))
 
         with patch.dict(os.environ, {
@@ -342,7 +340,8 @@ class TestBackendSelection:
 
     def test_fallback_exa_takes_priority_over_parallel(self):
         """Direct-credential backends are tried in the order tavily > exa > parallel
-        so an explicit Exa key wins when both Exa and Parallel are configured."""
+        so an explicit Exa key wins when both Exa and Parallel are configured.
+        """
         from tools.web_tools import _get_backend
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch.dict(os.environ, {"EXA_API_KEY": "exa-test", "PARALLEL_API_KEY": "par-test"}):
@@ -371,7 +370,8 @@ class TestBackendSelection:
 
     def test_fallback_parallel_beats_firecrawl_direct(self):
         """Parallel + Firecrawl-direct → parallel (parallel is the higher-priority
-        explicit-credential backend; firecrawl-direct ranks below it)."""
+        explicit-credential backend; firecrawl-direct ranks below it).
+        """
         from tools.web_tools import _get_backend
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch.dict(os.environ, {"PARALLEL_API_KEY": "test-key", "FIRECRAWL_API_KEY": "fc-test"}):
@@ -403,7 +403,8 @@ class TestBackendSelection:
         beat an explicitly configured TAVILY_API_KEY in the fallback path.
         Free Nous tiers don't include web search, so the user's deliberate
         Tavily setup would fail at runtime with "no subscription" if the
-        gateway pre-empted it."""
+        gateway pre-empted it.
+        """
         from tools.web_tools import _get_backend
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch("tools.web_tools._is_tool_gateway_ready", return_value=True), \
@@ -413,7 +414,8 @@ class TestBackendSelection:
     def test_managed_gateway_only_falls_through_to_firecrawl(self):
         """When no explicit-credential backend is configured, a Nous-managed
         gateway token still selects firecrawl — the convenience path is
-        preserved, just no longer pre-empts."""
+        preserved, just no longer pre-empts.
+        """
         from tools.web_tools import _get_backend
         with patch("tools.web_tools._load_web_config", return_value={}), \
              patch("tools.web_tools._is_tool_gateway_ready", return_value=True):
@@ -450,8 +452,9 @@ class TestParallelClientConfig:
     def test_creates_client_with_key(self):
         """PARALLEL_API_KEY set → creates Parallel client."""
         with patch.dict(os.environ, {"PARALLEL_API_KEY": "test-key"}):
-            from tools.web_tools import _get_parallel_client
             from parallel import Parallel
+
+            from tools.web_tools import _get_parallel_client
             client = _get_parallel_client()
             assert client is not None
             assert isinstance(client, Parallel)
@@ -665,8 +668,8 @@ class TestCheckWebApiKey:
                     "access_token": "expired-token",
                     "refresh_token": "refresh-token",
                     "expires_at": expired_at,
-                }
-            }
+                },
+            },
         }))
         refresh_calls = []
 

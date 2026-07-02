@@ -23,11 +23,10 @@ from __future__ import annotations
 
 import base64
 import json
-import os
+import pathlib
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -154,7 +153,8 @@ class TestCaptureResponseDefaultPath:
 
 class TestCaptureResponseRoutedToAuxVision:
     """When routing helper says 'aux', the PNG is pre-analysed and a text
-    response is returned with no image_url parts at all."""
+    response is returned with no image_url parts at all.
+    """
 
     def test_som_capture_returns_text_with_vision_analysis(
         self, tmp_cache_dir,
@@ -169,7 +169,7 @@ class TestCaptureResponseRoutedToAuxVision:
             captured_calls["called"] = True
             return _stub_aux_analysis(
                 "A Safari window showing a GitHub issue page with a 'Sign "
-                "in' button and a 'username' text field."
+                "in' button and a 'username' text field.",
             )
 
         # vision_analyze_tool is async; force a sync MagicMock so we can
@@ -225,7 +225,7 @@ class TestCaptureResponseRoutedToAuxVision:
         def _fake_vat(image_path, _prompt):
             observed_path["path"] = image_path
             # File must exist while aux is being arranged.
-            assert os.path.exists(image_path)
+            assert pathlib.Path(image_path).exists()
             return "<coro>"
 
         fake_vat = MagicMock(side_effect=_fake_vat)
@@ -239,7 +239,7 @@ class TestCaptureResponseRoutedToAuxVision:
 
         # File must be unlinked after _capture_response returns.
         assert observed_path["path"]
-        assert not os.path.exists(observed_path["path"])
+        assert not pathlib.Path(observed_path["path"]).exists()
 
     def test_aux_route_creates_missing_cache_dir(self, tmp_path):
         from tools.computer_use import tool as cu_tool
@@ -256,7 +256,7 @@ class TestCaptureResponseRoutedToAuxVision:
 
         def _fake_vat(image_path, _prompt):
             observed_path["path"] = image_path
-            assert os.path.exists(image_path)
+            assert pathlib.Path(image_path).exists()
             return "<coro>"
 
         fake_vat = MagicMock(side_effect=_fake_vat)
@@ -272,7 +272,7 @@ class TestCaptureResponseRoutedToAuxVision:
         assert isinstance(resp, str)
         assert cache_dir.is_dir()
         assert observed_path["path"]
-        assert not os.path.exists(observed_path["path"])
+        assert not pathlib.Path(observed_path["path"]).exists()
 
     def test_temp_file_cleaned_up_even_when_aux_call_raises(
         self, tmp_cache_dir,
@@ -306,7 +306,7 @@ class TestCaptureResponseRoutedToAuxVision:
         assert body.get("vision_unavailable") is True
         # Temp file must still be cleaned up.
         assert observed_path["path"]
-        assert not os.path.exists(observed_path["path"])
+        assert not pathlib.Path(observed_path["path"]).exists()
 
     def test_empty_aux_analysis_degrades_to_text_payload(self, tmp_cache_dir):
         from tools.computer_use import tool as cu_tool
@@ -371,7 +371,7 @@ class TestRoutingDecisionWiring:
                 "vision": {
                     "provider": "openrouter",
                     "model": "google/gemini-2.5-flash",
-                }
+                },
             },
         }
         with patch("agent.auxiliary_client._read_main_provider",
@@ -447,7 +447,7 @@ class TestBugReproductionAnchor:
         def _fake_run_async(_coro):
             return _stub_aux_analysis(
                 "Screenshot showing a GitHub.com window with a sign-in "
-                "form."
+                "form.",
             )
 
         fake_vat = MagicMock(return_value="<coro>")

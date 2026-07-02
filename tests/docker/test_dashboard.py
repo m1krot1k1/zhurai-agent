@@ -22,7 +22,8 @@ from tests.docker.conftest import docker_exec, docker_exec_sh
 def _poll(container: str, probe: str, *, deadline_s: float = 30.0,
           interval_s: float = 0.5) -> tuple[bool, str]:
     """Repeatedly run ``probe`` inside the container until it exits 0 or
-    ``deadline_s`` elapses. Returns (success, last stdout)."""
+    ``deadline_s`` elapses. Returns (success, last stdout).
+    """
     end = time.monotonic() + deadline_s
     last = ""
     while time.monotonic() < end:
@@ -112,7 +113,7 @@ def test_dashboard_slot_reports_up_when_enabled(
             return  # success
         time.sleep(0.5)
     raise AssertionError(
-        f"Dashboard slot never reached up state; last svstat: {last!r}"
+        f"Dashboard slot never reached up state; last svstat: {last!r}",
     )
 
 
@@ -228,7 +229,7 @@ def test_dashboard_restarts_after_crash(
         time.sleep(0.5)
 
     raise AssertionError(
-        f"Dashboard not restarted after kill (first_pid={first_pid})"
+        f"Dashboard not restarted after kill (first_pid={first_pid})",
     )
 
 
@@ -303,7 +304,7 @@ except urllib.error.HTTPError as h:
         time.sleep(0.5)
     raise AssertionError(
         f"Probe of {path} never returned HTTP within {deadline_s}s; "
-        f"last error: {last_err}"
+        f"last error: {last_err}",
     )
 
 

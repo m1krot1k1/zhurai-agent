@@ -15,10 +15,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 from hermes_constants import get_hermes_home
-
 from plugins.google_meet import process_manager as pm
 from plugins.google_meet.meet_bot import _is_safe_meet_url
 
@@ -62,11 +60,11 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
     join_p.add_argument("--headed", action="store_true", help="show browser")
     join_p.add_argument(
         "--mode", choices=("transcribe", "realtime"), default="transcribe",
-        help="transcribe (default, listen-only) or realtime (speak via OpenAI Realtime)"
+        help="transcribe (default, listen-only) or realtime (speak via OpenAI Realtime)",
     )
     join_p.add_argument(
         "--node", default=None,
-        help="remote node name, or 'auto' to use the sole registered node"
+        help="remote node name, or 'auto' to use the sole registered node",
     )
 
     subs.add_parser("status", help="Print current Meet bot state")
@@ -92,8 +90,8 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
         # If the node module fails to import for any reason (optional dep
         # missing at import time etc.), leave the subparser present but
         # flag it. The argparse dispatch will surface a clear error.
-        def _node_unavailable(args):
-            print(f"hermes meet node: module unavailable ({e})")
+        def _node_unavailable(args, _e=e):
+            print(f"hermes meet node: module unavailable ({_e})")
             return 1
         node_p.set_defaults(func=_node_unavailable)
 
@@ -196,7 +194,7 @@ def _cmd_setup() -> int:
     auth_ok = auth_path.is_file()
     print(
         "  google auth    : "
-        + (f"ok ({auth_path})" if auth_ok else "not saved — run: hermes meet auth")
+        + (f"ok ({auth_path})" if auth_ok else "not saved — run: hermes meet auth"),
     )
 
     print()
@@ -204,7 +202,7 @@ def _cmd_setup() -> int:
     if all_ok:
         print(
             "ready. Join a meeting:  "
-            "hermes meet join https://meet.google.com/abc-defg-hij"
+            "hermes meet join https://meet.google.com/abc-defg-hij",
         )
     else:
         print("not ready yet — fix the items above.")
@@ -280,17 +278,16 @@ def _cmd_install(*, realtime: bool, assume_yes: bool) -> int:
         if system == "Linux":
             if _shutil.which("paplay") and _shutil.which("pactl"):
                 print("  pulseaudio-utils already installed.")
+            elif not _confirm(
+                "  install pulseaudio-utils? this runs `sudo apt-get install -y pulseaudio-utils`",
+            ):
+                print("  skipped (you can run it manually later)")
             else:
-                if not _confirm(
-                    "  install pulseaudio-utils? this runs `sudo apt-get install -y pulseaudio-utils`"
-                ):
-                    print("  skipped (you can run it manually later)")
-                else:
-                    cmd = ["sudo", "apt-get", "install", "-y", "pulseaudio-utils"]
-                    print(f"  $ {' '.join(cmd)}")
-                    res = _sp.run(cmd, check=False)
-                    if res.returncode != 0:
-                        print("  apt install failed — install pulseaudio-utils manually")
+                cmd = ["sudo", "apt-get", "install", "-y", "pulseaudio-utils"]
+                print(f"  $ {' '.join(cmd)}")
+                res = _sp.run(cmd, check=False)
+                if res.returncode != 0:
+                    print("  apt install failed — install pulseaudio-utils manually")
         elif system == "Darwin":
             have_bh = False
             try:
@@ -309,22 +306,21 @@ def _cmd_install(*, realtime: bool, assume_yes: bool) -> int:
             elif not _shutil.which("brew"):
                 print(
                     "  missing: " + ", ".join(needs) + "\n"
-                    "  install Homebrew first (https://brew.sh) or install the packages manually."
+                    "  install Homebrew first (https://brew.sh) or install the packages manually.",
                 )
+            elif not _confirm(f"  install via brew: {' '.join(needs)}?"):
+                print("  skipped (you can run it manually later)")
             else:
-                if not _confirm(f"  install via brew: {' '.join(needs)}?"):
-                    print("  skipped (you can run it manually later)")
-                else:
-                    cmd = ["brew", "install", *needs]
-                    print(f"  $ {' '.join(cmd)}")
-                    res = _sp.run(cmd, check=False)
-                    if res.returncode != 0:
-                        print("  brew install failed — install them manually")
+                cmd = ["brew", "install", *needs]
+                print(f"  $ {' '.join(cmd)}")
+                res = _sp.run(cmd, check=False)
+                if res.returncode != 0:
+                    print("  brew install failed — install them manually")
             print(
                 "\n  NOTE: macOS does not auto-route audio. Open\n"
                 "    System Settings → Sound → Input\n"
                 "  and select 'BlackHole 2ch' before starting a realtime meeting.\n"
-                "  hermes will not switch your default input for you."
+                "  hermes will not switch your default input for you.",
             )
     else:
         print("\n[3/3] skipped (pass --realtime to install audio tooling too)")
@@ -340,14 +336,14 @@ def _cmd_auth() -> int:
     except ImportError:
         print(
             "playwright is not installed. run:\n"
-            "  pip install playwright && python -m playwright install chromium"
+            "  pip install playwright && python -m playwright install chromium",
         )
         return 1
 
     path = _auth_state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"opening Chromium — sign in to Google, then return here and press Enter.")
+    print("opening Chromium — sign in to Google, then return here and press Enter.")
     print(f"saving storage state to: {path}")
     try:
         with sync_playwright() as pw:
@@ -372,10 +368,10 @@ def _cmd_join(
     url: str,
     *,
     guest_name: str,
-    duration: Optional[str],
+    duration: str | None,
     headed: bool,
     mode: str = "transcribe",
-    node: Optional[str] = None,
+    node: str | None = None,
 ) -> int:
     if not _is_safe_meet_url(url):
         print(f"refusing: not a meet.google.com URL: {url}")
@@ -383,8 +379,8 @@ def _cmd_join(
     if node:
         # Remote: go through NodeClient.
         try:
-            from plugins.google_meet.node.registry import NodeRegistry
             from plugins.google_meet.node.client import NodeClient
+            from plugins.google_meet.node.registry import NodeRegistry
         except ImportError as e:
             print(f"node module unavailable: {e}")
             return 1
@@ -418,14 +414,14 @@ def _cmd_join(
     return 0 if res.get("ok") else 1
 
 
-def _cmd_say(text: str, node: Optional[str] = None) -> int:
+def _cmd_say(text: str, node: str | None = None) -> int:
     if not (text or "").strip():
         print("refusing: empty text")
         return 2
     if node:
         try:
-            from plugins.google_meet.node.registry import NodeRegistry
             from plugins.google_meet.node.client import NodeClient
+            from plugins.google_meet.node.registry import NodeRegistry
         except ImportError as e:
             print(f"node module unavailable: {e}")
             return 1
@@ -454,7 +450,7 @@ def _cmd_status() -> int:
     return 0 if res.get("ok") else 1
 
 
-def _cmd_transcript(last: Optional[int]) -> int:
+def _cmd_transcript(last: int | None) -> int:
     res = pm.transcript(last=last)
     if not res.get("ok"):
         print(json.dumps(res, indent=2))

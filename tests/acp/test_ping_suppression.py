@@ -15,11 +15,9 @@ import os
 from io import StringIO
 
 import pytest
-
 from acp.exceptions import RequestError
 
 from acp_adapter.entry import _BenignProbeMethodFilter
-
 
 # -- Unit tests on the filter itself ----------------------------------------
 
@@ -159,7 +157,7 @@ async def test_bare_ping_request_produces_proper_response_and_no_stderr_noise(
 
         # Agent writes its output via this StreamWriter:
         out_transport, out_protocol = await loop.connect_write_pipe(
-            asyncio.streams.FlowControlMixin, out_write_file
+            asyncio.streams.FlowControlMixin, out_write_file,
         )
         agent_output = asyncio.StreamWriter(out_transport, out_protocol, None, loop)
 
@@ -174,7 +172,7 @@ async def test_bare_ping_request_produces_proper_response_and_no_stderr_noise(
                 input_stream=agent_output,
                 output_stream=agent_input,
                 use_unstable_protocol=True,
-            )
+            ),
         )
 
         # Send a bare `ping`
@@ -199,7 +197,7 @@ async def test_bare_ping_request_produces_proper_response_and_no_stderr_noise(
         in_write_file.close()
         try:
             await asyncio.wait_for(agent_task, timeout=2.0)
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             agent_task.cancel()
             try:
                 await agent_task

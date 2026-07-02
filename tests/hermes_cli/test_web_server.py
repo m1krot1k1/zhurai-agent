@@ -1,24 +1,23 @@
 """Tests for hermes_cli.web_server and related config utilities."""
 
 import asyncio
-import os
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 
 from hermes_cli.config import (
-    reload_env,
-    redact_key,
-    OPTIONAL_ENV_VARS,
     DEFAULT_CONFIG,
+    OPTIONAL_ENV_VARS,
+    redact_key,
+    reload_env,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -56,8 +55,8 @@ def _install_example_plugin(_isolate_hermes_home):
     all). User plugins are first in the discovery search order, so
     laying down the fixture here is enough.
     """
-    from hermes_constants import get_hermes_home
     from hermes_cli import web_server
+    from hermes_constants import get_hermes_home
 
     user_plugins_dir = get_hermes_home() / "plugins"
     user_plugins_dir.mkdir(parents=True, exist_ok=True)
@@ -195,6 +194,7 @@ class TestSessionTokenInjection:
 
     def test_honors_injected_token(self, monkeypatch):
         import importlib
+
         import hermes_cli.web_server as ws
 
         monkeypatch.setenv("HERMES_DASHBOARD_SESSION_TOKEN", "desktop-seeded-token")
@@ -207,6 +207,7 @@ class TestSessionTokenInjection:
 
     def test_falls_back_to_random_token(self, monkeypatch):
         import importlib
+
         import hermes_cli.web_server as ws
 
         monkeypatch.delenv("HERMES_DASHBOARD_SESSION_TOKEN", raising=False)
@@ -232,8 +233,8 @@ class TestWebServerEndpoints:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
 
@@ -250,7 +251,7 @@ class TestWebServerEndpoints:
         assert data["can_update_hermes"] is True
 
     def test_get_status_hides_update_capability_in_managed_runtime(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         monkeypatch.setattr(web_server, "_dashboard_local_update_managed_externally", lambda: True)
 
@@ -260,7 +261,7 @@ class TestWebServerEndpoints:
 
     def test_dashboard_update_capability_detects_generic_container(self, monkeypatch):
         import hermes_constants
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         monkeypatch.setattr(hermes_constants, "is_container", lambda: True)
         # A docker install inside a container should be managed externally.
@@ -270,9 +271,10 @@ class TestWebServerEndpoints:
 
     def test_dashboard_update_capability_allows_git_in_container(self, monkeypatch):
         """A git checkout inside a container (e.g. bind-mounted in hermes-webui)
-        should still offer dashboard updates — the checkout is self-managed."""
+        should still offer dashboard updates — the checkout is self-managed.
+        """
         import hermes_constants
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         monkeypatch.setattr(hermes_constants, "is_container", lambda: True)
         monkeypatch.setattr(web_server, "detect_install_method", lambda _root: "git")
@@ -282,7 +284,7 @@ class TestWebServerEndpoints:
     def test_dashboard_update_capability_blocks_pip_in_container(self, monkeypatch):
         """A pip install inside a container is still managed externally."""
         import hermes_constants
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         monkeypatch.setattr(hermes_constants, "is_container", lambda: True)
         monkeypatch.setattr(web_server, "detect_install_method", lambda _root: "pip")
@@ -312,8 +314,8 @@ class TestWebServerEndpoints:
         assert fields["api_key"]["is_set"] is False
 
     def test_put_memory_provider_config_writes_config_and_secret(self):
-        from hermes_constants import get_hermes_home
         from hermes_cli.config import load_config, load_env
+        from hermes_constants import get_hermes_home
 
         resp = self.client.put(
             "/api/memory/providers/hindsight/config",
@@ -324,7 +326,7 @@ class TestWebServerEndpoints:
                     "api_key": "hs-test-key",
                     "bank_id": "ben-bank",
                     "recall_budget": "high",
-                }
+                },
             },
         )
 
@@ -351,7 +353,7 @@ class TestWebServerEndpoints:
                     "api_url": "http://localhost:8888",
                     "bank_id": "hermes",
                     "recall_budget": "mid",
-                }
+                },
             },
         )
 
@@ -359,7 +361,7 @@ class TestWebServerEndpoints:
 
     def test_put_unknown_memory_provider_returns_404(self):
         resp = self.client.put(
-            "/api/memory/providers/nope/config", json={"values": {}}
+            "/api/memory/providers/nope/config", json={"values": {}},
         )
 
         assert resp.status_code == 404
@@ -380,7 +382,7 @@ class TestWebServerEndpoints:
                     "api_key": "secret-value",
                     "bank_id": "hermes",
                     "recall_budget": "mid",
-                }
+                },
             },
         )
 
@@ -477,9 +479,10 @@ class TestWebServerEndpoints:
 
     def test_set_dashboard_font_rejects_unknown_id(self):
         """An id not in the curated catalog coerces to the theme sentinel,
-        so a stale/hostile client can't inject an arbitrary font id."""
+        so a stale/hostile client can't inject an arbitrary font id.
+        """
         resp = self.client.put(
-            "/api/dashboard/font", json={"font": "../../etc/passwd"}
+            "/api/dashboard/font", json={"font": "../../etc/passwd"},
         )
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "font": "theme"}
@@ -496,7 +499,8 @@ class TestWebServerEndpoints:
 
     def test_dashboard_font_override_independent_of_theme(self):
         """The font override and the theme are stored separately — setting
-        one must not disturb the other."""
+        one must not disturb the other.
+        """
         from hermes_cli.config import load_config
 
         self.client.put("/api/dashboard/theme", json={"name": "ember"})
@@ -562,7 +566,8 @@ class TestWebServerEndpoints:
 
     def test_rename_session_updates_title(self):
         """PATCH /api/sessions/{id} renames a session (regression: the route
-        was missing entirely, so the desktop rename dialog got a 405)."""
+        was missing entirely, so the desktop rename dialog got a 405).
+        """
         from hermes_state import SessionDB
 
         db = SessionDB()
@@ -646,7 +651,8 @@ class TestWebServerEndpoints:
 
     def test_profiles_sessions_tags_default_profile(self):
         """The cross-profile aggregator returns the default profile's rows
-        tagged profile="default" (single-profile parity with /api/sessions)."""
+        tagged profile="default" (single-profile parity with /api/sessions).
+        """
         from hermes_state import SessionDB
 
         db = SessionDB()
@@ -670,9 +676,10 @@ class TestWebServerEndpoints:
 
     def test_sessions_endpoint_reads_requested_profile(self):
         """The machine dashboard's global profile switcher must retarget
-        the Sessions page, not just config/skills/model pages."""
-        from hermes_state import SessionDB
+        the Sessions page, not just config/skills/model pages.
+        """
         from hermes_cli import profiles as profiles_mod
+        from hermes_state import SessionDB
 
         worker_home = profiles_mod.get_profile_dir("worker")
         worker_home.mkdir(parents=True)
@@ -709,8 +716,8 @@ class TestWebServerEndpoints:
         assert [m["content"] for m in messages["messages"]] == ["worker"]
 
     def test_analytics_endpoints_read_requested_profile(self):
-        from hermes_state import SessionDB
         from hermes_cli import profiles as profiles_mod
+        from hermes_state import SessionDB
 
         worker_home = profiles_mod.get_profile_dir("worker")
         worker_home.mkdir(parents=True)
@@ -759,7 +766,8 @@ class TestWebServerEndpoints:
 
     def test_get_sessions_order_recent_surfaces_compression_tip(self):
         """A long-running conversation that auto-compresses must stay on the
-        first page by recency, listed under its live continuation id."""
+        first page by recency, listed under its live continuation id.
+        """
         import time as _time
 
         from hermes_state import SessionDB
@@ -800,7 +808,8 @@ class TestWebServerEndpoints:
         """A conversation that auto-compresses leaves the matched term in both
         the root segment and the continuation. Search must collapse them to a
         single result keyed by the lineage root and pointing at the live tip,
-        so the sidebar stops showing the same chat several times."""
+        so the sidebar stops showing the same chat several times.
+        """
         import time as _time
 
         from hermes_state import SessionDB
@@ -837,7 +846,8 @@ class TestWebServerEndpoints:
     def test_search_keeps_branch_specific_hits_on_branch(self):
         """Branch sessions share parent_session_id, but they are not compression
         continuations. A query that only exists in the branch must open the
-        branch instead of being collapsed back to the parent/root."""
+        branch instead of being collapsed back to the parent/root.
+        """
         import time as _time
 
         from hermes_state import SessionDB
@@ -870,7 +880,8 @@ class TestWebServerEndpoints:
 
     def test_get_session_messages_follows_compression_tip(self):
         """Reading a compressed session by its old id should hydrate from the
-        live continuation, matching /resume behavior."""
+        live continuation, matching /resume behavior.
+        """
         import time as _time
 
         from hermes_state import SessionDB
@@ -927,7 +938,7 @@ class TestWebServerEndpoints:
         assert "archived" not in resp.json()
 
     def test_audio_transcription_endpoint(self, monkeypatch):
-        import tools.transcription_tools as transcription_tools
+        from tools import transcription_tools
 
         captured = {}
 
@@ -986,9 +997,9 @@ class TestWebServerEndpoints:
         assert "/api/audio/elevenlabs/voices" in paths
 
     def test_elevenlabs_voices_unavailable_without_key(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
-        monkeypatch.setattr(web_server, "load_env", lambda: {})
+        monkeypatch.setattr(web_server, "load_env", dict)
         monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
 
         resp = self.client.get("/api/audio/elevenlabs/voices")
@@ -996,7 +1007,7 @@ class TestWebServerEndpoints:
         assert resp.json() == {"available": False, "voices": []}
 
     def test_speak_text_returns_base64_data_url(self, monkeypatch, tmp_path):
-        import tools.tts_tool as tts_tool
+        from tools import tts_tool
 
         audio_file = tmp_path / "speech.mp3"
         audio_file.write_bytes(b"ID3fake-audio-bytes")
@@ -1025,7 +1036,7 @@ class TestWebServerEndpoints:
         assert resp.status_code == 400
 
     def test_update_hermes_returns_docker_guidance_without_spawning(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         spawned = False
 
@@ -1061,7 +1072,7 @@ class TestWebServerEndpoints:
         assert any("docker pull nousresearch/hermes-agent:latest" in line for line in status_data["lines"])
 
     def test_update_hermes_returns_managed_runtime_guidance_without_spawning(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         spawned = False
         detected = False
@@ -1103,7 +1114,7 @@ class TestWebServerEndpoints:
         assert any("managed outside this dashboard" in line for line in status_data["lines"])
 
     def test_update_hermes_spawns_on_non_docker_install(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         class Proc:
             pid = 12345
@@ -1129,7 +1140,7 @@ class TestWebServerEndpoints:
         assert calls == [(["update"], "hermes-update")]
 
     def test_action_status_reaps_completed_process(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         waited = {"done": False}
 
@@ -1163,7 +1174,7 @@ class TestWebServerEndpoints:
         }
 
     def test_action_status_ignores_wait_failure(self, monkeypatch):
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         class _Proc:
             pid = 99
@@ -1190,10 +1201,9 @@ class TestWebServerEndpoints:
             "pid": 99,
         }
 
-
     def test_get_status_filters_unconfigured_gateway_platforms(self, monkeypatch):
         import gateway.config as gateway_config
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         class _Platform:
             def __init__(self, value):
@@ -1229,7 +1239,7 @@ class TestWebServerEndpoints:
 
     def test_get_status_hides_stale_platforms_when_gateway_not_running(self, monkeypatch):
         import gateway.config as gateway_config
-        import hermes_cli.web_server as web_server
+        from hermes_cli import web_server
 
         class _GatewayConfig:
             def get_connected_platforms(self):
@@ -1270,7 +1280,7 @@ class TestWebServerEndpoints:
                 return [_Platform("matrix")]
 
         monkeypatch.setattr(
-            gateway_config, "load_gateway_config", lambda: _GatewayConfig()
+            gateway_config, "load_gateway_config", lambda: _GatewayConfig(),
         )
         monkeypatch.setenv("MATRIX_HOME_ROOM", "!room:matrix.org")
 
@@ -1351,7 +1361,8 @@ class TestWebServerEndpoints:
 
     def test_get_env_vars_provider_rows_carry_grouping_hints(self):
         """Provider env rows expose the backend `provider`/`provider_label` the
-        desktop Keys tab groups by (so it no longer relies on prefix guesses)."""
+        desktop Keys tab groups by (so it no longer relies on prefix guesses).
+        """
         data = self.client.get("/api/env").json()
         # OPENAI_API_KEY is a hand-listed protected var AND a catalog provider;
         # it must come back tagged to the openai-api provider.
@@ -1360,7 +1371,8 @@ class TestWebServerEndpoints:
 
     def test_get_env_vars_copilot_uses_provider_token_not_shared_github_token(self):
         """Copilot surfaces as its own provider card via COPILOT_GITHUB_TOKEN;
-        the shared GITHUB_TOKEN keeps its existing (tool) category."""
+        the shared GITHUB_TOKEN keeps its existing (tool) category.
+        """
         data = self.client.get("/api/env").json()
         assert data["COPILOT_GITHUB_TOKEN"]["provider"] == "copilot"
         assert data["COPILOT_GITHUB_TOKEN"]["category"] == "provider"
@@ -1431,7 +1443,8 @@ class TestWebServerEndpoints:
     def test_model_set_normalizes_vendor_slug_for_native_provider(self, monkeypatch):
         """'Use as → Main' with an OpenRouter slug + native provider must not
         persist the vendor-prefixed slug verbatim (it 400s against the native
-        API and reads as "changing models does nothing")."""
+        API and reads as "changing models does nothing").
+        """
         monkeypatch.setattr(
             "hermes_cli.model_cost_guard.expensive_model_warning",
             lambda *_args, **_kwargs: None,
@@ -1459,7 +1472,8 @@ class TestWebServerEndpoints:
     def test_model_set_maps_unknown_vendor_to_aggregator(self, monkeypatch):
         """A bare vendor name from analytics rows (no billing_provider) is not
         a Hermes provider — keep the user's aggregator instead of writing a
-        provider that can never resolve credentials."""
+        provider that can never resolve credentials.
+        """
         monkeypatch.setattr(
             "hermes_cli.model_cost_guard.expensive_model_warning",
             lambda *_args, **_kwargs: None,
@@ -1505,7 +1519,8 @@ class TestWebServerEndpoints:
 
     def test_ops_import_passes_force_flag(self, tmp_path, monkeypatch):
         """force=True must append --force so the spawned non-interactive
-        `hermes import` doesn't auto-abort at the overwrite prompt."""
+        `hermes import` doesn't auto-abort at the overwrite prompt.
+        """
         import hermes_cli.web_server as ws
 
         archive = tmp_path / "backup.zip"
@@ -1535,7 +1550,6 @@ class TestWebServerEndpoints:
         assert resp.status_code == 200
         assert captured["args"] == ["import", str(archive)]
 
-
     def test_reveal_env_var(self, tmp_path):
         """POST /api/env/reveal should return the real unredacted value."""
         from hermes_cli.config import save_env_value
@@ -1564,8 +1578,9 @@ class TestWebServerEndpoints:
     def test_reveal_env_var_no_token(self, tmp_path):
         """POST /api/env/reveal without token should return 401."""
         from starlette.testclient import TestClient
-        from hermes_cli.web_server import app
+
         from hermes_cli.config import save_env_value
+        from hermes_cli.web_server import app
         save_env_value("TEST_REVEAL_NOAUTH", "secret-value")
         # Use a fresh client WITHOUT the dashboard session header
         unauth_client = TestClient(app)
@@ -1804,6 +1819,7 @@ class TestWebServerEndpoints:
 
     def test_telegram_onboarding_worker_request_uses_httpx(self, monkeypatch):
         import httpx
+
         import hermes_cli.web_server as ws
 
         calls = {}
@@ -1851,7 +1867,7 @@ class TestWebServerEndpoints:
         assert kwargs["headers"]["User-Agent"].startswith("HermesDashboard/")
 
     def test_telegram_onboarding_worker_request_maps_unexpected_errors(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         import hermes_cli.web_server as ws
 
@@ -1906,7 +1922,7 @@ class TestWebServerEndpoints:
                 "/v1/telegram/pairings",
                 {"bot_name": "Hosted Hermes"},
                 None,
-            )
+            ),
         ]
 
     def test_telegram_onboarding_ready_and_apply_never_returns_bot_token(self, monkeypatch):
@@ -1981,7 +1997,7 @@ class TestWebServerEndpoints:
         assert load_config()["platforms"]["telegram"]["enabled"] is True
 
     def test_telegram_onboarding_apply_reports_restart_failure_after_save(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         import hermes_cli.web_server as ws
         from hermes_cli.config import load_config, load_env
@@ -2043,11 +2059,12 @@ class TestWebServerEndpoints:
         assert load_config()["platforms"]["telegram"]["enabled"] is True
 
     def test_telegram_onboarding_apply_reuses_inflight_gateway_restart(
-        self, monkeypatch
+        self, monkeypatch,
     ):
         """A live in-flight gateway restart is reused instead of spawning a
         second racing ``hermes gateway restart`` child (e.g. when a stale
-        cached frontend also fires its own restart call)."""
+        cached frontend also fires its own restart call).
+        """
         import hermes_cli.web_server as ws
 
         with ws._telegram_onboarding_lock:
@@ -2173,6 +2190,7 @@ class TestWebServerEndpoints:
     def test_unauthenticated_api_blocked(self):
         """API requests without the session token should be rejected."""
         from starlette.testclient import TestClient
+
         from hermes_cli.web_server import app
         # Create a client WITHOUT the dashboard session header
         unauth_client = TestClient(app)
@@ -2210,6 +2228,7 @@ class TestWebServerEndpoints:
     def test_spa_assets_are_read_as_utf8(self, monkeypatch, tmp_path):
         from fastapi import FastAPI
         from starlette.testclient import TestClient
+
         import hermes_cli.web_server as ws
 
         dist = tmp_path / "web_dist"
@@ -2249,7 +2268,8 @@ class TestWebServerEndpoints:
     def test_set_model_main_nous_applies_gateway_defaults(self, monkeypatch):
         """Switching the main provider to Nous calls apply_nous_managed_defaults
         (mirroring the CLI's post-model-selection Tool Gateway routing) and
-        surfaces the routed tools in the response."""
+        surfaces the routed tools in the response.
+        """
         import hermes_cli.nous_subscription as ns
 
         called = {}
@@ -2298,12 +2318,13 @@ class TestWebServerEndpoints:
         base_url, clear a stale base_url only when switching providers, preserve
         it on same-provider re-assignment, and always drop a hardcoded
         context_length override. Both POST /api/model/set and profile-model
-        writes route through this, so the contract is pinned here."""
+        writes route through this, so the contract is pinned here.
+        """
         from hermes_cli.web_server import _apply_main_model_assignment
 
         # Custom + base_url → persisted; stale context_length dropped.
         out = _apply_main_model_assignment(
-            {"context_length": 8192}, "custom", "llama-3.1-8b", "http://127.0.0.1:8000/v1"
+            {"context_length": 8192}, "custom", "llama-3.1-8b", "http://127.0.0.1:8000/v1",
         )
         assert out["provider"] == "custom"
         assert out["default"] == "llama-3.1-8b"
@@ -2342,7 +2363,7 @@ class TestWebServerEndpoints:
 
         # Switching providers without a base_url → don't invent one, clear stale.
         out = _apply_main_model_assignment(
-            {"provider": "openrouter", "base_url": "http://stale:1/v1"}, "custom", "m"
+            {"provider": "openrouter", "base_url": "http://stale:1/v1"}, "custom", "m",
         )
         assert out["base_url"] == ""
 
@@ -2353,7 +2374,7 @@ class TestWebServerEndpoints:
         # api_key follows the same lifecycle as base_url:
         # supplied → persisted.
         out = _apply_main_model_assignment(
-            {"api": "sk-legacy-old"}, "custom", "m", "http://x/v1", "sk-secret"
+            {"api": "sk-legacy-old"}, "custom", "m", "http://x/v1", "sk-secret",
         )
         assert out["api_key"] == "sk-secret"
         assert "api" not in out
@@ -2378,7 +2399,8 @@ class TestWebServerEndpoints:
 
     def test_parse_model_ids_handles_openai_and_bare_shapes(self):
         """Model discovery must tolerate the common /v1/models shapes and
-        never raise (so a slightly non-standard local endpoint still works)."""
+        never raise (so a slightly non-standard local endpoint still works).
+        """
         from hermes_cli.web_server import _parse_model_ids
 
         class FakeResp:
@@ -2393,7 +2415,7 @@ class TestWebServerEndpoints:
 
         # OpenAI / vLLM / llama.cpp shape.
         assert _parse_model_ids(
-            FakeResp({"data": [{"id": "llama-3.1-8b"}, {"id": "qwen2.5-7b"}]})
+            FakeResp({"data": [{"id": "llama-3.1-8b"}, {"id": "qwen2.5-7b"}]}),
         ) == ["llama-3.1-8b", "qwen2.5-7b"]
         # Bare list of ids.
         assert _parse_model_ids(FakeResp({"data": ["m1", "m2"]})) == ["m1", "m2"]
@@ -2408,7 +2430,8 @@ class TestWebServerEndpoints:
         """Custom/local providers must persist model.base_url so the runtime
         resolver (which ignores OPENAI_BASE_URL) can route to a self-hosted
         endpoint without an API key. Regression for the desktop onboarding bug
-        where 'Local / custom endpoint' could never be configured."""
+        where 'Local / custom endpoint' could never be configured.
+        """
         from hermes_cli.config import load_config
 
         resp = self.client.post(
@@ -2437,7 +2460,8 @@ class TestWebServerEndpoints:
         the runtime reads it) AND register a named custom_providers entry so the
         endpoint reappears as a ready row in the picker — matching the
         ``hermes model`` custom flow. Regression for the desktop loop where a
-        keyed custom endpoint could never be configured from the GUI."""
+        keyed custom endpoint could never be configured from the GUI.
+        """
         from hermes_cli.config import load_config
 
         resp = self.client.post(
@@ -2473,7 +2497,8 @@ class TestWebServerEndpoints:
 
     def test_set_model_main_non_custom_clears_stale_base_url(self):
         """Switching to a hosted provider must clear a stale base_url so the
-        resolver picks that provider's own default endpoint."""
+        resolver picks that provider's own default endpoint.
+        """
         from hermes_cli.config import load_config, save_config
 
         cfg = load_config()
@@ -2495,7 +2520,8 @@ class TestWebServerEndpoints:
         """Re-picking a model under the SAME provider must NOT wipe a configured
         base_url. Regression for the desktop bug where selecting a Xiaomi MiMo
         model reset a Token Plan endpoint back to the registry default, breaking
-        Token Plan keys (https://token-plan-*.xiaomimimo.com/v1)."""
+        Token Plan keys (https://token-plan-*.xiaomimimo.com/v1).
+        """
         from hermes_cli.config import load_config, save_config
 
         cfg = load_config()
@@ -2522,7 +2548,8 @@ class TestWebServerEndpoints:
     def test_set_model_main_reports_stale_auxiliary_pins(self):
         """Switching the main provider must report auxiliary slots still pinned
         to a *different* provider so the UI can warn the user their helper tasks
-        aren't following the switch (the silent credit-burn path)."""
+        aren't following the switch (the silent credit-burn path).
+        """
         from hermes_cli.config import load_config, save_config
 
         cfg = load_config()
@@ -2595,7 +2622,8 @@ class TestWebServerEndpoints:
 
     def test_recommended_default_nous_honors_free_tier(self, monkeypatch):
         """For a free-tier Nous user, the recommended default must be a free
-        model (mirroring `hermes model`), not the first curated paid entry."""
+        model (mirroring `hermes model`), not the first curated paid entry.
+        """
         import hermes_cli.models as models_mod
 
         monkeypatch.setattr(models_mod, "get_curated_nous_model_ids", lambda: ["paid/expensive", "free/cheap"])
@@ -2710,8 +2738,9 @@ class TestBuildSchemaFromConfig:
 
     def test_no_single_field_categories(self):
         """After merging, no category should have just 1 field."""
-        from hermes_cli.web_server import CONFIG_SCHEMA
         from collections import Counter
+
+        from hermes_cli.web_server import CONFIG_SCHEMA
         cats = Counter(e["category"] for e in CONFIG_SCHEMA.values())
         for cat, count in cats.items():
             assert count >= 2, f"Category '{cat}' has only {count} field(s) — should be merged"
@@ -2731,7 +2760,7 @@ class TestConfigRoundTrip:
             from starlette.testclient import TestClient
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -2758,7 +2787,7 @@ class TestConfigRoundTrip:
                 "provider": "openrouter",
                 "base_url": "https://openrouter.ai/api/v1",
                 "api_mode": "openai",
-            }
+            },
         })
 
         before = load_config()
@@ -2847,7 +2876,7 @@ class TestConfigRoundTrip:
                 mismatches.append(f"{key}: expected bool, got {type(val).__name__}")
             elif expected == "list" and not isinstance(val, list):
                 mismatches.append(f"{key}: expected list, got {type(val).__name__}")
-        assert not mismatches, f"Type mismatches:\n" + "\n".join(mismatches)
+        assert not mismatches, "Type mismatches:\n" + "\n".join(mismatches)
 
 
 # ---------------------------------------------------------------------------
@@ -2866,8 +2895,8 @@ class TestNewEndpoints:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
 
@@ -2943,8 +2972,8 @@ class TestNewEndpoints:
         assert "default" in names
 
     def test_profiles_list_falls_back_when_profile_listing_fails(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
 
         hermes_home = get_hermes_home()
         hermes_home.mkdir(parents=True, exist_ok=True)
@@ -3041,8 +3070,8 @@ class TestNewEndpoints:
             assert lines == ["#!/bin/sh", 'exec /opt/hermes/bin/hermes -p writer "$@"']
 
     def test_profiles_create_with_clone_from_copies_source_skills(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
         (get_hermes_home() / "config.yaml").write_text(
@@ -3068,8 +3097,8 @@ class TestNewEndpoints:
         assert profiles["cloned"]["skill_count"] == 1
 
     def test_profiles_create_with_clone_from_duplicates_source(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -3092,8 +3121,8 @@ class TestNewEndpoints:
         assert cloned_skill.exists()
 
     def test_profiles_create_clone_all_from_named_source(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -3114,8 +3143,8 @@ class TestNewEndpoints:
         assert (target_dir / "workspace" / "artifact.txt").read_text(encoding="utf-8") == "copied"
 
     def test_profiles_create_without_clone_seeds_bundled_skills(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -3141,16 +3170,17 @@ class TestNewEndpoints:
     def test_profiles_create_builder_fields_model_mcp_and_keep_skills(self, monkeypatch):
         """Profile-builder create: model + MCP servers + keep-skills selection
         all land in the NEW profile's config, and hub installs are spawned
-        scoped to that profile via ``-p <name>``."""
-        from hermes_constants import (
-            get_hermes_home,
-            set_hermes_home_override,
-            reset_hermes_home_override,
-        )
+        scoped to that profile via ``-p <name>``.
+        """
+        import hermes_cli.profiles as profiles_mod
+        from hermes_cli import web_server
         from hermes_cli.config import load_config
         from hermes_cli.skills_config import get_disabled_skills
-        import hermes_cli.profiles as profiles_mod
-        import hermes_cli.web_server as web_server
+        from hermes_constants import (
+            get_hermes_home,
+            reset_hermes_home_override,
+            set_hermes_home_override,
+        )
 
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
@@ -3203,7 +3233,7 @@ class TestNewEndpoints:
             (
                 ["-p", "builder", "skills", "install", "someuser/some-skill", "--yes"],
                 "skills-install",
-            )
+            ),
         ]
 
         # Verify the writes landed in the NEW profile's config, not the root.
@@ -3221,8 +3251,8 @@ class TestNewEndpoints:
             reset_hermes_home_override(token)
 
     def test_profile_open_terminal_uses_macos_terminal(self, monkeypatch):
+        from hermes_cli import web_server
         from hermes_constants import get_hermes_home
-        import hermes_cli.web_server as web_server
 
         (get_hermes_home() / "profiles" / "coder").mkdir(parents=True)
         calls = []
@@ -3237,8 +3267,8 @@ class TestNewEndpoints:
         assert "coder setup" in " ".join(calls[0])
 
     def test_profile_open_terminal_uses_windows_cmd(self, monkeypatch):
+        from hermes_cli import web_server
         from hermes_constants import get_hermes_home
-        import hermes_cli.web_server as web_server
 
         (get_hermes_home() / "profiles" / "coder").mkdir(parents=True)
         calls = []
@@ -3336,13 +3366,13 @@ class TestNewEndpoints:
 
     def test_profile_description_unknown_404(self):
         resp = self.client.put(
-            "/api/profiles/nope/description", json={"description": "x"}
+            "/api/profiles/nope/description", json={"description": "x"},
         )
         assert resp.status_code == 404
 
     def test_profile_model_round_trip(self, monkeypatch):
-        from hermes_constants import get_hermes_home
         import hermes_cli.profiles as profiles_mod
+        from hermes_constants import get_hermes_home
         monkeypatch.setattr(profiles_mod, "create_wrapper_script", lambda name: None)
 
         self.client.post("/api/profiles", json={"name": "model-prof"})
@@ -3382,7 +3412,7 @@ class TestNewEndpoints:
             profile_describer,
             "describe_profile",
             lambda name, overwrite=False: profile_describer.DescribeOutcome(
-                name, True, "described", description="Generated blurb"
+                name, True, "described", description="Generated blurb",
             ),
         )
 
@@ -3404,7 +3434,7 @@ class TestNewEndpoints:
             profile_describer,
             "describe_profile",
             lambda name, overwrite=False: profile_describer.DescribeOutcome(
-                name, False, "no aux client", description=None
+                name, False, "no aux client", description=None,
             ),
         )
 
@@ -3424,9 +3454,8 @@ class TestNewEndpoints:
             assert "enabled" in skills[0]
 
     def test_skills_list_includes_disabled_skills(self, monkeypatch):
-        import tools.skills_tool as skills_tool
-        import hermes_cli.skills_config as skills_config
-        import hermes_cli.web_server as web_server
+        from hermes_cli import skills_config, web_server
+        from tools import skills_tool
 
         def _fake_find_all_skills(*, skip_disabled=False):
             if skip_disabled:
@@ -3471,9 +3500,8 @@ class TestNewEndpoints:
             assert "enabled" in toolsets[0]
 
     def test_toolsets_list_matches_cli_enabled_state(self, monkeypatch):
-        import hermes_cli.tools_config as tools_config
         import toolsets as toolsets_module
-        import hermes_cli.web_server as web_server
+        from hermes_cli import tools_config, web_server
 
         monkeypatch.setattr(
             tools_config,
@@ -3561,7 +3589,7 @@ class TestNewEndpoints:
 
     def test_toggle_toolset_unknown_returns_400(self):
         resp = self.client.put(
-            "/api/tools/toolsets/not_a_real_toolset", json={"enabled": True}
+            "/api/tools/toolsets/not_a_real_toolset", json={"enabled": True},
         )
         assert resp.status_code == 400
 
@@ -3779,13 +3807,13 @@ class TestNewEndpoints:
                         "function": {
                             "name": "skill_view",
                             "arguments": '{"name":"github-pr-workflow"}',
-                        }
+                        },
                     },
                     {
                         "function": {
                             "name": "skill_manage",
                             "arguments": '{"name":"github-code-review"}',
-                        }
+                        },
                     },
                 ],
             )
@@ -3832,7 +3860,7 @@ class TestModelContextLength:
     """Tests for model_context_length in normalize/denormalize and /api/model/info."""
 
     def test_normalize_extracts_context_length_from_dict(self):
-        """normalize should surface context_length from model dict."""
+        """Normalize should surface context_length from model dict."""
         from hermes_cli.web_server import _normalize_config_for_web
 
         cfg = {
@@ -3840,14 +3868,14 @@ class TestModelContextLength:
                 "default": "anthropic/claude-opus-4.6",
                 "provider": "openrouter",
                 "context_length": 200000,
-            }
+            },
         }
         result = _normalize_config_for_web(cfg)
         assert result["model"] == "anthropic/claude-opus-4.6"
         assert result["model_context_length"] == 200000
 
     def test_normalize_bare_string_model_yields_zero(self):
-        """normalize should set model_context_length=0 for bare string model."""
+        """Normalize should set model_context_length=0 for bare string model."""
         from hermes_cli.web_server import _normalize_config_for_web
 
         result = _normalize_config_for_web({"model": "anthropic/claude-sonnet-4"})
@@ -3855,7 +3883,7 @@ class TestModelContextLength:
         assert result["model_context_length"] == 0
 
     def test_normalize_dict_without_context_length_yields_zero(self):
-        """normalize should default to 0 when model dict has no context_length."""
+        """Normalize should default to 0 when model dict has no context_length."""
         from hermes_cli.web_server import _normalize_config_for_web
 
         cfg = {"model": {"default": "test/model", "provider": "openrouter"}}
@@ -3863,7 +3891,7 @@ class TestModelContextLength:
         assert result["model_context_length"] == 0
 
     def test_normalize_non_int_context_length_yields_zero(self):
-        """normalize should coerce non-int context_length to 0."""
+        """Normalize should coerce non-int context_length to 0."""
         from hermes_cli.web_server import _normalize_config_for_web
 
         cfg = {"model": {"default": "test/model", "context_length": "invalid"}}
@@ -3871,13 +3899,13 @@ class TestModelContextLength:
         assert result["model_context_length"] == 0
 
     def test_denormalize_writes_context_length_into_model_dict(self):
-        """denormalize should write model_context_length back into model dict."""
-        from hermes_cli.web_server import _denormalize_config_from_web
+        """Denormalize should write model_context_length back into model dict."""
         from hermes_cli.config import save_config
+        from hermes_cli.web_server import _denormalize_config_from_web
 
         # Set up disk config with model as a dict
         save_config({
-            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"}
+            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"},
         })
 
         result = _denormalize_config_from_web({
@@ -3889,16 +3917,16 @@ class TestModelContextLength:
         assert "model_context_length" not in result  # virtual field removed
 
     def test_denormalize_zero_removes_context_length(self):
-        """denormalize with model_context_length=0 should remove context_length key."""
-        from hermes_cli.web_server import _denormalize_config_from_web
+        """Denormalize with model_context_length=0 should remove context_length key."""
         from hermes_cli.config import save_config
+        from hermes_cli.web_server import _denormalize_config_from_web
 
         save_config({
             "model": {
                 "default": "anthropic/claude-opus-4.6",
                 "provider": "openrouter",
                 "context_length": 50000,
-            }
+            },
         })
 
         result = _denormalize_config_from_web({
@@ -3909,9 +3937,9 @@ class TestModelContextLength:
         assert "context_length" not in result["model"]
 
     def test_denormalize_upgrades_bare_string_to_dict(self):
-        """denormalize should upgrade bare string model to dict when context_length set."""
-        from hermes_cli.web_server import _denormalize_config_from_web
+        """Denormalize should upgrade bare string model to dict when context_length set."""
         from hermes_cli.config import save_config
+        from hermes_cli.web_server import _denormalize_config_from_web
 
         # Disk has model as bare string
         save_config({"model": "anthropic/claude-sonnet-4"})
@@ -3925,9 +3953,9 @@ class TestModelContextLength:
         assert result["model"]["context_length"] == 65000
 
     def test_denormalize_bare_string_stays_string_when_zero(self):
-        """denormalize should keep bare string model as string when context_length=0."""
-        from hermes_cli.web_server import _denormalize_config_from_web
+        """Denormalize should keep bare string model as string when context_length=0."""
         from hermes_cli.config import save_config
+        from hermes_cli.web_server import _denormalize_config_from_web
 
         save_config({"model": "anthropic/claude-sonnet-4"})
 
@@ -3938,12 +3966,12 @@ class TestModelContextLength:
         assert result["model"] == "anthropic/claude-sonnet-4"
 
     def test_denormalize_coerces_string_context_length(self):
-        """denormalize should handle string model_context_length from frontend."""
-        from hermes_cli.web_server import _denormalize_config_from_web
+        """Denormalize should handle string model_context_length from frontend."""
         from hermes_cli.config import save_config
+        from hermes_cli.web_server import _denormalize_config_from_web
 
         save_config({
-            "model": {"default": "test/model", "provider": "openrouter"}
+            "model": {"default": "test/model", "provider": "openrouter"},
         })
 
         result = _denormalize_config_from_web({
@@ -4006,7 +4034,7 @@ class TestModelInfoEndpoint:
                 "default": "anthropic/claude-opus-4.6",
                 "provider": "openrouter",
                 "context_length": 100000,
-            }
+            },
         })
 
         with patch("agent.model_metadata.get_model_context_length", return_value=200000):
@@ -4023,7 +4051,7 @@ class TestModelInfoEndpoint:
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "load_config", lambda: {
-            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"}
+            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"},
         })
 
         with patch("agent.model_metadata.get_model_context_length", return_value=200000):
@@ -4048,7 +4076,7 @@ class TestModelInfoEndpoint:
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "load_config", lambda: {
-            "model": "anthropic/claude-sonnet-4"
+            "model": "anthropic/claude-sonnet-4",
         })
 
         with patch("agent.model_metadata.get_model_context_length", return_value=200000):
@@ -4064,7 +4092,7 @@ class TestModelInfoEndpoint:
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "load_config", lambda: {
-            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"}
+            "model": {"default": "anthropic/claude-opus-4.6", "provider": "openrouter"},
         })
 
         mock_caps = MagicMock()
@@ -4091,7 +4119,7 @@ class TestModelInfoEndpoint:
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "load_config", lambda: {
-            "model": "some/obscure-model"
+            "model": "some/obscure-model",
         })
 
         with patch("agent.model_metadata.get_model_context_length", side_effect=Exception("boom")):
@@ -4214,7 +4242,7 @@ class TestStatusRemoteGateway:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -4312,7 +4340,7 @@ class TestGatewayBusyReadout:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
 
@@ -4353,7 +4381,8 @@ class TestGatewayBusyReadout:
     def test_draining_state_is_neither_busy_nor_drainable(self, monkeypatch):
         """While draining, the gateway is not a fresh begin-drain target, and
         busy is False even with a stale active_agents>0 in the file — the state
-        gate dominates."""
+        gate dominates.
+        """
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "get_running_pid", lambda: 1234)
@@ -4369,7 +4398,8 @@ class TestGatewayBusyReadout:
 
     def test_down_gateway_degrades_to_safe_falsy(self, monkeypatch):
         """Gateway down (no PID, no remote probe): busy/drainable False,
-        active_agents 0 — never a spurious busy that would wedge NAS."""
+        active_agents 0 — never a spurious busy that would wedge NAS.
+        """
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "get_running_pid", lambda: None)
@@ -4385,7 +4415,8 @@ class TestGatewayBusyReadout:
     def test_down_gateway_with_stale_busy_file_still_not_busy(self, monkeypatch):
         """A leftover status file claiming running + active_agents>0 must NOT
         read as busy when the live PID probe says the gateway is down. Liveness
-        wins over the file."""
+        wins over the file.
+        """
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "get_running_pid", lambda: None)
@@ -4406,7 +4437,8 @@ class TestGatewayBusyReadout:
 
     def test_restart_drain_timeout_surfaced_and_numeric(self, monkeypatch):
         """restart_drain_timeout is present and resolves to a non-negative
-        float so NAS can size its poll deadline without out-of-band knowledge."""
+        float so NAS can size its poll deadline without out-of-band knowledge.
+        """
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "get_running_pid", lambda: 1234)
@@ -4424,7 +4456,8 @@ class TestGatewayBusyReadout:
 
     def test_active_agents_unparseable_in_file_degrades_to_zero(self, monkeypatch):
         """A corrupt active_agents value in the status file must not 500 or
-        produce a spurious busy — it degrades to 0/not-busy."""
+        produce a spurious busy — it degrades to 0/not-busy.
+        """
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(ws, "get_running_pid", lambda: 1234)
@@ -4593,10 +4626,10 @@ class TestDiscoverUserThemes:
             "label: Ocean\n"
             "palette:\n"
             "  background:\n"
-            "    hex: \"#0a1628\"\n"
+            '    hex: "#0a1628"\n'
             "    alpha: 1.0\n"
             "layout:\n"
-            "  density: spacious\n"
+            "  density: spacious\n",
         )
         from hermes_cli import web_server
         results = web_server._discover_user_themes()
@@ -4626,7 +4659,8 @@ class TestDiscoverUserThemes:
 class TestNormaliseThemeExtensions:
     """Tests for the extended normaliser fields (assets, customCSS,
     componentStyles, layoutVariant) — the surfaces themes use to reskin
-    the dashboard without shipping code."""
+    the dashboard without shipping code.
+    """
 
     def test_layout_variant_defaults_to_standard(self):
         from hermes_cli.web_server import _normalise_theme_definition
@@ -4772,11 +4806,11 @@ class TestDeleteSessionEndpoint:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db",
         )
 
         self.auth_client = TestClient(app)
@@ -4849,11 +4883,11 @@ class TestBulkDeleteSessionsEndpoint:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db",
         )
 
         self.client = TestClient(app)
@@ -4879,7 +4913,7 @@ class TestBulkDeleteSessionsEndpoint:
 
         self._seed(["a", "b", "c"])
         resp = self.auth_client.post(
-            "/api/sessions/bulk-delete", json={"ids": ["a", "b"]}
+            "/api/sessions/bulk-delete", json={"ids": ["a", "b"]},
         )
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "deleted": 2}
@@ -4895,7 +4929,8 @@ class TestBulkDeleteSessionsEndpoint:
     def test_unknown_ids_silently_skipped(self):
         """The endpoint never 404s on a missing ID — it returns the
         real deleted count so a UI selection that raced against
-        another tab still resolves cleanly."""
+        another tab still resolves cleanly.
+        """
         self._seed(["real"])
         resp = self.auth_client.post(
             "/api/sessions/bulk-delete",
@@ -4906,16 +4941,18 @@ class TestBulkDeleteSessionsEndpoint:
 
     def test_empty_list_is_noop(self):
         """``ids: []`` returns ``deleted: 0`` (200, not 400) — the UI
-        treats an empty selection as a no-op rather than an error."""
+        treats an empty selection as a no-op rather than an error.
+        """
         resp = self.auth_client.post(
-            "/api/sessions/bulk-delete", json={"ids": []}
+            "/api/sessions/bulk-delete", json={"ids": []},
         )
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "deleted": 0}
 
     def test_payload_cap_enforced(self):
         """501 IDs returns 400 — a hard cap stops a runaway selection
-        from holding the SQLite writer for an extended window."""
+        from holding the SQLite writer for an extended window.
+        """
         resp = self.auth_client.post(
             "/api/sessions/bulk-delete",
             json={"ids": [f"s{i}" for i in range(501)]},
@@ -4933,9 +4970,10 @@ class TestBulkDeleteSessionsEndpoint:
         """Pin the route-ordering contract: ``POST /api/sessions/bulk-delete``
         must hit the bulk handler, not be re-interpreted via the
         templated ``/api/sessions/{session_id}`` family. Concretely the
-        response carries our ``ok`` + ``deleted`` keys."""
+        response carries our ``ok`` + ``deleted`` keys.
+        """
         resp = self.auth_client.post(
-            "/api/sessions/bulk-delete", json={"ids": []}
+            "/api/sessions/bulk-delete", json={"ids": []},
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -4973,13 +5011,13 @@ class TestDeleteEmptySessionsEndpoint:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         # Pin the SessionDB to the isolated HERMES_HOME so each test
         # starts with a clean state.db.
         monkeypatch.setattr(
-            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db"
+            hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db",
         )
 
         self.client = TestClient(app)
@@ -5025,14 +5063,16 @@ class TestDeleteEmptySessionsEndpoint:
 
         Regression guard for issue #19533 — the bulk-delete is a strictly
         destructive primitive, the middleware must gate it even if a
-        future refactor introduces a non-auth path."""
+        future refactor introduces a non-auth path.
+        """
         resp = self.client.delete("/api/sessions/empty")
         assert resp.status_code == 401
 
     def test_count_returns_only_empty_ended_unarchived(self):
         """With the standard corpus, the count is exactly 2 — only
         ``empty1`` and ``empty2`` qualify (``hasmsg`` has a message,
-        ``live`` is active, ``archived`` is archived)."""
+        ``live`` is active, ``archived`` is archived).
+        """
         self._seed()
         resp = self.auth_client.get("/api/sessions/empty/count")
         assert resp.status_code == 200
@@ -5041,7 +5081,8 @@ class TestDeleteEmptySessionsEndpoint:
     def test_delete_returns_count_and_removes_only_empties(self):
         """DELETE returns the deleted count and removes only the
         empty-ended-unarchived rows — same shape contract as the
-        DB-level method's unit tests."""
+        DB-level method's unit tests.
+        """
         from hermes_state import SessionDB
 
         self._seed()
@@ -5066,7 +5107,8 @@ class TestDeleteEmptySessionsEndpoint:
     def test_delete_with_no_empties_returns_zero(self):
         """No empty sessions → endpoint returns ``deleted: 0`` (200,
         not 404). The dashboard relies on this no-op path to surface
-        a "Nothing to clean up" toast instead of an error."""
+        a "Nothing to clean up" toast instead of an error.
+        """
         resp = self.auth_client.delete("/api/sessions/empty")
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "deleted": 0}
@@ -5103,8 +5145,8 @@ class TestPluginAPIAuth:
             pytest.skip("fastapi/starlette not installed")
 
         import hermes_state
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
         from hermes_constants import get_hermes_home
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
 
         monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", get_hermes_home() / "state.db")
 
@@ -5186,7 +5228,7 @@ class TestPluginAPIAuth:
         # (its own _check_ws_token), NOT 401 from the HTTP middleware.
         try:
             with self.client.websocket_connect(
-                "/api/plugins/kanban/events"
+                "/api/plugins/kanban/events",
             ):
                 pass  # if we got here without disconnect, the WS accepted us
         except WebSocketDisconnect:
@@ -5201,7 +5243,8 @@ class TestPluginAPIAuth:
 
 class TestDashboardPluginManifestExtensions:
     """Tests for the extended plugin manifest fields (tab.override,
-    tab.hidden, slots) read by _discover_dashboard_plugins()."""
+    tab.hidden, slots) read by _discover_dashboard_plugins().
+    """
 
     def _write_plugin(self, tmp_path, name, manifest):
         import json
@@ -5277,7 +5320,8 @@ class TestDashboardPluginManifestExtensions:
         """Page-scoped slot names (e.g. ``sessions:top``) round-trip through
         the manifest loader untouched.  The backend has no allowlist — the
         frontend ``<PluginSlot name="...">`` placements decide what actually
-        renders — but the loader must not mangle colons in slot names."""
+        renders — but the loader must not mangle colons in slot names.
+        """
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         self._write_plugin(tmp_path, "page-slots", {
             "name": "page-slots",
@@ -5322,11 +5366,8 @@ class TestDashboardPluginManifestExtensions:
 # monkeypatch that hook.
 # ---------------------------------------------------------------------------
 
-import sys
-
-
 skip_on_windows = pytest.mark.skipif(
-    sys.platform.startswith("win"), reason="PTY bridge is POSIX-only"
+    sys.platform.startswith("win"), reason="PTY bridge is POSIX-only",
 )
 
 
@@ -5371,7 +5412,7 @@ class TestPtyWebSocket:
         assert env["HERMES_TUI_DISABLE_MOUSE"] == "1"
 
     def test_resolve_chat_argv_applies_terminal_backend_config(
-        self, monkeypatch, _isolate_hermes_home
+        self, monkeypatch, _isolate_hermes_home,
     ):
         import hermes_cli.main as main_mod
 
@@ -5384,7 +5425,7 @@ class TestPtyWebSocket:
                     "  docker_image: example/hermes-tools:latest",
                     "  docker_extra_args:",
                     "    - --network=host",
-                ]
+                ],
             ),
             encoding="utf-8",
         )
@@ -5461,7 +5502,7 @@ class TestPtyWebSocket:
                 resume="sess-42",
                 sidecar_url="ws://127.0.0.1:9119/api/pub?channel=abc",
                 profile="worker",
-            )
+            ),
         )
 
         assert callable(captured["thread_fn"])
@@ -5502,7 +5543,8 @@ class TestPtyWebSocket:
         propagates through the real _resolve_chat_argv_async -> asyncio.to_thread
         -> lock -> re-raise chain into pty_ws's handler: the "Chat unavailable"
         notice is sent and the socket closes with code 1011 (the stable
-        contract — we assert the close code, not the exact notice wording)."""
+        contract — we assert the close code, not the exact notice wording).
+        """
         from starlette.websockets import WebSocketDisconnect
 
         # Patch the REAL resolver so the whole wrapper/to_thread/lock chain runs.
@@ -5520,7 +5562,8 @@ class TestPtyWebSocket:
 
     def test_pty_ws_propagates_systemexit_through_async_wrapper(self, monkeypatch):
         """SystemExit from _make_tui_argv (node/npm missing) propagates through
-        the async wrapper and is caught by pty_ws's ``except SystemExit``."""
+        the async wrapper and is caught by pty_ws's ``except SystemExit``.
+        """
 
         def boom(resume=None, sidecar_url=None, profile=None):
             raise SystemExit("node not found")
@@ -5529,14 +5572,15 @@ class TestPtyWebSocket:
 
     def test_pty_ws_propagates_httpexception_through_async_wrapper(self, monkeypatch):
         """An invalid-profile HTTPException raised inside the threaded resolver
-        propagates through the wrapper and hits pty_ws's ``except HTTPException``."""
+        propagates through the wrapper and hits pty_ws's ``except HTTPException``.
+        """
         from fastapi import HTTPException
 
         def bad_profile(resume=None, sidecar_url=None, profile=None):
             raise HTTPException(status_code=404, detail="unknown profile")
 
         self._assert_pty_propagates(
-            monkeypatch, bad_profile, profile="ghost", expect_detail="unknown profile"
+            monkeypatch, bad_profile, profile="ghost", expect_detail="unknown profile",
         )
 
     def test_streams_child_stdout_to_client(self, monkeypatch):
@@ -5674,7 +5718,8 @@ class TestPtyWebSocket:
     def test_channel_param_propagates_sidecar_url(self, monkeypatch):
         """When /api/pty is opened with ?channel=, the PTY child gets a
         HERMES_TUI_SIDECAR_URL env var pointing back at /api/pub on the
-        same channel — which is how tool events reach the dashboard sidebar."""
+        same channel — which is how tool events reach the dashboard sidebar.
+        """
         captured: dict = {}
 
         def fake_resolve(resume=None, sidecar_url=None, profile=None):
@@ -5683,15 +5728,15 @@ class TestPtyWebSocket:
 
         monkeypatch.setattr(self.ws_module, "_resolve_chat_argv", fake_resolve)
         monkeypatch.setattr(
-            self.ws_module.app.state, "bound_host", "127.0.0.1", raising=False
+            self.ws_module.app.state, "bound_host", "127.0.0.1", raising=False,
         )
         monkeypatch.setattr(
-            self.ws_module.app.state, "bound_port", 9119, raising=False
+            self.ws_module.app.state, "bound_port", 9119, raising=False,
         )
 
         headers = {"host": "127.0.0.1:9119", "origin": "http://127.0.0.1:9119"}
         with self.client.websocket_connect(
-            self._url(channel="abc-123"), headers=headers
+            self._url(channel="abc-123"), headers=headers,
         ) as conn:
             try:
                 conn.receive_bytes()
@@ -5718,6 +5763,7 @@ class TestPtyWebSocket:
         asserting the exact fan-out contract.
         """
         import asyncio
+
         from hermes_cli import web_server as ws_mod
 
         class _FakeSub:
@@ -5740,7 +5786,7 @@ class TestPtyWebSocket:
             # different channel, exactly as the /api/events handler does.
             async with event_lock:
                 event_channels.setdefault("broadcast-test", set()).update(
-                    {sub_a1, sub_a2}
+                    {sub_a1, sub_a2},
                 )
                 event_channels.setdefault("other-channel", set()).add(sub_other)
             try:
@@ -5765,7 +5811,7 @@ class TestPtyWebSocket:
 
         with pytest.raises(WebSocketDisconnect) as exc:
             with self.client.websocket_connect(
-                f"/api/events?token={self.token}"
+                f"/api/events?token={self.token}",
             ):
                 pass
         assert exc.value.code == 4400
@@ -5827,19 +5873,21 @@ class TestDashboardPluginStaticAssetAllowlist:
     def test_python_source_is_404(self):
         """The example plugin's ``plugin_api.py`` must NOT be served as
         a static asset, even though the file exists under the plugin's
-        dashboard directory. Suffix not in the allowlist → 404."""
+        dashboard directory. Suffix not in the allowlist → 404.
+        """
         resp = self.client.get("/dashboard-plugins/example/plugin_api.py")
         assert resp.status_code == 404
 
     def test_pycache_is_404(self):
         """Same protection for compiled Python (``.pyc``) inside the
         plugin's ``__pycache__/``. Real plugins ship these as a
-        side-effect of running tests / dashboard once."""
+        side-effect of running tests / dashboard once.
+        """
         # __pycache__ files are only generated after the api file has
         # been imported once. Use the path the example plugin actually
         # generates during the dashboard test boot.
         resp = self.client.get(
-            "/dashboard-plugins/example/__pycache__/plugin_api.cpython-311.pyc"
+            "/dashboard-plugins/example/__pycache__/plugin_api.cpython-311.pyc",
         )
         # 404 either way (file may not exist on this CI Python version);
         # what matters is we never get a 200 with the bytes.
@@ -5847,7 +5895,8 @@ class TestDashboardPluginStaticAssetAllowlist:
 
     def test_manifest_json_still_served(self):
         """JSON files remain browser-fetchable — manifests, localized
-        data, source maps, etc. all sit in this bucket."""
+        data, source maps, etc. all sit in this bucket.
+        """
         resp = self.client.get("/dashboard-plugins/example/manifest.json")
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("application/json")
@@ -5858,16 +5907,17 @@ class TestDashboardPluginStaticAssetAllowlist:
     def test_unknown_plugin_is_404(self):
         """Existing behaviour preserved: nonexistent plugin name → 404."""
         resp = self.client.get(
-            "/dashboard-plugins/_definitely_not_a_plugin_/manifest.json"
+            "/dashboard-plugins/_definitely_not_a_plugin_/manifest.json",
         )
         assert resp.status_code == 404
 
     def test_path_traversal_still_blocked(self):
         """The allowlist is on top of the existing ``.resolve()`` /
         ``is_relative_to()`` check — a ``.js`` named file at an
-        out-of-base path is still rejected as traversal, not served."""
+        out-of-base path is still rejected as traversal, not served.
+        """
         resp = self.client.get(
-            "/dashboard-plugins/example/..%2Fplugin_api.py"
+            "/dashboard-plugins/example/..%2Fplugin_api.py",
         )
         # 403 traversal-blocked OR 404 (depending on URL decode order)
         # — never 200.
@@ -5877,7 +5927,8 @@ class TestDashboardPluginStaticAssetAllowlist:
 def _fake_httpx_client(*, status: int | None = None, raise_exc: bool = False):
     """Build a drop-in for httpx.Client whose .get() returns a canned status
     (or raises a transport error). Patched in for the credential-validate probe
-    so tests never touch the network."""
+    so tests never touch the network.
+    """
     class _Resp:
         def __init__(self, code):
             self.status_code = code
@@ -5914,7 +5965,7 @@ class TestValidateProviderCredential:
         except ImportError:
             pytest.skip("fastapi/starlette not installed")
 
-        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+        from hermes_cli.web_server import _SESSION_HEADER_NAME, _SESSION_TOKEN, app
 
         self.client = TestClient(app)
         self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
@@ -5954,7 +6005,8 @@ class TestValidateProviderCredential:
     def test_local_endpoint_forwards_api_key_as_bearer(self, monkeypatch):
         """A custom endpoint that gates /v1/models behind auth must still
         enumerate models: the optional api_key is sent as a Bearer header so the
-        probe doesn't come back empty (the desktop loop's root cause)."""
+        probe doesn't come back empty (the desktop loop's root cause).
+        """
         captured = {}
 
         class _Resp:
@@ -6043,6 +6095,7 @@ class TestDesktopCronTicker:
 
     def test_ticker_runs_when_desktop(self, monkeypatch, _isolate_hermes_home):
         import threading
+
         import cron.scheduler as sched
 
         called = threading.Event()
@@ -6054,6 +6107,7 @@ class TestDesktopCronTicker:
 
     def test_ticker_skipped_without_desktop(self, monkeypatch, _isolate_hermes_home):
         import threading
+
         import cron.scheduler as sched
 
         called = threading.Event()

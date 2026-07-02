@@ -11,7 +11,12 @@ import pytest
 
 import gateway.platforms.base as base_platform
 from gateway.config import Platform, PlatformConfig, StreamingConfig
-from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, SendResult
+from gateway.platforms.base import (
+    BasePlatformAdapter,
+    MessageEvent,
+    MessageType,
+    SendResult,
+)
 from gateway.session import SessionSource
 
 
@@ -35,7 +40,7 @@ class ProgressCaptureAdapter(BasePlatformAdapter):
                 "content": content,
                 "reply_to": reply_to,
                 "metadata": metadata,
-            }
+            },
         )
         return SendResult(success=True, message_id="progress-1")
 
@@ -45,7 +50,7 @@ class ProgressCaptureAdapter(BasePlatformAdapter):
                 "chat_id": chat_id,
                 "message_id": message_id,
                 "content": content,
-            }
+            },
         )
         return SendResult(success=True, message_id=message_id)
 
@@ -83,7 +88,7 @@ class SmallLimitProgressAdapter(ProgressCaptureAdapter):
                 "content": content,
                 "reply_to": reply_to,
                 "metadata": metadata,
-            }
+            },
         )
         return SendResult(success=True, message_id=self._mint_id())
 
@@ -95,14 +100,14 @@ class SmallLimitProgressAdapter(ProgressCaptureAdapter):
                 "chat_id": chat_id,
                 "message_id": message_id,
                 "content": content,
-            }
+            },
         )
         return SendResult(success=True, message_id=message_id)
 
 
 class MetadataEditProgressCaptureAdapter(ProgressCaptureAdapter):
     async def edit_message(
-        self, chat_id, message_id, content, *, finalize: bool = False, metadata=None
+        self, chat_id, message_id, content, *, finalize: bool = False, metadata=None,
     ) -> SendResult:
         self.edits.append(
             {
@@ -110,7 +115,7 @@ class MetadataEditProgressCaptureAdapter(ProgressCaptureAdapter):
                 "message_id": message_id,
                 "content": content,
                 "metadata": metadata,
-            }
+            },
         )
         return SendResult(success=True, message_id=message_id)
 
@@ -147,6 +152,7 @@ class FakeAgent:
 
 class LongPreviewAgent:
     """Agent that emits a tool call with a very long preview string."""
+
     LONG_CMD = "cd /home/teknium/.hermes/hermes-agent/.worktrees/hermes-d8860339 && source .venv/bin/activate && python -m pytest tests/gateway/test_run_progress_topics.py -n0 -q"
 
     def __init__(self, **kwargs):
@@ -287,7 +293,7 @@ async def test_run_agent_progress_stays_in_originating_topic(monkeypatch, tmp_pa
             "content": '💻 terminal: "pwd"',
             "reply_to": None,
             "metadata": {"thread_id": "17585"},
-        }
+        },
     ]
     assert adapter.edits
     assert all(call["metadata"] == {"thread_id": "17585"} for call in adapter.typing)
@@ -480,6 +486,7 @@ def _run_long_preview_helper(monkeypatch, tmp_path, preview_length=0):
     that _run_agent reads — so the gateway picks it up the same way production does.
     """
     import asyncio
+
     import yaml
 
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
@@ -517,7 +524,7 @@ def _run_long_preview_helper(monkeypatch, tmp_path, preview_length=0):
             source=source,
             session_id="sess-trunc",
             session_key="agent:main:telegram:dm:12345",
-        )
+        ),
     )
     return adapter, result
 
@@ -656,6 +663,7 @@ class BackgroundReviewAgent:
 
 class VerboseAgent:
     """Agent that emits a tool call with args whose JSON exceeds 200 chars."""
+
     LONG_CODE = "x" * 300
 
     def __init__(self, **kwargs):
@@ -756,7 +764,7 @@ async def test_run_agent_rolls_progress_bubble_before_platform_limit(monkeypatch
                 "tool_progress": "all",
                 "interim_assistant_messages": False,
                 "tool_preview_length": 60,
-            }
+            },
         },
         adapter_cls=SmallLimitProgressAdapter,
     )
@@ -827,7 +835,7 @@ async def test_run_agent_tool_progress_does_not_control_interim_commentary(monke
 
 @pytest.mark.asyncio
 async def test_run_agent_streaming_does_not_enable_completed_interim_commentary(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path,
 ):
     """Streaming alone with interim_assistant_messages=false should not surface commentary."""
     adapter, result = await _run_with_agent(
@@ -1051,7 +1059,7 @@ async def test_base_processing_releases_post_delivery_callback_after_main_send()
                 "content": "💾 Skill 'prospect-scanner' created.",
                 "reply_to": None,
                 "metadata": None,
-            }
+            },
         )
 
     source = SessionSource(
@@ -1117,7 +1125,7 @@ async def test_base_processing_stops_typing_before_hung_post_delivery_callback(
     adapter._post_delivery_callbacks[session_key] = _post_delivery_cb
 
     await asyncio.wait_for(
-        adapter._process_message_background(event, session_key), timeout=1.0
+        adapter._process_message_background(event, session_key), timeout=1.0,
     )
 
     assert [call["content"] for call in adapter.sent] == ["done"]
@@ -1191,8 +1199,8 @@ async def test_run_agent_drops_tool_progress_after_generation_invalidation(monke
     all_progress_text = " ".join(call["content"] for call in adapter.sent)
     all_progress_text += " ".join(call["content"] for call in adapter.edits)
     assert result["final_response"] == "done"
-    assert 'first command' in all_progress_text
-    assert 'second command' not in all_progress_text
+    assert "first command" in all_progress_text
+    assert "second command" not in all_progress_text
 
 
 @pytest.mark.asyncio
@@ -1265,7 +1273,7 @@ async def test_keep_typing_stops_immediately_when_interrupt_event_is_set():
             "dm-typing-stop",
             interval=30.0,
             stop_event=stop_event,
-        )
+        ),
     )
     await asyncio.sleep(0.05)
     stop_event.set()
@@ -1344,7 +1352,7 @@ class TerminalCommandAgent:
 
     def run_conversation(self, message, conversation_history=None, task_id=None):
         self.tool_progress_callback(
-            "tool.started", "terminal", self.CMD, {"command": self.CMD}
+            "tool.started", "terminal", self.CMD, {"command": self.CMD},
         )
         # Let the async progress task drain the queue and send before returning.
         time.sleep(0.35)
@@ -1357,7 +1365,8 @@ async def test_terminal_progress_renders_fenced_code_block(monkeypatch, tmp_path
     renders a bare fenced code block — no language tag (Slack mrkdwn would print
     'bash' as a literal first code line).  In non-verbose ("all"/"new") mode the
     command is collapsed to a single line capped at tool_preview_length so a long
-    or multi-line command doesn't render as a huge block (#42634)."""
+    or multi-line command doesn't render as a huge block (#42634).
+    """
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")
@@ -1410,7 +1419,8 @@ async def test_terminal_progress_renders_fenced_code_block(monkeypatch, tmp_path
 async def test_terminal_progress_verbose_shows_full_command(monkeypatch, tmp_path):
     """Verbose mode on a markdown-capable gateway renders the FULL multi-line
     command in a bare fenced block (no truncation, no 'bash' tag).  This is the
-    parity guarantee for #42634: verbose keeps full detail, non-verbose caps."""
+    parity guarantee for #42634: verbose keeps full detail, non-verbose caps.
+    """
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "verbose")
 
     fake_dotenv = types.ModuleType("dotenv")
@@ -1458,7 +1468,8 @@ async def test_terminal_progress_verbose_shows_full_command(monkeypatch, tmp_pat
 async def test_terminal_progress_no_bash_block_in_verbose_mode(monkeypatch, tmp_path):
     """#41215 also rendered the bash block in verbose mode. The revert removed it
     from both branches, so verbose progress must not emit a fenced ```bash block
-    either (verbose still shows args by opt-in, just not as a code block)."""
+    either (verbose still shows args by opt-in, just not as a code block).
+    """
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "verbose")
 
     fake_dotenv = types.ModuleType("dotenv")
@@ -1497,9 +1508,11 @@ async def test_terminal_progress_no_bash_block_in_verbose_mode(monkeypatch, tmp_
     all_content += " ".join(call["content"] for call in adapter.edits)
     assert "```bash" not in all_content
 
+
 class MultiTerminalCommandAgent:
     """Emits several consecutive terminal tool.started events, then a
-    different tool, then terminal again — to exercise header collapsing."""
+    different tool, then terminal again — to exercise header collapsing.
+    """
 
     def __init__(self, **kwargs):
         self.tool_progress_callback = kwargs.get("tool_progress_callback")
@@ -1520,7 +1533,8 @@ class MultiTerminalCommandAgent:
 async def test_consecutive_terminal_progress_collapses_headers(monkeypatch, tmp_path):
     """Back-to-back terminal calls render ONE "terminal" header followed by
     adjacent code blocks; a different tool in between resets the header so the
-    next terminal call gets a fresh one."""
+    next terminal call gets a fresh one.
+    """
     monkeypatch.setenv("HERMES_TOOL_PROGRESS_MODE", "all")
 
     fake_dotenv = types.ModuleType("dotenv")

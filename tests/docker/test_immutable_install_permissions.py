@@ -44,7 +44,7 @@ def test_hermes_user_cannot_modify_install_but_can_write_data(built_image: str) 
         if skill_file.read_text(encoding="utf-8") != "# Permission smoke\n":
             raise SystemExit("data write verification failed")
         PY
-        """
+        """,
     ).strip()
     result = subprocess.run(
         [

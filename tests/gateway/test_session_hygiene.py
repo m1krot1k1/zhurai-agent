@@ -13,7 +13,7 @@ import sys
 import types
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -22,10 +22,10 @@ from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, SendResult
 from gateway.session import SessionEntry, SessionSource
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_history(n_messages: int, content_size: int = 100) -> list:
     """Build a fake transcript with n_messages user/assistant pairs."""
@@ -69,7 +69,7 @@ class HygieneCaptureAdapter(BasePlatformAdapter):
                 "content": content,
                 "reply_to": reply_to,
                 "metadata": metadata,
-            }
+            },
         )
         return SendResult(success=True, message_id="hygiene-1")
 
@@ -212,9 +212,6 @@ class TestSessionHygieneWarnThreshold:
         assert post_compress_tokens < warn_threshold
 
 
-
-
-
 class TestEstimatedTokenThreshold:
     """Verify that hygiene thresholds are always below the model's context
     limit — for both actual and estimated token counts.
@@ -330,7 +327,7 @@ async def test_session_hygiene_messages_stay_in_originating_topic(monkeypatch, t
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -361,7 +358,7 @@ async def test_session_hygiene_messages_stay_in_originating_topic(monkeypatch, t
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
@@ -401,7 +398,8 @@ async def test_session_hygiene_preserves_transcript_when_no_rotation(monkeypatch
     so _compress_context cannot rotate. When it neither rotates NOR compacts
     in place, the transcript MUST be preserved — an unconditional
     rewrite_transcript() would replace the original messages with only the
-    summary (permanent data loss). Mirrors the /compress guard (#44794)."""
+    summary (permanent data loss). Mirrors the /compress guard (#44794).
+    """
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
@@ -433,7 +431,7 @@ async def test_session_hygiene_preserves_transcript_when_no_rotation(monkeypatch
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -464,7 +462,7 @@ async def test_session_hygiene_preserves_transcript_when_no_rotation(monkeypatch
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
@@ -500,7 +498,8 @@ async def test_session_hygiene_warns_user_when_compression_aborts(monkeypatch, t
     ABORTS — returns messages unchanged, sets _last_compress_aborted=True,
     and drops nothing.  Gateway must surface a visible ⚠️ warning to the
     user (including thread_id metadata so it lands in the originating
-    topic/thread) saying the conversation is unchanged and how to retry."""
+    topic/thread) saying the conversation is unchanged and how to retry.
+    """
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
@@ -538,7 +537,7 @@ async def test_session_hygiene_warns_user_when_compression_aborts(monkeypatch, t
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -569,7 +568,7 @@ async def test_session_hygiene_warns_user_when_compression_aborts(monkeypatch, t
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
@@ -619,7 +618,8 @@ async def test_session_hygiene_informs_user_when_aux_model_fails_but_recovers(mo
     and we recover via the main model, compression succeeds but the user's
     config is still broken.  Gateway hygiene must surface an ℹ note so the
     user knows to fix ``auxiliary.compression.model`` — silent recovery
-    hides a misconfig only they can resolve."""
+    hides a misconfig only they can resolve.
+    """
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
@@ -658,7 +658,7 @@ async def test_session_hygiene_informs_user_when_aux_model_fails_but_recovers(mo
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -689,7 +689,7 @@ async def test_session_hygiene_informs_user_when_aux_model_fails_but_recovers(mo
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
@@ -739,7 +739,7 @@ async def test_session_hygiene_informs_user_when_aux_model_fails_but_recovers(mo
 
 @pytest.mark.asyncio
 async def test_session_hygiene_honors_configurable_hard_message_limit(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path,
 ):
     """compression.hygiene_hard_message_limit overrides the default.
 
@@ -776,7 +776,7 @@ async def test_session_hygiene_honors_configurable_hard_message_limit(
     cfg_path.write_text(
         "compression:\n"
         "  enabled: true\n"
-        "  hygiene_hard_message_limit: 10\n"
+        "  hygiene_hard_message_limit: 10\n",
     )
 
     gateway_run = importlib.import_module("gateway.run")
@@ -785,7 +785,7 @@ async def test_session_hygiene_honors_configurable_hard_message_limit(
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -818,12 +818,12 @@ async def test_session_hygiene_honors_configurable_hard_message_limit(
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
     monkeypatch.setattr(
-        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
+        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"},
     )
     # Pick a context length large enough that the token-based threshold
     # won't trigger for 12 short messages — hard-limit must be the ONLY
@@ -857,11 +857,12 @@ async def test_session_hygiene_honors_configurable_hard_message_limit(
 
 @pytest.mark.asyncio
 async def test_session_hygiene_default_hard_message_limit_does_not_fire_at_12_messages(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path,
 ):
     """Sanity check for the companion test above: without config override,
     12 messages must NOT trigger the default hard limit.  If this test
-    passes without changes, the override test's finding is meaningful."""
+    passes without changes, the override test's finding is meaningful.
+    """
     fake_dotenv = types.ModuleType("dotenv")
     fake_dotenv.load_dotenv = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "dotenv", fake_dotenv)
@@ -890,7 +891,7 @@ async def test_session_hygiene_default_hard_message_limit_does_not_fire_at_12_me
     adapter = HygieneCaptureAdapter()
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake-token")},
     )
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner._voice_mode = {}
@@ -921,12 +922,12 @@ async def test_session_hygiene_default_hard_message_limit_does_not_fire_at_12_me
             "tools": [],
             "history_offset": 0,
             "last_prompt_tokens": 0,
-        }
+        },
     )
 
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
     monkeypatch.setattr(
-        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"}
+        gateway_run, "_resolve_runtime_agent_kwargs", lambda: {"api_key": "fake"},
     )
     monkeypatch.setattr(
         "agent.model_metadata.get_model_context_length",

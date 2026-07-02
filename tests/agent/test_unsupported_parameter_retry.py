@@ -16,15 +16,15 @@ These tests lock in:
     legacy ``"max_tokens"`` / ``"unsupported_parameter"`` substring checks
 """
 
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from agent.auxiliary_client import (
-    call_llm,
-    async_call_llm,
     _is_unsupported_parameter_error,
     _is_unsupported_temperature_error,
+    async_call_llm,
+    call_llm,
 )
 
 
@@ -62,7 +62,7 @@ class TestIsUnsupportedParameterError:
 
     def test_empty_param_returns_false(self):
         assert _is_unsupported_parameter_error(
-            RuntimeError("HTTP 400: Unsupported parameter: temperature"), ""
+            RuntimeError("HTTP 400: Unsupported parameter: temperature"), "",
         ) is False
 
     def test_temperature_wrapper_delegates_to_generic(self):
@@ -102,19 +102,17 @@ class TestMaxTokensRetryHardening:
             patch("agent.auxiliary_client._get_cached_client",
                   return_value=(client, "gpt-5.5")),
             patch("agent.auxiliary_client._validate_llm_response",
-                  side_effect=lambda resp, _task: resp),
+                  side_effect=lambda resp, _task: resp), pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                call_llm(
-                    task="session_search",
-                    messages=[{"role": "user", "content": "hi"}],
-                    temperature=0.3,
-                    # max_tokens omitted on purpose
-                )
+            call_llm(
+                task="session_search",
+                messages=[{"role": "user", "content": "hi"}],
+                temperature=0.3,
+                # max_tokens omitted on purpose
+            )
 
         # Only the initial attempt — no retry because the gate blocked it
         assert client.chat.completions.create.call_count == 1
-
 
     @pytest.mark.asyncio
     async def test_async_max_tokens_retry_skipped_when_max_tokens_is_none(self):
@@ -129,14 +127,12 @@ class TestMaxTokensRetryHardening:
             patch("agent.auxiliary_client._get_cached_client",
                   return_value=(client, "gpt-5.5")),
             patch("agent.auxiliary_client._validate_llm_response",
-                  side_effect=lambda resp, _task: resp),
+                  side_effect=lambda resp, _task: resp), pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                await async_call_llm(
-                    task="session_search",
-                    messages=[{"role": "user", "content": "hi"}],
-                    temperature=0.3,
-                )
+            await async_call_llm(
+                task="session_search",
+                messages=[{"role": "user", "content": "hi"}],
+                temperature=0.3,
+            )
 
         assert client.chat.completions.create.call_count == 1
-

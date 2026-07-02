@@ -30,7 +30,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 
-
 def _make_init_result(*, resources: bool, prompts: bool):
     """Build a fake ``InitializeResult`` whose ``capabilities`` sub-object
     matches a server that advertises exactly the given capability set.
@@ -59,7 +58,7 @@ def _make_fake_server(*, initialize_result):
     server.name = "test-server"
     # session must satisfy the legacy ``hasattr`` fallback too
     server.session = MagicMock(
-        spec=["list_resources", "read_resource", "list_prompts", "get_prompt"]
+        spec=["list_resources", "read_resource", "list_prompts", "get_prompt"],
     )
     server.initialize_result = initialize_result
     return server
@@ -73,11 +72,12 @@ class TestCapabilityGatedRegistration:
     def test_tools_only_server_gets_no_utility_schemas(self):
         """Context7-shaped server (tools only, no prompts / resources) should
         get zero utility stubs registered — this is the exact scenario
-        from the #18051 bug report."""
+        from the #18051 bug report.
+        """
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=False, prompts=False)
+            initialize_result=_make_init_result(resources=False, prompts=False),
         )
         selected = _select_utility_schemas("context7", server, {})
         assert _handler_keys(selected) == set(), (
@@ -89,7 +89,7 @@ class TestCapabilityGatedRegistration:
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=True, prompts=False)
+            initialize_result=_make_init_result(resources=True, prompts=False),
         )
         selected = _select_utility_schemas("res-only", server, {})
         assert _handler_keys(selected) == {"list_resources", "read_resource"}
@@ -98,7 +98,7 @@ class TestCapabilityGatedRegistration:
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=False, prompts=True)
+            initialize_result=_make_init_result(resources=False, prompts=True),
         )
         selected = _select_utility_schemas("prompt-only", server, {})
         assert _handler_keys(selected) == {"list_prompts", "get_prompt"}
@@ -107,7 +107,7 @@ class TestCapabilityGatedRegistration:
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=True, prompts=True)
+            initialize_result=_make_init_result(resources=True, prompts=True),
         )
         selected = _select_utility_schemas("full", server, {})
         assert _handler_keys(selected) == {
@@ -117,13 +117,14 @@ class TestCapabilityGatedRegistration:
 
 class TestConfigFilterStillApplies:
     """Per-server config flags ``tools.resources: false`` / ``tools.prompts: false``
-    must continue to override even when the server DOES advertise the capability."""
+    must continue to override even when the server DOES advertise the capability.
+    """
 
     def test_config_disables_resources_even_when_advertised(self):
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=True, prompts=True)
+            initialize_result=_make_init_result(resources=True, prompts=True),
         )
         selected = _select_utility_schemas(
             "full-but-filtered",
@@ -136,7 +137,7 @@ class TestConfigFilterStillApplies:
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(
-            initialize_result=_make_init_result(resources=True, prompts=True)
+            initialize_result=_make_init_result(resources=True, prompts=True),
         )
         selected = _select_utility_schemas(
             "full-but-filtered",
@@ -149,7 +150,8 @@ class TestConfigFilterStillApplies:
 class TestLegacyFallback:
     """When ``initialize_result`` is missing (older test fixtures or code
     paths that haven't captured it yet), fall back to the legacy hasattr
-    check so pre-existing tests and servers keep working."""
+    check so pre-existing tests and servers keep working.
+    """
 
     def test_no_initialize_result_falls_back_to_hasattr_check(self):
         from tools.mcp_tool import _select_utility_schemas
@@ -164,7 +166,8 @@ class TestLegacyFallback:
 
     def test_no_initialize_result_respects_session_spec(self):
         """Legacy fallback still filters by ``hasattr(session, method)``, so
-        a session whose spec lacks a method is correctly skipped."""
+        a session whose spec lacks a method is correctly skipped.
+        """
         from tools.mcp_tool import _select_utility_schemas
 
         server = _make_fake_server(initialize_result=None)

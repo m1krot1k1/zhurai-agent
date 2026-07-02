@@ -44,7 +44,8 @@ def stage2_text() -> str:
 
 def _seed_block(text: str) -> str:
     """Extract the ``if [ ! -f "$HERMES_HOME/gateway_state.json" ] && … fi``
-    block that seeds the gateway state file from the bootstrap env var."""
+    block that seeds the gateway state file from the bootstrap env var.
+    """
     m = re.search(
         r'(if \[ ! -f "\$HERMES_HOME/gateway_state\.json" \] && \\\n'
         r"(?:.*\n)*?fi)",
@@ -68,7 +69,7 @@ def test_seed_block_present_and_guarded(stage2_text: str) -> None:
 
 
 def _run_seed(
-    text: str, *, env_value: str | None, preexisting: str | None
+    text: str, *, env_value: str | None, preexisting: str | None,
 ) -> str | None:
     """Run the extracted seed block in a sandbox $HERMES_HOME.
 
@@ -109,7 +110,7 @@ def _run_seed(
         script_path.write_text(script)
 
         proc = subprocess.run(
-            [bash, str(script_path)], capture_output=True, text=True
+            [bash, str(script_path)], capture_output=True, text=True,
         )
         assert proc.returncode == 0, proc.stderr
 
@@ -128,7 +129,8 @@ def test_seeds_running_state_on_blank_volume(stage2_text: str) -> None:
 def test_does_not_clobber_existing_state(stage2_text: str) -> None:
     """The [ ! -f ] guard: an existing state file is never overwritten, even
     when the bootstrap env var says running. A deliberately-stopped gateway
-    must stay stopped across restarts."""
+    must stay stopped across restarts.
+    """
     existing = json.dumps({"gateway_state": "stopped", "pid": 123})
     out = _run_seed(stage2_text, env_value="running", preexisting=existing)
     assert out == existing, "seed must not clobber a persisted state file"
@@ -136,7 +138,8 @@ def test_does_not_clobber_existing_state(stage2_text: str) -> None:
 
 def test_no_seed_when_env_unset(stage2_text: str) -> None:
     """No env var -> no file written (preserves the default down-on-first-boot
-    behaviour for orchestrators that don't opt in)."""
+    behaviour for orchestrators that don't opt in).
+    """
     out = _run_seed(stage2_text, env_value=None, preexisting=None)
     assert out is None, "seed must not run when HERMES_GATEWAY_BOOTSTRAP_STATE is unset"
 
@@ -144,7 +147,8 @@ def test_no_seed_when_env_unset(stage2_text: str) -> None:
 def test_non_running_value_ignored(stage2_text: str) -> None:
     """Only a literal "running" is honoured; any other value is ignored so a
     typo can't write a bogus state. (The reconciler's _AUTOSTART_STATES is
-    exactly {"running"}.)"""
+    exactly {"running"}.)
+    """
     for bogus in ("stopped", "Running", "1", "true", "starting"):
         out = _run_seed(stage2_text, env_value=bogus, preexisting=None)
         assert out is None, (

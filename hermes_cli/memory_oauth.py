@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import importlib
 from contextlib import contextmanager
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -29,9 +28,10 @@ def _resolve_flow(provider: str):
 
 
 @contextmanager
-def _scope_to_profile(profile: Optional[str]):
+def _scope_to_profile(profile: str | None):
     """Scope config resolution to ``profile`` so the flow's eager path resolve
-    targets that profile's honcho.json. None/""/"current" leaves it untouched."""
+    targets that profile's honcho.json. None/""/"current" leaves it untouched.
+    """
     requested = (profile or "").strip()
     if not requested or requested.lower() == "current":
         yield
@@ -55,9 +55,10 @@ def _scope_to_profile(profile: Optional[str]):
 
 
 @router.post("/{provider}/oauth/start")
-async def start_memory_oauth(provider: str, profile: Optional[str] = None):
+async def start_memory_oauth(provider: str, profile: str | None = None):
     """Begin a provider's zero-CLI OAuth flow — opens the browser and captures
-    the grant via the loopback listener. Returns immediately; poll status."""
+    the grant via the loopback listener. Returns immediately; poll status.
+    """
     flow = _resolve_flow(provider)
     try:
         # The flow resolves its config path eagerly inside this scope; the worker
@@ -71,7 +72,7 @@ async def start_memory_oauth(provider: str, profile: Optional[str] = None):
 
 
 @router.get("/{provider}/oauth/status")
-async def memory_oauth_status(provider: str, profile: Optional[str] = None):
+async def memory_oauth_status(provider: str, profile: str | None = None):
     """Poll a provider's OAuth flow: idle | pending | connected | error."""
     flow = _resolve_flow(provider)
     try:

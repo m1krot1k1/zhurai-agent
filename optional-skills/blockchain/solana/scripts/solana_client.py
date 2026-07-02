@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Solana Blockchain CLI Tool for Hermes Agent
+"""Solana Blockchain CLI Tool for Hermes Agent
 --------------------------------------------
 Queries the Solana JSON-RPC API and CoinGecko for enriched on-chain data.
 Uses only Python standard library — no external packages required.
@@ -24,9 +23,9 @@ import json
 import os
 import sys
 import time
-import urllib.request
 import urllib.error
-from typing import Any, Dict, List, Optional
+import urllib.request
+from typing import Any
 
 RPC_URL = os.environ.get(
     "SOLANA_RPC_URL",
@@ -37,29 +36,29 @@ LAMPORTS_PER_SOL = 1_000_000_000
 
 # Well-known Solana token names — avoids API calls for common tokens.
 # Maps mint address → (symbol, name).
-KNOWN_TOKENS: Dict[str, tuple] = {
-    "So11111111111111111111111111111111111111112":  ("SOL",   "Solana"),
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": ("USDC",  "USD Coin"),
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB":  ("USDT",  "Tether"),
-    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": ("BONK",  "Bonk"),
-    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN":  ("JUP",   "Jupiter"),
-    "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": ("WETH",  "Wrapped Ether"),
-    "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL":  ("JTO",   "Jito"),
-    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So":  ("mSOL",  "Marinade Staked SOL"),
+KNOWN_TOKENS: dict[str, tuple] = {
+    "So11111111111111111111111111111111111111112":  ("SOL", "Solana"),
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": ("USDC", "USD Coin"),
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB":  ("USDT", "Tether"),
+    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": ("BONK", "Bonk"),
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN":  ("JUP", "Jupiter"),
+    "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": ("WETH", "Wrapped Ether"),
+    "jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL":  ("JTO", "Jito"),
+    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So":  ("mSOL", "Marinade Staked SOL"),
     "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj": ("stSOL", "Lido Staked SOL"),
-    "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": ("PYTH",  "Pyth Network"),
-    "RLBxxFkseAZ4RgJH3Sqn8jXxhmGoz9jWxDNJMh8pL7a":  ("RLBB",  "Rollbit"),
-    "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux":  ("HNT",   "Helium"),
-    "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof":  ("RNDR",  "Render"),
-    "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p91oHQQ":  ("WEN",   "Wen"),
-    "85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ": ("W",     "Wormhole"),
-    "TNSRxcUxoT9xBG3de7PiJyTDYu7kskLqcpddxnEJAS6":  ("TNSR",  "Tensor"),
+    "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": ("PYTH", "Pyth Network"),
+    "RLBxxFkseAZ4RgJH3Sqn8jXxhmGoz9jWxDNJMh8pL7a":  ("RLBB", "Rollbit"),
+    "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux":  ("HNT", "Helium"),
+    "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof":  ("RNDR", "Render"),
+    "WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p91oHQQ":  ("WEN", "Wen"),
+    "85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ": ("W", "Wormhole"),
+    "TNSRxcUxoT9xBG3de7PiJyTDYu7kskLqcpddxnEJAS6":  ("TNSR", "Tensor"),
     "DriFtupJYLTosbwoN8koMbEYSx54aFAVLddWsbksjwg7":  ("DRIFT", "Drift"),
-    "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1":  ("bSOL",  "BlazeStake Staked SOL"),
-    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4": ("JLP",   "Jupiter LP"),
-    "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm": ("WIF",   "dogwifhat"),
-    "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5":  ("MEW",   "cat in a dogs world"),
-    "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82":  ("BOME",  "Book of Meme"),
+    "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1":  ("bSOL", "BlazeStake Staked SOL"),
+    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4": ("JLP", "Jupiter LP"),
+    "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm": ("WIF", "dogwifhat"),
+    "MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5":  ("MEW", "cat in a dogs world"),
+    "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82":  ("BOME", "Book of Meme"),
     "A8C3xuqscfmyLrte3VwJvtPHXvcSN3FjDbUaSMAkQrCS": ("PENGU", "Pudgy Penguins"),
 }
 
@@ -172,14 +171,14 @@ def _short_mint(mint: str) -> str:
 # Price & token name helpers (CoinGecko — free, no API key)
 # ---------------------------------------------------------------------------
 
-def fetch_prices(mints: List[str], max_lookups: int = 20) -> Dict[str, float]:
+def fetch_prices(mints: list[str], max_lookups: int = 20) -> dict[str, float]:
     """Fetch USD prices for mint addresses via CoinGecko (one per request).
 
     CoinGecko free tier doesn't support batch Solana token lookups,
     so we do individual calls — capped at *max_lookups* to stay within
     rate limits. Returns {mint: usd_price}.
     """
-    prices: Dict[str, float] = {}
+    prices: dict[str, float] = {}
     for i, mint in enumerate(mints[:max_lookups]):
         url = (
             f"https://api.coingecko.com/api/v3/simple/token_price/solana"
@@ -197,17 +196,17 @@ def fetch_prices(mints: List[str], max_lookups: int = 20) -> Dict[str, float]:
     return prices
 
 
-def fetch_sol_price() -> Optional[float]:
+def fetch_sol_price() -> float | None:
     """Fetch current SOL price in USD via CoinGecko."""
     data = _http_get_json(
-        "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+        "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
     )
     if data and "solana" in data:
         return data["solana"].get("usd")
     return None
 
 
-def resolve_token_name(mint: str) -> Optional[Dict[str, str]]:
+def resolve_token_name(mint: str) -> dict[str, str] | None:
     """Look up token name and symbol from CoinGecko by mint address.
 
     Returns {"name": ..., "symbol": ...} or None.
@@ -245,30 +244,30 @@ def cmd_stats(_args):
 
     by_id = {r["id"]: r.get("result") for r in results}
 
-    slot         = by_id.get(0)
-    epoch_info   = by_id.get(1)
+    slot = by_id.get(0)
+    epoch_info = by_id.get(1)
     perf_samples = by_id.get(2)
-    supply       = by_id.get(3)
-    version      = by_id.get(4)
+    supply = by_id.get(3)
+    version = by_id.get(4)
 
     tps = None
     if perf_samples:
         s = perf_samples[0]
         tps = round(s["numTransactions"] / s["samplePeriodSecs"], 1)
 
-    total_supply = lamports_to_sol(supply["value"]["total"])      if supply else None
-    circ_supply  = lamports_to_sol(supply["value"]["circulating"]) if supply else None
+    total_supply = lamports_to_sol(supply["value"]["total"]) if supply else None
+    circ_supply = lamports_to_sol(supply["value"]["circulating"]) if supply else None
 
     sol_price = fetch_sol_price()
 
     out = {
         "slot":                   slot,
-        "epoch":                  epoch_info.get("epoch")     if epoch_info else None,
+        "epoch":                  epoch_info.get("epoch") if epoch_info else None,
         "slot_in_epoch":          epoch_info.get("slotIndex") if epoch_info else None,
         "tps":                    tps,
         "total_supply_SOL":       round(total_supply, 2) if total_supply else None,
-        "circulating_supply_SOL": round(circ_supply, 2)  if circ_supply  else None,
-        "validator_version":      version.get("solana-core")  if version   else None,
+        "circulating_supply_SOL": round(circ_supply, 2) if circ_supply else None,
+        "validator_version":      version.get("solana-core") if version else None,
     }
     if sol_price is not None:
         out["sol_price_usd"] = sol_price
@@ -317,7 +316,7 @@ def cmd_wallet(args):
 
     # Fetch prices for fungible tokens (cap lookups to avoid API abuse)
     sol_price = None
-    prices: Dict[str, float] = {}
+    prices: dict[str, float] = {}
     if not skip_prices and fungible:
         sol_price = fetch_sol_price()
         # Prioritize known tokens, then a small sample of unknowns.
@@ -403,11 +402,11 @@ def cmd_tx(args):
     if result is None:
         sys.exit("Transaction not found (may be too old for public RPC history).")
 
-    meta         = result.get("meta", {}) or {}
-    msg          = result.get("transaction", {}).get("message", {})
+    meta = result.get("meta", {}) or {}
+    msg = result.get("transaction", {}).get("message", {})
     account_keys = msg.get("accountKeys", [])
 
-    pre  = meta.get("preBalances",  [])
+    pre = meta.get("preBalances", [])
     post = meta.get("postBalances", [])
 
     balance_changes = []
@@ -456,9 +455,9 @@ def cmd_token(args):
     if mint_info is None or mint_info.get("value") is None:
         sys.exit("Mint account not found.")
 
-    parsed       = mint_info["value"]["data"]["parsed"]["info"]
-    decimals     = parsed.get("decimals", 0)
-    supply_raw   = int(parsed.get("supply", 0))
+    parsed = mint_info["value"]["data"]["parsed"]["info"]
+    decimals = parsed.get("decimals", 0)
+    supply_raw = int(parsed.get("supply", 0))
     supply_human = supply_raw / (10 ** decimals) if decimals else supply_raw
 
     largest = rpc("getTokenLargestAccounts", [mint])
@@ -498,7 +497,7 @@ def cmd_token(args):
 
 def cmd_activity(args):
     """Recent transaction signatures for an address."""
-    limit  = min(args.limit, 25)
+    limit = min(args.limit, 25)
     result = rpc("getSignaturesForAddress", [args.address, {"limit": limit}])
 
     txs = [
@@ -549,7 +548,7 @@ def cmd_whales(args):
     """Scan the latest block for large SOL transfers."""
     min_lamports = int(args.min_sol * LAMPORTS_PER_SOL)
 
-    slot  = rpc("getSlot")
+    slot = rpc("getSlot")
     block = rpc("getBlock", [
         slot,
         {
@@ -571,20 +570,20 @@ def cmd_whales(args):
         if meta.get("err") is not None:
             continue
 
-        msg          = tx["transaction"].get("message", {})
+        msg = tx["transaction"].get("message", {})
         account_keys = msg.get("accountKeys", [])
-        pre          = meta.get("preBalances",  [])
-        post         = meta.get("postBalances", [])
+        pre = meta.get("preBalances", [])
+        post = meta.get("postBalances", [])
 
         for i in range(len(pre)):
             change = post[i] - pre[i]
             if change >= min_lamports:
-                k        = account_keys[i]
+                k = account_keys[i]
                 receiver = k["pubkey"] if isinstance(k, dict) else k
-                sender   = None
+                sender = None
                 for j in range(len(pre)):
                     if pre[j] - post[j] >= min_lamports:
-                        sk     = account_keys[j]
+                        sk = account_keys[j]
                         sender = sk["pubkey"] if isinstance(sk, dict) else sk
                         break
                 entry = {

@@ -14,8 +14,12 @@ import json
 
 import pytest
 
-import hermes_cli.auth as auth
-from hermes_cli.auth import AuthError, _refresh_codex_auth_tokens, resolve_codex_runtime_credentials
+from hermes_cli import auth
+from hermes_cli.auth import (
+    AuthError,
+    _refresh_codex_auth_tokens,
+    resolve_codex_runtime_credentials,
+)
 
 STALE = {"access_token": "stale-access", "refresh_token": "stale-refresh"}
 
@@ -104,7 +108,6 @@ def test_happy_path_unchanged(monkeypatch):
 
     def _import_spy():
         import_calls["n"] += 1
-        return None
 
     monkeypatch.setattr(
         auth,
@@ -124,7 +127,8 @@ def test_happy_path_unchanged(monkeypatch):
 
 def test_reraises_when_imported_token_lacks_refresh_token(monkeypatch):
     """relogin-required, but ~/.codex returns an access_token with NO refresh_token →
-    re-raise rather than persist a half-token that would break the next refresh."""
+    re-raise rather than persist a half-token that would break the next refresh.
+    """
     saved = {}
 
     def _rejected(*_a, **_k):

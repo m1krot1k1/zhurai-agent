@@ -9,14 +9,11 @@ Verifies that:
 
 import ast
 import json
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 
-import pytest
-
-from hermes_state import SessionDB
 from acp_adapter.session import SessionManager
+from hermes_state import SessionDB
 
 
 def _tmp_db(tmp_path):
@@ -105,8 +102,7 @@ class TestNoPrviateDBAccess:
     """_persist() in session.py must not access db._lock or db._conn."""
 
     def test_no_db_private_lock_access(self):
-        with open("acp_adapter/session.py", encoding="utf-8") as f:
-            source = f.read()
+        source = Path("acp_adapter/session.py").read_text(encoding="utf-8")
 
         tree = ast.parse(source)
 
@@ -117,7 +113,7 @@ class TestNoPrviateDBAccess:
                 if isinstance(node.value, ast.Name) and node.value.id == "db":
                     if node.attr in ("_lock", "_conn"):
                         violations.append(
-                            f"db.{node.attr} at line {node.lineno}"
+                            f"db.{node.attr} at line {node.lineno}",
                         )
 
         assert violations == [], (
@@ -128,7 +124,7 @@ class TestNoPrviateDBAccess:
 
     def test_persist_calls_update_session_meta(self):
         """AST check: _persist must call db.update_session_meta()."""
-        with open("acp_adapter/session.py", encoding="utf-8") as f:
+        with Path("acp_adapter/session.py").open(encoding="utf-8") as f:
             tree = ast.parse(f.read())
 
         found = False

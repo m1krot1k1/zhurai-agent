@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Tests for structured-document extraction in the read_file tool.
+"""Tests for structured-document extraction in the read_file tool.
 
 Covers .ipynb / .docx / .xlsx extraction (ported from Kilo-Org/kilocode
 #10733, #10737, #10740) and the read_file_tool integration: pagination,
@@ -12,25 +11,26 @@ Run with:  python -m pytest tests/tools/test_read_extract.py -v
 
 import json
 import os
+import pathlib
 import tempfile
 import unittest
 import zipfile
 
+from tools.file_tools import read_file_tool
 from tools.read_extract import (
     ExtractionError,
     extract_document_text,
     is_extractable_document,
 )
-from tools.file_tools import read_file_tool
-
 
 # ---------------------------------------------------------------------------
 # Fixture builders — construct minimal valid OOXML / notebook files.
 # ---------------------------------------------------------------------------
 
+
 def _write_notebook(path, cells, nbformat=4):
     nb = {"cells": cells, "metadata": {}, "nbformat": nbformat, "nbformat_minor": 5}
-    with open(path, "w", encoding="utf-8") as fh:
+    with pathlib.Path(path).open("w", encoding="utf-8") as fh:
         json.dump(nb, fh)
 
 
@@ -110,14 +110,13 @@ class TestNotebookExtraction(unittest.TestCase):
         nb = {"worksheets": [{"cells": [
             {"cell_type": "code", "input": "ignored", "source": "legacy cell"}]}],
             "nbformat": 3}
-        with open(p, "w") as fh:
+        with pathlib.Path(p).open("w") as fh:
             json.dump(nb, fh)
         self.assertIn("legacy cell", extract_document_text(p))
 
     def test_malformed_notebook_raises(self):
         p = os.path.join(self.tmp, "bad.ipynb")
-        with open(p, "w") as fh:
-            fh.write("{ not valid json")
+        pathlib.Path(p).write_text("{ not valid json")
         with self.assertRaises(ExtractionError):
             extract_document_text(p)
 
@@ -147,8 +146,8 @@ class TestDocxExtraction(unittest.TestCase):
     def test_paragraphs_and_runs(self):
         p = os.path.join(self.tmp, "d.docx")
         _write_docx(p, self._doc(
-            '<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>'
-            '<w:p><w:r><w:t>Second</w:t></w:r></w:p>'))
+            "<w:p><w:r><w:t>Hello </w:t></w:r><w:r><w:t>World</w:t></w:r></w:p>"
+            "<w:p><w:r><w:t>Second</w:t></w:r></w:p>"))
         text = extract_document_text(p)
         self.assertIn("Hello World", text)
         self.assertIn("Second", text)
@@ -156,15 +155,14 @@ class TestDocxExtraction(unittest.TestCase):
     def test_tabs_and_breaks(self):
         p = os.path.join(self.tmp, "d2.docx")
         _write_docx(p, self._doc(
-            '<w:p><w:r><w:t>A</w:t><w:tab/><w:t>B</w:t><w:br/><w:t>C</w:t></w:r></w:p>'))
+            "<w:p><w:r><w:t>A</w:t><w:tab/><w:t>B</w:t><w:br/><w:t>C</w:t></w:r></w:p>"))
         text = extract_document_text(p)
         self.assertIn("A\tB", text)
         self.assertIn("C", text)
 
     def test_not_a_zip_raises(self):
         p = os.path.join(self.tmp, "bad.docx")
-        with open(p, "wb") as fh:
-            fh.write(b"plain bytes, not a zip")
+        pathlib.Path(p).write_bytes(b"plain bytes, not a zip")
         with self.assertRaises(ExtractionError):
             extract_document_text(p)
 
@@ -232,8 +230,7 @@ class TestXlsxExtraction(unittest.TestCase):
 
     def test_not_a_zip_raises(self):
         p = os.path.join(self.tmp, "bad.xlsx")
-        with open(p, "wb") as fh:
-            fh.write(b"nope")
+        pathlib.Path(p).write_bytes(b"nope")
         with self.assertRaises(ExtractionError):
             extract_document_text(p)
 
@@ -274,8 +271,7 @@ class TestReadFileToolIntegration(unittest.TestCase):
 
     def test_corrupt_docx_falls_through_to_binary_guard(self):
         p = os.path.join(self.tmp, "bad.docx")
-        with open(p, "wb") as fh:
-            fh.write(b"not a zip")
+        pathlib.Path(p).write_bytes(b"not a zip")
         res = json.loads(read_file_tool(p))
         # Should NOT crash; falls through to the binary-extension guard.
         self.assertIn("error", res)

@@ -36,7 +36,6 @@ import socket
 import sys
 import urllib.error
 import urllib.request
-from typing import Optional
 
 
 def _default_gateway_id() -> str:
@@ -54,7 +53,7 @@ def _default_gateway_id() -> str:
     return f"gw-{host or 'hermes'}"
 
 
-def _resolve_connector_url(override: Optional[str]) -> Optional[str]:
+def _resolve_connector_url(override: str | None) -> str | None:
     """Resolve the connector base URL (no trailing slash) for enrollment.
 
     Precedence: explicit ``--connector-url`` flag > ``GATEWAY_RELAY_URL`` env >
@@ -80,8 +79,7 @@ def _resolve_connector_url(override: Optional[str]) -> Optional[str]:
     elif raw.startswith("wss://"):
         raw = "https://" + raw[len("wss://"):]
     # Strip a trailing /relay path segment if the user pasted the dial URL.
-    if raw.endswith("/relay"):
-        raw = raw[: -len("/relay")]
+    raw = raw.removesuffix("/relay")
     return raw
 
 
@@ -123,19 +121,19 @@ def _post_enroll(
         if exc.code == 401:
             raise RuntimeError(
                 "Connector rejected the caller identity (401). Your Nous Portal "
-                "token could not be verified — try `hermes auth login nous` and retry."
+                "token could not be verified — try `hermes auth login nous` and retry.",
             ) from exc
         if exc.code == 403:
             raise RuntimeError(
                 detail
-                or "Enrollment token invalid, expired, already used, or tenant mismatch (403)."
+                or "Enrollment token invalid, expired, already used, or tenant mismatch (403).",
             ) from exc
         raise RuntimeError(
-            f"Connector returned HTTP {exc.code}" + (f": {detail}" if detail else "")
+            f"Connector returned HTTP {exc.code}" + (f": {detail}" if detail else ""),
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach the connector at {connector_base_url}: {exc.reason}"
+            f"Could not reach the connector at {connector_base_url}: {exc.reason}",
         ) from exc
 
     if not isinstance(payload, dict) or not payload.get("secret"):
@@ -155,7 +153,7 @@ def cmd_gateway_enroll(args) -> None:
     if is_managed():
         print(
             "✗ `hermes gateway enroll` is not available in a managed/hosted install.\n"
-            "  The relay gateway secret is provisioned by the hosting platform."
+            "  The relay gateway secret is provisioned by the hosting platform.",
         )
         sys.exit(1)
 
@@ -165,7 +163,7 @@ def cmd_gateway_enroll(args) -> None:
             "✗ No enrollment token. Pass --token <token> (or set "
             "GATEWAY_RELAY_ENROLL_TOKEN).\n"
             "  The connector mints this single-use token when your tenant's route "
-            "is provisioned; it is delivered with your gateway config."
+            "is provisioned; it is delivered with your gateway config.",
         )
         sys.exit(1)
 
@@ -173,7 +171,7 @@ def cmd_gateway_enroll(args) -> None:
     if not connector_base_url:
         print(
             "✗ No connector URL. Pass --connector-url <url> (or set GATEWAY_RELAY_URL "
-            "/ gateway.relay_url in config.yaml)."
+            "/ gateway.relay_url in config.yaml).",
         )
         sys.exit(1)
 
@@ -246,5 +244,5 @@ def cmd_gateway_enroll(args) -> None:
     print(
         "  The gateway now authenticates its relay WS upgrade with the per-gateway\n"
         "  secret and verifies signed inbound deliveries with the tenant delivery\n"
-        "  key. Restart the gateway to pick up the new env."
+        "  key. Restart the gateway to pick up the new env.",
     )

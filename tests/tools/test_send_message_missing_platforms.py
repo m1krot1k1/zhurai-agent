@@ -18,16 +18,19 @@ from plugins.platforms.matrix.adapter import (
 
 async def _send_dingtalk(extra, chat_id, message):
     """Pre-migration ``(extra, chat_id, message)`` shim around the dingtalk
-    plugin's ``_standalone_send(pconfig, chat_id, message)``."""
+    plugin's ``_standalone_send(pconfig, chat_id, message)``.
+    """
     pconfig = SimpleNamespace(token=None, extra=extra or {})
     return await _dingtalk_standalone_send(pconfig, chat_id, message)
 
 
 async def _send_matrix(token, extra, chat_id, message):
     """Pre-migration ``(token, extra, chat_id, message)`` shim around the matrix
-    plugin's ``_standalone_send(pconfig, chat_id, message)``."""
+    plugin's ``_standalone_send(pconfig, chat_id, message)``.
+    """
     pconfig = SimpleNamespace(token=token, extra=extra or {})
     return await _matrix_standalone_send(pconfig, chat_id, message)
+
 
 # ``_send_mattermost`` moved into the mattermost plugin
 # (``plugins/platforms/mattermost/adapter.py::_standalone_send``).  Keep a
@@ -120,7 +123,7 @@ class TestSendMattermost:
 
         with patch("aiohttp.ClientSession", return_value=session_ctx):
             result = asyncio.run(_send_mattermost(
-                "tok", {"url": "https://mm.example.com"}, "ch", "hi"
+                "tok", {"url": "https://mm.example.com"}, "ch", "hi",
             ))
 
         assert "error" in result
@@ -185,7 +188,7 @@ class TestSendMatrix:
         with patch("aiohttp.ClientSession", return_value=session_ctx):
             result = asyncio.run(_send_matrix(
                 "tok", {"homeserver": "https://matrix.example.com"},
-                "!room:example.com", "hi"
+                "!room:example.com", "hi",
             ))
 
         assert "error" in result
@@ -274,7 +277,7 @@ class TestSendHomeAssistant:
         with patch("aiohttp.ClientSession", return_value=session_ctx):
             result = asyncio.run(_send_homeassistant(
                 "bad-tok", {"url": "https://hass.example.com"},
-                "target", "msg"
+                "target", "msg",
             ))
 
         assert "error" in result
@@ -344,7 +347,7 @@ class TestSendDingtalk:
         with patch("httpx.AsyncClient", return_value=client_ctx):
             result = asyncio.run(_send_dingtalk(
                 {"webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=bad"},
-                "ch", "hi"
+                "ch", "hi",
             ))
 
         assert "error" in result
@@ -359,7 +362,7 @@ class TestSendDingtalk:
         with patch("httpx.AsyncClient", return_value=client_ctx):
             result = asyncio.run(_send_dingtalk(
                 {"webhook_url": "https://oapi.dingtalk.com/robot/send?access_token=tok"},
-                "ch", "hi"
+                "ch", "hi",
             ))
 
         assert "error" in result
@@ -370,8 +373,8 @@ class TestSendDingtalk:
         resp = self._make_httpx_resp(status_code=401)
         resp.raise_for_status = MagicMock(
             side_effect=Exception(
-                f"POST https://oapi.dingtalk.com/robot/send?access_token={token} returned 401"
-            )
+                f"POST https://oapi.dingtalk.com/robot/send?access_token={token} returned 401",
+            ),
         )
         client_ctx, _ = self._make_httpx_client(resp)
 
@@ -381,7 +384,7 @@ class TestSendDingtalk:
                     {"webhook_url": f"https://oapi.dingtalk.com/robot/send?access_token={token}"},
                     "ch",
                     "hi",
-                )
+                ),
             )
 
         assert "error" in result

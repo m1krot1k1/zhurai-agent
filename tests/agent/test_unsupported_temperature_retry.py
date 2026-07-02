@@ -23,14 +23,14 @@ The universal fix is reactive: when a call returns an
 These tests lock in that behaviour for both sync and async paths.
 """
 
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from agent.auxiliary_client import (
-    call_llm,
-    async_call_llm,
     _is_unsupported_temperature_error,
+    async_call_llm,
+    call_llm,
 )
 
 
@@ -125,7 +125,7 @@ class TestCallLlmUnsupportedTemperatureRetry:
         client = MagicMock()
         client.base_url = "https://api.openai.com/v1"
         non_temp_err = RuntimeError(
-            "HTTP 400: Invalid value: 'tool'. Supported values are: 'assistant'..."
+            "HTTP 400: Invalid value: 'tool'. Supported values are: 'assistant'...",
         )
         client.chat.completions.create.side_effect = non_temp_err
 
@@ -137,15 +137,14 @@ class TestCallLlmUnsupportedTemperatureRetry:
             patch("agent.auxiliary_client._validate_llm_response",
                   side_effect=lambda resp, _task: resp),
             patch("agent.auxiliary_client._try_payment_fallback",
-                  return_value=None),
+                  return_value=None), pytest.raises(RuntimeError, match="Invalid value"),
         ):
-            with pytest.raises(RuntimeError, match="Invalid value"):
-                call_llm(
-                    task="compression",
-                    messages=[{"role": "user", "content": "x"}],
-                    temperature=0.3,
-                    max_tokens=500,
-                )
+            call_llm(
+                task="compression",
+                messages=[{"role": "user", "content": "x"}],
+                temperature=0.3,
+                max_tokens=500,
+            )
         # Should NOT have retried (non-temperature 400 doesn't match)
         assert client.chat.completions.create.call_count == 1
 
@@ -167,15 +166,14 @@ class TestCallLlmUnsupportedTemperatureRetry:
             patch("agent.auxiliary_client._validate_llm_response",
                   side_effect=lambda resp, _task: resp),
             patch("agent.auxiliary_client._try_payment_fallback",
-                  return_value=None),
+                  return_value=None), pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                call_llm(
-                    task="compression",
-                    messages=[{"role": "user", "content": "x"}],
-                    temperature=None,  # explicit: no temperature sent
-                    max_tokens=500,
-                )
+            call_llm(
+                task="compression",
+                messages=[{"role": "user", "content": "x"}],
+                temperature=None,  # explicit: no temperature sent
+                max_tokens=500,
+            )
         assert client.chat.completions.create.call_count == 1
 
 
@@ -234,13 +232,12 @@ class TestAsyncCallLlmUnsupportedTemperatureRetry:
             patch("agent.auxiliary_client._validate_llm_response",
                   side_effect=lambda resp, _task: resp),
             patch("agent.auxiliary_client._try_payment_fallback",
-                  return_value=None),
+                  return_value=None), pytest.raises(RuntimeError, match="Invalid value"),
         ):
-            with pytest.raises(RuntimeError, match="Invalid value"):
-                await async_call_llm(
-                    task="session_search",
-                    messages=[{"role": "user", "content": "x"}],
-                    temperature=0.3,
-                    max_tokens=500,
-                )
+            await async_call_llm(
+                task="session_search",
+                messages=[{"role": "user", "content": "x"}],
+                temperature=0.3,
+                max_tokens=500,
+            )
         assert client.chat.completions.create.await_count == 1

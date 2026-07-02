@@ -46,8 +46,8 @@ No more per-source if/elif chain in ``auth_remove_command``.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
 
 
 @dataclass
@@ -68,10 +68,11 @@ class RemovalResult:
             Default True — almost every source needs this to stay sticky.
             The only legitimate False is ``manual`` entries, which aren't
             seeded from anywhere external.
+
     """
 
-    cleaned: List[str] = field(default_factory=list)
-    hints: List[str] = field(default_factory=list)
+    cleaned: list[str] = field(default_factory=list)
+    hints: list[str] = field(default_factory=list)
     suppress: bool = True
 
 
@@ -93,12 +94,13 @@ class RemovalStep:
         remove_fn: ``(provider, removed_entry) -> RemovalResult``.  Does the
             actual cleanup and returns what happened for the user.
         description: One-line human-readable description for docs / tests.
+
     """
 
     provider: str
     source_id: str
     remove_fn: Callable[..., RemovalResult]
-    match_fn: Optional[Callable[[str], bool]] = None
+    match_fn: Callable[[str], bool] | None = None
     description: str = ""
 
     def matches(self, provider: str, source: str) -> bool:
@@ -109,7 +111,7 @@ class RemovalStep:
         return source == self.source_id
 
 
-_REGISTRY: List[RemovalStep] = []
+_REGISTRY: list[RemovalStep] = []
 
 
 def register(step: RemovalStep) -> RemovalStep:
@@ -117,7 +119,7 @@ def register(step: RemovalStep) -> RemovalStep:
     return step
 
 
-def find_removal_step(provider: str, source: str) -> Optional[RemovalStep]:
+def find_removal_step(provider: str, source: str) -> RemovalStep | None:
     """Return the first matching RemovalStep, or None if unregistered.
 
     Unregistered sources fall through to the default remove path in
@@ -186,7 +188,7 @@ def _remove_env_source(provider: str, removed) -> RemovalResult:
     else:
         result.hints.append(
             f"Suppressed env:{env_var} — it will not be re-seeded even "
-            f"if the variable is re-exported later."
+            f"if the variable is re-exported later.",
         )
     return result
 
@@ -266,7 +268,7 @@ def _remove_minimax_oauth(provider: str, removed) -> RemovalResult:
 
 
 def _remove_xai_oauth_loopback_pkce(provider: str, removed) -> RemovalResult:
-    """xAI OAuth tokens live in auth.json providers.xai-oauth — clear them.
+    """XAI OAuth tokens live in auth.json providers.xai-oauth — clear them.
 
     Without this step, ``hermes auth remove xai-oauth <N>`` silently undoes
     itself: the central dispatcher only removes the in-memory pool entry,
@@ -285,7 +287,7 @@ def _remove_xai_oauth_loopback_pkce(provider: str, removed) -> RemovalResult:
     if _clear_auth_store_provider(provider):
         result.cleaned.append(f"Cleared {provider} OAuth tokens from auth store")
     result.hints.append(
-        "Run `hermes model` → xAI Grok OAuth (SuperGrok / Premium+) to re-authenticate if needed."
+        "Run `hermes model` → xAI Grok OAuth (SuperGrok / Premium+) to re-authenticate if needed.",
     )
     return result
 

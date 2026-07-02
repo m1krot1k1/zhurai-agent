@@ -22,7 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_redact_secrets_false_in_config_yaml_is_honored(tmp_path):
     """Setting `security.redact_secrets: false` in config.yaml must disable
-    redaction — even though it's set in YAML, not as an env var."""
+    redaction — even though it's set in YAML, not as an env var.
+    """
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
 
@@ -32,8 +33,8 @@ def test_redact_secrets_false_in_config_yaml_is_honored(tmp_path):
             """\
             security:
               redact_secrets: false
-            """
-        )
+            """,
+        ),
     )
     # Empty .env so nothing else sets the env var
     (hermes_home / ".env").write_text("")
@@ -50,7 +51,7 @@ def test_redact_secrets_false_in_config_yaml_is_honored(tmp_path):
         import agent.redact
         print(f"REDACT_ENABLED={agent.redact._REDACT_ENABLED}")
         print(f"ENV_VAR={os.environ.get('HERMES_REDACT_SECRETS', '<unset>')}")
-        """
+        """,
     ) % str(REPO_ROOT)
 
     env = dict(os.environ)
@@ -93,7 +94,7 @@ def test_redact_secrets_default_true_when_unset(tmp_path):
         import hermes_cli.main
         import agent.redact
         print(f"REDACT_ENABLED={agent.redact._REDACT_ENABLED}")
-        """
+        """,
     ) % str(REPO_ROOT)
 
     env = dict(os.environ)
@@ -114,7 +115,8 @@ def test_redact_secrets_default_true_when_unset(tmp_path):
 
 def test_redact_secrets_true_in_config_yaml_is_honored(tmp_path):
     """Setting `security.redact_secrets: true` in config.yaml must enable
-    redaction — even though it's set in YAML, not as an env var."""
+    redaction — even though it's set in YAML, not as an env var.
+    """
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
@@ -122,8 +124,8 @@ def test_redact_secrets_true_in_config_yaml_is_honored(tmp_path):
             """\
             security:
               redact_secrets: true
-            """
-        )
+            """,
+        ),
     )
     (hermes_home / ".env").write_text("")
 
@@ -136,7 +138,7 @@ def test_redact_secrets_true_in_config_yaml_is_honored(tmp_path):
         import agent.redact
         print(f"REDACT_ENABLED={agent.redact._REDACT_ENABLED}")
         print(f"ENV_VAR={os.environ.get('HERMES_REDACT_SECRETS', '<unset>')}")
-        """
+        """,
     ) % str(REPO_ROOT)
 
     env = dict(os.environ)
@@ -167,8 +169,8 @@ def test_dotenv_redact_secrets_beats_config_yaml(tmp_path):
             """\
             security:
               redact_secrets: false
-            """
-        )
+            """,
+        ),
     )
     # .env force-enables redaction
     (hermes_home / ".env").write_text("HERMES_REDACT_SECRETS=true\n")
@@ -182,7 +184,7 @@ def test_dotenv_redact_secrets_beats_config_yaml(tmp_path):
         import agent.redact
         print(f"REDACT_ENABLED={agent.redact._REDACT_ENABLED}")
         print(f"ENV_VAR={os.environ.get('HERMES_REDACT_SECRETS', '<unset>')}")
-        """
+        """,
     ) % str(REPO_ROOT)
 
     env = dict(os.environ)

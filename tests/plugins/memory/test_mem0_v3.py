@@ -1,7 +1,6 @@
 """Tests for Mem0 v3 API — new tool names, paginated responses, update/delete tools."""
 
 import json
-import pytest
 
 from plugins.memory.mem0 import Mem0MemoryProvider
 
@@ -56,7 +55,7 @@ class TestMem0V3Tools:
             "results": [
                 {"id": "mem-1", "memory": "alpha"},
                 {"id": "mem-2", "memory": "beta"},
-            ]
+            ],
         })
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call("mem0_list", {}))
@@ -148,7 +147,7 @@ class TestMem0UpdateDelete:
         backend = FakeBackend()
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_update", {"memory_id": "mem-1", "text": "updated fact"}
+            "mem0_update", {"memory_id": "mem-1", "text": "updated fact"},
         ))
         assert backend.captured[0][1] == "mem-1"
         assert backend.captured[0][2] == "updated fact"
@@ -171,7 +170,7 @@ class TestMem0UpdateDelete:
         backend = FakeBackend()
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_delete", {"memory_id": "mem-1"}
+            "mem0_delete", {"memory_id": "mem-1"},
         ))
         assert backend.captured[0][1] == "mem-1"
         assert result["result"] == "Memory deleted."
@@ -198,7 +197,7 @@ class TestMem0ErrorHandling:
         backend.update = lambda mid, text: (_ for _ in ()).throw(Exception("404 Not Found"))
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_update", {"memory_id": "bad-id", "text": "x"}
+            "mem0_update", {"memory_id": "bad-id", "text": "x"},
         ))
         assert "error" in result
         assert provider._consecutive_failures == 0
@@ -208,7 +207,7 @@ class TestMem0ErrorHandling:
         backend.delete = lambda mid: (_ for _ in ()).throw(Exception("404 not found"))
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_delete", {"memory_id": "bad-id"}
+            "mem0_delete", {"memory_id": "bad-id"},
         ))
         assert "error" in result
         assert provider._consecutive_failures == 0
@@ -219,11 +218,11 @@ class TestMem0ErrorHandling:
             pass
         backend = FakeBackend()
         backend.update = lambda mid, text: (_ for _ in ()).throw(
-            ValidationError('{"error":"memory_id should be a valid UUID"}')
+            ValidationError('{"error":"memory_id should be a valid UUID"}'),
         )
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_update", {"memory_id": "not-a-uuid", "text": "x"}
+            "mem0_update", {"memory_id": "not-a-uuid", "text": "x"},
         ))
         assert "error" in result
         assert provider._consecutive_failures == 0
@@ -233,11 +232,11 @@ class TestMem0ErrorHandling:
             pass
         backend = FakeBackend()
         backend.delete = lambda mid: (_ for _ in ()).throw(
-            ValidationError('{"error":"memory_id should be a valid UUID"}')
+            ValidationError('{"error":"memory_id should be a valid UUID"}'),
         )
         provider = self._make_provider(monkeypatch, backend)
         result = json.loads(provider.handle_tool_call(
-            "mem0_delete", {"memory_id": "not-a-uuid"}
+            "mem0_delete", {"memory_id": "not-a-uuid"},
         ))
         assert "error" in result
         assert provider._consecutive_failures == 0
@@ -317,7 +316,7 @@ class TestMem0V3Config:
         assert "Rerank" not in block
 
     def test_search_schema_has_rerank(self):
-        """rerank property available in SEARCH_SCHEMA for platform mode."""
+        """Rerank property available in SEARCH_SCHEMA for platform mode."""
         provider = Mem0MemoryProvider()
         schemas = provider.get_tool_schemas()
         search = next(s for s in schemas if s["name"] == "mem0_search")

@@ -22,6 +22,7 @@ import pytest
 def fresh_constants(monkeypatch, tmp_path):
     """Import hermes_constants fresh and reset the one-shot warn flag."""
     import importlib
+
     import hermes_constants
     importlib.reload(hermes_constants)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
@@ -31,7 +32,7 @@ def fresh_constants(monkeypatch, tmp_path):
 
 class TestGetHermesHomeProfileWarning:
     def test_classic_mode_no_active_profile_no_warning(
-        self, fresh_constants, tmp_path, capsys
+        self, fresh_constants, tmp_path, capsys,
     ):
         """Classic mode: no active_profile file → silent, returns ~/.hermes."""
         result = fresh_constants.get_hermes_home()
@@ -39,7 +40,7 @@ class TestGetHermesHomeProfileWarning:
         assert "HERMES_HOME fallback" not in capsys.readouterr().err
 
     def test_default_active_profile_no_warning(
-        self, fresh_constants, tmp_path, capsys
+        self, fresh_constants, tmp_path, capsys,
     ):
         """active_profile=default → still no warning, returns ~/.hermes."""
         hermes_dir = tmp_path / ".hermes"
@@ -50,7 +51,7 @@ class TestGetHermesHomeProfileWarning:
         assert "HERMES_HOME fallback" not in capsys.readouterr().err
 
     def test_named_profile_unset_home_warns_once(
-        self, fresh_constants, tmp_path, capsys
+        self, fresh_constants, tmp_path, capsys,
     ):
         """active_profile=coder + HERMES_HOME unset → warn loudly, still return fallback."""
         hermes_dir = tmp_path / ".hermes"
@@ -74,7 +75,7 @@ class TestGetHermesHomeProfileWarning:
         assert "HERMES_HOME fallback" not in err2
 
     def test_hermes_home_set_suppresses_warning(
-        self, fresh_constants, tmp_path, capsys, monkeypatch
+        self, fresh_constants, tmp_path, capsys, monkeypatch,
     ):
         """Even if active_profile is 'coder', setting HERMES_HOME suppresses warning."""
         profile_dir = tmp_path / ".hermes" / "profiles" / "coder"
@@ -88,7 +89,7 @@ class TestGetHermesHomeProfileWarning:
         assert "HERMES_HOME fallback" not in capsys.readouterr().err
 
     def test_unreadable_active_profile_no_crash(
-        self, fresh_constants, tmp_path, capsys
+        self, fresh_constants, tmp_path, capsys,
     ):
         """active_profile that can't be decoded → fall through silently."""
         hermes_dir = tmp_path / ".hermes"
@@ -103,7 +104,7 @@ class TestGetHermesHomeProfileWarning:
         assert "HERMES_HOME fallback" not in capsys.readouterr().err
 
     def test_empty_active_profile_no_warning(
-        self, fresh_constants, tmp_path, capsys
+        self, fresh_constants, tmp_path, capsys,
     ):
         """Empty active_profile file → treated as default, no warning."""
         hermes_dir = tmp_path / ".hermes"

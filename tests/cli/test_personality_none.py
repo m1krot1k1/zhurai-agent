@@ -1,10 +1,11 @@
 """Tests for /personality none — clearing personality overlay."""
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 import yaml
 
-
 # ── CLI tests ──────────────────────────────────────────────────────────────
+
 
 class TestCLIPersonalityNone:
 
@@ -86,8 +87,8 @@ class TestGatewayPersonalityNone:
         runner._ephemeral_system_prompt = "You are kawaii~"
         runner.config = {
             "agent": {
-                "personalities": personalities or {"helpful": "You are helpful."}
-            }
+                "personalities": personalities or {"helpful": "You are helpful."},
+            },
         }
         return runner
 
@@ -176,7 +177,7 @@ class TestPersonalityDictFormat:
                 "system_prompt": "You are an expert programmer.",
                 "tone": "technical",
                 "style": "concise",
-            }
+            },
         })
         with patch("cli.save_config_value", return_value=True):
             cli._handle_personality_command("/personality coder")
@@ -187,7 +188,7 @@ class TestPersonalityDictFormat:
             "coder": {
                 "system_prompt": "You are an expert programmer.",
                 "tone": "technical and precise",
-            }
+            },
         })
         with patch("cli.save_config_value", return_value=True):
             cli._handle_personality_command("/personality coder")
@@ -198,7 +199,7 @@ class TestPersonalityDictFormat:
             "coder": {
                 "system_prompt": "You are an expert programmer.",
                 "style": "use code examples",
-            }
+            },
         })
         with patch("cli.save_config_value", return_value=True):
             cli._handle_personality_command("/personality coder")

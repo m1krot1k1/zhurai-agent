@@ -11,11 +11,11 @@ This validates the IPC + lifecycle story that mocks can't:
 """
 
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 
 WT = str(Path(__file__).resolve().parents[2])
 FAKE_WORKER = str(Path(__file__).parent / "_fake_worker.py")
@@ -24,7 +24,8 @@ PY = sys.executable
 
 def make_spawn_fn(home: str):
     """Return a spawn_fn the dispatcher can call. Launches the fake
-    worker as a detached subprocess."""
+    worker as a detached subprocess.
+    """
 
     def _spawn(task, workspace):
         log_path = os.path.join(home, f"worker_{task.id}.log")
@@ -35,9 +36,9 @@ def make_spawn_fn(home: str):
             "PYTHONPATH": WT,
             "HERMES_KANBAN_TASK": task.id,
             "HERMES_KANBAN_WORKSPACE": workspace,
-            "PATH": f"{os.path.dirname(PY)}:{os.environ.get('PATH','')}",
+            "PATH": f"{os.path.dirname(PY)}:{os.environ.get('PATH', '')}",
         }
-        log_f = open(log_path, "ab")
+        log_f = Path(log_path).open("ab")
         proc = subprocess.Popen(
             [PY, FAKE_WORKER],
             stdin=subprocess.DEVNULL,
@@ -61,14 +62,13 @@ def main():
     # Point the `hermes` CLI child processes will run at the worktree
     # hermes_cli.main. We do this by putting a shim on PATH.
     shim_dir = os.path.join(home, "bin")
-    os.makedirs(shim_dir, exist_ok=True)
+    Path(shim_dir).mkdir(exist_ok=True, parents=True)
     shim_path = os.path.join(shim_dir, "hermes")
-    with open(shim_path, "w") as f:
-        f.write(f"""#!/bin/sh
+    Path(shim_path).write_text(f"""#!/bin/sh
 exec {PY} -m hermes_cli.main "$@"
 """)
-    os.chmod(shim_path, 0o755)
-    os.environ["PATH"] = f"{shim_dir}:{os.environ.get('PATH','')}"
+    Path(shim_path).chmod(0o755)
+    os.environ["PATH"] = f"{shim_dir}:{os.environ.get('PATH', '')}"
 
     kb.init_db()
     conn = kb.connect()
@@ -216,7 +216,7 @@ exec {PY} -m hermes_cli.main "$@"
     logs = glob.glob(os.path.join(home, "worker_*.log"))
     print(f"  {len(logs)} worker log files")
     for lp in logs[:3]:
-        size = os.path.getsize(lp)
+        size = Path(lp).stat().st_size
         print(f"    {os.path.basename(lp)}: {size} bytes")
         # Our fake worker is quiet (no prints); size=0 is fine
 

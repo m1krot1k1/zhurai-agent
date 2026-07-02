@@ -11,11 +11,10 @@ import sysconfig
 from contextvars import ContextVar, Token
 from pathlib import Path
 
-
 _profile_fallback_warned: bool = False
 _UNSET = object()
 _HERMES_HOME_OVERRIDE: ContextVar[str | object] = ContextVar(
-    "_HERMES_HOME_OVERRIDE", default=_UNSET
+    "_HERMES_HOME_OVERRIDE", default=_UNSET,
 )
 
 
@@ -235,6 +234,7 @@ def get_hermes_dir(new_subpath: str, old_name: str) -> Path:
 
     Returns:
         Absolute ``Path`` — old location if it exists on disk, otherwise the new one.
+
     """
     home = get_hermes_home()
     old_path = home / old_name
@@ -375,7 +375,7 @@ def secure_parent_dir(path: Path) -> None:
     if parent == Path("/") or len(parent.parts) < 3:
         return
     try:
-        os.chmod(parent, 0o700)
+        Path(parent).chmod(0o700)
     except OSError:
         pass
 
@@ -397,7 +397,7 @@ def _profile_home_path(env: dict[str, str] | None = None) -> str | None:
     if not hermes_home:
         return None
     profile_home = os.path.join(hermes_home, "home")
-    if os.path.isdir(profile_home):
+    if Path(profile_home).is_dir():
         return profile_home
     return None
 
@@ -548,7 +548,7 @@ def is_wsl() -> bool:
     if _wsl_detected is not None:
         return _wsl_detected
     try:
-        with open("/proc/version", "r", encoding="utf-8") as f:
+        with Path("/proc/version").open(encoding="utf-8") as f:
             _wsl_detected = "microsoft" in f.read().lower()
     except Exception:
         _wsl_detected = False
@@ -578,10 +578,10 @@ def is_container() -> bool:
     global _container_detected
     if _container_detected is not None:
         return _container_detected
-    if os.path.exists("/.dockerenv"):
+    if Path("/.dockerenv").exists():
         _container_detected = True
         return True
-    if os.path.exists("/run/.containerenv"):
+    if Path("/run/.containerenv").exists():
         _container_detected = True
         return True
     # Kubernetes always injects this into pod containers; absent on hosts.
@@ -590,7 +590,7 @@ def is_container() -> bool:
         return True
     _CGROUP_MARKERS = ("docker", "podman", "/lxc/", "kubepods", "containerd", "crio")
     try:
-        with open("/proc/1/cgroup", "r", encoding="utf-8") as f:
+        with Path("/proc/1/cgroup").open(encoding="utf-8") as f:
             cgroup = f.read()
             if any(marker in cgroup for marker in _CGROUP_MARKERS):
                 _container_detected = True
@@ -601,7 +601,7 @@ def is_container() -> bool:
     # runtime still shows up in the mount table (overlay rootfs, runtime mount
     # paths), so scan mountinfo as a last resort.
     try:
-        with open("/proc/self/mountinfo", "r", encoding="utf-8") as f:
+        with Path("/proc/self/mountinfo").open(encoding="utf-8") as f:
             mountinfo = f.read()
             if any(marker in mountinfo for marker in ("kubepods", "containerd", "crio")):
                 _container_detected = True
@@ -627,7 +627,6 @@ def get_config_path() -> Path:
 def get_skills_dir() -> Path:
     """Return the path to the skills directory under HERMES_HOME."""
     return get_hermes_home() / "skills"
-
 
 
 def get_env_path() -> Path:
@@ -669,7 +668,7 @@ def apply_ipv4_preference(force: bool = False) -> None:
         if family == 0:  # AF_UNSPEC — caller didn't request a specific family
             try:
                 return _original_getaddrinfo(
-                    host, port, socket.AF_INET, type, proto, flags
+                    host, port, socket.AF_INET, type, proto, flags,
                 )
             except socket.gaierror:
                 # No A record — fall back to full resolution (pure-IPv6 hosts)

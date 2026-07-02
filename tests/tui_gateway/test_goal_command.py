@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / ".hermes"
     home.mkdir()
@@ -33,7 +33,7 @@ def hermes_home(tmp_path, monkeypatch):
     goals._DB_CACHE.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def server(hermes_home):
     with patch.dict(
         "sys.modules",
@@ -57,7 +57,7 @@ def server(hermes_home):
         mod._answers.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def session(server):
     sid = "sid-test"
     session_key = "tui-goal-session-1"
@@ -189,7 +189,8 @@ def test_slash_exec_routes_goal_to_command_dispatch(server, session):
     """slash.exec must route /goal directly to command.dispatch internally
     instead of returning an error.  Previously the 4018 error required the
     TUI client to retry via command.dispatch, but some clients failed the
-    fallback, leaving the command empty ("empty command")."""
+    fallback, leaving the command empty ("empty command").
+    """
     sid, _, _ = session
     r = _call(server, "slash.exec", command="goal status", session_id=sid)
     # Should succeed by routing to command.dispatch internally
@@ -200,5 +201,6 @@ def test_slash_exec_routes_goal_to_command_dispatch(server, session):
 
 def test_pending_input_commands_includes_goal(server):
     """Guard: _PENDING_INPUT_COMMANDS must list 'goal' — removing it would
-    silently re-break the TUI."""
+    silently re-break the TUI.
+    """
     assert "goal" in server._PENDING_INPUT_COMMANDS

@@ -1,5 +1,4 @@
-"""
-WhatsApp platform adapter.
+"""WhatsApp platform adapter.
 
 WhatsApp integration is more complex than Telegram/Discord because:
 - No official bot API for personal accounts
@@ -25,7 +24,9 @@ import subprocess
 
 _IS_WINDOWS = platform.system() == "Windows"
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any
+
+import aiohttp
 
 from hermes_constants import (
     find_node_executable,
@@ -198,7 +199,7 @@ def _write_bridge_pidfile(session_path: Path, pid: int) -> None:
     try:
         from gateway.status import get_process_start_time
         start = get_process_start_time(pid)
-        text = str(pid) if start is None else "{}\n{}".format(pid, start)
+        text = str(pid) if start is None else f"{pid}\n{start}"
         (session_path / "bridge.pid").write_text(text)
     except OSError:
         pass
@@ -250,21 +251,23 @@ def _terminate_bridge_process(proc, *, force: bool = False) -> None:
     except psutil.NoSuchProcess:
         return
 
+
 import sys
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from gateway.config import Platform, PlatformConfig
-from gateway.platforms.whatsapp_common import WhatsAppBehaviorMixin
-from gateway.whatsapp_identity import to_whatsapp_jid
 from gateway.platforms.base import (
+    SUPPORTED_DOCUMENT_TYPES,
     BasePlatformAdapter,
     MessageEvent,
     MessageType,
     SendResult,
-    SUPPORTED_DOCUMENT_TYPES,
-    cache_image_from_url,
     cache_audio_from_url,
+    cache_image_from_url,
 )
+from gateway.platforms.whatsapp_common import WhatsAppBehaviorMixin
+from gateway.whatsapp_identity import to_whatsapp_jid
 from utils import env_int
 
 
@@ -285,8 +288,7 @@ def _file_content_hash(path: Path) -> str:
 
 
 def check_whatsapp_requirements() -> bool:
-    """
-    Check if WhatsApp dependencies are available.
+    """Check if WhatsApp dependencies are available.
     
     WhatsApp requires a Node.js bridge for most implementations.
     """
@@ -300,7 +302,7 @@ def check_whatsapp_requirements() -> bool:
             [_node, "--version"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
         return result.returncode == 0
     except Exception:
@@ -308,8 +310,7 @@ def check_whatsapp_requirements() -> bool:
 
 
 class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
-    """
-    WhatsApp adapter.
+    """WhatsApp adapter.
     
     This implementation uses a simple HTTP bridge pattern where:
     1. A Node.js process runs the WhatsApp Web client
@@ -345,17 +346,17 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         if WhatsAppAdapter._DEFAULT_BRIDGE_DIR is None:
             from gateway.platforms.whatsapp_common import resolve_whatsapp_bridge_dir
             WhatsAppAdapter._DEFAULT_BRIDGE_DIR = resolve_whatsapp_bridge_dir()
-        self._bridge_process: Optional[subprocess.Popen] = None
+        self._bridge_process: subprocess.Popen | None = None
         self._bridge_port: int = config.extra.get("bridge_port", 3000)
-        self._bridge_script: Optional[str] = config.extra.get(
+        self._bridge_script: str | None = config.extra.get(
             "bridge_script",
             str(self._DEFAULT_BRIDGE_DIR / "bridge.js"),
         )
         self._session_path: Path = Path(config.extra.get(
             "session_path",
-            get_hermes_dir("platforms/whatsapp/session", "whatsapp/session")
+            get_hermes_dir("platforms/whatsapp/session", "whatsapp/session"),
         ))
-        self._reply_prefix: Optional[str] = config.extra.get("reply_prefix")
+        self._reply_prefix: str | None = config.extra.get("reply_prefix")
         self._dm_policy = str(config.extra.get("dm_policy") or os.getenv("WHATSAPP_DM_POLICY", "open")).strip().lower()
         self._allow_from = self._coerce_allow_list(config.extra.get("allow_from") or config.extra.get("allowFrom"))
         self._group_policy = str(config.extra.get("group_policy") or os.getenv("WHATSAPP_GROUP_POLICY", "open")).strip().lower()
@@ -363,9 +364,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self._mention_patterns = self._compile_mention_patterns()
         self._message_queue: asyncio.Queue = asyncio.Queue()
         self._bridge_log_fh = None
-        self._bridge_log: Optional[Path] = None
-        self._poll_task: Optional[asyncio.Task] = None
-        self._http_session: Optional["aiohttp.ClientSession"] = None
+        self._bridge_log: Path | None = None
+        self._poll_task: asyncio.Task | None = None
+        self._http_session: aiohttp.ClientSession | None = None
         # Set to True by disconnect() before we SIGTERM our child bridge so
         # _check_managed_bridge_exit() can distinguish an intentional
         # shutdown-time exit (returncode -15 / -2 / 0) from a real crash.
@@ -384,13 +385,13 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         # ``gateway.platforms.whatsapp.extra.text_batch_delay_seconds`` /
         # ``text_batch_split_delay_seconds``.
         self._text_batch_delay_seconds = self._coerce_float_extra(
-            "text_batch_delay_seconds", 5.0
+            "text_batch_delay_seconds", 5.0,
         )
         self._text_batch_split_delay_seconds = self._coerce_float_extra(
-            "text_batch_split_delay_seconds", 10.0
+            "text_batch_split_delay_seconds", 10.0,
         )
-        self._pending_text_batches: Dict[str, MessageEvent] = {}
-        self._pending_text_batch_tasks: Dict[str, asyncio.Task] = {}
+        self._pending_text_batches: dict[str, MessageEvent] = {}
+        self._pending_text_batch_tasks: dict[str, asyncio.Task] = {}
 
     def _coerce_float_extra(self, key: str, default: float) -> float:
         """Read a float from ``config.extra``, guarding against bad/non-finite values.
@@ -412,8 +413,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         return parsed
 
     async def connect(self) -> bool:
-        """
-        Start the WhatsApp bridge.
+        """Start the WhatsApp bridge.
         
         This launches the Node.js bridge process and waits for it to be ready.
         """
@@ -425,7 +425,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 retryable=False,
             )
             return False
-        
+
         bridge_path = Path(self._bridge_script)
         if not bridge_path.exists():
             logger.warning("[%s] Bridge script not found: %s", self.name, bridge_path)
@@ -459,11 +459,11 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             return False
 
         logger.info("[%s] Bridge found at %s", self.name, bridge_path)
-        
+
         # Acquire scoped lock to prevent duplicate sessions
         lock_acquired = False
         try:
-            if not self._acquire_platform_lock('whatsapp-session', str(self._session_path), 'WhatsApp session'):
+            if not self._acquire_platform_lock("whatsapp-session", str(self._session_path), "WhatsApp session"):
                 return False
             lock_acquired = True
         except Exception as e:
@@ -516,14 +516,14 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
 
             # Ensure session directory exists
             self._session_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Check if bridge is already running and connected
             import aiohttp
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
                         f"http://127.0.0.1:{self._bridge_port}/health",
-                        timeout=aiohttp.ClientTimeout(total=2)
+                        timeout=aiohttp.ClientTimeout(total=2),
                     ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
@@ -549,24 +549,24 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                                     return True
                                 print(
                                     f"[{self.name}] Running bridge is stale "
-                                    f"(running={running_hash or 'unversioned'}, disk={disk_hash}), restarting"
+                                    f"(running={running_hash or 'unversioned'}, disk={disk_hash}), restarting",
                                 )
                             else:
                                 print(f"[{self.name}] Bridge found but not connected (status: {bridge_status}), restarting")
             except Exception:
                 pass  # Bridge not running, start a new one
-            
+
             # Kill any orphaned bridge from a previous gateway run
             _kill_stale_bridge_by_pidfile(self._session_path)
             _kill_port_process(self._bridge_port)
             await asyncio.sleep(1)
-            
+
             # Start the bridge process in its own process group.
             # Route output to a log file so QR codes, errors, and reconnection
             # messages are preserved for troubleshooting.
             whatsapp_mode = os.getenv("WHATSAPP_MODE", "self-chat")
             self._bridge_log = self._session_path.parent / "bridge.log"
-            bridge_log_fh = open(self._bridge_log, "a", encoding="utf-8")
+            bridge_log_fh = Path(self._bridge_log).open("a", encoding="utf-8")
             self._bridge_log_fh = bridge_log_fh
 
             # Build bridge subprocess environment.
@@ -582,7 +582,11 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             # under HERMES_HOME overrides, profiles, and the new cache/ layout.
             from gateway.platforms.base import (
                 get_audio_cache_dir as _get_audio_dir,
+            )
+            from gateway.platforms.base import (
                 get_document_cache_dir as _get_doc_dir,
+            )
+            from gateway.platforms.base import (
                 get_image_cache_dir as _get_img_dir,
             )
             bridge_env["HERMES_IMAGE_CACHE_DIR"] = str(_get_img_dir())
@@ -603,7 +607,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 env=bridge_env,
             )
             _write_bridge_pidfile(self._session_path, self._bridge_process.pid)
-            
+
             # Wait for the bridge to connect to WhatsApp.
             # Phase 1: wait for the HTTP server to come up (up to 15s).
             # Phase 2: wait for WhatsApp status: connected (up to 15s more).
@@ -621,7 +625,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
                             f"http://127.0.0.1:{self._bridge_port}/health",
-                            timeout=aiohttp.ClientTimeout(total=2)
+                            timeout=aiohttp.ClientTimeout(total=2),
                         ) as resp:
                             if resp.status == 200:
                                 http_ready = True
@@ -637,7 +641,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 print(f"[{self.name}] Check log: {self._bridge_log}")
                 self._close_bridge_log()
                 return False
-            
+
             # Phase 2: HTTP is up but WhatsApp may still be connecting.
             # Give it more time to authenticate with saved credentials.
             if data.get("status") != "connected":
@@ -653,7 +657,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                         async with aiohttp.ClientSession() as session:
                             async with session.get(
                                 f"http://127.0.0.1:{self._bridge_port}/health",
-                                timeout=aiohttp.ClientTimeout(total=2)
+                                timeout=aiohttp.ClientTimeout(total=2),
                             ) as resp:
                                 if resp.status == 200:
                                     data = await resp.json()
@@ -668,17 +672,17 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     print(f"[{self.name}] ⚠ WhatsApp not connected after 30s")
                     print(f"[{self.name}]   Bridge log: {self._bridge_log}")
                     print(f"[{self.name}]   If session expired, re-pair: hermes whatsapp")
-            
+
             # Create a persistent HTTP session for all bridge communication
             self._http_session = aiohttp.ClientSession()
 
             # Start message polling task
             self._poll_task = asyncio.create_task(self._poll_messages())
-            
+
             self._mark_connected()
             print(f"[{self.name}] Bridge started on port {self._bridge_port}")
             return True
-            
+
         except Exception as e:
             logger.error("[%s] Failed to start bridge: %s", self.name, e, exc_info=True)
             return False
@@ -687,7 +691,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 if lock_acquired:
                     self._release_platform_lock()
                 self._close_bridge_log()
-    
+
     def _close_bridge_log(self) -> None:
         """Close the bridge log file handle if open."""
         if self._bridge_log_fh:
@@ -697,7 +701,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 pass
             self._bridge_log_fh = None
 
-    async def _check_managed_bridge_exit(self) -> Optional[str]:
+    async def _check_managed_bridge_exit(self) -> str | None:
         """Return a fatal error message if the managed bridge child exited."""
         if self._bridge_process is None:
             return None
@@ -779,13 +783,13 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self._bridge_process = None
         self._close_bridge_log()
         print(f"[{self.name}] Disconnected")
-    
+
     async def send(
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Send a message via the WhatsApp bridge.
 
@@ -812,7 +816,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
 
             last_message_id = None
             for chunk in chunks:
-                payload: Dict[str, Any] = {
+                payload: dict[str, Any] = {
                     "chatId": chat_id,
                     "message": chunk,
                 }
@@ -823,7 +827,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 async with self._http_session.post(
                     f"http://127.0.0.1:{self._bridge_port}/send",
                     json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -866,13 +870,12 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     "messageId": message_id,
                     "message": content,
                 },
-                timeout=aiohttp.ClientTimeout(total=15)
+                timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 if resp.status == 200:
                     return SendResult(success=True, message_id=message_id)
-                else:
-                    error = await resp.text()
-                    return SendResult(success=False, error=error)
+                error = await resp.text()
+                return SendResult(success=False, error=error)
         except Exception as e:
             return SendResult(success=False, error=str(e))
 
@@ -881,8 +884,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         chat_id: str,
         file_path: str,
         media_type: str,
-        caption: Optional[str] = None,
-        file_name: Optional[str] = None,
+        caption: str | None = None,
+        file_name: str | None = None,
     ) -> SendResult:
         """Send any media file via bridge /send-media endpoint."""
         if not self._running or not self._http_session:
@@ -893,10 +896,10 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         try:
             import aiohttp
 
-            if not os.path.exists(file_path):
+            if not Path(file_path).exists():
                 return SendResult(success=False, error=f"File not found: {file_path}")
 
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "chatId": to_whatsapp_jid(chat_id),
                 "filePath": file_path,
                 "mediaType": media_type,
@@ -918,9 +921,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                         message_id=data.get("messageId"),
                         raw_response=data,
                     )
-                else:
-                    error = await resp.text()
-                    return SendResult(success=False, error=error)
+                error = await resp.text()
+                return SendResult(success=False, error=error)
 
         except Exception as e:
             return SendResult(success=False, error=str(e))
@@ -929,9 +931,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self,
         chat_id: str,
         image_url: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Download image URL to cache, send natively via bridge.
 
@@ -950,8 +952,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self,
         chat_id: str,
         image_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a local image file natively via bridge."""
@@ -961,8 +963,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self,
         chat_id: str,
         video_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a video natively via bridge — plays inline in WhatsApp."""
@@ -972,8 +974,8 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self,
         chat_id: str,
         audio_path: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send an audio file as a WhatsApp voice message via bridge."""
@@ -983,9 +985,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         self,
         chat_id: str,
         file_path: str,
-        caption: Optional[str] = None,
-        file_name: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        file_name: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a document/file as a downloadable attachment via bridge."""
@@ -1000,7 +1002,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             return
         if await self._check_managed_bridge_exit():
             return
-        
+
         try:
             import aiohttp
 
@@ -1010,25 +1012,25 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             async with self._http_session.post(
                 f"http://127.0.0.1:{self._bridge_port}/typing",
                 json={"chatId": to_whatsapp_jid(chat_id)},
-                timeout=aiohttp.ClientTimeout(total=5)
+                timeout=aiohttp.ClientTimeout(total=5),
             ):
                 pass
         except Exception:
             pass  # Ignore typing indicator failures
-    
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         """Get information about a WhatsApp chat."""
         if not self._running or not self._http_session:
             return {"name": "Unknown", "type": "dm"}
         if await self._check_managed_bridge_exit():
             return {"name": chat_id, "type": "dm"}
-        
+
         try:
             import aiohttp
 
             async with self._http_session.get(
                 f"http://127.0.0.1:{self._bridge_port}/chat/{to_whatsapp_jid(chat_id)}",
-                timeout=aiohttp.ClientTimeout(total=10)
+                timeout=aiohttp.ClientTimeout(total=10),
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -1039,9 +1041,9 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     }
         except Exception as e:
             logger.debug("Could not get WhatsApp chat info for %s: %s", chat_id, e)
-        
+
         return {"name": chat_id, "type": "dm"}
-    
+
     async def _poll_messages(self) -> None:
         """Poll the bridge for incoming messages."""
         import aiohttp
@@ -1056,7 +1058,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             try:
                 async with self._http_session.get(
                     f"http://127.0.0.1:{self._bridge_port}/messages",
-                    timeout=aiohttp.ClientTimeout(total=30)
+                    timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status == 200:
                         messages = await resp.json()
@@ -1076,7 +1078,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     break
                 print(f"[{self.name}] Poll error: {e}")
                 await asyncio.sleep(5)
-            
+
             await asyncio.sleep(1)  # Poll interval
 
     # ── Text debounce batching ──────────────────────────────────────
@@ -1117,7 +1119,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
         if prior_task and not prior_task.done():
             prior_task.cancel()
         self._pending_text_batch_tasks[key] = asyncio.create_task(
-            self._flush_text_batch(key)
+            self._flush_text_batch(key),
         )
 
     async def _flush_text_batch(self, key: str) -> None:
@@ -1139,7 +1141,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             if self._pending_text_batch_tasks.get(key) is current_task:
                 self._pending_text_batch_tasks.pop(key, None)
 
-    async def _build_message_event(self, data: Dict[str, Any]) -> Optional[MessageEvent]:
+    async def _build_message_event(self, data: dict[str, Any]) -> MessageEvent | None:
         """Build a MessageEvent from bridge message data, downloading images to cache."""
         try:
             if not self._should_process_message(data):
@@ -1157,11 +1159,11 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                     msg_type = MessageType.VOICE
                 else:
                     msg_type = MessageType.DOCUMENT
-            
+
             # Determine chat type
             is_group = data.get("isGroup", False)
             chat_type = "group" if is_group else "dm"
-            
+
             # Build source
             source = self.build_source(
                 chat_id=data.get("chatId", ""),
@@ -1170,7 +1172,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 user_id=data.get("senderId"),
                 user_name=data.get("senderName"),
             )
-            
+
             # Download media URLs to the local cache so agent tools
             # can access them reliably regardless of URL expiration.
             raw_urls = data.get("mediaUrls", [])
@@ -1187,7 +1189,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                         print(f"[{self.name}] Failed to cache image: {e}", flush=True)
                         cached_urls.append(url)
                         media_types.append("image/jpeg")
-                elif msg_type == MessageType.PHOTO and os.path.isabs(url):
+                elif msg_type == MessageType.PHOTO and Path(url).is_absolute():
                     # Local file path — bridge already downloaded the image
                     cached_urls.append(url)
                     media_types.append("image/jpeg")
@@ -1202,19 +1204,19 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                         print(f"[{self.name}] Failed to cache voice: {e}", flush=True)
                         cached_urls.append(url)
                         media_types.append("audio/ogg")
-                elif msg_type == MessageType.VOICE and os.path.isabs(url):
+                elif msg_type == MessageType.VOICE and Path(url).is_absolute():
                     # Local file path — bridge already downloaded the audio
                     cached_urls.append(url)
                     media_types.append("audio/ogg")
                     print(f"[{self.name}] Using bridge-cached audio: {url}", flush=True)
-                elif msg_type == MessageType.DOCUMENT and os.path.isabs(url):
+                elif msg_type == MessageType.DOCUMENT and Path(url).is_absolute():
                     # Local file path — bridge already downloaded the document
                     cached_urls.append(url)
                     ext = Path(url).suffix.lower()
                     mime = SUPPORTED_DOCUMENT_TYPES.get(ext, "application/octet-stream")
                     media_types.append(mime)
                     print(f"[{self.name}] Using bridge-cached document: {url}", flush=True)
-                elif msg_type == MessageType.VIDEO and os.path.isabs(url):
+                elif msg_type == MessageType.VIDEO and Path(url).is_absolute():
                     cached_urls.append(url)
                     media_types.append("video/mp4")
                     print(f"[{self.name}] Using bridge-cached video: {url}", flush=True)
@@ -1236,7 +1238,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
                 # Truncate long quoted text to keep prompts reasonable
                 if len(quoted_text) > 300:
                     quoted_text = quoted_text[:297] + "..."
-                body = f"[Replying to: \"{quoted_text}\"]\n{body}"
+                body = f'[Replying to: "{quoted_text}"]\n{body}'
             MAX_TEXT_INJECT_BYTES = 100 * 1024
             if msg_type == MessageType.DOCUMENT and cached_urls:
                 for doc_path in cached_urls:
@@ -1316,22 +1318,21 @@ async def _standalone_send(
     try:
         bridge_port = extra.get("bridge_port", 3000)
         normalized_chat_id = to_whatsapp_jid(chat_id)
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"http://localhost:{bridge_port}/send",
-                json={"chatId": normalized_chat_id, "message": message},
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return {
-                        "success": True,
-                        "platform": "whatsapp",
-                        "chat_id": normalized_chat_id,
-                        "message_id": data.get("messageId"),
-                    }
-                body = await resp.text()
-                return {"error": f"WhatsApp bridge error ({resp.status}): {body}"}
+        async with aiohttp.ClientSession() as session, session.post(
+            f"http://localhost:{bridge_port}/send",
+            json={"chatId": normalized_chat_id, "message": message},
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                return {
+                    "success": True,
+                    "platform": "whatsapp",
+                    "chat_id": normalized_chat_id,
+                    "message_id": data.get("messageId"),
+                }
+            body = await resp.text()
+            return {"error": f"WhatsApp bridge error ({resp.status}): {body}"}
     except Exception as e:
         return {"error": f"WhatsApp send failed: {e}"}
 
@@ -1343,14 +1344,14 @@ def interactive_setup() -> None:
     static _PLATFORMS["whatsapp"] dict. CLI helpers are lazy-imported so the
     plugin's module-load surface stays minimal.
     """
-    from hermes_cli.config import get_env_value, save_env_value
     from hermes_cli.cli_output import (
-        prompt,
-        prompt_yes_no,
         print_header,
         print_info,
         print_success,
+        prompt,
+        prompt_yes_no,
     )
+    from hermes_cli.config import get_env_value, save_env_value
 
     print_header("WhatsApp")
     print_info("WhatsApp uses a local Node.js bridge (WhatsApp Web client).")
@@ -1370,7 +1371,7 @@ def interactive_setup() -> None:
         return
 
     allowed_users = prompt(
-        "Allowed user IDs (comma-separated, leave empty for no allowlist)"
+        "Allowed user IDs (comma-separated, leave empty for no allowlist)",
     )
     if allowed_users:
         save_env_value("WHATSAPP_ALLOWED_USERS", allowed_users.replace(" ", ""))

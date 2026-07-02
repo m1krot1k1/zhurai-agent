@@ -6,9 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from hermes_cli.auth import AuthError
 from hermes_cli import main as hermes_main
-
+from hermes_cli.auth import AuthError
 
 # ---------------------------------------------------------------------------
 # Module isolation: _import_cli() wipes tools.* / cli / run_agent from
@@ -16,6 +15,7 @@ from hermes_cli import main as hermes_main
 # modules leak into subsequent tests on the same xdist worker, breaking
 # mock patches that target "tools.file_tools._get_file_ops" etc.
 # ---------------------------------------------------------------------------
+
 
 def _reset_modules(prefixes: tuple[str, ...]):
     for name in list(sys.modules):
@@ -233,7 +233,8 @@ def test_cli_prefers_config_provider_over_stale_env_override(monkeypatch):
 def test_codex_provider_replaces_incompatible_default_model(monkeypatch):
     """When provider resolves to openai-codex and no model was explicitly
     chosen, the global config default (e.g. anthropic/claude-opus-4.6) must
-    be replaced with a Codex-compatible model.  Fixes #651."""
+    be replaced with a Codex-compatible model.  Fixes #651.
+    """
     cli = _import_cli()
 
     monkeypatch.delenv("LLM_MODEL", raising=False)
@@ -325,10 +326,10 @@ def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeyp
                     "base_url": "https://api.neuralwatt.com/v1",
                     "api_key": "${NEURALWATT_API_KEY}",
                     "api_mode": "chat_completions",
-                }
+                },
             },
             sort_keys=False,
-        )
+        ),
     )
 
     stale_config = yaml.safe_load(config_path.read_text()) or {}
@@ -395,10 +396,10 @@ def _seed_stale_custom_model(tmp_path, monkeypatch):
                     "api_key": "${NEURALWATT_API_KEY}",
                     "api": "legacy-stale-key",
                     "api_mode": "anthropic_messages",
-                }
+                },
             },
             sort_keys=False,
-        )
+        ),
     )
     (config_home / ".env").write_text("")
     return config_path
@@ -526,7 +527,8 @@ def test_model_flow_nous_offers_tool_gateway_prompt_when_unconfigured(monkeypatc
 
 def test_codex_provider_uses_config_model(monkeypatch):
     """Model comes from config.yaml, not LLM_MODEL env var.
-    Config.yaml is the single source of truth to avoid multi-agent conflicts."""
+    Config.yaml is the single source of truth to avoid multi-agent conflicts.
+    """
     cli = _import_cli()
 
     # LLM_MODEL env var should be IGNORED (even if set)
@@ -570,7 +572,8 @@ def test_codex_provider_uses_config_model(monkeypatch):
 def test_codex_config_model_not_replaced_by_normalization(monkeypatch):
     """When the user sets model.default in config.yaml to a specific codex
     model, _normalize_model_for_provider must NOT replace it with the latest
-    available model from the API.  Regression test for #1887."""
+    available model from the API.  Regression test for #1887.
+    """
     cli = _import_cli()
 
     monkeypatch.delenv("LLM_MODEL", raising=False)
@@ -612,7 +615,8 @@ def test_codex_config_model_not_replaced_by_normalization(monkeypatch):
 
 def test_codex_provider_preserves_explicit_codex_model(monkeypatch):
     """If the user explicitly passes a Codex-compatible model, it must be
-    preserved even when the provider resolves to openai-codex."""
+    preserved even when the provider resolves to openai-codex.
+    """
     cli = _import_cli()
 
     monkeypatch.delenv("LLM_MODEL", raising=False)
@@ -639,7 +643,8 @@ def test_codex_provider_preserves_explicit_codex_model(monkeypatch):
 
 def test_codex_provider_strips_provider_prefix_from_model(monkeypatch):
     """openai/gpt-5.3-codex should become gpt-5.3-codex — the Codex
-    Responses API does not accept provider-prefixed model slugs."""
+    Responses API does not accept provider-prefixed model slugs.
+    """
     cli = _import_cli()
 
     monkeypatch.delenv("LLM_MODEL", raising=False)
@@ -764,7 +769,7 @@ def test_model_flow_custom_persists_selected_api_mode(monkeypatch):
                 "context_length": context_length,
                 "name": name,
                 "api_mode": api_mode,
-            }
+            },
         ),
     )
 
@@ -775,7 +780,7 @@ def test_model_flow_custom_persists_selected_api_mode(monkeypatch):
             "chosen-model",
             "",
             "",
-        ]
+        ],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
     monkeypatch.setattr("hermes_cli.secret_prompt.masked_secret_prompt", lambda _prompt="": "test-key")
@@ -826,7 +831,7 @@ def test_cmd_model_forwards_nous_login_tls_options(monkeypatch):
             timeout=7.5,
             ca_bundle="/tmp/local-ca.pem",
             insecure=True,
-        )
+        ),
     )
 
     assert captured == {
@@ -865,6 +870,7 @@ def test_auto_provider_name_remote():
 def test_save_custom_provider_uses_provided_name(monkeypatch, tmp_path):
     """When a display name is passed, it should appear in the saved entry."""
     import yaml
+
     from hermes_cli.main import _save_custom_provider
 
     cfg_path = tmp_path / "config.yaml"
@@ -874,6 +880,7 @@ def test_save_custom_provider_uses_provided_name(monkeypatch, tmp_path):
         "hermes_cli.config.load_config", lambda: yaml.safe_load(cfg_path.read_text()) or {},
     )
     saved = {}
+
     def _save(cfg):
         saved.update(cfg)
     monkeypatch.setattr("hermes_cli.config.save_config", _save)

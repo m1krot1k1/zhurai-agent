@@ -1,5 +1,4 @@
-"""
-_common.py — Shared logic for ComfyUI skill scripts.
+"""_common.py — Shared logic for ComfyUI skill scripts.
 
 Single source of truth for:
 - HTTP transport (with retry/backoff, streaming, timeout handling)
@@ -21,9 +20,10 @@ import re
 import sys
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 from urllib.parse import urlparse
 
 # Optional: prefer `requests` if installed (better redirects, streaming, header handling)
@@ -390,7 +390,7 @@ def resolve_url(base: str, path: str, *, is_cloud: bool | None = None) -> str:
 
 def resolve_api_key(explicit: str | None) -> str | None:
     """Look up API key from CLI flag → env var. Strips whitespace and quotes."""
-    val = explicit if explicit else os.environ.get(ENV_API_KEY)
+    val = explicit or os.environ.get(ENV_API_KEY)
     if val is None:
         return None
     val = val.strip().strip("'\"")
@@ -460,7 +460,7 @@ def http_request(
         if not HAS_REQUESTS:
             raise RuntimeError(
                 "Multipart upload requires the `requests` package. "
-                "Install with: pip install requests"
+                "Install with: pip install requests",
             )
 
     last_exc: Exception | None = None
@@ -664,10 +664,10 @@ def unwrap_workflow(payload: Any) -> dict:
         raise ValueError(
             "Workflow is in editor format (has top-level 'nodes' and 'links' arrays). "
             "Re-export from ComfyUI using 'Workflow → Export (API)' (newer UI) "
-            "or 'Save (API Format)' (older UI)."
+            "or 'Save (API Format)' (older UI).",
         )
     raise ValueError(
-        "Workflow is not in API format. Each top-level entry must have a 'class_type' field."
+        "Workflow is not in API format. Each top-level entry must have a 'class_type' field.",
     )
 
 
@@ -736,7 +736,7 @@ def safe_path_join(base: Path, *parts: str) -> Path:
         candidate.relative_to(base_resolved)
     except ValueError as e:
         raise ValueError(
-            f"Refusing path traversal: {candidate} is outside {base_resolved}"
+            f"Refusing path traversal: {candidate} is outside {base_resolved}",
         ) from e
     return candidate
 
@@ -831,5 +831,5 @@ def emit_json(obj: Any, *, indent: int = 2) -> None:
 
 
 def log(msg: str) -> None:
-    """stderr log with consistent prefix (so JSON stdout stays clean)."""
+    """Stderr log with consistent prefix (so JSON stdout stays clean)."""
     print(f"[comfyui-skill] {msg}", file=sys.stderr)

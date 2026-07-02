@@ -35,7 +35,7 @@ def _make_bundle_yaml(
     for s in skills:
         lines.append(f"  - {s}")
     if instruction:
-        lines.append(f"instruction: |")
+        lines.append("instruction: |")
         for ln in instruction.splitlines():
             lines.append(f"  {ln}")
     path = bundles_dir / f"{slug}.yaml"
@@ -47,7 +47,7 @@ def _make_skill(skills_dir: Path, name: str, body: str = "Do the thing.") -> Pat
     skill_dir = skills_dir / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(
-        f"---\nname: {name}\ndescription: Description for {name}\n---\n\n# {name}\n\n{body}\n"
+        f"---\nname: {name}\ndescription: Description for {name}\n---\n\n# {name}\n\n{body}\n",
     )
     return skill_dir
 
@@ -230,7 +230,7 @@ class TestBuildBundleInvocationMessage:
         _make_bundle_yaml(bundles_dir, "combo", ["skill-a"])
         scan_bundles()
         result = build_bundle_invocation_message(
-            "/combo", user_instruction="extra context here"
+            "/combo", user_instruction="extra context here",
         )
         assert result is not None
         msg, _, _ = result

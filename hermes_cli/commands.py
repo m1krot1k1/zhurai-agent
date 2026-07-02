@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
 import re
 import shutil
 import subprocess
@@ -368,7 +369,7 @@ ACTIVE_SESSION_BYPASS_COMMANDS: frozenset[str] = frozenset(
         "stop",
         "update",
         "version",
-    }
+    },
 )
 
 
@@ -670,7 +671,7 @@ def _collect_gateway_skill_entries(
     max_slots: int,
     reserved_names: set[str],
     desc_limit: int = 100,
-    sanitize_name: "Callable[[str], str] | None" = None,
+    sanitize_name: Callable[[str], str] | None = None,
 ) -> tuple[list[tuple[str, str, str]], int]:
     """Collect plugin + skill entries for a gateway platform.
 
@@ -699,6 +700,7 @@ def _collect_gateway_skill_entries(
         ``(name, description, cmd_key)`` triples and *hidden_count* is the
         number of skill entries dropped due to the cap.  ``cmd_key`` is the
         original ``/skill-name`` key from :func:`get_skill_commands`.
+
     """
     all_entries: list[tuple[str, str, str]] = []
 
@@ -735,8 +737,8 @@ def _collect_gateway_skill_entries(
     skill_triples: list[tuple[str, str, str]] = []
     try:
         from agent.skill_commands import get_skill_commands
-        from tools.skills_tool import SKILLS_DIR
         from agent.skill_utils import get_external_skills_dirs
+        from tools.skills_tool import SKILLS_DIR
         _skills_dir = str(SKILLS_DIR.resolve())
         _hub_dir = str((SKILLS_DIR / ".hub").resolve()).rstrip("/") + "/"
         # Build set of allowed directory prefixes: local skills dir + any
@@ -806,6 +808,7 @@ def telegram_menu_commands(max_commands: int = 100) -> tuple[list[tuple[str, str
     Returns:
         (menu_commands, hidden_count) where hidden_count is the number of
         commands omitted due to the cap.
+
     """
     core_commands = _prioritize_telegram_menu_commands(list(telegram_bot_commands()))
     reserved_names = {n for n, _ in core_commands}
@@ -846,6 +849,7 @@ def discord_skill_commands(
         ``(entries, hidden_count)`` where *entries* is a list of
         ``(discord_name, description, cmd_key)`` triples.  ``cmd_key`` is
         the original ``/skill-name`` key needed for the slash handler callback.
+
     """
     return _collect_gateway_skill_entries(
         platform="discord",
@@ -892,6 +896,7 @@ def discord_skill_commands_by_category(
         - *uncategorized*: ``[(name, description, cmd_key), ...]``
         - *hidden_count*: skills dropped due to name clamp collisions
           against already-registered command names.
+
     """
     from pathlib import Path as _P
 
@@ -1338,12 +1343,12 @@ class SlashCommandCompleter(Completer):
                 break
 
             full_path = os.path.join(search_dir, entry)
-            is_dir = os.path.isdir(full_path)
+            is_dir = pathlib.Path(full_path).is_dir()
 
             # Build the completion text (what replaces the typed word)
             if word.startswith("~"):
                 display_path = "~/" + os.path.relpath(full_path, os.path.expanduser("~"))
-            elif os.path.isabs(word):
+            elif pathlib.Path(word).is_absolute():
                 display_path = full_path
             else:
                 # Keep relative
@@ -1414,7 +1419,7 @@ class SlashCommandCompleter(Completer):
 
             if word == bare or word.startswith(prefix):
                 want_dir = prefix == "@folder:"
-                path_part = '' if word == bare else word[len(prefix):]
+                path_part = "" if word == bare else word[len(prefix):]
                 expanded = os.path.expanduser(path_part)
 
                 if not expanded or expanded == ".":
@@ -1436,7 +1441,7 @@ class SlashCommandCompleter(Completer):
                     if match_prefix and not entry.lower().startswith(prefix_lower):
                         continue
                     full_path = os.path.join(search_dir, entry)
-                    is_dir = os.path.isdir(full_path)
+                    is_dir = pathlib.Path(full_path).is_dir()
                     # `@folder:` must only surface directories; `@file:` only
                     # regular files.  Without this filter `@folder:` listed
                     # every .env / .gitignore in the cwd, defeating the
@@ -1493,7 +1498,7 @@ class SlashCommandCompleter(Completer):
                     raw = proc.stdout.strip().split("\n")
                     # Store relative paths
                     for p in raw[:5000]:
-                        rel = os.path.relpath(p, cwd) if os.path.isabs(p) else p
+                        rel = os.path.relpath(p, cwd) if pathlib.Path(p).is_absolute() else p
                         files.append(rel)
                     break
             except (subprocess.TimeoutExpired, OSError):
@@ -1560,7 +1565,7 @@ class SlashCommandCompleter(Completer):
                 filename = os.path.basename(fp)
                 kind = "folder" if is_dir else "file"
                 meta = "dir" if is_dir else _file_size_label(
-                    os.path.join(os.getcwd(), fp)
+                    os.path.join(os.getcwd(), fp),
                 )
                 yield Completion(
                     f"@{kind}:{fp}",
@@ -1583,7 +1588,7 @@ class SlashCommandCompleter(Completer):
             filename = os.path.basename(fp)
             kind = "folder" if is_dir else "file"
             meta = "dir" if is_dir else _file_size_label(
-                os.path.join(os.getcwd(), fp)
+                os.path.join(os.getcwd(), fp),
             )
             yield Completion(
                 f"@{kind}:{fp}",
@@ -1743,7 +1748,7 @@ class SlashCommandCompleter(Completer):
             from cli import load_cli_config
 
             personalities = (load_cli_config().get("agent") or {}).get("personalities", {}) or {}
-            if "none".startswith(sub_lower) and "none" != sub_lower:
+            if "none".startswith(sub_lower) and sub_lower != "none":
                 yield Completion(
                     "none",
                     start_position=-len(sub_text),
@@ -1923,11 +1928,10 @@ class SlashCommandAutoSuggest(AutoSuggest):
         # Static subcommands
         if self._completer is not None and not self._completer._command_allowed(base_cmd):
             return None
-        if base_cmd in SUBCOMMANDS and SUBCOMMANDS[base_cmd]:
-            if " " not in sub_text:
-                for sub in SUBCOMMANDS[base_cmd]:
-                    if sub.startswith(sub_lower) and sub != sub_lower:
-                        return Suggestion(sub[len(sub_text):])
+        if SUBCOMMANDS.get(base_cmd) and " " not in sub_text:
+            for sub in SUBCOMMANDS[base_cmd]:
+                if sub.startswith(sub_lower) and sub != sub_lower:
+                    return Suggestion(sub[len(sub_text):])
 
         # Fall back to history
         if self._history:
@@ -1938,7 +1942,7 @@ class SlashCommandAutoSuggest(AutoSuggest):
 def _file_size_label(path: str) -> str:
     """Return a compact human-readable file size, or '' on error."""
     try:
-        size = os.path.getsize(path)
+        size = pathlib.Path(path).stat().st_size
     except OSError:
         return ""
     if size < 1024:

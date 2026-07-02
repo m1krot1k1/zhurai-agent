@@ -21,7 +21,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from _http import get_json  # noqa: E402
+from _http import get_json
 
 PARTIES_URL = "https://data.cityofnewyork.us/resource/636b-3b5g.json"
 MASTER_URL = "https://data.cityofnewyork.us/resource/bnx9-e6tj.json"
@@ -146,11 +146,11 @@ def fetch(
                 "borough": BOROUGH.get(m.get("recorded_borough", ""), m.get("recorded_borough", "")),
                 "amount": m.get("document_amt", "") or "",
                 "filing_url": _filing_url(did),
-            }
+            },
         )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(out_rows)

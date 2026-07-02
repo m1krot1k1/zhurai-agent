@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
-
 
 ArtifactType = Literal["transcript", "recording", "call_record"]
 
@@ -20,14 +19,14 @@ def _parse_datetime(value: Any) -> datetime | None:
         text = f"{text[:-1]}+00:00"
     parsed = datetime.fromisoformat(text)
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+        return parsed.replace(tzinfo=UTC)
     return parsed
 
 
 def _serialize_datetime(value: datetime | None) -> str | None:
     if value is None:
         return None
-    normalized = value.astimezone(timezone.utc)
+    normalized = value.astimezone(UTC)
     return normalized.isoformat().replace("+00:00", "Z")
 
 
@@ -61,13 +60,13 @@ class GraphSubscription:
             raise ValueError("GraphSubscription.expiration_datetime is required.")
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "GraphSubscription":
+    def from_dict(cls, payload: dict[str, Any]) -> GraphSubscription:
         return cls(
             subscription_id=str(payload.get("subscription_id") or payload.get("id") or "").strip(),
             resource=str(payload.get("resource") or "").strip(),
             change_type=str(payload.get("change_type") or payload.get("changeType") or "").strip(),
             notification_url=str(
-                payload.get("notification_url") or payload.get("notificationUrl") or ""
+                payload.get("notification_url") or payload.get("notificationUrl") or "",
             ).strip(),
             expiration_datetime=payload.get("expiration_datetime")
             or payload.get("expirationDateTime"),
@@ -87,7 +86,7 @@ class GraphSubscription:
                 "client_state": self.client_state,
                 "latest_renewal_at": _serialize_datetime(self.latest_renewal_at),
                 "status": self.status,
-            }
+            },
         )
 
 
@@ -106,7 +105,7 @@ class TeamsMeetingRef:
             raise ValueError("TeamsMeetingRef.meeting_id is required.")
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "TeamsMeetingRef":
+    def from_dict(cls, payload: dict[str, Any]) -> TeamsMeetingRef:
         return cls(
             meeting_id=str(payload.get("meeting_id") or payload.get("id") or "").strip(),
             organizer_user_id=payload.get("organizer_user_id") or payload.get("organizerUserId"),
@@ -127,7 +126,7 @@ class TeamsMeetingRef:
                 "thread_id": self.thread_id,
                 "tenant_id": self.tenant_id,
                 "metadata": self.metadata or None,
-            }
+            },
         )
 
 
@@ -147,7 +146,7 @@ class MeetingArtifact:
     def __post_init__(self) -> None:
         if self.artifact_type not in {"transcript", "recording", "call_record"}:
             raise ValueError(
-                "MeetingArtifact.artifact_type must be transcript, recording, or call_record."
+                "MeetingArtifact.artifact_type must be transcript, recording, or call_record.",
             )
         if not self.artifact_id.strip():
             raise ValueError("MeetingArtifact.artifact_id is required.")
@@ -157,7 +156,7 @@ class MeetingArtifact:
             self.size_bytes = int(self.size_bytes)
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "MeetingArtifact":
+    def from_dict(cls, payload: dict[str, Any]) -> MeetingArtifact:
         return cls(
             artifact_type=payload.get("artifact_type") or payload.get("artifactType"),
             artifact_id=str(payload.get("artifact_id") or payload.get("id") or "").strip(),
@@ -190,7 +189,7 @@ class MeetingArtifact:
                 "available_at": _serialize_datetime(self.available_at),
                 "size_bytes": self.size_bytes,
                 "metadata": self.metadata or None,
-            }
+            },
         )
 
 
@@ -219,7 +218,7 @@ class TeamsMeetingSummaryPayload:
         self.end_time = _parse_datetime(self.end_time)
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "TeamsMeetingSummaryPayload":
+    def from_dict(cls, payload: dict[str, Any]) -> TeamsMeetingSummaryPayload:
         return cls(
             meeting_ref=TeamsMeetingRef.from_dict(payload["meeting_ref"]),
             title=payload.get("title"),
@@ -263,7 +262,7 @@ class TeamsMeetingSummaryPayload:
                 "notion_target": self.notion_target,
                 "linear_target": self.linear_target,
                 "teams_target": self.teams_target,
-            }
+            },
         )
 
 
@@ -298,14 +297,14 @@ class TeamsMeetingPipelineJob:
         self.updated_at = _parse_datetime(self.updated_at)
 
     @classmethod
-    def from_dict(cls, payload: dict[str, Any]) -> "TeamsMeetingPipelineJob":
+    def from_dict(cls, payload: dict[str, Any]) -> TeamsMeetingPipelineJob:
         meeting_ref_payload = payload.get("meeting_ref") or payload.get("meetingRef")
         summary_payload = payload.get("summary_payload") or payload.get("summaryPayload")
         return cls(
             job_id=str(payload.get("job_id") or payload.get("jobId") or "").strip(),
             event_id=str(payload.get("event_id") or payload.get("eventId") or "").strip(),
             source_event_type=str(
-                payload.get("source_event_type") or payload.get("sourceEventType") or ""
+                payload.get("source_event_type") or payload.get("sourceEventType") or "",
             ).strip(),
             dedupe_key=str(payload.get("dedupe_key") or payload.get("dedupeKey") or "").strip(),
             status=str(payload.get("status") or "").strip(),
@@ -336,7 +335,7 @@ class TeamsMeetingPipelineJob:
                 "selected_artifact_strategy": self.selected_artifact_strategy,
                 "summary_payload": self.summary_payload.to_dict() if self.summary_payload else None,
                 "error_info": self.error_info or None,
-            }
+            },
         )
 
 

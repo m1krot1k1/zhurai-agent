@@ -330,7 +330,7 @@ class Mem0MemoryProvider(MemoryProvider):
             atexit.register(self._shutdown_backend)
             self._atexit_registered = True
 
-    def _read_filters(self) -> Dict[str, Any]:
+    def _read_filters(self) -> dict[str, Any]:
         # Scoped to user_id only — by design — so recall surfaces memories
         # written from any gateway/agent under this principal. Writes attach
         # agent_id (and metadata.channel) so per-agent / per-channel views are
@@ -338,7 +338,7 @@ class Mem0MemoryProvider(MemoryProvider):
         # cross-agent recall.
         return {"user_id": self._user_id}
 
-    def _write_metadata(self) -> Dict[str, Any]:
+    def _write_metadata(self) -> dict[str, Any]:
         # Tag every write with the gateway channel so the dashboard can offer
         # per-channel filtered views without coupling identity to the channel.
         return {"channel": self._channel} if self._channel else {}
@@ -423,7 +423,7 @@ class Mem0MemoryProvider(MemoryProvider):
             self._sync_thread = threading.Thread(target=_sync, daemon=True, name="mem0-sync")
             self._sync_thread.start()
 
-    def get_tool_schemas(self) -> List[Dict[str, Any]]:
+    def get_tool_schemas(self) -> list[dict[str, Any]]:
         return [LIST_SCHEMA, SEARCH_SCHEMA, ADD_SCHEMA, UPDATE_SCHEMA, DELETE_SCHEMA]
 
     def handle_tool_call(self, tool_name: str, args: dict, **kwargs) -> str:

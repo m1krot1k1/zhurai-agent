@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-run_batch.py — Run a workflow many times, varying parameters per run.
+"""run_batch.py — Run a workflow many times, varying parameters per run.
 
 Two modes:
   1. --count N --randomize-seed
@@ -21,6 +20,7 @@ Examples:
         --args '{"prompt": "abstract"}' \
         --sweep '{"seed": [1,2,3], "steps": [20, 40]}' \
         --output-dir ./outputs/sweep
+
 """
 
 from __future__ import annotations
@@ -33,14 +33,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DEFAULT_LOCAL_HOST, ENV_API_KEY, coerce_seed, emit_json, log,
-    looks_like_video_workflow, resolve_api_key, unwrap_workflow,
+from _common import (
+    DEFAULT_LOCAL_HOST,
+    ENV_API_KEY,
+    coerce_seed,
+    emit_json,
+    log,
+    looks_like_video_workflow,
+    resolve_api_key,
+    unwrap_workflow,
 )
-from run_workflow import (  # noqa: E402
-    ComfyRunner, download_outputs, inject_params,
+from extract_schema import extract_schema
+from run_workflow import (
+    ComfyRunner,
+    download_outputs,
+    inject_params,
 )
-from extract_schema import extract_schema  # noqa: E402
 
 
 def expand_sweep(sweep: dict, base_args: dict, count: int, randomize_seed: bool) -> list[dict]:
@@ -205,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
                 results.append(r)
                 if r["status"] != "success":
                     failures += 1
-                    log(f"  run {i} → {r['status']}: {r.get('error','?')}")
+                    log(f"  run {i} → {r['status']}: {r.get('error', '?')}")
                     if not args.continue_on_error:
                         log("  --continue-on-error not set; aborting batch")
                         break
@@ -220,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             results.append(r)
             if r["status"] != "success":
                 failures += 1
-                log(f"  run {i} → {r['status']}: {r.get('error','?')}")
+                log(f"  run {i} → {r['status']}: {r.get('error', '?')}")
                 if not args.continue_on_error:
                     log("  --continue-on-error not set; aborting batch")
                     break

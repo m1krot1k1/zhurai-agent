@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-SQLite State Store for Hermes Agent.
+"""SQLite State Store for Hermes Agent.
 
 Provides persistent session storage with FTS5 full-text search, replacing
 the per-session JSONL file approach. Stores session metadata, full message
@@ -21,13 +20,15 @@ import re
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, TypeVar
 
 from agent.memory_manager import sanitize_context
 from hermes_constants import get_hermes_home
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 logger = logging.getLogger(__name__)
+
 
 def _delegate_from_json(col: str = "model_config") -> str:
     return f"json_extract(COALESCE({col}, '{{}}'), '$._delegate_from')"
@@ -66,7 +67,7 @@ def _ephemeral_child_sql(alias: str = "s") -> str:
     )
 
 
-def _collect_delegate_child_ids(conn, parent_ids: List[str]) -> List[str]:
+def _collect_delegate_child_ids(conn, parent_ids: list[str]) -> list[str]:
     """Delegate-subagent ids to cascade-delete with *parent_ids*.
 
     Only rows carrying the ``_delegate_from`` marker (set at creation, and
@@ -98,7 +99,7 @@ def _collect_delegate_child_ids(conn, parent_ids: List[str]) -> List[str]:
     return [sid for sid in found if sid not in seeds]
 
 
-def _delete_delegate_children(conn, parent_ids: List[str]) -> List[str]:
+def _delete_delegate_children(conn, parent_ids: list[str]) -> list[str]:
     ids = _collect_delegate_child_ids(conn, parent_ids)
     if ids:
         ph = ",".join("?" * len(ids))
@@ -111,6 +112,7 @@ def _delete_delegate_children(conn, parent_ids: List[str]) -> List[str]:
         )
         conn.execute(f"DELETE FROM sessions WHERE id IN ({ph})", ids)
     return ids
+
 
 T = TypeVar("T")
 
@@ -145,7 +147,7 @@ _WAL_INCOMPAT_MARKERS = (
 # Only SessionDB.__init__ writes to this; kanban_db.connect() failures
 # do not update it (by design — kanban failures are reported via their
 # own caller's error handling, not via /resume-style slash commands).
-_last_init_error: Optional[str] = None
+_last_init_error: str | None = None
 _last_init_error_lock = threading.Lock()
 
 # Paths for which we've already logged a WAL-fallback WARNING.  Without
@@ -165,7 +167,7 @@ _FTS_TRIGGERS = (
 )
 
 
-def _set_last_init_error(msg: Optional[str]) -> None:
+def _set_last_init_error(msg: str | None) -> None:
     """Record (or clear) the most recent state.db init failure.
 
     Thread-safe via _last_init_error_lock.  Callers pass a message to
@@ -182,7 +184,7 @@ def _set_last_init_error(msg: Optional[str]) -> None:
         _last_init_error = msg
 
 
-def get_last_init_error() -> Optional[str]:
+def get_last_init_error() -> str | None:
     """Return the most recent state.db init failure, if any.
 
     Slash-command handlers (``/resume``, ``/title``, ``/history``, ``/branch``)
@@ -216,7 +218,7 @@ def format_session_db_unavailable(prefix: str = "Session database not available"
     return f"{prefix}: {cause}{hint}."
 
 
-def _on_disk_journal_mode(conn: sqlite3.Connection) -> Optional[str]:
+def _on_disk_journal_mode(conn: sqlite3.Connection) -> str | None:
     """Read the journal mode from the SQLite DB header on disk.
 
     Returns the mode string (e.g. ``"wal"``, ``"delete"``), or ``None``
@@ -309,6 +311,7 @@ def _log_wal_fallback_once(db_label: str, exc: Exception) -> None:
         exc,
     )
 
+
 # ---------------------------------------------------------------------------
 # Malformed-schema recovery
 # ---------------------------------------------------------------------------
@@ -370,7 +373,7 @@ def _claim_repair_attempt(db_path: Path) -> bool:
         return True
 
 
-def _backup_db_file(db_path: Path) -> Optional[Path]:
+def _backup_db_file(db_path: Path) -> Path | None:
     """Copy a (possibly malformed) DB file to a timestamped backup beside it.
 
     Raw file copy on purpose: the DB won't open cleanly, so we preserve the
@@ -394,7 +397,7 @@ def _backup_db_file(db_path: Path) -> Optional[Path]:
         return None
 
 
-def _db_opens_cleanly(db_path: Path) -> Optional[str]:
+def _db_opens_cleanly(db_path: Path) -> str | None:
     """Probe a DB on a fresh connection. Returns None if healthy, else a reason.
 
     Runs the same first-statement (``PRAGMA journal_mode``) that trips the
@@ -416,7 +419,7 @@ def _db_opens_cleanly(db_path: Path) -> Optional[str]:
         conn.close()
 
 
-def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, Any]:
+def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> dict[str, Any]:
     """Repair a state.db whose ``sqlite_master`` schema is malformed.
 
     Handles the "duplicate object definition" / malformed-schema class where
@@ -436,7 +439,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, A
     Returns a report dict: ``{repaired: bool, strategy: str|None,
     backup_path: str|None, error: str|None}``.
     """
-    report: Dict[str, Any] = {
+    report: dict[str, Any] = {
         "repaired": False,
         "strategy": None,
         "backup_path": None,
@@ -459,7 +462,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, A
             conn.execute("PRAGMA writable_schema=ON")
             dupes = conn.execute(
                 "SELECT type, name, COUNT(*) AS c, MIN(rowid) AS keep "
-                "FROM sqlite_master GROUP BY type, name HAVING c > 1"
+                "FROM sqlite_master GROUP BY type, name HAVING c > 1",
             ).fetchall()
             for type_, name, _count, keep in dupes:
                 conn.execute(
@@ -476,7 +479,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, A
             report["strategy"] = "dedup_schema"
             logger.warning(
                 "state.db schema repaired by de-duplicating sqlite_master "
-                "(FTS index preserved): %s", db_path
+                "(FTS index preserved): %s", db_path,
             )
             return report
     except sqlite3.DatabaseError as exc:
@@ -499,7 +502,7 @@ def repair_state_db_schema(db_path: Path, *, backup: bool = True) -> Dict[str, A
             report["strategy"] = "drop_fts_rebuild"
             logger.warning(
                 "state.db schema repaired by dropping FTS schema; indexes "
-                "will rebuild from messages on next open: %s", db_path
+                "will rebuild from messages on next open: %s", db_path,
             )
             return report
         report["error"] = reason
@@ -665,8 +668,7 @@ END;
 
 
 class SessionDB:
-    """
-    SQLite-backed session storage with FTS5 search.
+    """SQLite-backed session storage with FTS5 search.
 
     Thread-safe for the common gateway pattern (multiple reader threads,
     single writer via WAL mode). Each method opens its own cursor.
@@ -867,7 +869,7 @@ class SessionDB:
             "COALESCE(content, '') || ' ' || "
             "COALESCE(tool_name, '') || ' ' || "
             "COALESCE(tool_calls, '') "
-            "FROM messages"
+            "FROM messages",
         )
         if not include_trigram:
             return
@@ -878,10 +880,10 @@ class SessionDB:
             "COALESCE(content, '') || ' ' || "
             "COALESCE(tool_name, '') || ' ' || "
             "COALESCE(tool_calls, '') "
-            "FROM messages"
+            "FROM messages",
         )
 
-    def _fts_table_probe(self, cursor: sqlite3.Cursor, table_name: str) -> Optional[bool]:
+    def _fts_table_probe(self, cursor: sqlite3.Cursor, table_name: str) -> bool | None:
         try:
             cursor.execute(f"SELECT * FROM {table_name} LIMIT 0")
             return True
@@ -940,7 +942,7 @@ class SessionDB:
 
         Returns whatever *fn* returns.
         """
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for attempt in range(self._WRITE_MAX_RETRIES):
             try:
                 with self._lock:
@@ -974,7 +976,7 @@ class SessionDB:
                 raise
         # Retries exhausted (shouldn't normally reach here).
         raise last_err or sqlite3.OperationalError(
-            "database is locked after max retries"
+            "database is locked after max retries",
         )
 
     def _try_wal_checkpoint(self) -> None:
@@ -998,7 +1000,7 @@ class SessionDB:
         try:
             with self._lock:
                 result = self._conn.execute(
-                    "PRAGMA wal_checkpoint(TRUNCATE)"
+                    "PRAGMA wal_checkpoint(TRUNCATE)",
                 ).fetchone()
                 if result and result[1] > 0:
                     logger.debug(
@@ -1024,7 +1026,7 @@ class SessionDB:
                 self._conn = None
 
     @staticmethod
-    def _parse_schema_columns(schema_sql: str) -> Dict[str, Dict[str, str]]:
+    def _parse_schema_columns(schema_sql: str) -> dict[str, dict[str, str]]:
         """Extract expected columns per table from SCHEMA_SQL.
 
         Uses an in-memory SQLite database to parse the SQL — SQLite itself
@@ -1039,14 +1041,14 @@ class SessionDB:
         ref = sqlite3.connect(":memory:")
         try:
             ref.executescript(schema_sql)
-            table_columns: Dict[str, Dict[str, str]] = {}
+            table_columns: dict[str, dict[str, str]] = {}
             for (tbl,) in ref.execute(
                 "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%'",
             ).fetchall():
-                cols: Dict[str, str] = {}
+                cols: dict[str, str] = {}
                 for row in ref.execute(
-                    f'PRAGMA table_info("{tbl}")'
+                    f'PRAGMA table_info("{tbl}")',
                 ).fetchall():
                     # row: (cid, name, type, notnull, dflt_value, pk)
                     col_name = row[1]
@@ -1084,7 +1086,7 @@ class SessionDB:
             # Get current columns from the live table
             try:
                 rows = cursor.execute(
-                    f'PRAGMA table_info("{table_name}")'
+                    f'PRAGMA table_info("{table_name}")',
                 ).fetchall()
             except sqlite3.OperationalError:
                 continue  # Table doesn't exist yet (shouldn't happen after executescript)
@@ -1099,7 +1101,7 @@ class SessionDB:
                     safe_name = col_name.replace('"', '""')
                     try:
                         cursor.execute(
-                            f'ALTER TABLE "{table_name}" ADD COLUMN "{safe_name}" {col_type}'
+                            f'ALTER TABLE "{table_name}" ADD COLUMN "{safe_name}" {col_type}',
                         )
                     except sqlite3.OperationalError as exc:
                         # Expected: "duplicate column name" from a race or
@@ -1142,7 +1144,7 @@ class SessionDB:
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_messages_platform_msg_id "
                 "ON messages(session_id, platform_message_id) "
-                "WHERE platform_message_id IS NOT NULL"
+                "WHERE platform_message_id IS NOT NULL",
             )
         except sqlite3.OperationalError as exc:
             logger.debug("idx_messages_platform_msg_id create skipped: %s", exc)
@@ -1189,15 +1191,15 @@ class SessionDB:
                 # and WAL space before v11 throws the work away.
                 if fts5_available:
                     _fts_trigram_exists = self._fts_table_probe(
-                        cursor, "messages_fts_trigram"
+                        cursor, "messages_fts_trigram",
                     )
                     if _fts_trigram_exists is False:
                         if self._ensure_fts_schema(
-                            cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
+                            cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL,
                         ):
                             cursor.execute(
                                 "INSERT INTO messages_fts_trigram(rowid, content) "
-                                "SELECT id, content FROM messages WHERE content IS NOT NULL"
+                                "SELECT id, content FROM messages WHERE content IS NOT NULL",
                             )
                         else:
                             fts_migrations_complete = False
@@ -1234,7 +1236,7 @@ class SessionDB:
                         # Handle base and trigram independently — a missing
                         # trigram tokenizer should not prevent base FTS backfill.
                         base_fts_ok = self._ensure_fts_schema(
-                            cursor, "messages_fts", FTS_SQL
+                            cursor, "messages_fts", FTS_SQL,
                         )
                         if base_fts_ok:
                             cursor.execute(
@@ -1243,10 +1245,10 @@ class SessionDB:
                                 "COALESCE(content, '') || ' ' || "
                                 "COALESCE(tool_name, '') || ' ' || "
                                 "COALESCE(tool_calls, '') "
-                                "FROM messages"
+                                "FROM messages",
                             )
                         trigram_ok = self._ensure_fts_schema(
-                            cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
+                            cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL,
                         )
                         if trigram_ok:
                             cursor.execute(
@@ -1255,7 +1257,7 @@ class SessionDB:
                                 "COALESCE(content, '') || ' ' || "
                                 "COALESCE(tool_name, '') || ' ' || "
                                 "COALESCE(tool_calls, '') "
-                                "FROM messages"
+                                "FROM messages",
                             )
                         if not base_fts_ok:
                             fts_migrations_complete = False
@@ -1273,7 +1275,7 @@ class SessionDB:
                 # active=1 rather than NULL.
                 try:
                     cursor.execute(
-                        "UPDATE messages SET active = 1 WHERE active IS NULL"
+                        "UPDATE messages SET active = 1 WHERE active IS NULL",
                     )
                 except sqlite3.OperationalError:
                     pass
@@ -1286,7 +1288,7 @@ class SessionDB:
                         "COALESCE(model_config, '{}'), '$._delegate_from', parent_session_id) "
                         f"WHERE parent_session_id IS NOT NULL "
                         "AND json_extract(COALESCE(model_config, '{}'), '$._delegate_from') IS NULL "
-                        f"AND {_ephemeral_child_sql('sessions')}"
+                        f"AND {_ephemeral_child_sql('sessions')}",
                     )
                     cursor.execute(
                         "UPDATE sessions SET model_config = json_set("
@@ -1299,7 +1301,7 @@ class SessionDB:
                         "AND EXISTS (SELECT 1 FROM messages m "
                         "            WHERE m.session_id = sessions.id AND m.role = 'tool') "
                         "AND NOT EXISTS (SELECT 1 FROM sessions ch "
-                        "                WHERE ch.parent_session_id = sessions.id)"
+                        "                WHERE ch.parent_session_id = sessions.id)",
                     )
                 except sqlite3.OperationalError:
                     pass
@@ -1313,7 +1315,7 @@ class SessionDB:
         try:
             cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_title_unique "
-                "ON sessions(title) WHERE title IS NOT NULL"
+                "ON sessions(title) WHERE title IS NOT NULL",
             )
         except sqlite3.OperationalError:
             pass  # Index already exists
@@ -1330,7 +1332,7 @@ class SessionDB:
             # back to LIKE.
             if self._fts_enabled:
                 trigram_enabled = self._ensure_fts_schema(
-                    cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL
+                    cursor, "messages_fts_trigram", FTS_TRIGRAM_SQL,
                 )
                 self._trigram_available = trigram_enabled
                 if triggers_need_repair:
@@ -1350,7 +1352,7 @@ class SessionDB:
         session_id: str,
         source: str,
         model: str = None,
-        model_config: Dict[str, Any] = None,
+        model_config: dict[str, Any] = None,
         system_prompt: str = None,
         user_id: str = None,
         parent_session_id: str = None,
@@ -1380,6 +1382,7 @@ class SessionDB:
         """Create a new session record. Returns the session_id."""
         self._insert_session_row(session_id, source, **kwargs)
         return session_id
+
     def end_session(self, session_id: str, end_reason: str) -> None:
         """Mark a session as ended.
 
@@ -1416,6 +1419,7 @@ class SessionDB:
             conn.execute("UPDATE sessions SET cwd = ? WHERE id = ?", (cwd, session_id))
 
         self._execute_write(_do)
+
     # ──────────────────────────────────────────────────────────────────────
     # Compression locks
     # ──────────────────────────────────────────────────────────────────────
@@ -1525,7 +1529,7 @@ class SessionDB:
                 session_id, exc,
             )
 
-    def get_compression_lock_holder(self, session_id: str) -> Optional[str]:
+    def get_compression_lock_holder(self, session_id: str) -> str | None:
         """Return the current (non-expired) holder for ``session_id``, or None.
 
         Diagnostic helper — not used by the locking protocol itself.
@@ -1546,7 +1550,7 @@ class SessionDB:
         self,
         session_id: str,
         model_config_json: str,
-        model: Optional[str] = None,
+        model: str | None = None,
     ) -> None:
         """Update model_config and optionally model for an existing session.
 
@@ -1593,14 +1597,14 @@ class SessionDB:
         cache_read_tokens: int = 0,
         cache_write_tokens: int = 0,
         reasoning_tokens: int = 0,
-        estimated_cost_usd: Optional[float] = None,
-        actual_cost_usd: Optional[float] = None,
-        cost_status: Optional[str] = None,
-        cost_source: Optional[str] = None,
-        pricing_version: Optional[str] = None,
-        billing_provider: Optional[str] = None,
-        billing_base_url: Optional[str] = None,
-        billing_mode: Optional[str] = None,
+        estimated_cost_usd: float | None = None,
+        actual_cost_usd: float | None = None,
+        cost_status: str | None = None,
+        cost_source: str | None = None,
+        pricing_version: str | None = None,
+        billing_provider: str | None = None,
+        billing_base_url: str | None = None,
+        billing_mode: str | None = None,
         api_call_count: int = 0,
         absolute: bool = False,
     ) -> None:
@@ -1679,6 +1683,7 @@ class SessionDB:
             api_call_count,
             session_id,
         )
+
         def _do(conn):
             conn.execute(sql, params)
         self._execute_write(_do)
@@ -1694,7 +1699,7 @@ class SessionDB:
         self._insert_session_row(session_id, source, model=model, **kwargs)
         return session_id
 
-    def prune_empty_ghost_sessions(self, sessions_dir: "Optional[Path]" = None) -> int:
+    def prune_empty_ghost_sessions(self, sessions_dir: "Path | None" = None) -> int:
         """Remove empty TUI ghost sessions (no messages, no title, >24hr old)."""
         cutoff = time.time() - 86400  # Only sessions older than 24 hours
 
@@ -1713,7 +1718,7 @@ class SessionDB:
             if ids:
                 placeholders = ",".join("?" * len(ids))
                 conn.execute(
-                    f"DELETE FROM sessions WHERE id IN ({placeholders})", ids
+                    f"DELETE FROM sessions WHERE id IN ({placeholders})", ids,
                 )
             return ids
 
@@ -1763,16 +1768,16 @@ class SessionDB:
 
         return self._execute_write(_do) or 0
 
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
         """Get a session by ID."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT * FROM sessions WHERE id = ?", (session_id,)
+                "SELECT * FROM sessions WHERE id = ?", (session_id,),
             )
             row = cursor.fetchone()
         return dict(row) if row else None
 
-    def resolve_session_id(self, session_id_or_prefix: str) -> Optional[str]:
+    def resolve_session_id(self, session_id_or_prefix: str) -> str | None:
         """Resolve an exact or uniquely prefixed session ID to the full ID.
 
         Returns the exact ID when it exists. Otherwise treats the input as a
@@ -1803,7 +1808,7 @@ class SessionDB:
     MAX_TITLE_LENGTH = 100
 
     @staticmethod
-    def sanitize_title(title: Optional[str]) -> Optional[str]:
+    def sanitize_title(title: str | None) -> str | None:
         """Validate and sanitize a session title.
 
         - Strips leading/trailing whitespace
@@ -1822,32 +1827,32 @@ class SessionDB:
         # Remove ASCII control characters (0x00-0x1F, 0x7F) but keep
         # whitespace chars (\t=0x09, \n=0x0A, \r=0x0D) so they can be
         # normalized to spaces by the whitespace collapsing step below
-        cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', title)
+        cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", title)
 
         # Remove problematic Unicode control characters:
         # - Zero-width chars (U+200B-U+200F, U+FEFF)
         # - Directional overrides (U+202A-U+202E, U+2066-U+2069)
         # - Object replacement (U+FFFC), interlinear annotation (U+FFF9-U+FFFB)
         cleaned = re.sub(
-            r'[\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff\ufffc\ufff9-\ufffb]',
-            '', cleaned,
+            r"[\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff\ufffc\ufff9-\ufffb]",
+            "", cleaned,
         )
 
         # Collapse internal whitespace runs and strip
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
         if not cleaned:
             return None
 
         if len(cleaned) > SessionDB.MAX_TITLE_LENGTH:
             raise ValueError(
-                f"Title too long ({len(cleaned)} chars, max {SessionDB.MAX_TITLE_LENGTH})"
+                f"Title too long ({len(cleaned)} chars, max {SessionDB.MAX_TITLE_LENGTH})",
             )
 
         return cleaned
 
     def _is_compression_ancestor(
-        self, conn, *, ancestor_id: str, descendant_id: str
+        self, conn, *, ancestor_id: str, descendant_id: str,
     ) -> bool:
         """Return True if *ancestor_id* is a compression predecessor of
         *descendant_id* (walking parent links up the continuation chain).
@@ -1892,6 +1897,7 @@ class SessionDB:
         Empty/whitespace-only strings are normalized to None (clearing the title).
         """
         title = self.sanitize_title(title)
+
         def _do(conn):
             if title:
                 # Check uniqueness (allow the same session to keep its own title)
@@ -1914,7 +1920,7 @@ class SessionDB:
                     # one session carries the exact title) and the parent-link
                     # lineage is untouched.
                     if self._is_compression_ancestor(
-                        conn, ancestor_id=conflict_id, descendant_id=session_id
+                        conn, ancestor_id=conflict_id, descendant_id=session_id,
                     ):
                         conn.execute(
                             "UPDATE sessions SET title = NULL WHERE id = ?",
@@ -1922,7 +1928,7 @@ class SessionDB:
                         )
                     else:
                         raise ValueError(
-                            f"Title '{title}' is already in use by session {conflict_id}"
+                            f"Title '{title}' is already in use by session {conflict_id}",
                         )
             cursor = conn.execute(
                 "UPDATE sessions SET title = ? WHERE id = ?",
@@ -1932,11 +1938,11 @@ class SessionDB:
         rowcount = self._execute_write(_do)
         return rowcount > 0
 
-    def get_session_title(self, session_id: str) -> Optional[str]:
+    def get_session_title(self, session_id: str) -> str | None:
         """Get the title for a session, or None."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT title FROM sessions WHERE id = ?", (session_id,)
+                "SELECT title FROM sessions WHERE id = ?", (session_id,),
             )
             row = cursor.fetchone()
         return row["title"] if row else None
@@ -1993,16 +1999,16 @@ class SessionDB:
         rowcount = self._execute_write(_do)
         return rowcount > 0
 
-    def get_session_by_title(self, title: str) -> Optional[Dict[str, Any]]:
+    def get_session_by_title(self, title: str) -> dict[str, Any] | None:
         """Look up a session by exact title. Returns session dict or None."""
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT * FROM sessions WHERE title = ?", (title,)
+                "SELECT * FROM sessions WHERE title = ?", (title,),
             )
             row = cursor.fetchone()
         return dict(row) if row else None
 
-    def resolve_session_by_title(self, title: str) -> Optional[str]:
+    def resolve_session_by_title(self, title: str) -> str | None:
         """Resolve a title to a session ID, preferring the latest in a lineage.
 
         If the exact title exists, returns that session's ID.
@@ -2027,7 +2033,7 @@ class SessionDB:
         if numbered:
             # Return the most recent numbered variant
             return numbered[0]["id"]
-        elif exact:
+        if exact:
             return exact["id"]
         return None
 
@@ -2038,7 +2044,7 @@ class SessionDB:
         the highest existing number and increments.
         """
         # Strip existing #N suffix to find the true base
-        match = re.match(r'^(.*?) #(\d+)$', base_title)
+        match = re.match(r"^(.*?) #(\d+)$", base_title)
         if match:
             base = match.group(1)
         else:
@@ -2060,13 +2066,13 @@ class SessionDB:
         # Find the highest number
         max_num = 1  # The unnumbered original counts as #1
         for t in existing:
-            m = re.match(r'^.* #(\d+)$', t)
+            m = re.match(r"^.* #(\d+)$", t)
             if m:
                 max_num = max(max_num, int(m.group(1)))
 
         return f"{base} #{max_num + 1}"
 
-    def get_compression_tip(self, session_id: str) -> Optional[str]:
+    def get_compression_tip(self, session_id: str) -> str | None:
         """Walk the compression-continuation chain forward and return the tip.
 
         A compression continuation is a child session where:
@@ -2105,7 +2111,7 @@ class SessionDB:
     def list_sessions_rich(
         self,
         source: str = None,
-        exclude_sources: List[str] = None,
+        exclude_sources: list[str] = None,
         limit: int = 20,
         offset: int = 0,
         include_children: bool = False,
@@ -2115,7 +2121,7 @@ class SessionDB:
         include_archived: bool = False,
         archived_only: bool = False,
         id_query: str = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List sessions with preview (first user message) and last active timestamp.
 
         Returns dicts with keys: id, source, model, title, started_at, ended_at,
@@ -2203,7 +2209,7 @@ class SessionDB:
             # get_compression_tip (parent.end_reason='compression' AND
             # child.started_at >= parent.ended_at).
             outer_where = where_sql
-            id_params: List[Any] = []
+            id_params: list[Any] = []
             if id_needle:
                 # Admit a surfaced row if its own id or any id in its forward
                 # compression chain matches the needle. LIKE with a leading
@@ -2345,7 +2351,7 @@ class SessionDB:
         job_id: str,
         limit: int = 20,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List the run sessions produced by a single cron job, newest first.
 
         Cron runs are flat, independent sessions whose id is
@@ -2394,7 +2400,7 @@ class SessionDB:
             cursor = self._conn.execute(query, (prefix, prefix_hi, limit, offset))
             rows = cursor.fetchall()
 
-        runs: List[Dict[str, Any]] = []
+        runs: list[dict[str, Any]] = []
         for row in rows:
             s = dict(row)
             raw = s.pop("_preview_raw", "").strip()
@@ -2406,7 +2412,7 @@ class SessionDB:
             runs.append(s)
         return runs
 
-    def _get_session_rich_row(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def _get_session_rich_row(self, session_id: str) -> dict[str, Any] | None:
         """Fetch a single session with the same enriched columns as
         ``list_sessions_rich`` (preview + last_active). Returns None if the
         session doesn't exist.
@@ -2482,7 +2488,7 @@ class SessionDB:
             except (json.JSONDecodeError, TypeError):
                 logger.warning(
                     "Failed to decode JSON-encoded message content; "
-                    "returning raw string"
+                    "returning raw string",
                 )
                 return content
         return content
@@ -2506,8 +2512,7 @@ class SessionDB:
         observed: bool = False,
         timestamp: Any = None,
     ) -> int:
-        """
-        Append a message to a session. Returns the message row ID.
+        """Append a message to a session. Returns the message row ID.
 
         Also increments the session's message_count (and tool_call_count
         if role is 'tool' or tool_calls is present).
@@ -2595,7 +2600,7 @@ class SessionDB:
 
         return self._execute_write(_do)
 
-    def _insert_message_rows(self, conn, session_id: str, messages: List[Dict[str, Any]]) -> tuple[int, int]:
+    def _insert_message_rows(self, conn, session_id: str, messages: list[dict[str, Any]]) -> tuple[int, int]:
         """Insert *messages* as fresh active rows for *session_id*.
 
         Shared by :meth:`replace_messages` (delete-then-insert) and
@@ -2676,7 +2681,7 @@ class SessionDB:
             now_ts = max(now_ts + 1e-6, message_timestamp + 1e-6)
         return inserted, tool_calls_total
 
-    def replace_messages(self, session_id: str, messages: List[Dict[str, Any]]) -> None:
+    def replace_messages(self, session_id: str, messages: list[dict[str, Any]]) -> None:
         """Atomically replace every message for a session.
 
         Used by transcript-rewrite flows such as /retry, /undo, and /compress.
@@ -2690,14 +2695,14 @@ class SessionDB:
 
         def _do(conn):
             conn.execute(
-                "DELETE FROM messages WHERE session_id = ?", (session_id,)
+                "DELETE FROM messages WHERE session_id = ?", (session_id,),
             )
             conn.execute(
                 "UPDATE sessions SET message_count = 0, tool_call_count = 0 WHERE id = ?",
                 (session_id,),
             )
             total_messages, total_tool_calls = self._insert_message_rows(
-                conn, session_id, messages
+                conn, session_id, messages,
             )
             conn.execute(
                 "UPDATE sessions SET message_count = ?, tool_call_count = ? WHERE id = ?",
@@ -2707,7 +2712,7 @@ class SessionDB:
         self._execute_write(_do)
 
     def archive_and_compact(
-        self, session_id: str, compacted_messages: List[Dict[str, Any]]
+        self, session_id: str, compacted_messages: list[dict[str, Any]],
     ) -> int:
         """Non-destructive in-place compaction for a single durable session id.
 
@@ -2746,7 +2751,7 @@ class SessionDB:
                 (session_id,),
             )
             inserted, tool_calls_total = self._insert_message_rows(
-                conn, session_id, compacted_messages
+                conn, session_id, compacted_messages,
             )
             # message_count / tool_call_count reflect the LIVE (active) set —
             # the archived rows are still on disk but not part of the live count.
@@ -2758,10 +2763,9 @@ class SessionDB:
 
         return self._execute_write(_do)
 
-
     def get_messages(
-        self, session_id: str, include_inactive: bool = False
-    ) -> List[Dict[str, Any]]:
+        self, session_id: str, include_inactive: bool = False,
+    ) -> list[dict[str, Any]]:
         """Load messages for a session in insertion order.
 
         By default only active messages are returned. Pass
@@ -2799,7 +2803,7 @@ class SessionDB:
         session_id: str,
         around_message_id: int,
         window: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Load a window of messages anchored on a specific message id.
 
         Returns a dict with:
@@ -2819,8 +2823,7 @@ class SessionDB:
         Returns an empty window when ``around_message_id`` is not a real id in
         ``session_id`` — callers decide how to surface that.
         """
-        if window < 0:
-            window = 0
+        window = max(window, 0)
         with self._lock:
             # Confirm the anchor exists in this session.
             anchor_exists = self._conn.execute(
@@ -2857,7 +2860,7 @@ class SessionDB:
                     msg["tool_calls"] = json.loads(msg["tool_calls"])
                 except (json.JSONDecodeError, TypeError):
                     logger.warning(
-                        "Failed to deserialize tool_calls in get_messages_around, falling back to []"
+                        "Failed to deserialize tool_calls in get_messages_around, falling back to []",
                     )
                     msg["tool_calls"] = []
             result.append(msg)
@@ -2878,8 +2881,8 @@ class SessionDB:
         around_message_id: int,
         window: int = 5,
         bookend: int = 3,
-        keep_roles: Optional[Tuple[str, ...]] = ("user", "assistant"),
-    ) -> Dict[str, Any]:
+        keep_roles: tuple[str, ...] | None = ("user", "assistant"),
+    ) -> dict[str, Any]:
         """Return an anchored window plus session bookends.
 
         Built on top of ``get_messages_around``. Three slices:
@@ -2906,13 +2909,12 @@ class SessionDB:
         ``keep_roles=None`` disables role filtering (raw window + raw
         bookends).
         """
-        if bookend < 0:
-            bookend = 0
+        bookend = max(bookend, 0)
 
         # Reuse the primitive — handles anchor-existence, content decoding,
         # tool_calls deserialisation, and boundary counts.
         primitive = self.get_messages_around(
-            session_id, around_message_id, window=window
+            session_id, around_message_id, window=window,
         )
         window_rows = primitive["window"]
         if not window_rows:
@@ -2941,8 +2943,8 @@ class SessionDB:
         # by id range, role, and non-empty content — tool-call-only assistant
         # turns (content='' with tool_calls populated) are excluded so they
         # don't crowd out actual prose openings/closings.
-        bookend_start_rows: List[Any] = []
-        bookend_end_rows: List[Any] = []
+        bookend_start_rows: list[Any] = []
+        bookend_end_rows: list[Any] = []
         if bookend > 0:
             with self._lock:
                 role_clause = ""
@@ -2970,7 +2972,7 @@ class SessionDB:
                 # End rows came back DESC for the LIMIT cap; flip to ASC.
                 bookend_end_rows = list(reversed(bookend_end_rows))
 
-        def _hydrate(row) -> Dict[str, Any]:
+        def _hydrate(row) -> dict[str, Any]:
             msg = dict(row)
             if "content" in msg:
                 msg["content"] = self._decode_content(msg["content"])
@@ -2979,7 +2981,7 @@ class SessionDB:
                     msg["tool_calls"] = json.loads(msg["tool_calls"])
                 except (json.JSONDecodeError, TypeError):
                     logger.warning(
-                        "Failed to deserialize tool_calls in get_anchored_view, falling back to []"
+                        "Failed to deserialize tool_calls in get_anchored_view, falling back to []",
                     )
                     msg["tool_calls"] = []
             return msg
@@ -3080,9 +3082,8 @@ class SessionDB:
         session_id: str,
         include_ancestors: bool = False,
         include_inactive: bool = False,
-    ) -> List[Dict[str, Any]]:
-        """
-        Load messages in the OpenAI conversation format (role + content dicts).
+    ) -> list[dict[str, Any]]:
+        """Load messages in the OpenAI conversation format (role + content dicts).
         Used by the gateway to restore conversation history.
 
         By default only active messages are returned. Pass
@@ -3165,7 +3166,7 @@ class SessionDB:
             messages.append(msg)
         return messages
 
-    def _session_lineage_root_to_tip(self, session_id: str) -> List[str]:
+    def _session_lineage_root_to_tip(self, session_id: str) -> list[str]:
         if not session_id:
             return [session_id]
 
@@ -3188,7 +3189,7 @@ class SessionDB:
         return list(reversed(chain)) or [session_id]
 
     @staticmethod
-    def _is_duplicate_replayed_user_message(messages: List[Dict[str, Any]], msg: Dict[str, Any]) -> bool:
+    def _is_duplicate_replayed_user_message(messages: list[dict[str, Any]], msg: dict[str, Any]) -> bool:
         if msg.get("role") != "user":
             return False
         content = msg.get("content")
@@ -3206,8 +3207,8 @@ class SessionDB:
     # =========================================================================
 
     def rewind_to_message(
-        self, session_id: str, target_message_id: int
-    ) -> Dict[str, Any]:
+        self, session_id: str, target_message_id: int,
+    ) -> dict[str, Any]:
         """Soft-delete all messages with id >= ``target_message_id`` in *session_id*.
 
         The target message itself becomes inactive as well so the caller
@@ -3233,7 +3234,6 @@ class SessionDB:
         Idempotent on the ``active`` flag: re-rewinding past the same
         target is a no-op on row state but still bumps the counter.
         """
-
         # 1) Validate target up-front (read-only, outside the write txn).
         with self._lock:
             row = self._conn.execute(
@@ -3242,19 +3242,19 @@ class SessionDB:
             ).fetchone()
         if row is None:
             raise ValueError(
-                f"message {target_message_id} not found in session {session_id}"
+                f"message {target_message_id} not found in session {session_id}",
             )
         target_row = dict(row)
         if target_row.get("role") != "user":
             raise ValueError(
                 f"rewind target must be a 'user' message (got role="
-                f"{target_row.get('role')!r}, id={target_message_id})"
+                f"{target_row.get('role')!r}, id={target_message_id})",
             )
 
         # Decode content for callers (prefill the prompt buffer).
         target_row["content"] = self._decode_content(target_row.get("content"))
 
-        rewound: List[int] = []
+        rewound: list[int] = []
 
         def _do(conn):
             cursor = conn.execute(
@@ -3321,7 +3321,7 @@ class SessionDB:
         session_id: str,
         limit: int = 20,
         include_inactive: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Return the *limit* most-recent user messages, newest first.
 
         Each entry is a dict with keys ``id``, ``timestamp``, ``preview``.
@@ -3342,7 +3342,7 @@ class SessionDB:
             )
             rows = cursor.fetchall()
 
-        result: List[Dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         for row in rows:
             decoded = self._decode_content(row["content"])
             if isinstance(decoded, list):
@@ -3366,7 +3366,7 @@ class SessionDB:
                     "id": row["id"],
                     "timestamp": row["timestamp"],
                     "preview": preview,
-                }
+                },
             )
         return result
 
@@ -3432,7 +3432,6 @@ class SessionDB:
 
         return sanitized.strip()
 
-
     @staticmethod
     def _is_cjk_codepoint(cp: int) -> bool:
         return (0x4E00 <= cp <= 0x9FFF or    # CJK Unified Ideographs
@@ -3466,16 +3465,15 @@ class SessionDB:
     def search_messages(
         self,
         query: str,
-        source_filter: List[str] = None,
-        exclude_sources: List[str] = None,
-        role_filter: List[str] = None,
+        source_filter: list[str] = None,
+        exclude_sources: list[str] = None,
+        role_filter: list[str] = None,
         limit: int = 20,
         offset: int = 0,
         sort: str = None,
         include_inactive: bool = False,
-    ) -> List[Dict[str, Any]]:
-        """
-        Full-text search across session messages using FTS5.
+    ) -> list[dict[str, Any]]:
+        """Full-text search across session messages using FTS5.
 
         Supports FTS5 query syntax:
           - Simple keywords: "docker deployment"
@@ -3674,7 +3672,7 @@ class SessionDB:
                 for tok in non_op_tokens:
                     esc = tok.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                     token_clauses.append(
-                        "(m.content LIKE ? ESCAPE '\\' OR m.tool_name LIKE ? ESCAPE '\\' OR m.tool_calls LIKE ? ESCAPE '\\')"
+                        "(m.content LIKE ? ESCAPE '\\' OR m.tool_name LIKE ? ESCAPE '\\' OR m.tool_calls LIKE ? ESCAPE '\\')",
                     )
                     like_params += [f"%{esc}%", f"%{esc}%", f"%{esc}%"]
                 like_where = [f"({' OR '.join(token_clauses)})"]
@@ -3772,7 +3770,7 @@ class SessionDB:
                         else:
                             preview = ""
                         context_msgs.append(
-                            {"role": r["role"], "content": preview[:200]}
+                            {"role": r["role"], "content": preview[:200]},
                         )
                 match["context"] = context_msgs
             except Exception:
@@ -3789,7 +3787,7 @@ class SessionDB:
         query: str,
         limit: int = 20,
         include_archived: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search surfaced sessions by exact/prefix/substring session id.
 
         Desktop search uses this alongside FTS message search so users can paste
@@ -3816,7 +3814,7 @@ class SessionDB:
             id_query=needle,
         )
 
-        def score(row: Dict[str, Any]) -> int:
+        def score(row: dict[str, Any]) -> int:
             ids = [str(row.get("id") or ""), str(row.get("_lineage_root_id") or "")]
             normalized = [value.lower() for value in ids if value]
             if any(value == needle for value in normalized):
@@ -3836,7 +3834,7 @@ class SessionDB:
         source: str = None,
         limit: int = 20,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List sessions, optionally filtered by source.
 
         Returns rows enriched with a computed ``last_active`` column (latest
@@ -3878,7 +3876,7 @@ class SessionDB:
         include_archived: bool = False,
         archived_only: bool = False,
         exclude_children: bool = False,
-        exclude_sources: List[str] = None,
+        exclude_sources: list[str] = None,
     ) -> int:
         """Count sessions, optionally filtered by source.
 
@@ -3929,7 +3927,7 @@ class SessionDB:
         with self._lock:
             if session_id:
                 cursor = self._conn.execute(
-                    "SELECT COUNT(*) FROM messages WHERE session_id = ?", (session_id,)
+                    "SELECT COUNT(*) FROM messages WHERE session_id = ?", (session_id,),
                 )
             else:
                 cursor = self._conn.execute("SELECT COUNT(*) FROM messages")
@@ -3939,7 +3937,7 @@ class SessionDB:
     # Export and cleanup
     # =========================================================================
 
-    def export_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def export_session(self, session_id: str) -> dict[str, Any] | None:
         """Export a single session with all its messages as a dict."""
         session = self.get_session(session_id)
         if not session:
@@ -3947,9 +3945,8 @@ class SessionDB:
         messages = self.get_messages(session_id)
         return {**session, "messages": messages}
 
-    def export_all(self, source: str = None) -> List[Dict[str, Any]]:
-        """
-        Export all sessions (with messages) as a list of dicts.
+    def export_all(self, source: str = None) -> list[dict[str, Any]]:
+        """Export all sessions (with messages) as a list of dicts.
         Suitable for writing to a JSONL file for backup/analysis.
         """
         sessions = self.search_sessions(source=source, limit=100000)
@@ -3963,7 +3960,7 @@ class SessionDB:
         """Delete all messages for a session and reset its counters."""
         def _do(conn):
             conn.execute(
-                "DELETE FROM messages WHERE session_id = ?", (session_id,)
+                "DELETE FROM messages WHERE session_id = ?", (session_id,),
             )
             conn.execute(
                 "UPDATE sessions SET message_count = 0, tool_call_count = 0 WHERE id = ?",
@@ -3972,7 +3969,7 @@ class SessionDB:
         self._execute_write(_do)
 
     @staticmethod
-    def _remove_session_files(sessions_dir: Optional[Path], session_id: str) -> None:
+    def _remove_session_files(sessions_dir: Path | None, session_id: str) -> None:
         """Remove on-disk transcript files for a session.
 
         Cleans up ``{session_id}.json``, ``{session_id}.jsonl``, and any
@@ -4001,7 +3998,7 @@ class SessionDB:
     def delete_session(
         self,
         session_id: str,
-        sessions_dir: Optional[Path] = None,
+        sessions_dir: Path | None = None,
     ) -> bool:
         """Delete a session and all its messages.
 
@@ -4013,11 +4010,11 @@ class SessionDB:
         files (``.json`` / ``.jsonl`` / ``request_dump_*``) for every deleted
         session. Returns True if the session was found and deleted.
         """
-        removed_delegate_ids: List[str] = []
+        removed_delegate_ids: list[str] = []
 
         def _do(conn):
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM sessions WHERE id = ?", (session_id,)
+                "SELECT COUNT(*) FROM sessions WHERE id = ?", (session_id,),
             )
             if cursor.fetchone()[0] == 0:
                 return False
@@ -4042,7 +4039,7 @@ class SessionDB:
     def delete_session_if_empty(
         self,
         session_id: str,
-        sessions_dir: Optional[Path] = None,
+        sessions_dir: Path | None = None,
     ) -> bool:
         """Delete *session_id* only when it never gained resumable content.
 
@@ -4083,8 +4080,8 @@ class SessionDB:
 
     def delete_sessions(
         self,
-        session_ids: List[str],
-        sessions_dir: Optional[Path] = None,
+        session_ids: list[str],
+        sessions_dir: Path | None = None,
     ) -> int:
         """Delete every session in *session_ids* in a single transaction.
 
@@ -4185,13 +4182,13 @@ class SessionDB:
                 "SELECT COUNT(*) FROM sessions "
                 "WHERE message_count = 0 "
                 "AND ended_at IS NOT NULL "
-                "AND archived = 0"
+                "AND archived = 0",
             )
             return cursor.fetchone()[0]
 
     def delete_empty_sessions(
         self,
-        sessions_dir: Optional[Path] = None,
+        sessions_dir: Path | None = None,
     ) -> int:
         """Delete every empty, ended, non-archived session.
 
@@ -4225,7 +4222,7 @@ class SessionDB:
                 "SELECT id FROM sessions "
                 "WHERE message_count = 0 "
                 "AND ended_at IS NOT NULL "
-                "AND archived = 0"
+                "AND archived = 0",
             )
             session_ids = {row["id"] for row in cursor.fetchall()}
 
@@ -4245,7 +4242,7 @@ class SessionDB:
                 # bookkeeping bug ever lets the counter drift below the
                 # real row count, we still leave a clean FK state.
                 conn.execute(
-                    "DELETE FROM messages WHERE session_id = ?", (sid,)
+                    "DELETE FROM messages WHERE session_id = ?", (sid,),
                 )
                 conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
                 removed_ids.append(sid)
@@ -4260,7 +4257,7 @@ class SessionDB:
         self,
         older_than_days: int = 90,
         source: str = None,
-        sessions_dir: Optional[Path] = None,
+        sessions_dir: Path | None = None,
     ) -> int:
         """Delete sessions older than N days. Returns count of deleted sessions.
 
@@ -4313,11 +4310,11 @@ class SessionDB:
 
     # ── Meta key/value (for scheduler bookkeeping) ──
 
-    def get_meta(self, key: str) -> Optional[str]:
+    def get_meta(self, key: str) -> str | None:
         """Read a value from the state_meta key/value store."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT value FROM state_meta WHERE key = ?", (key,)
+                "SELECT value FROM state_meta WHERE key = ?", (key,),
             ).fetchone()
         if row is None:
             return None
@@ -4379,7 +4376,7 @@ class SessionDB:
 
                 CREATE INDEX IF NOT EXISTS idx_telegram_dm_topic_bindings_user
                 ON telegram_dm_topic_bindings(user_id, chat_id);
-                """
+                """,
             )
 
             # v1 → v2: rebuild telegram_dm_topic_bindings if its session_id FK
@@ -4392,7 +4389,7 @@ class SessionDB:
             current_version = int(current[0]) if current and str(current[0]).isdigit() else 0
             if current_version < 2:
                 fk_rows = conn.execute(
-                    "PRAGMA foreign_key_list('telegram_dm_topic_bindings')"
+                    "PRAGMA foreign_key_list('telegram_dm_topic_bindings')",
                 ).fetchall()
                 needs_rebuild = any(
                     row[2] == "sessions" and (row[6] or "") != "CASCADE"
@@ -4423,7 +4420,7 @@ class SessionDB:
                             ON telegram_dm_topic_bindings(session_id);
                         CREATE INDEX idx_telegram_dm_topic_bindings_user
                             ON telegram_dm_topic_bindings(user_id, chat_id);
-                        """
+                        """,
                     )
 
             conn.execute(
@@ -4438,8 +4435,8 @@ class SessionDB:
         *,
         chat_id: str,
         user_id: str,
-        has_topics_enabled: Optional[bool] = None,
-        allows_users_to_create_topics: Optional[bool] = None,
+        has_topics_enabled: bool | None = None,
+        allows_users_to_create_topics: bool | None = None,
     ) -> None:
         """Enable Telegram DM topic mode for one private chat/user.
 
@@ -4449,7 +4446,7 @@ class SessionDB:
         self.apply_telegram_topic_migration()
         now = time.time()
 
-        def _to_int(value: Optional[bool]) -> Optional[int]:
+        def _to_int(value: bool | None) -> int | None:
             if value is None:
                 return None
             return 1 if value else 0
@@ -4538,7 +4535,7 @@ class SessionDB:
         *,
         chat_id: str,
         thread_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Return the session binding for a Telegram DM topic, if present."""
         with self._lock:
             try:
@@ -4557,7 +4554,7 @@ class SessionDB:
         self,
         *,
         chat_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """All Telegram DM topic bindings for one chat, newest first.
 
         Read-only; returns [] if the bindings table doesn't exist yet
@@ -4578,7 +4575,7 @@ class SessionDB:
         self,
         *,
         session_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Return the Telegram DM topic binding for a given session_id, if present.
 
         Uses the UNIQUE INDEX on telegram_dm_topic_bindings(session_id) for an
@@ -4767,7 +4764,7 @@ class SessionDB:
         chat_id: str,
         user_id: str,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List previous Telegram sessions for this user that are not bound to a topic.
 
         Read-only: does NOT trigger the telegram-topic migration. If the
@@ -4829,7 +4826,7 @@ class SessionDB:
                     (str(user_id), int(limit)),
                 ).fetchall()
 
-        sessions: List[Dict[str, Any]] = []
+        sessions: list[dict[str, Any]] = []
         for row in rows:
             session = dict(row)
             raw = str(session.pop("_preview_raw", "") or "").strip()
@@ -4882,12 +4879,12 @@ class SessionDB:
                     # The column name in the INSERT must match the table name
                     # for FTS5 special commands.
                     self._conn.execute(
-                        f"INSERT INTO {tbl}({tbl}) VALUES('optimize')"
+                        f"INSERT INTO {tbl}({tbl}) VALUES('optimize')",
                     )
                     optimized += 1
                 except sqlite3.OperationalError as exc:
                     logger.warning(
-                        "FTS optimize failed for %s: %s", tbl, exc
+                        "FTS optimize failed for %s: %s", tbl, exc,
                     )
         return optimized
 
@@ -4934,8 +4931,8 @@ class SessionDB:
         retention_days: int = 90,
         min_interval_hours: int = 24,
         vacuum: bool = True,
-        sessions_dir: Optional[Path] = None,
-    ) -> Dict[str, Any]:
+        sessions_dir: Path | None = None,
+    ) -> dict[str, Any]:
         """Idempotent auto-maintenance: prune old sessions + optional VACUUM.
 
         Records the last run timestamp in state_meta so subsequent calls
@@ -4955,7 +4952,7 @@ class SessionDB:
           - ``"vacuumed"`` (bool) — true if VACUUM ran
           - ``"error"`` (str, optional) — present only on failure
         """
-        result: Dict[str, Any] = {"skipped": False, "pruned": 0, "vacuumed": False}
+        result: dict[str, Any] = {"skipped": False, "pruned": 0, "vacuumed": False}
         try:
             # Skip if another process/call did maintenance recently.
             last_raw = self.get_meta("last_auto_prune")
@@ -5033,7 +5030,7 @@ class SessionDB:
             return cur.rowcount > 0
         return self._execute_write(_do)
 
-    def get_handoff_state(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_handoff_state(self, session_id: str) -> dict[str, Any] | None:
         """Read the current handoff state for a session.
 
         Returns ``{"state", "platform", "error"}`` or None if the session has
@@ -5056,7 +5053,7 @@ class SessionDB:
         except Exception:
             return None
 
-    def list_pending_handoffs(self) -> List[Dict[str, Any]]:
+    def list_pending_handoffs(self) -> list[dict[str, Any]]:
         """Return all sessions in handoff_state='pending', oldest first.
 
         Used by the gateway's handoff watcher.
@@ -5065,7 +5062,7 @@ class SessionDB:
             cur = self._conn.execute(
                 "SELECT * FROM sessions "
                 "WHERE handoff_state = 'pending' "
-                "ORDER BY started_at ASC"
+                "ORDER BY started_at ASC",
             )
             return [dict(r) for r in cur.fetchall()]
         except Exception:

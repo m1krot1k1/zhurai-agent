@@ -12,18 +12,19 @@ Covers:
 
 import json
 import time
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from tools.process_registry import (
+    WATCH_GLOBAL_MAX_PER_WINDOW,
+    WATCH_STRIKE_LIMIT,
     ProcessRegistry,
     ProcessSession,
-    WATCH_STRIKE_LIMIT,
-    WATCH_GLOBAL_MAX_PER_WINDOW,
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry():
     """Create a fresh ProcessRegistry."""
     return ProcessRegistry()

@@ -73,12 +73,13 @@ class _FakeAgent:
 class TestFinalizeShutdownFlushesInflightTranscript:
     def test_inflight_messages_flushed_before_teardown(self):
         """The mid-turn transcript (tail = pending tool result) is flushed
-        to the session DB during shutdown finalization."""
+        to the session DB during shutdown finalization.
+        """
         runner = _make_runner()
         inflight = [
             {"role": "user", "content": "scan the repo and summarise"},
             {"role": "assistant", "content": "", "tool_calls": [
-                {"id": "c1", "function": {"name": "terminal", "arguments": "{}"}}
+                {"id": "c1", "function": {"name": "terminal", "arguments": "{}"}},
             ]},
             {"role": "tool", "tool_call_id": "c1", "content": "huge output..."},
         ]
@@ -92,7 +93,8 @@ class TestFinalizeShutdownFlushesInflightTranscript:
 
     def test_empty_session_messages_not_flushed(self):
         """An agent that ran no turns (empty list) triggers no flush — there
-        is nothing in flight to persist."""
+        is nothing in flight to persist.
+        """
         runner = _make_runner()
         agent = _FakeAgent(session_messages=[])
 
@@ -103,7 +105,8 @@ class TestFinalizeShutdownFlushesInflightTranscript:
 
     def test_missing_flush_method_is_tolerated(self):
         """A stub agent without the flush method (object.__new__ test stubs)
-        must not break shutdown — teardown still runs."""
+        must not break shutdown — teardown still runs.
+        """
         runner = _make_runner()
         agent = _FakeAgent(session_messages=[{"role": "user", "content": "x"}],
                            has_flush=False)
@@ -114,7 +117,8 @@ class TestFinalizeShutdownFlushesInflightTranscript:
 
     def test_flush_exception_is_swallowed(self):
         """A raising flush must not prevent teardown — a transcript-flush
-        failure is best-effort, losing tool resources is worse."""
+        failure is best-effort, losing tool resources is worse.
+        """
         runner = _make_runner()
         agent = _FakeAgent(session_messages=[{"role": "user", "content": "x"}])
         agent._flush_messages_to_session_db.side_effect = RuntimeError("db locked")
@@ -131,7 +135,8 @@ class TestShutdownTranscriptSurvivesResumeE2E:
     def test_interrupted_turn_persisted_and_readable_on_resume(self, tmp_path, monkeypatch):
         """Drive the real flush path against a real SessionDB and confirm the
         in-flight turn is readable back through SessionStore.load_transcript —
-        the exact path the resume logic reads on the next message."""
+        the exact path the resume logic reads on the next message.
+        """
         # Isolated state.db.
         monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
 
@@ -158,7 +163,7 @@ class TestShutdownTranscriptSurvivesResumeE2E:
             {"role": "user", "content": "now scan the whole repo for TODOs"},
             {"role": "assistant", "content": "", "tool_calls": [
                 {"id": "tc1", "function": {"name": "terminal",
-                                           "arguments": "{\"command\": \"grep -r TODO\"}"}}
+                                           "arguments": '{"command": "grep -r TODO"}'}},
             ]},
             {"role": "tool", "tool_call_id": "tc1", "name": "terminal",
              "content": "src/a.py: TODO fix this\nsrc/b.py: TODO and that"},
@@ -205,7 +210,8 @@ class TestShutdownTranscriptSurvivesResumeE2E:
 
     def test_graceful_agent_reflush_is_idempotent(self, tmp_path, monkeypatch):
         """An agent that already flushed via finalize_turn must not produce
-        duplicate rows when _finalize_shutdown_agents re-flushes."""
+        duplicate rows when _finalize_shutdown_agents re-flushes.
+        """
         monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
 
         from hermes_state import SessionDB

@@ -8,7 +8,6 @@ before the terminal query, which is the path most users hit.
 
 from __future__ import annotations
 
-
 import pytest
 
 
@@ -155,7 +154,7 @@ class TestSkinConfigHook:
         assert before is after
 
     def test_skin_color_remaps_through_wrapper_in_light_mode(
-        self, cli_mod, monkeypatch
+        self, cli_mod, monkeypatch,
     ):
         from hermes_cli.skin_engine import SkinConfig
 

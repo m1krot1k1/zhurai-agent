@@ -45,7 +45,8 @@ def test_latest_message_wins_on_conflict():
 
 def test_handoff_sections_are_framed_as_historical():
     """The summary headings referenced in the prefix must sound historical,
-    not like live instructions for the current turn."""
+    not like live instructions for the current turn.
+    """
     lower = SUMMARY_PREFIX.lower()
     assert "## active task" not in lower
     assert "## pending user asks" not in lower
@@ -56,7 +57,8 @@ def test_handoff_sections_are_framed_as_historical():
 
 def test_reverse_signals_called_out():
     """Reverse signals (stop/undo/never mind/topic change) must be named so
-    the model recognizes them as cancellation triggers, not just background."""
+    the model recognizes them as cancellation triggers, not just background.
+    """
     lower = SUMMARY_PREFIX.lower()
     # At least a few of the canonical reverse-signal verbs should appear.
     reverse_terms = ["stop", "undo", "roll back", "never mind", "just verify"]
@@ -85,7 +87,8 @@ def test_memory_authority_preserved():
 def test_no_background_consistency_carveout():
     """The "consistent → use as background" carveout licensed stale-task
     resumption on topic overlap (#41607, #38364, #42812). It must stay gone,
-    and the prefix must explicitly neutralize topic overlap."""
+    and the prefix must explicitly neutralize topic overlap.
+    """
     lower = SUMMARY_PREFIX.lower()
     assert "you may use the summary as background" not in lower
     assert "topic overlap" in lower
@@ -95,7 +98,8 @@ def test_replaced_prefixes_are_frozen_for_renormalization():
     """Every retired SUMMARY_PREFIX must be frozen into
     _HISTORICAL_SUMMARY_PREFIXES, otherwise summaries persisted by older
     builds lose detection/renormalization after an upgrade. The carveout-era
-    prefix is the latest retiree."""
+    prefix is the latest retiree.
+    """
     from agent.context_compressor import (
         _HISTORICAL_SUMMARY_PREFIXES,
         ContextCompressor,

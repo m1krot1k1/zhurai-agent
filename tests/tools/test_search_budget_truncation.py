@@ -2,13 +2,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from tools.file_operations import ExecuteResult, ShellFileOperations, _search_stdout_and_limit
-
+from tools.file_operations import (
+    ExecuteResult,
+    ShellFileOperations,
+    _search_stdout_and_limit,
+)
 
 TIMEOUT = "[Command timed out after 60s]"
 
 
-@pytest.fixture()
+@pytest.fixture
 def ops():
     env = MagicMock(cwd="/tmp/test")
     env.execute.return_value = {"output": "", "returncode": 0}

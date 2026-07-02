@@ -15,11 +15,8 @@ never mutate the primary's pool while a fallback provider is active).
 """
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from agent.agent_runtime_helpers import recover_with_credential_pool
 from agent.error_classifier import FailoverReason
-
 
 FIREWORKS_URL = "https://api.fireworks.ai/inference/v1"
 
@@ -37,7 +34,8 @@ def _agent(provider, base_url, pool_provider):
 class TestCustomPoolMismatchGuard:
     def test_matching_custom_pool_reaches_recovery(self):
         """agent=custom + pool=custom:<name> whose base_url matches must NOT
-        be treated as a cross-provider mismatch."""
+        be treated as a cross-provider mismatch.
+        """
         agent, pool = _agent("custom", FIREWORKS_URL, "custom:fireworks")
         # Rate-limit path deterministically calls pool.current() once past
         # the guard (the auth path consults agent._is_entitlement_failure,
@@ -60,9 +58,10 @@ class TestCustomPoolMismatchGuard:
 
     def test_unrelated_custom_pool_still_guarded(self):
         """agent=custom pointed at a DIFFERENT endpoint than the pool's
-        custom provider must still skip pool mutation."""
+        custom provider must still skip pool mutation.
+        """
         agent, pool = _agent(
-            "custom", "https://other-endpoint.example/v1", "custom:fireworks"
+            "custom", "https://other-endpoint.example/v1", "custom:fireworks",
         )
         with patch(
             "agent.credential_pool.get_custom_provider_pool_key",
@@ -80,7 +79,8 @@ class TestCustomPoolMismatchGuard:
     def test_fallback_provider_still_guarded(self):
         """Original #33088/#33163 contract: when a fallback provider is
         active (agent.provider != pool.provider, non-custom), the pool is
-        never mutated."""
+        never mutated.
+        """
         agent, pool = _agent("openai-codex", "https://chatgpt.com/backend-api", "custom:fireworks")
         recovered, _ = recover_with_credential_pool(
             agent,

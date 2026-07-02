@@ -21,13 +21,11 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-
 from hermes_cli.inventory import (
     ConfigContext,
     build_models_payload,
     load_picker_context,
 )
-
 
 # ─── load_picker_context ───────────────────────────────────────────────
 
@@ -106,7 +104,8 @@ def _empty_ctx(provider="orig", model="orig-model", base_url="orig-url"):
 
 def test_with_overrides_truthy_only_strings():
     """Empty strings must NOT clobber disk config — TUI calls this with
-    empty getattr(agent, 'provider', '') when no agent is spawned yet."""
+    empty getattr(agent, 'provider', '') when no agent is spawned yet.
+    """
     ctx = _empty_ctx()
     overlaid = ctx.with_overrides(
         current_provider="",
@@ -280,7 +279,8 @@ def test_pricing_can_force_fresh_nous_tier():
 def test_include_unconfigured_appends_canonical_skeletons():
     """include_unconfigured=True adds CANONICAL_PROVIDERS rows that
     list_authenticated_providers didn't emit. Skeleton rows have empty
-    models and source='canonical'."""
+    models and source='canonical'.
+    """
     rows = [
         {"slug": "openrouter", "name": "OpenRouter", "models": ["m1"],
          "total_models": 1, "is_current": True, "is_user_defined": False,
@@ -305,7 +305,8 @@ def test_include_unconfigured_appends_canonical_skeletons():
 
 def test_include_unconfigured_skips_already_present_slugs():
     """If list_authenticated_providers already returned a row for a
-    canonical slug, include_unconfigured must NOT duplicate it."""
+    canonical slug, include_unconfigured must NOT duplicate it.
+    """
     rows = [
         {"slug": "openrouter", "name": "OpenRouter", "models": ["m1"],
          "total_models": 1, "is_current": True, "is_user_defined": False,
@@ -336,7 +337,8 @@ def test_picker_hints_marks_authed_rows_authenticated():
 
 def test_picker_hints_adds_warning_to_skeleton_rows():
     """Skeleton rows (unconfigured canonical providers) must carry the
-    setup hint the picker UI displays."""
+    setup hint the picker UI displays.
+    """
     rows = []
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
@@ -360,7 +362,8 @@ def test_picker_hints_adds_warning_to_skeleton_rows():
 
 def test_picker_hints_api_key_warning_format():
     """For api_key providers with a defined env var, the warning must
-    point to that env var."""
+    point to that env var.
+    """
     rows = []
     ctx = _empty_ctx()
     with _list_auth_returning(rows):
@@ -447,7 +450,8 @@ def test_canonical_order_with_unconfigured_preserves_full_universe():
 def test_end_to_end_with_real_context_no_credentials_leak(monkeypatch):
     """Full pipeline: real load_picker_context + real
     list_authenticated_providers. Verify no credential string ever
-    appears in the returned payload, even with picker_hints=True."""
+    appears in the returned payload, even with picker_hints=True.
+    """
     canary = "sk-canary-XYZ-must-not-appear"
     monkeypatch.setenv("OPENROUTER_API_KEY", canary)
     monkeypatch.setenv("ANTHROPIC_API_KEY", canary)
@@ -514,7 +518,8 @@ def _aggregator_row(slug: str, models: list[str]) -> dict:
 def test_aggregator_dedup_removes_overlapping_models():
     """Models served by a user-defined provider are removed from
     aggregator rows so the picker doesn't show them under the wrong
-    provider.  (#45954)"""
+    provider.  (#45954)
+    """
     rows = [
         _user_provider_row("litellm-proxy", [
             "nvidia/nim/minimax-m3",
@@ -575,7 +580,8 @@ def test_aggregator_dedup_no_overlap_unchanged():
 
 def test_aggregator_dedup_no_user_providers_unchanged():
     """When there are no user-defined providers, nothing is filtered.
-    (#45954)"""
+    (#45954)
+    """
     rows = [
         _aggregator_row("openrouter", [
             "nvidia/nim/minimax-m3",
@@ -592,7 +598,8 @@ def test_aggregator_dedup_no_user_providers_unchanged():
 
 def test_aggregator_dedup_multiple_user_providers():
     """Models from all user-defined providers are excluded from aggregators.
-    (#45954)"""
+    (#45954)
+    """
     rows = [
         _user_provider_row("proxy-a", ["model-x"]),
         _user_provider_row("proxy-b", ["model-y"]),
@@ -615,7 +622,8 @@ def test_aggregator_dedup_does_not_empty_user_defined_custom_provider():
     filtering them against that set would strip the row's entire catalog and
     hide the provider from the picker.  Regression for the #45954 dedup
     emptying ``custom:*`` providers (e.g. a local llama.cpp endpoint or an
-    Anthropic-compatible proxy)."""
+    Anthropic-compatible proxy).
+    """
     rows = [
         _user_provider_row("custom:my-proxy", ["my-model-a", "my-model-b"]),
         _aggregator_row("openrouter", ["my-model-a", "other/model"]),
@@ -705,7 +713,8 @@ def test_build_models_payload_no_max_models_returns_full_list():
     """When max_models is not passed (None), build_models_payload must
     return the full model list — not truncate to the old default of 50.
     Regression for #48279: Kilo Gateway picker was capped at 50 of 336
-    models, making most models undiscoverable via search."""
+    models, making most models undiscoverable via search.
+    """
     full_models = [f"model-{i}" for i in range(100)]
     rows = [
         {
@@ -756,7 +765,8 @@ def test_build_models_payload_forwards_refresh_flag():
 
 def test_list_authenticated_providers_refresh_busts_cache():
     """refresh=True clears the provider-model disk cache exactly once;
-    refresh=False leaves it untouched (so normal picker opens stay snappy)."""
+    refresh=False leaves it untouched (so normal picker opens stay snappy).
+    """
     from hermes_cli import model_switch
 
     with patch("hermes_cli.models.clear_provider_models_cache") as clear:
@@ -764,4 +774,3 @@ def test_list_authenticated_providers_refresh_busts_cache():
         assert clear.call_count == 0
         model_switch.list_authenticated_providers(refresh=True)
         assert clear.call_count == 1
-

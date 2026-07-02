@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 from rich.console import Console
 
-import hermes_cli.banner as banner
 import model_tools
 import tools.mcp_tool
+from hermes_cli import banner
 
 
 def test_display_toolset_name_strips_legacy_suffix():
@@ -45,7 +45,7 @@ def test_build_welcome_banner_uses_normalized_toolset_names():
         patch.object(tools.mcp_tool, "get_mcp_status", return_value=[]),
     ):
         console = Console(
-            record=True, force_terminal=False, color_system=None, width=160
+            record=True, force_terminal=False, color_system=None, width=160,
         )
         banner.build_welcome_banner(
             console=console,
@@ -74,6 +74,7 @@ def test_build_welcome_banner_title_is_hyperlinked_to_release():
     """Panel title (version label) is wrapped in an OSC-8 hyperlink to the GitHub release."""
     import io
     from unittest.mock import patch as _patch
+
     import hermes_cli.banner as _banner
     import model_tools as _mt
     import tools.mcp_tool as _mcp
@@ -109,6 +110,7 @@ def test_build_welcome_banner_title_falls_back_when_no_tag():
     """Without a resolvable tag, the panel title renders as plain text (no hyperlink escape)."""
     import io
     from unittest.mock import patch as _patch
+
     import hermes_cli.banner as _banner
     import model_tools as _mt
     import tools.mcp_tool as _mcp
@@ -244,7 +246,8 @@ def test_banner_hides_toolsets_not_enabled_for_platform():
 
 def test_banner_skills_section_reflects_disabled_skills_toolset():
     """When the `skills` toolset is disabled (Blank Slate), the banner must not
-    advertise the on-disk skill catalog — the agent can't load any of them."""
+    advertise the on-disk skill catalog — the agent can't load any of them.
+    """
     fake_skills = {"creative": ["ascii-art", "p5js"], "devops": ["bug-triage-work"]}
 
     # skills toolset DISABLED -> catalog hidden, "disabled" message shown

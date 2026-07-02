@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # (or session_id as fallback) so on_session_end can decide whether to run
 # cleanup.  Guarded by a lock — post_tool_call can fire concurrently on
 # parallel tool calls.
-_recent_test_tracks: Dict[str, Set[str]] = {}
+_recent_test_tracks: dict[str, set[str]] = {}
 _lock = threading.Lock()
 
 
@@ -62,7 +62,7 @@ def _record_track(task_id: str, session_id: str, path: Path, category: str) -> N
         _recent_test_tracks.setdefault(key, set()).add(str(path))
 
 
-def _drain(task_id: str, session_id: str) -> Set[str]:
+def _drain(task_id: str, session_id: str) -> set[str]:
     """Pop the set of test paths tracked during this turn."""
     key = _tracker_key(task_id, session_id)
     with _lock:
@@ -85,12 +85,12 @@ def _attempt_track(path_str: str, task_id: str, session_id: str) -> None:
         _record_track(task_id, session_id, p, category)
 
 
-def _extract_paths_from_write_file(args: Dict[str, Any]) -> Set[str]:
+def _extract_paths_from_write_file(args: dict[str, Any]) -> set[str]:
     path = args.get(_WRITE_FILE_PATH_KEY)
     return {path} if isinstance(path, str) and path else set()
 
 
-def _extract_paths_from_patch(args: Dict[str, Any]) -> Set[str]:
+def _extract_paths_from_patch(args: dict[str, Any]) -> set[str]:
     # The patch tool creates new files via the `mode="patch"` path too, but
     # most of its use is editing existing files — we only care about new
     # ephemeral creations, so treat patch conservatively and only pick up
@@ -100,11 +100,11 @@ def _extract_paths_from_patch(args: Dict[str, Any]) -> Set[str]:
     return {path} if isinstance(path, str) and path else set()
 
 
-def _extract_paths_from_terminal(args: Dict[str, Any], result: str) -> Set[str]:
+def _extract_paths_from_terminal(args: dict[str, Any], result: str) -> set[str]:
     """Best-effort: pull candidate filesystem paths from a terminal command
     and its output, then let ``guess_category`` / ``is_safe_path`` filter.
     """
-    paths: Set[str] = set()
+    paths: set[str] = set()
     cmd = args.get("command") or ""
     if isinstance(cmd, str) and cmd:
         # Tokenise the command — catches `touch /tmp/hermes-x/test_foo.py`
@@ -116,8 +116,7 @@ def _extract_paths_from_terminal(args: Dict[str, Any], result: str) -> Set[str]:
             pass
     # Only scan the result text if it's a reasonable size (avoid 50KB dumps).
     if isinstance(result, str) and len(result) < 4096:
-        for match in _TERMINAL_PATH_REGEX.findall(result):
-            paths.add(match)
+        paths.update(_TERMINAL_PATH_REGEX.findall(result))
     return paths
 
 
@@ -127,7 +126,7 @@ def _extract_paths_from_terminal(args: Dict[str, Any], result: str) -> Set[str]:
 
 def _on_post_tool_call(
     tool_name: str = "",
-    args: Optional[Dict[str, Any]] = None,
+    args: dict[str, Any] | None = None,
     result: Any = None,
     task_id: str = "",
     session_id: str = "",
@@ -138,7 +137,7 @@ def _on_post_tool_call(
     if not isinstance(args, dict):
         return
 
-    candidates: Set[str] = set()
+    candidates: set[str] = set()
     if tool_name == "write_file":
         candidates = _extract_paths_from_write_file(args)
     elif tool_name == "patch":
@@ -184,7 +183,7 @@ def _on_session_end(
     if summary["deleted"] or summary["empty_dirs"]:
         dg._log(
             f"AUTO_QUICK (session_end): deleted={summary['deleted']} "
-            f"dirs={summary['empty_dirs']} freed={dg.fmt_size(summary['freed'])}"
+            f"dirs={summary['empty_dirs']} freed={dg.fmt_size(summary['freed'])}",
         )
 
 
@@ -210,7 +209,7 @@ Test files are auto-tracked on write_file / terminal and auto-cleaned at session
 """
 
 
-def _fmt_summary(summary: Dict[str, Any]) -> str:
+def _fmt_summary(summary: dict[str, Any]) -> str:
     base = (
         f"[disk-cleanup] Cleaned {summary['deleted']} files + "
         f"{summary['empty_dirs']} empty dirs, freed {dg.fmt_size(summary['freed'])}."
@@ -220,7 +219,7 @@ def _fmt_summary(summary: Dict[str, Any]) -> str:
     return base
 
 
-def _handle_slash(raw_args: str) -> Optional[str]:
+def _handle_slash(raw_args: str) -> str | None:
     argv = raw_args.strip().split()
     if not argv or argv[0] in {"help", "-h", "--help"}:
         return _HELP_TEXT
@@ -241,12 +240,12 @@ def _handle_slash(raw_args: str) -> Optional[str]:
         for item in auto:
             lines.append(f"    [{item['category']}] {item['path']}")
         lines.append(
-            f"  Needs prompt: {len(prompt)} files ({dg.fmt_size(prompt_size)})"
+            f"  Needs prompt: {len(prompt)} files ({dg.fmt_size(prompt_size)})",
         )
         for item in prompt:
             lines.append(f"    [{item['category']}] {item['path']}")
         lines.append(
-            f"\n  Total potential: {dg.fmt_size(auto_size + prompt_size)}"
+            f"\n  Total potential: {dg.fmt_size(auto_size + prompt_size)}",
         )
         return "\n".join(lines)
 
@@ -263,13 +262,13 @@ def _handle_slash(raw_args: str) -> Optional[str]:
             size = sum(i["size"] for i in prompt_items)
             lines.append(
                 f"\n{len(prompt_items)} item(s) need confirmation "
-                f"({dg.fmt_size(size)}):"
+                f"({dg.fmt_size(size)}):",
             )
             for item in prompt_items:
                 lines.append(f"  [{item['category']}] {item['path']}")
             lines.append(
                 "\nRun `/disk-cleanup forget <path>` to skip, or delete "
-                "manually via terminal."
+                "manually via terminal.",
             )
         return "\n".join(lines)
 

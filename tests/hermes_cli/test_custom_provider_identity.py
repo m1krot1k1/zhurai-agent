@@ -17,8 +17,8 @@ def test_matches_legacy_custom_providers_list(monkeypatch):
         "load_config",
         lambda: {
             "custom_providers": [
-                {"name": "MiMo v2.5 Pro", "base_url": "https://api.mimo.example/v1"}
-            ]
+                {"name": "MiMo v2.5 Pro", "base_url": "https://api.mimo.example/v1"},
+            ],
         },
     )
     assert (
@@ -45,8 +45,8 @@ def test_match_ignores_trailing_slash_and_case(monkeypatch):
         "load_config",
         lambda: {
             "custom_providers": [
-                {"name": "local", "base_url": "http://Localhost:8000/v1/"}
-            ]
+                {"name": "local", "base_url": "http://Localhost:8000/v1/"},
+            ],
         },
     )
     assert (
@@ -61,8 +61,8 @@ def test_no_match_returns_none(monkeypatch):
         "load_config",
         lambda: {
             "custom_providers": [
-                {"name": "other", "base_url": "https://elsewhere.example/v1"}
-            ]
+                {"name": "other", "base_url": "https://elsewhere.example/v1"},
+            ],
         },
     )
     assert rp.find_custom_provider_identity("https://api.mimo.example/v1") is None
@@ -70,7 +70,7 @@ def test_no_match_returns_none(monkeypatch):
 
 def test_empty_base_url_returns_none(monkeypatch):
     monkeypatch.setattr(
-        rp, "load_config", lambda: {"custom_providers": [{"name": "x"}]}
+        rp, "load_config", lambda: {"custom_providers": [{"name": "x"}]},
     )
     assert rp.find_custom_provider_identity("") is None
     assert rp.find_custom_provider_identity(None) is None
@@ -78,15 +78,16 @@ def test_empty_base_url_returns_none(monkeypatch):
 
 def test_identity_resolves_back_through_named_lookup(monkeypatch):
     """The returned slug must be accepted by _get_named_custom_provider —
-    that is the whole point of persisting it."""
+    that is the whole point of persisting it.
+    """
     config = {
         "custom_providers": [
             {
                 "name": "mimo-v2.5-pro",
                 "base_url": "https://api.mimo.example/v1",
                 "api_key": "sk-entry",
-            }
-        ]
+            },
+        ],
     }
     monkeypatch.setattr(rp, "load_config", lambda: config)
 

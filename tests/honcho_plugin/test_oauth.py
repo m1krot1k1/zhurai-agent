@@ -151,7 +151,7 @@ class TestEnsureFreshToken:
         seen = {}
 
         def fake_post(url, data, timeout):
-            with open(f"{path}.lock", "a+b") as other:
+            with Path(f"{path}.lock").open("a+b") as other:
                 try:
                     fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     fcntl.flock(other.fileno(), fcntl.LOCK_UN)
@@ -165,7 +165,7 @@ class TestEnsureFreshToken:
         token, refreshed = oauth.ensure_fresh_token(path, "hermes", now=1000)
         assert refreshed is True and seen.get("held") is True
         # Released afterward: a non-blocking acquire now succeeds.
-        with open(f"{path}.lock", "a+b") as fh:
+        with Path(f"{path}.lock").open("a+b") as fh:
             fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
 

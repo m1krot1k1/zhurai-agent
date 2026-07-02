@@ -38,7 +38,7 @@ def test_atomic_replace_swaps_content_on_success(tmp_path: Path) -> None:
 
 
 def test_atomic_replace_leaves_original_intact_when_copy_fails(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch,
 ) -> None:
     src = tmp_path / "src" / "ui-tui"
     src.mkdir(parents=True)

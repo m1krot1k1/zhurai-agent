@@ -1,6 +1,7 @@
 """Tests for ``hermes debug`` CLI command and debug utilities."""
 
 import os
+import pathlib
 import urllib.error
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
@@ -23,19 +25,19 @@ def hermes_home(tmp_path, monkeypatch):
     (logs_dir / "agent.log").write_text(
         "2026-04-12 17:00:00 INFO agent: session started\n"
         "2026-04-12 17:00:01 INFO tools.terminal: running ls\n"
-        "2026-04-12 17:00:02 WARNING agent: high token usage\n"
+        "2026-04-12 17:00:02 WARNING agent: high token usage\n",
     )
     (logs_dir / "errors.log").write_text(
-        "2026-04-12 17:00:05 ERROR gateway.run: connection lost\n"
+        "2026-04-12 17:00:05 ERROR gateway.run: connection lost\n",
     )
     (logs_dir / "gateway.log").write_text(
-        "2026-04-12 17:00:10 INFO gateway.run: started\n"
+        "2026-04-12 17:00:10 INFO gateway.run: started\n",
     )
     (logs_dir / "gui.log").write_text(
-        "2026-04-12 17:00:12 INFO hermes_cli.web_server: dashboard request\n"
+        "2026-04-12 17:00:12 INFO hermes_cli.web_server: dashboard request\n",
     )
     (logs_dir / "desktop.log").write_text(
-        "2026-04-12 17:00:15 INFO desktop: backend spawned\n"
+        "2026-04-12 17:00:15 INFO desktop: backend spawned\n",
     )
 
     return home
@@ -79,9 +81,8 @@ class TestUploadPasteRs:
         with patch(
             "hermes_cli.debug.urllib.request.urlopen",
             side_effect=urllib.error.URLError("connection refused"),
-        ):
-            with pytest.raises(urllib.error.URLError):
-                _upload_paste_rs("test")
+        ), pytest.raises(urllib.error.URLError):
+            _upload_paste_rs("test")
 
 
 class TestUploadDpasteCom:
@@ -245,7 +246,7 @@ class TestCaptureLogSnapshot:
         # Remove the primary (if any) and create a .1 rotation
         (logs_dir / "gateway.log").unlink(missing_ok=True)
         (logs_dir / "gateway.log.1").write_text(
-            "2026-04-12 10:00:00 INFO gateway.run: rotated content\n"
+            "2026-04-12 10:00:00 INFO gateway.run: rotated content\n",
         )
 
         snap = _capture_log_snapshot("gateway", tail_lines=10)
@@ -305,7 +306,7 @@ class TestCaptureLogSnapshotRedaction:
         logs_dir = home / "logs"
         logs_dir.mkdir()
         (logs_dir / "agent.log").write_text(
-            f"2026-04-12 17:00:00 INFO config: api_key={_REDACT_FIXTURE_TOKEN} loaded\n"
+            f"2026-04-12 17:00:00 INFO config: api_key={_REDACT_FIXTURE_TOKEN} loaded\n",
         )
         (logs_dir / "errors.log").write_text("")
         (logs_dir / "gateway.log").write_text("")
@@ -331,7 +332,7 @@ class TestCaptureLogSnapshotRedaction:
         assert _REDACT_FIXTURE_TOKEN in (snap.full_text or "")
 
     def test_force_true_works_when_redaction_disabled(
-        self, hermes_home_with_secret, monkeypatch
+        self, hermes_home_with_secret, monkeypatch,
     ):
         """Regression test: redact_sensitive_text short-circuits without force=True.
 
@@ -341,7 +342,6 @@ class TestCaptureLogSnapshotRedaction:
         redaction feature ships silently broken for users who opted out of
         runtime redaction (e.g. developers working on the redactor itself).
         """
-
         # Force the runtime flag off so we're exercising the force=True path,
         # not the default-on path.
         monkeypatch.setenv("HERMES_REDACT_SECRETS", "false")
@@ -357,7 +357,7 @@ class TestCaptureLogSnapshotRedaction:
         assert _REDACT_FIXTURE_TOKEN not in snap.full_text
 
     def test_default_redacts_email_addresses_for_public_share(
-        self, hermes_home_with_secret
+        self, hermes_home_with_secret,
     ):
         from hermes_cli.debug import _capture_log_snapshot
 
@@ -365,7 +365,7 @@ class TestCaptureLogSnapshotRedaction:
         log_path.write_text(
             "2026-04-12 17:00:00 INFO gateway.run: "
             "inbound message: platform=bluebubbles "
-            "user=person@example.com chat=iMessage;-;person@example.com msg='hello'\n"
+            "user=person@example.com chat=iMessage;-;person@example.com msg='hello'\n",
         )
 
         snap = _capture_log_snapshot("agent", tail_lines=10)
@@ -382,7 +382,7 @@ class TestCaptureLogSnapshotRedaction:
         log_path.write_text(
             "2026-04-12 17:00:00 INFO gateway.run: "
             "inbound message: platform=bluebubbles "
-            "user=person@example.com chat=iMessage;-;person@example.com msg='hello'\n"
+            "user=person@example.com chat=iMessage;-;person@example.com msg='hello'\n",
         )
 
         snap = _capture_log_snapshot("agent", tail_lines=10, redact=False)
@@ -391,7 +391,7 @@ class TestCaptureLogSnapshotRedaction:
         assert "person@example.com" in (snap.full_text or "")
 
     def test_capture_default_log_snapshots_threads_redact(
-        self, hermes_home_with_secret
+        self, hermes_home_with_secret,
     ):
         from hermes_cli.debug import _capture_default_log_snapshots
 
@@ -402,7 +402,7 @@ class TestCaptureLogSnapshotRedaction:
         assert _REDACT_FIXTURE_TOKEN not in (snaps["agent"].full_text or "")
 
     def test_capture_default_log_snapshots_no_redact_passes_through(
-        self, hermes_home_with_secret
+        self, hermes_home_with_secret,
     ):
         from hermes_cli.debug import _capture_default_log_snapshots
 
@@ -424,7 +424,7 @@ class TestCollectDebugReport:
 
         with patch("hermes_cli.dump.run_dump") as mock_dump:
             mock_dump.side_effect = lambda args: print(
-                "--- hermes dump ---\nversion: 0.8.0\n--- end dump ---"
+                "--- hermes dump ---\nversion: 0.8.0\n--- end dump ---",
             )
             report = collect_debug_report(log_lines=50)
 
@@ -561,6 +561,7 @@ class TestRunDebugShare:
 
         call_count = [0]
         uploaded_content = []
+
         def _mock_upload(content, expiry_days=7):
             call_count[0] += 1
             uploaded_content.append(content)
@@ -602,14 +603,15 @@ class TestRunDebugShare:
 
     def test_share_keeps_report_and_full_log_on_same_snapshot(self, hermes_home, capsys):
         """A mid-run rotation must not make full agent.log older than the report."""
-        from hermes_cli.debug import run_debug_share, collect_debug_report as real_collect_debug_report
+        from hermes_cli.debug import collect_debug_report as real_collect_debug_report
+        from hermes_cli.debug import run_debug_share
 
         logs_dir = hermes_home / "logs"
         (logs_dir / "agent.log").write_text(
-            "2026-04-22 12:00:00 INFO agent: newest line\n"
+            "2026-04-22 12:00:00 INFO agent: newest line\n",
         )
         (logs_dir / "agent.log.1").write_text(
-            "2026-04-10 12:00:00 INFO agent: old rotated line\n"
+            "2026-04-10 12:00:00 INFO agent: old rotated line\n",
         )
 
         args = MagicMock()
@@ -634,7 +636,7 @@ class TestRunDebugShare:
             # standalone upload.
             (logs_dir / "agent.log").write_text("")
             (logs_dir / "agent.log.1").write_text(
-                "2026-04-10 12:00:00 INFO agent: old rotated line\n"
+                "2026-04-10 12:00:00 INFO agent: old rotated line\n",
             )
             return report
 
@@ -663,6 +665,7 @@ class TestRunDebugShare:
         args.local = False
 
         call_count = [0]
+
         def _mock_upload(content, expiry_days=7):
             call_count[0] += 1
             return f"https://paste.rs/paste{call_count[0]}"
@@ -687,6 +690,7 @@ class TestRunDebugShare:
         args.local = False
 
         call_count = [0]
+
         def _mock_upload(content, expiry_days=7):
             call_count[0] += 1
             if call_count[0] > 1:
@@ -741,16 +745,16 @@ class TestRunDebugShareRedaction:
         logs_dir = home / "logs"
         logs_dir.mkdir()
         (logs_dir / "agent.log").write_text(
-            f"2026-04-12 17:00:00 INFO config: api_key={_REDACT_FIXTURE_TOKEN} loaded\n"
+            f"2026-04-12 17:00:00 INFO config: api_key={_REDACT_FIXTURE_TOKEN} loaded\n",
         )
         (logs_dir / "errors.log").write_text("")
         (logs_dir / "gateway.log").write_text(
-            f"2026-04-12 17:00:01 INFO gateway.run: token {_REDACT_FIXTURE_TOKEN}\n"
+            f"2026-04-12 17:00:01 INFO gateway.run: token {_REDACT_FIXTURE_TOKEN}\n",
         )
         return home
 
     def test_default_share_redacts_uploaded_content(
-        self, hermes_home_with_secret, capsys
+        self, hermes_home_with_secret, capsys,
     ):
         """The uploaded report and full-log pastes do not contain the raw token."""
         from hermes_cli.debug import run_debug_share
@@ -780,7 +784,7 @@ class TestRunDebugShareRedaction:
             )
 
     def test_default_share_includes_redaction_banner(
-        self, hermes_home_with_secret, capsys
+        self, hermes_home_with_secret, capsys,
     ):
         """Each upload-bound paste carries the visible redaction banner."""
         from hermes_cli.debug import run_debug_share
@@ -808,7 +812,7 @@ class TestRunDebugShareRedaction:
             )
 
     def test_no_redact_flag_disables_redaction_and_banner(
-        self, hermes_home_with_secret, capsys
+        self, hermes_home_with_secret, capsys,
     ):
         """--no-redact preserves original log content and omits the banner."""
         from hermes_cli.debug import run_debug_share
@@ -948,6 +952,7 @@ class TestScheduleAutoDelete:
         """
         import ast
         import inspect
+
         from hermes_cli.debug import _schedule_auto_delete
 
         # Strip the docstring before scanning so the regression-rationale
@@ -978,7 +983,7 @@ class TestScheduleAutoDelete:
         # And verify that calling it doesn't produce any orphaned children
         # (it should just write pending.json synchronously).
         import os as _os
-        before = set(_os.listdir("/proc")) if _os.path.exists("/proc") else None
+        before = set(_os.listdir("/proc")) if pathlib.Path("/proc").exists() else None
         _schedule_auto_delete(
             ["https://paste.rs/abc", "https://paste.rs/def"],
             delay_seconds=10,
@@ -993,7 +998,7 @@ class TestScheduleAutoDelete:
             # a python interpreter whose cmdline contained "time.sleep".
             for pid in new_pids:
                 try:
-                    with open(f"/proc/{pid}/cmdline", "rb") as f:
+                    with pathlib.Path(f"/proc/{pid}/cmdline").open("rb") as f:
                         cmdline = f.read().decode("utf-8", errors="replace")
                     assert "time.sleep" not in cmdline, (
                         f"Leaked sleeper subprocess PID {pid}: {cmdline}"
@@ -1003,8 +1008,9 @@ class TestScheduleAutoDelete:
 
     def test_records_pending_to_json(self, hermes_home):
         """Scheduled URLs are persisted to pending.json with expiration."""
-        from hermes_cli.debug import _schedule_auto_delete, _pending_file
         import json
+
+        from hermes_cli.debug import _pending_file, _schedule_auto_delete
 
         _schedule_auto_delete(
             ["https://paste.rs/abc", "https://paste.rs/def"],
@@ -1027,7 +1033,7 @@ class TestScheduleAutoDelete:
 
     def test_skips_non_paste_rs_urls(self, hermes_home):
         """dpaste.com URLs auto-expire — don't track them."""
-        from hermes_cli.debug import _schedule_auto_delete, _pending_file
+        from hermes_cli.debug import _pending_file, _schedule_auto_delete
 
         _schedule_auto_delete(["https://dpaste.com/something"])
 
@@ -1036,7 +1042,7 @@ class TestScheduleAutoDelete:
 
     def test_merges_with_existing_pending(self, hermes_home):
         """Subsequent calls merge into existing pending.json."""
-        from hermes_cli.debug import _schedule_auto_delete, _load_pending
+        from hermes_cli.debug import _load_pending, _schedule_auto_delete
 
         _schedule_auto_delete(["https://paste.rs/first"], delay_seconds=10)
         _schedule_auto_delete(["https://paste.rs/second"], delay_seconds=10)
@@ -1047,7 +1053,7 @@ class TestScheduleAutoDelete:
 
     def test_dedupes_same_url(self, hermes_home):
         """Same URL recorded twice → one entry with the later expire_at."""
-        from hermes_cli.debug import _schedule_auto_delete, _load_pending
+        from hermes_cli.debug import _load_pending, _schedule_auto_delete
 
         _schedule_auto_delete(["https://paste.rs/dup"], delay_seconds=10)
         _schedule_auto_delete(["https://paste.rs/dup"], delay_seconds=100)
@@ -1068,12 +1074,13 @@ class TestSweepExpiredPastes:
         assert remaining == 0
 
     def test_sweep_deletes_expired_entries(self, hermes_home):
-        from hermes_cli.debug import (
-            _sweep_expired_pastes,
-            _save_pending,
-            _load_pending,
-        )
         import time
+
+        from hermes_cli.debug import (
+            _load_pending,
+            _save_pending,
+            _sweep_expired_pastes,
+        )
 
         # Seed pending.json with one expired + one future entry
         _save_pending([
@@ -1099,8 +1106,9 @@ class TestSweepExpiredPastes:
         assert urls == {"https://paste.rs/future"}
 
     def test_sweep_leaves_future_entries_alone(self, hermes_home):
-        from hermes_cli.debug import _sweep_expired_pastes, _save_pending
         import time
+
+        from hermes_cli.debug import _save_pending, _sweep_expired_pastes
 
         _save_pending([
             {"url": "https://paste.rs/future1", "expire_at": time.time() + 3600},
@@ -1116,12 +1124,13 @@ class TestSweepExpiredPastes:
 
     def test_sweep_survives_network_failure(self, hermes_home):
         """Failed DELETEs stay in pending.json until the 24h grace window."""
-        from hermes_cli.debug import (
-            _sweep_expired_pastes,
-            _save_pending,
-            _load_pending,
-        )
         import time
+
+        from hermes_cli.debug import (
+            _load_pending,
+            _save_pending,
+            _sweep_expired_pastes,
+        )
 
         _save_pending([
             {"url": "https://paste.rs/flaky", "expire_at": time.time() - 100},
@@ -1140,12 +1149,13 @@ class TestSweepExpiredPastes:
 
     def test_sweep_drops_entries_past_grace_window(self, hermes_home):
         """After 24h past expiration, give up even on network failures."""
-        from hermes_cli.debug import (
-            _sweep_expired_pastes,
-            _save_pending,
-            _load_pending,
-        )
         import time
+
+        from hermes_cli.debug import (
+            _load_pending,
+            _save_pending,
+            _sweep_expired_pastes,
+        )
 
         # Expired 25 hours ago → past the 24h grace window
         very_old = time.time() - (25 * 3600)
@@ -1306,7 +1316,7 @@ class TestBuildDebugShare:
     """
 
     def test_returns_structured_urls(self, hermes_home):
-        from hermes_cli.debug import build_debug_share, DebugShareResult
+        from hermes_cli.debug import DebugShareResult, build_debug_share
 
         count = [0]
 
@@ -1315,7 +1325,7 @@ class TestBuildDebugShare:
             return f"https://paste.rs/p{count[0]}"
 
         with patch("hermes_cli.dump.run_dump"), patch(
-            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload
+            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload,
         ), patch("hermes_cli.debug._schedule_auto_delete"):
             result = build_debug_share(log_lines=50, redact=True)
 
@@ -1349,7 +1359,7 @@ class TestBuildDebugShare:
 
         secret = "sk-proj-SUPERSECRETtoken1234567890"
         (hermes_home / "logs" / "agent.log").write_text(
-            f"line one\nauthorization token={secret}\nline three\n"
+            f"line one\nauthorization token={secret}\nline three\n",
         )
 
         uploaded = []
@@ -1359,7 +1369,7 @@ class TestBuildDebugShare:
             return "https://paste.rs/x"
 
         with patch("hermes_cli.dump.run_dump"), patch(
-            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload
+            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload,
         ), patch("hermes_cli.debug._schedule_auto_delete"):
             result = build_debug_share(log_lines=50, redact=True)
 
@@ -1380,7 +1390,7 @@ class TestBuildDebugShare:
             return f"https://paste.rs/p{count[0]}"
 
         with patch("hermes_cli.dump.run_dump"), patch(
-            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload
+            "hermes_cli.debug.upload_to_pastebin", side_effect=_upload,
         ), patch("hermes_cli.debug._schedule_auto_delete"):
             result = build_debug_share(log_lines=50, redact=True)
 

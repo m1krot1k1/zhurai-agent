@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers to build mock Daytona SDK objects
 # ---------------------------------------------------------------------------
+
 
 def _make_exec_response(result="", exit_code=0):
     return SimpleNamespace(result=result, exit_code=exit_code)
@@ -25,9 +25,8 @@ def _make_sandbox(sandbox_id="sb-123", state="started"):
 
 def _patch_daytona_imports(monkeypatch):
     """Patch the daytona SDK so DaytonaEnvironment can be imported without it."""
-    import types as _types
-
     import enum
+    import types as _types
 
     class _SandboxState(str, enum.Enum):
         STARTED = "started"
@@ -50,19 +49,19 @@ def _patch_daytona_imports(monkeypatch):
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
+@pytest.fixture
 def daytona_sdk(monkeypatch):
     """Provide a mock daytona SDK module and return it for assertions."""
     return _patch_daytona_imports(monkeypatch)
 
 
-@pytest.fixture()
+@pytest.fixture
 def make_env(daytona_sdk, monkeypatch):
     """Factory that creates a DaytonaEnvironment with a mocked SDK."""
     # Prevent is_interrupted from interfering — patch where it's used (base.py)
     monkeypatch.setattr("tools.environments.base.is_interrupted", lambda: False)
     # Prevent skills/credential sync from consuming mock exec calls
-    monkeypatch.setattr("tools.credential_files.get_credential_file_mounts", lambda: [])
+    monkeypatch.setattr("tools.credential_files.get_credential_file_mounts", list)
     monkeypatch.setattr("tools.credential_files.get_skills_directory_mount", lambda **kw: None)
     monkeypatch.setattr("tools.credential_files.iter_skills_files", lambda **kw: [])
 
@@ -299,7 +298,6 @@ class TestExecute:
         assert "print" in cmd
         assert "hi" in cmd
 
-
     def test_daytona_error_triggers_retry(self, make_env, daytona_sdk):
         sb = _make_sandbox()
         sb.state = "started"
@@ -366,7 +364,7 @@ class TestInterrupt:
         # is_interrupted is checked by base.py's _wait_for_process,
         # patch where it's actually referenced (base.py's local binding)
         monkeypatch.setattr(
-            "tools.environments.base.is_interrupted", lambda: True
+            "tools.environments.base.is_interrupted", lambda: True,
         )
         try:
             result = env.execute("sleep 10")

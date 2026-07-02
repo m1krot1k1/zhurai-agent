@@ -22,14 +22,13 @@ from pathlib import Path
 import pytest
 
 from hermes_cli.setup_whatsapp_cloud import (
-    _validate_phone_number_id,
-    _validate_waba_id,
+    _validate_access_token,
     _validate_app_id,
     _validate_app_secret,
-    _validate_access_token,
+    _validate_phone_number_id,
+    _validate_waba_id,
     run_whatsapp_cloud_setup,
 )
-
 
 # ---------------------------------------------------------------------------
 # Validator tests — the cheap, exhaustive coverage layer
@@ -220,7 +219,8 @@ class TestWizardFlow:
     def test_phone_number_id_validator_catches_phone_number(self, isolated_home, monkeypatch):
         """The trap test — user pastes their phone number into the
         Phone Number ID field. Wizard MUST reject with a helpful
-        explanation, not pass through."""
+        explanation, not pass through.
+        """
         inputs = iter([
             "",                                       # press Enter to continue
             "15556422442",                            # phone number — rejected
@@ -259,7 +259,8 @@ class TestWizardFlow:
 
     def test_verify_token_is_auto_generated(self, isolated_home, monkeypatch):
         """The verify token is one of the few things the user shouldn't
-        have to invent. Wizard generates a strong random one."""
+        have to invent. Wizard generates a strong random one.
+        """
         inputs = iter([
             "",                                       # continue
             "7794189252778687",                       # Phone ID
@@ -283,7 +284,8 @@ class TestWizardFlow:
     def test_setup_complete_block_includes_post_setup_instructions(self, isolated_home, monkeypatch):
         """The wizard can't smoke-test the webhook itself (the gateway
         isn't running yet), so it MUST print the exact curl/cloudflared
-        steps the user needs after the wizard exits."""
+        steps the user needs after the wizard exits.
+        """
         inputs = iter([
             "",                                       # continue
             "7794189252778687",                       # Phone ID
@@ -309,14 +311,15 @@ class TestWizardFlow:
 
     def test_existing_token_preserved_on_rerun(self, isolated_home, monkeypatch):
         """Re-running the wizard with existing config should let the
-        user keep current values by hitting Enter."""
+        user keep current values by hitting Enter.
+        """
         # Pre-populate .env as if a previous run succeeded
         env_file = isolated_home / ".env"
         env_file.write_text(
             "WHATSAPP_CLOUD_PHONE_NUMBER_ID=7794189252778687\n"
             "WHATSAPP_CLOUD_ACCESS_TOKEN=EAAprevious_token_here_" + "x" * 100 + "\n"
             "WHATSAPP_CLOUD_APP_SECRET=0123456789abcdef0123456789abcdef\n"
-            "WHATSAPP_CLOUD_VERIFY_TOKEN=existing_verify_token_already_set\n"
+            "WHATSAPP_CLOUD_VERIFY_TOKEN=existing_verify_token_already_set\n",
         )
         inputs = iter([
             "",                                       # continue
@@ -350,10 +353,11 @@ class TestProfilePolishGuidance:
     """The wizard can't set the bot's WhatsApp display name or profile
     picture via the API — those go through Meta's Business Manager UI.
     Verify that the SETUP COMPLETE block points the user at the right
-    place rather than leaving them to figure it out on their own."""
+    place rather than leaving them to figure it out on their own.
+    """
 
     def test_polish_block_present_and_points_at_business_manager(
-        self, isolated_home, monkeypatch
+        self, isolated_home, monkeypatch,
     ):
         inputs = iter([
             "",
@@ -381,10 +385,11 @@ class TestProfilePolishGuidance:
         assert "24-48h" in out or "24–48h" in out
 
     def test_polish_block_deeplinks_when_waba_id_known(
-        self, isolated_home, monkeypatch
+        self, isolated_home, monkeypatch,
     ):
         """If the user gave us the WABA ID earlier in the wizard, the
-        Business Manager URL should pre-select their account."""
+        Business Manager URL should pre-select their account.
+        """
         waba = "987654321098765"
         inputs = iter([
             "",

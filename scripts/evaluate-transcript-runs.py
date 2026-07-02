@@ -226,7 +226,7 @@ def best_speaker(item: dict[str, Any]) -> str | None:
 
 def synthesize_delegate_text(item: dict[str, Any]) -> str:
     subagent = flatten_text(
-        item.get("subagent") or item.get("subagent_type") or item.get("agent")
+        item.get("subagent") or item.get("subagent_type") or item.get("agent"),
     ).strip()
     prompt = flatten_text(item.get("prompt") or item.get("text") or item.get("content"))
     if not subagent:
@@ -263,7 +263,7 @@ def extract_messages(data: Any) -> list[Message]:
                     or item.get("content")
                     or item.get("body")
                     or item.get("prompt")
-                    or item.get("quote")
+                    or item.get("quote"),
                 )
         else:
             speaker = None
@@ -287,7 +287,7 @@ def extract_delegates(messages: list[Message]) -> list[Delegate]:
                     prompt=prompt,
                     message_index=message.index,
                     speaker=message.speaker,
-                )
+                ),
             )
     return delegates
 
@@ -311,7 +311,7 @@ def error(
     message: str,
     message_index: int | None = None,
 ) -> None:
-    findings[(code, message_index)] = Finding(
+    findings[code, message_index] = Finding(
         code=code,
         severity="error",
         message=message,
@@ -536,7 +536,7 @@ def analyze_transcript(path: Path) -> Report:
                     error(
                         findings,
                         "illegal_start_delegate",
-                        'Task(start, analyzer) is allowed only from orchestrator.',
+                        "Task(start, analyzer) is allowed only from orchestrator.",
                         delegate.message_index,
                     )
             elif normalize_speaker(speaker) == "start":
@@ -550,7 +550,7 @@ def analyze_transcript(path: Path) -> Report:
                 error(
                     findings,
                     "illegal_start_delegate",
-                    'Task(start) is allowed only for analyzer handoffs from orchestrator.',
+                    "Task(start) is allowed only for analyzer handoffs from orchestrator.",
                     delegate.message_index,
                 )
 
@@ -607,7 +607,7 @@ def analyze_transcript(path: Path) -> Report:
                 ):
                     if ownership_sets_overlap(ownership_map[left_idx], ownership_map[right_idx]):
                         overlaps.append(
-                            f"{left_delegate.subagent} vs {right_delegate.subagent}"
+                            f"{left_delegate.subagent} vs {right_delegate.subagent}",
                         )
                 if overlaps:
                     error(
@@ -732,7 +732,7 @@ def analyze_transcript(path: Path) -> Report:
     open_ended_until_stop = bool(
         root_start_message_index is not None
         and OPEN_ENDED_IMPROVEMENT_RE.search(full_text)
-        and UNTIL_STOP_RE.search(full_text)
+        and UNTIL_STOP_RE.search(full_text),
     )
     if open_ended_until_stop:
         has_steady_state_proof = bool(STEADY_STATE_PROOF_RE.search(full_text))
@@ -837,7 +837,7 @@ def analyze_transcript(path: Path) -> Report:
     degraded_in_forbidden_context = bool(
         SINGLE_AGENT_DEGRADED_RE.search(full_text)
         and (root_start_message_index is not None or SWARM_OR_START_RE.search(full_text))
-        and (UNTIL_STOP_RE.search(full_text) or OPEN_ENDED_IMPROVEMENT_RE.search(full_text) or SWARM_OR_START_RE.search(full_text))
+        and (UNTIL_STOP_RE.search(full_text) or OPEN_ENDED_IMPROVEMENT_RE.search(full_text) or SWARM_OR_START_RE.search(full_text)),
     )
     if degraded_in_forbidden_context:
         degraded_message = next(
@@ -916,7 +916,7 @@ def run_fixture_suite(case_file: Path) -> int:
         actual_status = "pass" if report.status == "passed" else "fail" if report.status == "failed" else "skip"
         if actual_status != expected_status:
             failures.append(
-                f'[{case["id"]}] expected status {expected_status}, got {actual_status}'
+                f'[{case["id"]}] expected status {expected_status}, got {actual_status}',
             )
 
         present_codes = {finding.code for finding in report.findings}
@@ -961,7 +961,7 @@ def run_live(paths: list[str]) -> int:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate transcript/export JSON files for agent orchestration safety."
+        description="Evaluate transcript/export JSON files for agent orchestration safety.",
     )
     parser.add_argument(
         "inputs",

@@ -25,9 +25,9 @@ from pathlib import Path
 
 # Allow running directly or as a module.
 sys.path.insert(0, str(Path(__file__).parent))
-from _normalize import (  # noqa: E402
-    normalize_name,
+from _normalize import (
     normalize_aggressive,
+    normalize_name,
     token_overlap_ratio,
 )
 
@@ -40,12 +40,12 @@ CONFIDENCE = {
 
 def _read_csv(path: str, name_col: str) -> list[dict[str, str]]:
     rows = []
-    with open(path, newline="", encoding="utf-8") as fh:
+    with Path(path).open(newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         if name_col not in (reader.fieldnames or []):
             raise SystemExit(
                 f"Column {name_col!r} not in {path}. "
-                f"Available: {reader.fieldnames}"
+                f"Available: {reader.fieldnames}",
             )
         for i, row in enumerate(reader):
             row["__row__"] = str(i)
@@ -101,7 +101,7 @@ def _emit(
             "right_row": right_row["__row__"],
             "overlap_ratio": f"{ratio:.3f}" if ratio else "",
             "shared_tokens": str(shared) if shared else "",
-        }
+        },
     )
 
 
@@ -144,7 +144,7 @@ def resolve(
                 continue
             for rrow in right_rows:
                 ratio, shared = token_overlap_ratio(
-                    l_raw, rrow.get(right_col, "")
+                    l_raw, rrow.get(right_col, ""),
                 )
                 if ratio >= overlap_threshold and shared >= min_shared:
                     _emit(
@@ -171,7 +171,7 @@ def resolve(
         "overlap_ratio",
         "shared_tokens",
     ]
-    with open(out_path, "w", newline="", encoding="utf-8") as fh:
+    with Path(out_path).open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(out_rows)
@@ -182,7 +182,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--left", required=True, help="Left CSV path")
     p.add_argument(
-        "--left-name-col", required=True, help="Name column in left CSV"
+        "--left-name-col", required=True, help="Name column in left CSV",
     )
     p.add_argument("--right", required=True, help="Right CSV path")
     p.add_argument(

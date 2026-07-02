@@ -1,5 +1,4 @@
-"""
-Integration tests for the desktop boot handshake fix (PR #50231 / issue #50209).
+"""Integration tests for the desktop boot handshake fix (PR #50231 / issue #50209).
 
 Simulates a slow hermes_cli.gateway import (15-30 s on a fresh Windows install
 with Defender scanning every new .pyc) by patching the two helpers that touch
@@ -23,10 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-import threading
 from unittest.mock import patch
-
-import pytest
 
 import hermes_cli.web_server as web_server_mod
 
@@ -57,8 +53,7 @@ def _make_slow_drain(seconds: float):
 # ---------------------------------------------------------------------------
 
 def test_lifespan_warmup_is_nonblocking():
-    """
-    _warm_gateway_module runs in an executor (fire-and-forget).
+    """_warm_gateway_module runs in an executor (fire-and-forget).
     Even if it sleeps for SLOW_SECONDS, TestClient startup must complete
     in well under that time — proving the event loop was never blocked and
     HERMES_DASHBOARD_READY would have fired without delay.
@@ -85,14 +80,12 @@ def test_lifespan_warmup_is_nonblocking():
 # ---------------------------------------------------------------------------
 
 def test_get_status_does_not_block_event_loop():
-    """
-    /api/status calls _resolve_restart_drain_timeout via run_in_executor.
+    """/api/status calls _resolve_restart_drain_timeout via run_in_executor.
     While that slow call is running in a thread, a concurrent fast request
     (/api/version) must still get a response — proving the event loop stayed
     free during the import.
     """
     import httpx
-    from anyio import from_thread, to_thread
 
     results: dict[str, float] = {}
     errors: list[str] = []
@@ -100,7 +93,7 @@ def test_get_status_does_not_block_event_loop():
     async def _run():
         transport = httpx.ASGITransport(app=web_server_mod.app)
         async with httpx.AsyncClient(
-            transport=transport, base_url="http://test"
+            transport=transport, base_url="http://test",
         ) as client:
             # Fire both requests concurrently
             async with asyncio.TaskGroup() as tg:
@@ -122,7 +115,7 @@ def test_get_status_does_not_block_event_loop():
                 tg.create_task(_version())
 
     with patch.object(
-        web_server_mod, "_resolve_restart_drain_timeout", _make_slow_drain(SLOW_SECONDS)
+        web_server_mod, "_resolve_restart_drain_timeout", _make_slow_drain(SLOW_SECONDS),
     ):
         asyncio.run(_run())
 
@@ -150,8 +143,7 @@ def test_get_status_does_not_block_event_loop():
 # ---------------------------------------------------------------------------
 
 def test_concurrent_status_probes_all_respond():
-    """
-    Three concurrent /api/status requests must all receive HTTP 200.
+    """Three concurrent /api/status requests must all receive HTTP 200.
     If the event loop were blocked, later requests would pile up and
     the desktop shell would eventually reset the connection (WinError 10054).
     """
@@ -163,7 +155,7 @@ def test_concurrent_status_probes_all_respond():
     async def _run():
         transport = httpx.ASGITransport(app=web_server_mod.app)
         async with httpx.AsyncClient(
-            transport=transport, base_url="http://test"
+            transport=transport, base_url="http://test",
         ) as client:
             tasks = [
                 client.get("/api/status", timeout=SLOW_SECONDS + 5)
@@ -177,7 +169,7 @@ def test_concurrent_status_probes_all_respond():
                     responses.append(r.status_code)
 
     with patch.object(
-        web_server_mod, "_resolve_restart_drain_timeout", _make_slow_drain(SLOW_SECONDS)
+        web_server_mod, "_resolve_restart_drain_timeout", _make_slow_drain(SLOW_SECONDS),
     ):
         asyncio.run(_run())
 

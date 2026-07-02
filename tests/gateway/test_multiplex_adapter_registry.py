@@ -83,8 +83,8 @@ class TestPortBindingHardError:
 
     @pytest.mark.asyncio
     async def test_secondary_webhook_raises(self, monkeypatch):
-        from gateway.run import MultiplexConfigError
         from gateway.config import GatewayConfig, Platform, PlatformConfig
+        from gateway.run import MultiplexConfigError
 
         runner = GatewayRunner.__new__(GatewayRunner)
         runner.config = GatewayConfig(multiplex_profiles=True)
@@ -96,7 +96,7 @@ class TestPortBindingHardError:
             Platform.WEBHOOK: PlatformConfig(enabled=True, extra={"port": 8644}),
         }
         monkeypatch.setattr(
-            "gateway.config.load_gateway_config", lambda: reviewer_cfg
+            "gateway.config.load_gateway_config", lambda: reviewer_cfg,
         )
 
         with pytest.raises(MultiplexConfigError) as ei:
@@ -118,7 +118,7 @@ class TestPortBindingHardError:
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="t"),
         }
         monkeypatch.setattr(
-            "gateway.config.load_gateway_config", lambda: reviewer_cfg
+            "gateway.config.load_gateway_config", lambda: reviewer_cfg,
         )
         # _create_adapter returns None here (no real telegram token wiring), so
         # the loop simply connects nothing — the key assertion is NO raise.
@@ -133,4 +133,3 @@ class TestPortBindingHardError:
         for p in ("webhook", "api_server", "msgraph_webhook", "feishu",
                   "wecom_callback", "bluebubbles", "sms"):
             assert p in _PORT_BINDING_PLATFORM_VALUES
-

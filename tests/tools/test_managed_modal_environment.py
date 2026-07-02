@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 
 
@@ -85,7 +84,7 @@ def _install_fake_tools_package(*, credential_mounts=None):
             gateway_origin="https://modal-gateway.example.com",
             nous_user_token="user-token",
             managed_mode=True,
-        )
+        ),
     )
     sys.modules["tools.credential_files"] = types.SimpleNamespace(
         get_credential_file_mounts=lambda: list(credential_mounts or []),
@@ -281,7 +280,7 @@ def test_managed_modal_rejects_host_credential_passthrough():
         credential_mounts=[{
             "host_path": "/tmp/token.json",
             "container_path": "/root/.hermes/token.json",
-        }]
+        }],
     )
     managed_modal = _load_tool_module("tools.environments.managed_modal", "environments/managed_modal.py")
 

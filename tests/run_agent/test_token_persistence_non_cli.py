@@ -1,7 +1,7 @@
-from types import ModuleType, SimpleNamespace
-from unittest.mock import MagicMock, patch
 import json
 import sys
+from types import ModuleType, SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from run_agent import AIAgent
 
@@ -38,7 +38,7 @@ def _make_agent(session_db, *, platform: str):
             "prompt_tokens": 11,
             "completion_tokens": 7,
             "total_tokens": 18,
-        }
+        },
     )
     return agent
 

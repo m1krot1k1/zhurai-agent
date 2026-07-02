@@ -70,21 +70,21 @@ class TestTargetToStringRoundtrip:
 
 class TestCaseSensitiveChatIdParsing:
     """Test that chat IDs preserve their original case (issue #11768)."""
-    
+
     def test_slack_uppercase_chat_id_preserved(self):
         """Slack channel IDs like C123ABC should preserve case."""
         target = DeliveryTarget.parse("slack:C123ABC")
         assert target.platform == Platform.SLACK
         assert target.chat_id == "C123ABC"  # Should NOT be lowercased to c123abc
         assert target.is_explicit is True
-    
+
     def test_slack_chat_id_with_thread_preserved(self):
         """Slack channel:thread IDs should preserve case."""
         target = DeliveryTarget.parse("slack:C123ABC:thread123")
         assert target.platform == Platform.SLACK
         assert target.chat_id == "C123ABC"
         assert target.thread_id == "thread123"
-    
+
     def test_matrix_room_id_preserved(self):
         """Matrix room IDs like !RoomABC:example.org should preserve case.
         
@@ -100,7 +100,7 @@ class TestCaseSensitiveChatIdParsing:
         # This is a format limitation - the case is preserved but the structure is split
         assert target.chat_id == "!RoomABC"
         assert target.thread_id == "example.org"
-    
+
     def test_mixed_case_chat_id_roundtrip(self):
         """Mixed-case chat IDs should survive parse-to_string roundtrip."""
         original = "telegram:ChatId123ABC"
@@ -112,18 +112,19 @@ class TestCaseSensitiveChatIdParsing:
 
 class TestPlatformNameCaseInsensitivity:
     """Test that platform names are case-insensitive."""
-    
+
     def test_uppercase_platform_name(self):
         """Platform names should be case-insensitive."""
         target = DeliveryTarget.parse("TELEGRAM:12345")
         assert target.platform == Platform.TELEGRAM
         assert target.chat_id == "12345"
-    
+
     def test_mixed_case_platform_name(self):
         """Mixed-case platform names should work."""
         target = DeliveryTarget.parse("TeleGram:12345")
         assert target.platform == Platform.TELEGRAM
         assert target.chat_id == "12345"
+
 
 class RecordingAdapter:
     def __init__(self):
@@ -136,7 +137,7 @@ class RecordingAdapter:
 
     async def ensure_dm_topic(self, chat_id, topic_name, force_create=False):
         self.ensure_dm_topic_calls.append(
-            {"chat_id": chat_id, "topic_name": topic_name, "force_create": force_create}
+            {"chat_id": chat_id, "topic_name": topic_name, "force_create": force_create},
         )
         return "38049"
 
@@ -154,7 +155,7 @@ class StaleTopicAdapter:
 
     async def ensure_dm_topic(self, chat_id, topic_name, force_create=False):
         self.ensure_dm_topic_calls.append(
-            {"chat_id": chat_id, "topic_name": topic_name, "force_create": force_create}
+            {"chat_id": chat_id, "topic_name": topic_name, "force_create": force_create},
         )
         return "38064" if force_create else "32343"
 
@@ -182,7 +183,7 @@ async def test_named_telegram_private_topic_is_created_before_delivery(tmp_path,
     await router._deliver_to_platform(target, "hello", metadata=None)
 
     assert adapter.ensure_dm_topic_calls == [
-        {"chat_id": "722341991", "topic_name": "Hermes API Test", "force_create": False}
+        {"chat_id": "722341991", "topic_name": "Hermes API Test", "force_create": False},
     ]
     assert adapter.calls == [
         {
@@ -192,7 +193,7 @@ async def test_named_telegram_private_topic_is_created_before_delivery(tmp_path,
                 "thread_id": "38049",
                 "telegram_dm_topic_created_for_send": True,
             },
-        }
+        },
     ]
 
 
@@ -236,7 +237,7 @@ async def test_explicit_telegram_private_thread_uses_reply_fallback_with_anchor(
                 "thread_id": "32344",
                 "telegram_dm_topic_reply_fallback": True,
             },
-        }
+        },
     ]
 
 
@@ -289,6 +290,7 @@ async def test_platform_send_failure_raises_for_delivery_result(tmp_path, monkey
 
 class ChunkingAdapter:
     """Adapter that declares splits_long_messages=True (like Discord/Telegram)."""
+
     splits_long_messages = True
 
     def __init__(self):
@@ -370,7 +372,8 @@ async def test_short_output_never_truncated(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_audit_save_failure_does_not_break_chunking_delivery(tmp_path, monkeypatch):
     """If the audit save fails (disk full, permissions), chunking adapters
-    still receive the full content — the save is best-effort."""
+    still receive the full content — the save is best-effort.
+    """
     monkeypatch.setattr("gateway.delivery.get_hermes_home", lambda: tmp_path)
 
     adapter = ChunkingAdapter()
@@ -400,7 +403,8 @@ async def test_audit_save_failure_does_not_break_chunking_delivery(tmp_path, mon
 async def test_save_failure_during_truncation_raises_for_non_chunking_adapter(tmp_path, monkeypatch):
     """For a non-chunking adapter, the truncation footer needs a valid saved
     path. If the save fails there, that is a real delivery problem and the
-    error propagates (not swallowed like the chunking best-effort save)."""
+    error propagates (not swallowed like the chunking best-effort save).
+    """
     monkeypatch.setattr("gateway.delivery.get_hermes_home", lambda: tmp_path)
 
     adapter = NonChunkingAdapter()
@@ -419,5 +423,3 @@ async def test_save_failure_during_truncation_raises_for_non_chunking_adapter(tm
     # retry (footer needs the path) re-raises.
     with pytest.raises(OSError, match="No space left on device"):
         await router._deliver_to_platform(target, long_content, metadata={"job_id": "job7"})
-
-

@@ -21,7 +21,6 @@ from gateway.config import PlatformConfig
 from gateway.relay.adapter import RelayAdapter
 from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
 from gateway.relay.ws_transport import PassthroughForward, _passthrough_from_wire
-
 from tests.gateway.relay.stub_connector import StubConnector
 
 
@@ -58,7 +57,8 @@ def _interaction_forward(payload: dict) -> PassthroughForward:
 
 def test_passthrough_from_wire_byte_preserves_body():
     """The wire frame's base64 body decodes back to the exact bytes (parity with
-    the connector's toPassthroughForward)."""
+    the connector's toPassthroughForward).
+    """
     original = json.dumps({"type": 2, "data": {"name": "ping"}, "guild_id": "g1"}).encode("utf-8")
     wire = {
         "platform": "discord",
@@ -84,7 +84,8 @@ def test_passthrough_from_wire_tolerates_malformed_body():
 @pytest.mark.asyncio
 async def test_connect_wires_passthrough_handler_over_ws(adapter):
     """connect() registers the passthrough handler on the transport so a
-    connector-delivered passthrough_forward frame reaches the adapter."""
+    connector-delivered passthrough_forward frame reaches the adapter.
+    """
     await adapter.connect()
     stub = adapter._transport
     assert stub._passthrough is not None
@@ -93,7 +94,8 @@ async def test_connect_wires_passthrough_handler_over_ws(adapter):
 @pytest.mark.asyncio
 async def test_discord_interaction_routes_through_handle_message(adapter, monkeypatch):
     """A forwarded Discord application-command interaction is decoded and routed
-    through the normal agent path (handle_message) with a correct session source."""
+    through the normal agent path (handle_message) with a correct session source.
+    """
     await adapter.connect()
     stub = adapter._transport
 
@@ -112,7 +114,7 @@ async def test_discord_interaction_routes_through_handle_message(adapter, monkey
             "guild_id": "guild-7",
             "data": {"name": "summarize"},
             "member": {"user": {"id": "user-3", "username": "ben"}},
-        }
+        },
     )
     await stub.push_passthrough(fwd, buffer_id=None)
 
@@ -146,7 +148,7 @@ async def test_message_component_interaction_uses_custom_id(adapter, monkeypatch
             "guild_id": "g2",
             "data": {"custom_id": "approve_btn"},
             "member": {"user": {"id": "u2", "username": "x"}},
-        }
+        },
     )
     await stub.push_passthrough(fwd)
     assert len(seen) == 1

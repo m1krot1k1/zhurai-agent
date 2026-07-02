@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Memory Tool Module - Persistent Curated Memory
+"""Memory Tool Module - Persistent Curated Memory
 
 Provides bounded, file-backed memory that persists across sessions. Two stores:
   - MEMORY.md: agent's personal notes and observations (environment facts, project
@@ -30,9 +29,9 @@ import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from hermes_constants import get_hermes_home
-from typing import Dict, Any, List, Optional
+from typing import Any
 
+from hermes_constants import get_hermes_home
 from utils import atomic_replace
 
 # fcntl is Unix-only; on Windows use msvcrt for file locking
@@ -48,6 +47,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 # Where memory files live — resolved dynamically so profile overrides
 # (HERMES_HOME env var changes) are always respected.  The old module-level
 # constant was cached at import time and could go stale if a profile switch
@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
 def get_memory_dir() -> Path:
     """Return the profile-scoped memories directory."""
     return get_hermes_home() / "memories"
+
 
 ENTRY_DELIMITER = "\n§\n"
 
@@ -75,12 +76,12 @@ ENTRY_DELIMITER = "\n§\n"
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 
-def _scan_memory_content(content: str) -> Optional[str]:
+def _scan_memory_content(content: str) -> str | None:
     """Scan memory content for injection/exfil patterns. Returns error string if blocked."""
     return _first_threat_message(content, scope="strict")
 
 
-def _drift_error(path: "Path", bak_path: str) -> Dict[str, Any]:
+def _drift_error(path: "Path", bak_path: str) -> dict[str, Any]:
     """Build the error dict returned when external drift is detected.
 
     The on-disk memory file contains content that wouldn't round-trip
@@ -111,8 +112,7 @@ def _drift_error(path: "Path", bak_path: str) -> Dict[str, Any]:
 
 
 class MemoryStore:
-    """
-    Bounded curated memory with file persistence. One instance per AIAgent.
+    """Bounded curated memory with file persistence. One instance per AIAgent.
 
     Maintains two parallel states:
       - _system_prompt_snapshot: frozen at load time, used for system prompt injection.
@@ -122,12 +122,12 @@ class MemoryStore:
     """
 
     def __init__(self, memory_char_limit: int = 2200, user_char_limit: int = 1375):
-        self.memory_entries: List[str] = []
-        self.user_entries: List[str] = []
+        self.memory_entries: list[str] = []
+        self.user_entries: list[str] = []
         self.memory_char_limit = memory_char_limit
         self.user_char_limit = user_char_limit
         # Frozen snapshot for system prompt -- set once at load_from_disk()
-        self._system_prompt_snapshot: Dict[str, str] = {"memory": "", "user": ""}
+        self._system_prompt_snapshot: dict[str, str] = {"memory": "", "user": ""}
 
     def load_from_disk(self):
         """Load entries from MEMORY.md and USER.md, capture system prompt snapshot.
@@ -169,7 +169,7 @@ class MemoryStore:
         }
 
     @staticmethod
-    def _sanitize_entries_for_snapshot(entries: List[str], filename: str) -> List[str]:
+    def _sanitize_entries_for_snapshot(entries: list[str], filename: str) -> list[str]:
         """Return ``entries`` with any threat-matching entry replaced by a placeholder.
 
         Each entry is scanned with the shared threat-pattern library at the
@@ -183,7 +183,7 @@ class MemoryStore:
         """
         from tools.threat_patterns import scan_for_threats
 
-        sanitized: List[str] = []
+        sanitized: list[str] = []
         for entry in entries:
             if not entry or entry.startswith("[BLOCKED:"):
                 sanitized.append(entry)
@@ -198,7 +198,7 @@ class MemoryStore:
                     f"[BLOCKED: {filename} entry contained threat pattern(s): "
                     f"{', '.join(findings)}. Removed from system prompt; "
                     f"use memory(action=remove) "
-                    f"to delete the original.]"
+                    f"to delete the original.]",
                 )
             else:
                 sanitized.append(entry)
@@ -219,7 +219,7 @@ class MemoryStore:
             yield
             return
 
-        fd = open(lock_path, "a+", encoding="utf-8")
+        fd = Path(lock_path).open("a+", encoding="utf-8")
         try:
             if fcntl:
                 fcntl.flock(fd, fcntl.LOCK_EX)
@@ -231,13 +231,13 @@ class MemoryStore:
             if fcntl:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_UN)
-                except (OSError, IOError):
+                except OSError:
                     pass
             elif msvcrt:
                 try:
                     fd.seek(0)
                     msvcrt.locking(fd.fileno(), msvcrt.LK_UNLCK, 1)
-                except (OSError, IOError):
+                except OSError:
                     pass
             fd.close()
 
@@ -248,7 +248,7 @@ class MemoryStore:
             return mem_dir / "USER.md"
         return mem_dir / "MEMORY.md"
 
-    def _reload_target(self, target: str) -> Optional[str]:
+    def _reload_target(self, target: str) -> str | None:
         """Re-read entries from disk into in-memory state.
 
         Called under file lock to get the latest state before mutating.
@@ -271,12 +271,12 @@ class MemoryStore:
         get_memory_dir().mkdir(parents=True, exist_ok=True)
         self._write_file(self._path_for(target), self._entries_for(target))
 
-    def _entries_for(self, target: str) -> List[str]:
+    def _entries_for(self, target: str) -> list[str]:
         if target == "user":
             return self.user_entries
         return self.memory_entries
 
-    def _set_entries(self, target: str, entries: List[str]):
+    def _set_entries(self, target: str, entries: list[str]):
         if target == "user":
             self.user_entries = entries
         else:
@@ -293,7 +293,7 @@ class MemoryStore:
             return self.user_char_limit
         return self.memory_char_limit
 
-    def add(self, target: str, content: str) -> Dict[str, Any]:
+    def add(self, target: str, content: str) -> dict[str, Any]:
         """Append a new entry. Returns error if it would exceed the char limit."""
         content = content.strip()
         if not content:
@@ -345,7 +345,7 @@ class MemoryStore:
 
         return self._success_response(target, "Entry added.")
 
-    def replace(self, target: str, old_text: str, new_content: str) -> Dict[str, Any]:
+    def replace(self, target: str, old_text: str, new_content: str) -> dict[str, Any]:
         """Find entry containing old_text substring, replace it with new_content."""
         old_text = old_text.strip()
         new_content = new_content.strip()
@@ -410,7 +410,7 @@ class MemoryStore:
 
         return self._success_response(target, "Entry replaced.")
 
-    def remove(self, target: str, old_text: str) -> Dict[str, Any]:
+    def remove(self, target: str, old_text: str) -> dict[str, Any]:
         """Remove the entry containing old_text substring."""
         old_text = old_text.strip()
         if not old_text:
@@ -446,7 +446,7 @@ class MemoryStore:
 
         return self._success_response(target, "Entry removed.")
 
-    def apply_batch(self, target: str, operations: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def apply_batch(self, target: str, operations: list[dict[str, Any]]) -> dict[str, Any]:
         """Apply a sequence of add/replace/remove ops to one target atomically.
 
         All operations are validated and applied against the FINAL budget --
@@ -478,7 +478,7 @@ class MemoryStore:
                 return _drift_error(self._path_for(target), bak)
 
             # Work on a copy; only commit if the whole batch validates.
-            working: List[str] = list(self._entries_for(target))
+            working: list[str] = list(self._entries_for(target))
             limit = self._char_limit(target)
 
             for i, op in enumerate(operations):
@@ -553,7 +553,7 @@ class MemoryStore:
 
         return self._success_response(target, f"Applied {len(operations)} operation(s).")
 
-    def _batch_error(self, target: str, message: str) -> Dict[str, Any]:
+    def _batch_error(self, target: str, message: str) -> dict[str, Any]:
         """Build a batch-abort error that reports live (uncommitted) state."""
         current = self._char_count(target)
         limit = self._char_limit(target)
@@ -564,9 +564,8 @@ class MemoryStore:
             "usage": f"{current:,}/{limit:,}",
         }
 
-    def format_for_system_prompt(self, target: str) -> Optional[str]:
-        """
-        Return the frozen snapshot for system prompt injection.
+    def format_for_system_prompt(self, target: str) -> str | None:
+        """Return the frozen snapshot for system prompt injection.
 
         This returns the state captured at load_from_disk() time, NOT the live
         state. Mid-session writes do not affect this. This keeps the system
@@ -575,11 +574,11 @@ class MemoryStore:
         Returns None if the snapshot is empty (no entries at load time).
         """
         block = self._system_prompt_snapshot.get(target, "")
-        return block if block else None
+        return block or None
 
     # -- Internal helpers --
 
-    def _success_response(self, target: str, message: str = None) -> Dict[str, Any]:
+    def _success_response(self, target: str, message: str = None) -> dict[str, Any]:
         entries = self._entries_for(target)
         current = self._char_count(target)
         limit = self._char_limit(target)
@@ -604,7 +603,7 @@ class MemoryStore:
         resp["note"] = "Write saved. This update is complete — do not repeat it."
         return resp
 
-    def _render_block(self, target: str, entries: List[str]) -> str:
+    def _render_block(self, target: str, entries: list[str]) -> str:
         """Render a system prompt block with header and usage indicator."""
         if not entries:
             return ""
@@ -623,7 +622,7 @@ class MemoryStore:
         return f"{separator}\n{header}\n{separator}\n{content}"
 
     @staticmethod
-    def _read_file(path: Path) -> List[str]:
+    def _read_file(path: Path) -> list[str]:
         """Read a memory file and split into entries.
 
         No file locking needed: _write_file uses atomic rename, so readers
@@ -633,7 +632,7 @@ class MemoryStore:
             return []
         try:
             raw = path.read_text(encoding="utf-8")
-        except (OSError, IOError):
+        except OSError:
             return []
 
         if not raw.strip():
@@ -644,7 +643,7 @@ class MemoryStore:
         entries = [e.strip() for e in raw.split(ENTRY_DELIMITER)]
         return [e for e in entries if e]
 
-    def _detect_external_drift(self, target: str) -> Optional[str]:
+    def _detect_external_drift(self, target: str) -> str | None:
         """Return a backup-path string if on-disk content shows external drift.
 
         The memory file is supposed to be a list of small entries the tool
@@ -673,7 +672,7 @@ class MemoryStore:
             return None
         try:
             raw = path.read_text(encoding="utf-8")
-        except (OSError, IOError):
+        except OSError:
             return None
         if not raw.strip():
             return None
@@ -695,12 +694,12 @@ class MemoryStore:
         bak_path = path.with_suffix(path.suffix + f".bak.{ts}")
         try:
             bak_path.write_text(raw, encoding="utf-8")
-        except (OSError, IOError):
+        except OSError:
             return str(bak_path) + " (BACKUP FAILED — file unchanged on disk)"
         return str(bak_path)
 
     @staticmethod
-    def _write_file(path: Path, entries: List[str]):
+    def _write_file(path: Path, entries: list[str]):
         """Write entries to a memory file using atomic temp-file + rename.
 
         Previous implementation used open("w") + flock, but "w" truncates the
@@ -712,7 +711,7 @@ class MemoryStore:
         try:
             # Write to temp file in same directory (same filesystem for atomic rename)
             fd, tmp_path = tempfile.mkstemp(
-                dir=str(path.parent), suffix=".tmp", prefix=".mem_"
+                dir=str(path.parent), suffix=".tmp", prefix=".mem_",
             )
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -723,11 +722,11 @@ class MemoryStore:
             except BaseException:
                 # Clean up temp file on any failure
                 try:
-                    os.unlink(tmp_path)
+                    Path(tmp_path).unlink()
                 except OSError:
                     pass
                 raise
-        except (OSError, IOError) as e:
+        except OSError as e:
             raise RuntimeError(f"Failed to write memory file {path}: {e}")
 
 
@@ -763,8 +762,8 @@ def load_on_disk_store() -> "MemoryStore":
     return store
 
 
-def _apply_write_gate(action: str, target: str, content: Optional[str],
-                      old_text: Optional[str]) -> Optional[str]:
+def _apply_write_gate(action: str, target: str, content: str | None,
+                      old_text: str | None) -> str | None:
     """Evaluate the memory write gate. Returns a JSON tool-result string when
     the write should NOT proceed normally (blocked or staged), or None when the
     caller should perform the real write.
@@ -820,7 +819,7 @@ def _apply_write_gate(action: str, target: str, content: Optional[str],
     )
 
 
-def _apply_batch_write_gate(target: str, operations: List[Dict[str, Any]]) -> Optional[str]:
+def _apply_batch_write_gate(target: str, operations: list[dict[str, Any]]) -> str | None:
     """Evaluate the write gate for a batch of memory operations.
 
     Returns a JSON tool-result string when the batch should NOT proceed
@@ -904,11 +903,10 @@ def memory_tool(
     target: str = "memory",
     content: str = None,
     old_text: str = None,
-    operations: Optional[List[Dict[str, Any]]] = None,
-    store: Optional[MemoryStore] = None,
+    operations: list[dict[str, Any]] | None = None,
+    store: MemoryStore | None = None,
 ) -> str:
-    """
-    Single entry point for the memory tool. Dispatches to MemoryStore methods.
+    """Single entry point for the memory tool. Dispatches to MemoryStore methods.
 
     Two shapes:
       - Single op: action + (content / old_text).
@@ -976,7 +974,7 @@ def check_memory_requirements() -> bool:
     return True
 
 
-def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[str, Any]:
+def apply_memory_pending(payload: dict[str, Any], store: "MemoryStore") -> dict[str, Any]:
     """Replay a staged memory write directly against the store, bypassing the
     write gate. Called by the /memory approve handler.
 
@@ -997,6 +995,7 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
     return {"success": False, "error": f"Unknown staged action '{action}'."}
 # OpenAI Function-Calling Schema
 # =============================================================================
+
 
 MEMORY_SCHEMA = {
     "name": "memory",
@@ -1028,20 +1027,20 @@ MEMORY_SCHEMA = {
             "action": {
                 "type": "string",
                 "enum": ["add", "replace", "remove"],
-                "description": "The action to perform (single-op shape). Omit when using 'operations'."
+                "description": "The action to perform (single-op shape). Omit when using 'operations'.",
             },
             "target": {
                 "type": "string",
                 "enum": ["memory", "user"],
-                "description": "Which memory store: 'memory' for personal notes, 'user' for user profile."
+                "description": "Which memory store: 'memory' for personal notes, 'user' for user profile.",
             },
             "content": {
                 "type": "string",
-                "description": "The entry content. Required for 'add' and 'replace' (single-op shape)."
+                "description": "The entry content. Required for 'add' and 'replace' (single-op shape).",
             },
             "old_text": {
                 "type": "string",
-                "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a short unique substring identifying the existing entry to modify. Omit only for 'add'."
+                "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a short unique substring identifying the existing entry to modify. Omit only for 'add'.",
             },
             "operations": {
                 "type": "array",
@@ -1083,7 +1082,3 @@ registry.register(
     check_fn=check_memory_requirements,
     emoji="🧠",
 )
-
-
-
-

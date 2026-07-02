@@ -13,15 +13,15 @@ our bridge (kernel start time matches, or — for legacy pidfiles — its comman
 line names node + this session). A recycled PID is left alone.
 """
 
+import os
+import socket
 import subprocess
 import sys
 import time
 
 import pytest
 
-import os
-import socket
-
+from gateway.status import _pid_exists, get_process_start_time
 from plugins.platforms.whatsapp.adapter import (
     _bridge_pid_is_ours,
     _kill_port_process,
@@ -29,13 +29,12 @@ from plugins.platforms.whatsapp.adapter import (
     _listener_pids_on_port,
     _write_bridge_pidfile,
 )
-from gateway.status import get_process_start_time, _pid_exists
 
 
 def _spawn_sleeper(*extra_argv) -> subprocess.Popen:
     """Spawn a real, short-lived process; optional extra argv shapes its cmdline."""
     return subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(30)", *extra_argv]
+        [sys.executable, "-c", "import time; time.sleep(30)", *extra_argv],
     )
 
 
@@ -82,7 +81,7 @@ class TestIdentityGuard:
         try:
             real_start = get_process_start_time(proc.pid)
             # Pidfile claims a different start time -> simulates a recycled PID.
-            (tmp_path / "bridge.pid").write_text("{}\n{}".format(proc.pid, real_start + 1))
+            (tmp_path / "bridge.pid").write_text(f"{proc.pid}\n{real_start + 1}")
             _kill_stale_bridge_by_pidfile(tmp_path)
             assert not _wait_dead(proc, timeout=1.0), "recycled PID must survive"
             assert proc.poll() is None

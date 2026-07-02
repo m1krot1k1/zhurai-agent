@@ -158,7 +158,7 @@ def test_asyncio_create_subprocess_exec_systemctl_blocked():
 
     async def _attempt():
         await asyncio.create_subprocess_exec(
-            "systemctl", "--user", "restart", "hermes-gateway"
+            "systemctl", "--user", "restart", "hermes-gateway",
         )
 
     with pytest.raises(RuntimeError, match="live-system guard"):
@@ -170,7 +170,7 @@ def test_asyncio_create_subprocess_shell_systemctl_blocked():
 
     async def _attempt():
         await asyncio.create_subprocess_shell(
-            "systemctl --user restart hermes-gateway"
+            "systemctl --user restart hermes-gateway",
         )
 
     with pytest.raises(RuntimeError, match="live-system guard"):
@@ -237,7 +237,7 @@ def test_systemctl_list_units_passes_through():
 
 
 def test_systemctl_unrelated_unit_passes_through():
-    """systemctl restart of a non-hermes unit is allowed (we only protect hermes)."""
+    """Systemctl restart of a non-hermes unit is allowed (we only protect hermes)."""
     # Use --dry-run so we don't actually try to restart anything; just
     # verify the guard doesn't block the call. systemctl supports
     # --dry-run via the privileged API; on user scope it usually fails

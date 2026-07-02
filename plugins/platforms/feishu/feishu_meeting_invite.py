@@ -1,5 +1,4 @@
-"""
-Feishu/Lark meeting-invitation event handling.
+"""Feishu/Lark meeting-invitation event handling.
 
 Processes ``vc.bot.meeting_invited_v1`` events by converting them into a
 synthetic gateway ``MessageEvent``.  Unlike document comments, the response
@@ -13,7 +12,7 @@ import json
 import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any
 
 from gateway.platforms.base import MessageEvent, MessageType
 
@@ -35,18 +34,18 @@ class MeetingInviteMeeting:
     meeting_no: str = ""
     start_time_ms: int = 0
     end_time_ms: int = 0
-    host_user: Optional[MeetingInviteUser] = None
+    host_user: MeetingInviteUser | None = None
 
 
 @dataclass(frozen=True)
 class MeetingInvitedPayload:
     event_id: str = ""
-    meeting: Optional[MeetingInviteMeeting] = None
-    inviter: Optional[MeetingInviteUser] = None
+    meeting: MeetingInviteMeeting | None = None
+    inviter: MeetingInviteUser | None = None
     invite_time_s: int = 0
 
 
-def _as_dict(value: Any) -> Dict[str, Any]:
+def _as_dict(value: Any) -> dict[str, Any]:
     """Coerce a lark SDK object / dict / JSON string into a plain dict."""
     if isinstance(value, SimpleNamespace) or (value is not None and hasattr(value, "__dict__")):
         value = vars(value)
@@ -61,7 +60,7 @@ def _as_dict(value: Any) -> Dict[str, Any]:
     return {}
 
 
-def _content_payload(container: Dict[str, Any]) -> Dict[str, Any]:
+def _content_payload(container: dict[str, Any]) -> dict[str, Any]:
     """Unwrap a Feishu ``body.content`` list carrying an application/json payload."""
     content = _as_dict(container.get("body")).get("content")
     if not isinstance(content, list):
@@ -87,7 +86,7 @@ def _int_field(value: Any) -> int:
         return 0
 
 
-def _parse_user(value: Any) -> Optional[MeetingInviteUser]:
+def _parse_user(value: Any) -> MeetingInviteUser | None:
     raw = _as_dict(value)
     if not raw:
         return None
@@ -100,7 +99,7 @@ def _parse_user(value: Any) -> Optional[MeetingInviteUser]:
     )
 
 
-def _parse_meeting(value: Any) -> Optional[MeetingInviteMeeting]:
+def _parse_meeting(value: Any) -> MeetingInviteMeeting | None:
     raw = _as_dict(value)
     if not raw:
         return None
@@ -114,7 +113,7 @@ def _parse_meeting(value: Any) -> Optional[MeetingInviteMeeting]:
     )
 
 
-def parse_meeting_invited_event(data: Any) -> Optional[MeetingInvitedPayload]:
+def parse_meeting_invited_event(data: Any) -> MeetingInvitedPayload | None:
     root = _as_dict(data)
     event = _as_dict(root.get("event"))
     event = event or root
@@ -152,7 +151,7 @@ def build_meeting_invite_prompt(payload: MeetingInvitedPayload) -> str:
             "You may use lark-cli and the relevant Lark/Feishu meeting skills to join the meeting.",
             "Join the meeting directly. Do not ask the user for confirmation before joining.",
             "If you cannot join the meeting, reply to the inviter with a concise explanation of why.",
-        ]
+        ],
     )
 
 

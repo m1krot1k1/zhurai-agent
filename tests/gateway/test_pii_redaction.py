@@ -1,19 +1,19 @@
 """Tests for PII redaction in gateway session context prompts."""
 
+from gateway.config import HomeChannel, Platform
 from gateway.session import (
     SessionContext,
     SessionSource,
-    build_session_context_prompt,
+    _hash_chat_id,
     _hash_id,
     _hash_sender_id,
-    _hash_chat_id,
+    build_session_context_prompt,
 )
-from gateway.config import Platform, HomeChannel
-
 
 # ---------------------------------------------------------------------------
 # Low-level helpers
 # ---------------------------------------------------------------------------
+
 
 class TestHashHelpers:
     def test_hash_id_deterministic(self):
@@ -89,7 +89,7 @@ class TestBuildSessionContextPromptRedaction:
                 platform=Platform.TELEGRAM,
                 chat_id="telegram:99999",
                 name="Home Chat",
-            )
+            ),
         }
         ctx = _make_context(home_channels=hc)
         prompt = build_session_context_prompt(ctx, redact_pii=True)
@@ -103,7 +103,7 @@ class TestBuildSessionContextPromptRedaction:
                 platform=Platform.TELEGRAM,
                 chat_id="telegram:99999",
                 name="Home Chat",
-            )
+            ),
         }
         ctx = _make_context(home_channels=hc)
         prompt = build_session_context_prompt(ctx, redact_pii=False)

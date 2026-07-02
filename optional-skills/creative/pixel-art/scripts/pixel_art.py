@@ -98,10 +98,11 @@ def pixel_art(input_path, output_path, preset="arcade", **overrides):
 
     Returns:
         The resulting PIL.Image.
+
     """
     if preset not in PRESETS:
         raise ValueError(
-            f"Unknown preset {preset!r}. Choose from: {sorted(PRESETS)}"
+            f"Unknown preset {preset!r}. Choose from: {sorted(PRESETS)}",
         )
     cfg = {**PRESETS[preset], **overrides}
 

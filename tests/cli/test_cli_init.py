@@ -1,5 +1,6 @@
 """Tests for HermesCLI initialization -- catches configuration bugs
-that only manifest at runtime (not in mocked unit tests)."""
+that only manifest at runtime (not in mocked unit tests).
+"""
 
 import os
 import sys
@@ -186,9 +187,10 @@ class TestPromptToolkitTerminalCompatibility:
         unbound here so it can be used as the Ctrl+Enter newline keystroke
         without conflicting with submit. See issue #22379.
         """
-        import sys as _sys
         import os as _os
+        import sys as _sys
         from unittest.mock import patch as _patch
+
         from prompt_toolkit.key_binding import KeyBindings
 
         from cli import _bind_prompt_submit_keys
@@ -203,8 +205,8 @@ class TestPromptToolkitTerminalCompatibility:
             kb = KeyBindings()
             _bind_prompt_submit_keys(kb, submit_handler)
             bindings = {tuple(key.value for key in binding.keys): binding.handler for binding in kb.bindings}
-            assert bindings[("c-m",)] is submit_handler
-            assert bindings[("c-j",)] is submit_handler
+            assert bindings["c-m",] is submit_handler
+            assert bindings["c-j",] is submit_handler
 
         # POSIX over SSH: c-j stays free so Ctrl+Enter (sent as LF by
         # Windows Terminal / Kitty / mintty over SSH) inserts a newline.
@@ -214,7 +216,7 @@ class TestPromptToolkitTerminalCompatibility:
             kb = KeyBindings()
             _bind_prompt_submit_keys(kb, submit_handler)
             bindings = {tuple(key.value for key in binding.keys): binding.handler for binding in kb.bindings}
-            assert bindings[("c-m",)] is submit_handler
+            assert bindings["c-m",] is submit_handler
             assert ("c-j",) not in bindings
 
         # Ghostty through tmux: TERM_PROGRAM is tmux, but Ghostty exports a
@@ -225,7 +227,7 @@ class TestPromptToolkitTerminalCompatibility:
             kb = KeyBindings()
             _bind_prompt_submit_keys(kb, submit_handler)
             bindings = {tuple(key.value for key in binding.keys): binding.handler for binding in kb.bindings}
-            assert bindings[("c-m",)] is submit_handler
+            assert bindings["c-m",] is submit_handler
             assert ("c-j",) not in bindings
 
         # Windows: only enter submits; c-j is free for the newline binding
@@ -234,7 +236,7 @@ class TestPromptToolkitTerminalCompatibility:
             kb = KeyBindings()
             _bind_prompt_submit_keys(kb, submit_handler)
             bindings = {tuple(key.value for key in binding.keys): binding.handler for binding in kb.bindings}
-            assert bindings[("c-m",)] is submit_handler
+            assert bindings["c-m",] is submit_handler
             assert ("c-j",) not in bindings
 
     def test_cpr_warning_callback_is_disabled(self):
@@ -374,7 +376,8 @@ class TestHistoryDisplay:
 
     def test_resume_list_shows_full_long_titles(self, capsys):
         """Long session titles render in full in the /resume table — not
-        truncated to 30 chars (fixes #14082)."""
+        truncated to 30 chars (fixes #14082).
+        """
         cli = _make_cli()
         cli.session_id = "current"
         cli._session_db = MagicMock()
@@ -463,7 +466,7 @@ class TestHistoryDisplay:
             cli.process_command("/sessions Checking Running Hermes Agent")
 
         mock_resume.assert_called_once_with(
-            "/resume Checking Running Hermes Agent"
+            "/resume Checking Running Hermes Agent",
         )
 
     def test_sessions_command_is_dispatched(self):
@@ -678,4 +681,4 @@ class TestProviderResolution:
     def test_model_is_string(self):
         cli = _make_cli()
         assert isinstance(cli.model, str)
-        assert isinstance(cli.model, str) and '/' in cli.model
+        assert isinstance(cli.model, str) and "/" in cli.model

@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger("agent.lsp.protocol")
 
@@ -63,7 +63,7 @@ def encode_message(obj: dict) -> bytes:
     return header + body
 
 
-async def read_message(reader: asyncio.StreamReader) -> Optional[dict]:
+async def read_message(reader: asyncio.StreamReader) -> dict | None:
     """Read one Content-Length framed JSON-RPC message from the stream.
 
     Returns ``None`` on clean EOF (server closed stdout cleanly between
@@ -83,7 +83,7 @@ async def read_message(reader: asyncio.StreamReader) -> Optional[dict]:
             if not e.partial and not headers:
                 return None
             raise LSPProtocolError(
-                f"unexpected EOF while reading LSP headers (partial={e.partial!r})"
+                f"unexpected EOF while reading LSP headers (partial={e.partial!r})",
             ) from e
         # Defensive cap against a server streaming headers without ever
         # emitting CRLF-CRLF.  Caps total header bytes at 8 KiB — a
@@ -91,7 +91,7 @@ async def read_message(reader: asyncio.StreamReader) -> Optional[dict]:
         header_bytes += len(line)
         if header_bytes > 8192:
             raise LSPProtocolError(
-                f"LSP header block exceeded 8 KiB without terminator"
+                "LSP header block exceeded 8 KiB without terminator",
             )
         line = line[:-2]  # strip CRLF
         if not line:
@@ -118,7 +118,7 @@ async def read_message(reader: asyncio.StreamReader) -> Optional[dict]:
         body = await reader.readexactly(n)
     except asyncio.IncompleteReadError as e:
         raise LSPProtocolError(
-            f"truncated LSP body: expected {n} bytes, got {len(e.partial)}"
+            f"truncated LSP body: expected {n} bytes, got {len(e.partial)}",
         ) from e
 
     try:
@@ -158,7 +158,7 @@ def make_error_response(req_id: Any, code: int, message: str, data: Any = None) 
     return {"jsonrpc": "2.0", "id": req_id, "error": err}
 
 
-def classify_message(msg: dict) -> Tuple[str, Any]:
+def classify_message(msg: dict) -> tuple[str, Any]:
     """Return ``(kind, key)`` where kind is one of ``request``,
     ``response``, ``notification``, ``invalid``.
 
@@ -182,15 +182,15 @@ def classify_message(msg: dict) -> Tuple[str, Any]:
 
 __all__ = [
     "ERROR_CONTENT_MODIFIED",
-    "ERROR_REQUEST_CANCELLED",
     "ERROR_METHOD_NOT_FOUND",
+    "ERROR_REQUEST_CANCELLED",
     "LSPProtocolError",
     "LSPRequestError",
-    "encode_message",
-    "read_message",
-    "make_request",
-    "make_notification",
-    "make_response",
-    "make_error_response",
     "classify_message",
+    "encode_message",
+    "make_error_response",
+    "make_notification",
+    "make_request",
+    "make_response",
+    "read_message",
 ]

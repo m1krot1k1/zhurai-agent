@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 _INSTALL_ROOT = Path(__file__).resolve().parent.parent
 
 
-def get_ecosystem_root() -> Optional[Path]:
+def get_ecosystem_root() -> Path | None:
     """Return the ecosystem repo root, or None when not configured."""
     override = os.environ.get("ZHUR_AI_AGENT_ROOT", "").strip()
 
@@ -28,7 +27,7 @@ def get_ecosystem_root() -> Optional[Path]:
     return None
 
 
-def get_ecosystem_agents_dir() -> Optional[Path]:
+def get_ecosystem_agents_dir() -> Path | None:
     root = get_ecosystem_root()
     if root is None:
         return None
@@ -36,7 +35,7 @@ def get_ecosystem_agents_dir() -> Optional[Path]:
     return agents if agents.is_dir() else None
 
 
-def get_ecosystem_skills_dir() -> Optional[Path]:
+def get_ecosystem_skills_dir() -> Path | None:
     root = get_ecosystem_root()
     if root is None:
         return None
@@ -44,7 +43,7 @@ def get_ecosystem_skills_dir() -> Optional[Path]:
     return skills if skills.is_dir() else None
 
 
-def get_ecosystem_rules_dir() -> Optional[Path]:
+def get_ecosystem_rules_dir() -> Path | None:
     root = get_ecosystem_root()
     if root is None:
         return None

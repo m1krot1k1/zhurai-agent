@@ -15,7 +15,6 @@ import logging
 import os
 import re
 import urllib.request
-from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,8 @@ _TIMEOUT = 10  # seconds
 
 
 def check_package_for_malware(
-    command: str, args: list
-) -> Optional[str]:
+    command: str, args: list,
+) -> str | None:
     """Check if an MCP server package has known malware advisories.
 
     Inspects the *command* (e.g. ``npx``, ``uvx``) and *args* to infer the
@@ -34,6 +33,7 @@ def check_package_for_malware(
     Returns:
         An error message string if malware is found, or None if clean/unknown.
         Returns None (allow) on network errors or unrecognized commands.
+
     """
     ecosystem = _infer_ecosystem(command)
     if not ecosystem:
@@ -62,7 +62,7 @@ def check_package_for_malware(
     return None
 
 
-def _infer_ecosystem(command: str) -> Optional[str]:
+def _infer_ecosystem(command: str) -> str | None:
     """Infer package ecosystem from the command name."""
     base = os.path.basename(command).lower()
     if base in {"npx", "npx.cmd"}:
@@ -73,8 +73,8 @@ def _infer_ecosystem(command: str) -> Optional[str]:
 
 
 def _parse_package_from_args(
-    args: list, ecosystem: str
-) -> Tuple[Optional[str], Optional[str]]:
+    args: list, ecosystem: str,
+) -> tuple[str | None, str | None]:
     """Extract package name and optional version from command args.
 
     Returns (package_name, version) or (None, None) if not parseable.
@@ -111,12 +111,12 @@ def _parse_package_from_args(
 
     if ecosystem == "npm":
         return _parse_npm_package(package_token)
-    elif ecosystem == "PyPI":
+    if ecosystem == "PyPI":
         return _parse_pypi_package(package_token)
     return package_token, None
 
 
-def _parse_npm_package(token: str) -> Tuple[Optional[str], Optional[str]]:
+def _parse_npm_package(token: str) -> tuple[str | None, str | None]:
     """Parse npm package: @scope/name@version or name@version."""
     if token.startswith("@"):
         # Scoped: @scope/name@version
@@ -133,7 +133,7 @@ def _parse_npm_package(token: str) -> Tuple[Optional[str], Optional[str]]:
     return token, None
 
 
-def _parse_pypi_package(token: str) -> Tuple[Optional[str], Optional[str]]:
+def _parse_pypi_package(token: str) -> tuple[str | None, str | None]:
     """Parse PyPI package: name==version or name[extras]==version."""
     # Strip extras: name[extra1,extra2]==version
     match = re.match(r"^([a-zA-Z0-9._-]+)(?:\[[^\]]*\])?(?:==(.+))?$", token)
@@ -143,7 +143,7 @@ def _parse_pypi_package(token: str) -> Tuple[Optional[str], Optional[str]]:
 
 
 def _query_osv(
-    package: str, ecosystem: str, version: Optional[str] = None
+    package: str, ecosystem: str, version: str | None = None,
 ) -> list:
     """Query the OSV API for MAL-* advisories. Returns list of malware vulns."""
     payload = {"package": {"name": package, "ecosystem": ecosystem}}

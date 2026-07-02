@@ -21,12 +21,12 @@ def _client_with_app_state():
 
 def _restore_app_state(prev_auth_required, prev_bound_host):
     if prev_auth_required is None:
-        delattr(web_server.app.state, "auth_required")
+        del web_server.app.state.auth_required
     else:
         web_server.app.state.auth_required = prev_auth_required
     if prev_bound_host is None:
         if hasattr(web_server.app.state, "bound_host"):
-            delattr(web_server.app.state, "bound_host")
+            del web_server.app.state.bound_host
     else:
         web_server.app.state.bound_host = prev_bound_host
 
@@ -95,7 +95,7 @@ def test_forced_root_file_upload_list_read_delete_roundtrip(forced_files_client)
             "size": 5,
             "mtime": pytest.approx(file_path.stat().st_mtime),
             "mime_type": "text/plain",
-        }
+        },
     ]
 
     read = client.get("/api/files/read", params={"path": str(file_path)})
@@ -292,10 +292,10 @@ def test_download_authenticates_via_query_token(forced_files_client):
     assert ok.content == b"hello"
 
     assert client.get(
-        "/api/files/download", params={"path": str(file_path), "token": "nope"}
+        "/api/files/download", params={"path": str(file_path), "token": "nope"},
     ).status_code == 401
     assert client.get(
-        "/api/files/download", params={"path": str(file_path)}
+        "/api/files/download", params={"path": str(file_path)},
     ).status_code == 401
 
 
@@ -480,7 +480,7 @@ def test_stream_upload_cleans_temp_on_cancellation(forced_files_client):
                 file=_AbortingUpload(),
                 path=str(target),
                 overwrite=True,
-            )
+            ),
         )
 
     # No partial data was promoted into place ...

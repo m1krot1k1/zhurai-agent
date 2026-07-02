@@ -16,11 +16,10 @@ from pathlib import Path
 
 import hermes_constants
 
-
-
 # ---------------------------------------------------------------------------
 # get_subprocess_home()
 # ---------------------------------------------------------------------------
+
 
 class TestGetSubprocessHome:
     """Unit tests for hermes_constants.get_subprocess_home()."""
@@ -93,7 +92,7 @@ class TestGetSubprocessHome:
         monkeypatch.setenv("HOME", str(profile_home))
         monkeypatch.setenv("HERMES_REAL_HOME", str(real_home))
 
-        from hermes_constants import get_subprocess_home, get_real_home
+        from hermes_constants import get_real_home, get_subprocess_home
 
         assert get_real_home() == str(real_home)
         assert get_subprocess_home() == str(real_home)
@@ -247,7 +246,10 @@ class TestMakeRunEnvHomeInjection:
         monkeypatch.setenv("HOME", "/root")
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from hermes_constants import (
+            reset_hermes_home_override,
+            set_hermes_home_override,
+        )
         from tools.environments.local import _make_run_env
 
         token = set_hermes_home_override(profile)
@@ -321,7 +323,10 @@ class TestSanitizeSubprocessEnvHomeInjection:
         monkeypatch.setenv("HERMES_HOME", str(root))
 
         base_env = {"HOME": "/root", "PATH": "/usr/bin"}
-        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from hermes_constants import (
+            reset_hermes_home_override,
+            set_hermes_home_override,
+        )
         from tools.environments.local import _sanitize_subprocess_env
 
         token = set_hermes_home_override(profile)
@@ -365,7 +370,7 @@ class TestPythonProcessUnchanged:
     """Confirm the Python process's own HOME is never modified."""
 
     def test_path_home_unchanged_after_subprocess_home_resolved(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         hermes_home = tmp_path / "hermes"
         hermes_home.mkdir()

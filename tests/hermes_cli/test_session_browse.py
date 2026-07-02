@@ -9,11 +9,10 @@ Covers:
 import time
 from unittest.mock import MagicMock, patch
 
-
 from hermes_cli.main import _session_browse_picker
 
-
 # ─── Sample session data ──────────────────────────────────────────────────────
+
 
 def _make_sessions(n=5):
     """Generate a list of fake rich-session dicts."""
@@ -247,7 +246,6 @@ class TestCursesBrowse:
 
     def _run_with_keys(self, sessions, key_sequence):
         """Simulate running the curses picker with a given key sequence."""
-
         # Build a mock stdscr that returns keys from the sequence
         mock_stdscr = MagicMock()
         mock_stdscr.getmaxyx.return_value = (30, 120)
@@ -297,7 +295,7 @@ class TestCursesBrowse:
 
     def test_q_cancels(self):
         sessions = _make_sessions(3)
-        result = self._run_with_keys(sessions, [ord('q')])
+        result = self._run_with_keys(sessions, [ord("q")])
         assert result is None
 
     def test_type_to_filter_then_enter(self):
@@ -326,7 +324,7 @@ class TestCursesBrowse:
             {"id": "s2", "source": "cli", "title": "Beta", "preview": "", "last_active": time.time()},
         ]
         # Type "Bet", backspace, backspace, backspace (clears filter), then Enter (selects first)
-        keys = [ord('B'), ord('e'), ord('t'), 127, 127, 127, 10]
+        keys = [ord("B"), ord("e"), ord("t"), 127, 127, 127, 10]
         result = self._run_with_keys(sessions, keys)
         assert result == "s1"
 
@@ -334,7 +332,7 @@ class TestCursesBrowse:
         """First Esc clears the search text, second Esc exits."""
         sessions = _make_sessions(3)
         # Type "ab" then Esc (clears filter) then Enter (selects first)
-        keys = [ord('a'), ord('b'), 27, 10]
+        keys = [ord("a"), ord("b"), 27, 10]
         result = self._run_with_keys(sessions, keys)
         assert result == sessions[0]["id"]
 
@@ -361,7 +359,7 @@ class TestCursesBrowse:
     def test_q_quits_when_no_filter_active(self):
         """When no search text is active, 'q' should quit (not filter)."""
         sessions = _make_sessions(3)
-        result = self._run_with_keys(sessions, [ord('q')])
+        result = self._run_with_keys(sessions, [ord("q")])
         assert result is None
 
     def test_q_types_into_filter_when_filter_active(self):
@@ -373,7 +371,7 @@ class TestCursesBrowse:
         # Type "se" first (activates filter, matches "the sequel")
         # Then type "q" — should add 'q' to filter (filter="seq"), NOT quit
         # "seq" still matches "the sequel" → Enter selects it
-        keys = [ord('s'), ord('e'), ord('q'), 10]
+        keys = [ord("s"), ord("e"), ord("q"), 10]
         result = self._run_with_keys(sessions, keys)
         assert result == "s1"  # "the sequel" matches "seq"
 
@@ -384,8 +382,7 @@ class TestSessionBrowseArgparse:
     """Verify the 'browse' subcommand is properly registered."""
 
     def test_browse_subcommand_exists(self):
-        """hermes sessions browse should be parseable."""
-
+        """Hermes sessions browse should be parseable."""
         # We can't run main(), but we can import and test the parser setup
         # by checking that argparse doesn't error on "sessions browse"
         # Re-create the parser portion

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from agent.account_usage import (
     AccountUsageSnapshot,
@@ -80,7 +80,7 @@ def test_fetch_account_usage_codex(monkeypatch):
                     },
                 },
                 "credits": {"has_credits": True, "balance": 12.5},
-            }
+            },
         ),
     )
 
@@ -91,7 +91,7 @@ def test_fetch_account_usage_codex(monkeypatch):
     assert len(snapshot.windows) == 2
     assert snapshot.windows[0].label == "Session"
     assert snapshot.windows[0].used_percent == 15.0
-    assert snapshot.windows[0].reset_at == datetime.fromtimestamp(1_900_000_000, tz=timezone.utc)
+    assert snapshot.windows[0].reset_at == datetime.fromtimestamp(1_900_000_000, tz=UTC)
     assert "Credits balance: $12.50" in snapshot.details
 
 
@@ -99,13 +99,13 @@ def test_render_account_usage_lines_includes_reset_and_provider():
     snapshot = AccountUsageSnapshot(
         provider="openai-codex",
         source="usage_api",
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         plan="Pro",
         windows=(
             AccountUsageWindow(
                 label="Session",
                 used_percent=25,
-                reset_at=datetime.now(timezone.utc),
+                reset_at=datetime.now(UTC),
             ),
         ),
         details=("Credits balance: $9.99",),
@@ -132,7 +132,7 @@ def test_fetch_account_usage_openrouter_uses_limit_remaining_and_ignores_depreca
         lambda timeout=10.0: _RoutingClient(
             {
                 "https://openrouter.ai/api/v1/credits": {
-                    "data": {"total_credits": 300.0, "total_usage": 10.92}
+                    "data": {"total_credits": 300.0, "total_usage": 10.92},
                 },
                 "https://openrouter.ai/api/v1/key": {
                     "data": {
@@ -144,9 +144,9 @@ def test_fetch_account_usage_openrouter_uses_limit_remaining_and_ignores_depreca
                         "usage_weekly": 2.0,
                         "usage_monthly": 8.0,
                         "rate_limit": {"requests": -1, "interval": "10s"},
-                    }
+                    },
                 },
-            }
+            },
         ),
     )
 
@@ -179,7 +179,7 @@ def test_fetch_account_usage_openrouter_omits_quota_window_when_key_has_no_limit
         lambda timeout=10.0: _RoutingClient(
             {
                 "https://openrouter.ai/api/v1/credits": {
-                    "data": {"total_credits": 100.0, "total_usage": 25.5}
+                    "data": {"total_credits": 100.0, "total_usage": 25.5},
                 },
                 "https://openrouter.ai/api/v1/key": {
                     "data": {
@@ -189,9 +189,9 @@ def test_fetch_account_usage_openrouter_omits_quota_window_when_key_has_no_limit
                         "usage_daily": 1.25,
                         "usage_weekly": 4.5,
                         "usage_monthly": 18.0,
-                    }
+                    },
                 },
-            }
+            },
         ),
     )
 

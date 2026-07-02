@@ -1,21 +1,23 @@
 """Tests for agent.error_classifier — structured API error classification."""
 
 import pytest
+
 from agent.error_classifier import (
     ClassifiedError,
     FailoverReason,
-    classify_api_error,
-    _extract_status_code,
+    _classify_402,
     _extract_error_body,
     _extract_error_code,
-    _classify_402,
+    _extract_status_code,
+    classify_api_error,
 )
-
 
 # ── Helper: mock API errors ────────────────────────────────────────────
 
+
 class MockAPIError(Exception):
     """Simulates an OpenAI SDK APIStatusError."""
+
     def __init__(self, message, status_code=None, body=None):
         super().__init__(message)
         self.status_code = status_code
@@ -24,7 +26,6 @@ class MockAPIError(Exception):
 
 class MockTransportError(Exception):
     """Simulates a transport-level error with a specific type name."""
-    pass
 
 
 class ReadTimeout(MockTransportError):
@@ -155,7 +156,7 @@ class TestExtractErrorCode:
                     '"type":"invalid_request_error","param":"","code":"invalid_encrypted_content"}}'
                 ),
                 "type": "400",
-            }
+            },
         }
         assert _extract_error_code(body) == "invalid_encrypted_content"
 
@@ -365,7 +366,7 @@ class TestClassifyApiError:
                         "[unknown_parameter] Unknown parameter: "
                         "'input[617]._empty_recovery_synthetic'."
                     ),
-                }
+                },
             },
         )
         result = classify_api_error(e)
@@ -381,7 +382,7 @@ class TestClassifyApiError:
                 "error": {
                     "type": "invalid_request_error",
                     "message": "Unsupported parameter: logprobs",
-                }
+                },
             },
         )
         result = classify_api_error(e)
@@ -462,7 +463,7 @@ class TestClassifyApiError:
         # via the message-pattern fallback.
         e = Exception(
             "No endpoints available matching your guardrail restrictions "
-            "and data policy"
+            "and data policy",
         )
         result = classify_api_error(e)
         assert result.reason == FailoverReason.provider_policy_blocked
@@ -483,7 +484,7 @@ class TestClassifyApiError:
         e = Exception(
             "This content was flagged for possible cybersecurity risk. If this "
             "seems wrong, try rephrasing your request. To get authorized for "
-            "security work, join the Trusted Access for Cyber program."
+            "security work, join the Trusted Access for Cyber program.",
         )
         result = classify_api_error(e, provider="openai-codex", model="gpt-5.5")
         assert result.reason == FailoverReason.content_policy_blocked
@@ -519,7 +520,7 @@ class TestClassifyApiError:
         # Anthropic safety refusal — distinct phrasing from OpenAI.
         e = Exception(
             "Your prompt was flagged by our safety system. Please rephrase "
-            "and try again."
+            "and try again.",
         )
         result = classify_api_error(e, provider="anthropic", model="claude-3-5-sonnet")
         assert result.reason == FailoverReason.content_policy_blocked
@@ -665,7 +666,8 @@ class TestClassifyApiError:
         """Frozen-block mutation 400 (no 'signature' token) must route to
         thinking_signature recovery, not hard-abort. Regression for the
         real-world error: latest-assistant thinking blocks 'cannot be
-        modified' after upstream message mutation."""
+        modified' after upstream message mutation.
+        """
         e = MockAPIError(
             "messages.73.content.10: `thinking` or `redacted_thinking` blocks "
             "in the latest assistant message cannot be modified. These blocks "
@@ -678,7 +680,8 @@ class TestClassifyApiError:
 
     def test_anthropic_thinking_cannot_be_modified_via_openrouter(self):
         """Same frozen-block error proxied through OpenRouter must also be
-        caught (provider is not gated)."""
+        caught (provider is not gated).
+        """
         e = MockAPIError(
             "`thinking` or `redacted_thinking` blocks in the latest assistant "
             "message cannot be modified.",
@@ -690,7 +693,8 @@ class TestClassifyApiError:
 
     def test_400_cannot_be_modified_without_thinking_not_classified(self):
         """A 400 'cannot be modified' that has nothing to do with thinking
-        blocks must NOT be swept into thinking_signature recovery."""
+        blocks must NOT be swept into thinking_signature recovery.
+        """
         e = MockAPIError(
             "this field cannot be modified after creation", status_code=400,
         )
@@ -706,7 +710,7 @@ class TestClassifyApiError:
                     '"type":"invalid_request_error","param":"","code":"invalid_encrypted_content"}}'
                 ),
                 "type": "400",
-            }
+            },
         }
         e = MockAPIError(
             "Error code: 400 - invalid_encrypted_content",
@@ -800,7 +804,8 @@ class TestClassifyApiError:
 
     def test_anthropic_oauth_1m_beta_forbidden(self):
         """400 + 'long context beta is not yet available for this subscription'
-        → oauth_long_context_beta_forbidden (retryable, no compression)."""
+        → oauth_long_context_beta_forbidden (retryable, no compression).
+        """
         e = MockAPIError(
             "The long context beta is not yet available for this subscription.",
             status_code=400,
@@ -812,7 +817,8 @@ class TestClassifyApiError:
 
     def test_anthropic_oauth_1m_beta_forbidden_does_not_collide_with_tier_gate(self):
         """The 429 'extra usage' + 'long context' tier gate keeps its own
-        classification even though its message mentions 'long context'."""
+        classification even though its message mentions 'long context'.
+        """
         e = MockAPIError(
             "Extra usage is required for long context requests over 200k tokens",
             status_code=429,
@@ -822,7 +828,8 @@ class TestClassifyApiError:
 
     def test_400_without_beta_phrase_is_not_1m_beta_forbidden(self):
         """A generic 400 that happens to mention 'long context' but not the
-        exact beta-availability phrase should not be misclassified."""
+        exact beta-availability phrase should not be misclassified.
+        """
         e = MockAPIError(
             "long context window exceeded",
             status_code=400,
@@ -908,7 +915,7 @@ class TestClassifyApiError:
                 "error": {
                     "code": "model_not_supported_on_free_tier",
                     "message": "Model 'gpt-5' is not available on the Free Tier.",
-                }
+                },
             },
         )
         result = classify_api_error(e, provider="nous", model="gpt-5")
@@ -1006,7 +1013,8 @@ class TestClassifyApiError:
         'max_tokens' (a _CONTEXT_OVERFLOW_PATTERNS entry), so without the
         request-validation guard it was routed into the compression loop,
         re-sent with the same bad param, and ended in "Cannot compress
-        further". Regression for gpt-5-context-overflow-misclassification."""
+        further". Regression for gpt-5-context-overflow-misclassification.
+        """
         msg = ("Unsupported parameter: 'max_tokens' is not supported with this "
                "model. Use 'max_completion_tokens' instead.")
         e = MockAPIError(
@@ -1024,7 +1032,8 @@ class TestClassifyApiError:
 
     def test_400_unknown_parameter_not_context_overflow(self):
         """'Unknown parameter' 400s are deterministic request-validation
-        failures, not overflows."""
+        failures, not overflows.
+        """
         e = MockAPIError(
             "Unknown parameter: 'foo'.",
             status_code=400,
@@ -1038,7 +1047,8 @@ class TestClassifyApiError:
     def test_400_real_overflow_with_invalid_request_error_code_still_compresses(self):
         """Guard the guard: OpenAI stamps genuine context-overflow 400s with
         the generic 'invalid_request_error' code. The request-validation guard
-        must NOT key off that code, or real overflows stop compressing."""
+        must NOT key off that code, or real overflows stop compressing.
+        """
         msg = ("This model's maximum context length is 128000 tokens, however "
                "you requested 150000 tokens.")
         e = MockAPIError(
@@ -1106,7 +1116,7 @@ class TestClassifyApiError:
     # ── vLLM / local inference server error messages ──
 
     def test_vllm_max_model_len_overflow(self):
-        """vLLM's 'exceeds the max_model_len' error → context_overflow."""
+        """VLLM's 'exceeds the max_model_len' error → context_overflow."""
         e = MockAPIError(
             "The engine prompt length 1327246 exceeds the max_model_len 131072. "
             "Please reduce prompt.",
@@ -1116,7 +1126,7 @@ class TestClassifyApiError:
         assert result.reason == FailoverReason.context_overflow
 
     def test_vllm_prompt_length_exceeds(self):
-        """vLLM prompt length error → context_overflow."""
+        """VLLM prompt length error → context_overflow."""
         e = MockAPIError(
             "prompt length 200000 exceeds maximum model length 131072",
             status_code=400,
@@ -1125,7 +1135,7 @@ class TestClassifyApiError:
         assert result.reason == FailoverReason.context_overflow
 
     def test_vllm_input_too_long(self):
-        """vLLM 'input is too long' error → context_overflow."""
+        """VLLM 'input is too long' error → context_overflow."""
         e = MockAPIError("input is too long for model", status_code=400)
         result = classify_api_error(e)
         assert result.reason == FailoverReason.context_overflow
@@ -1255,7 +1265,8 @@ class TestAdversarialEdgeCases:
 
     def test_body_message_enrichment(self):
         """Body message must be included in pattern matching even when
-        str(error) doesn't contain it (OpenAI SDK APIStatusError)."""
+        str(error) doesn't contain it (OpenAI SDK APIStatusError).
+        """
         e = MockAPIError(
             "Usage limit",  # str(e) = "usage limit"
             status_code=402,
@@ -1301,9 +1312,9 @@ class TestAdversarialEdgeCases:
                     "message": "Provider returned error",
                     "code": 400,
                     "metadata": {
-                        "raw": '{"error":{"message":"context length exceeded: 50000 > 32768"}}'
-                    }
-                }
+                        "raw": '{"error":{"message":"context length exceeded: 50000 > 32768"}}',
+                    },
+                },
             },
         )
         result = classify_api_error(e, provider="openrouter", approx_tokens=10000)
@@ -1318,9 +1329,9 @@ class TestAdversarialEdgeCases:
                 "error": {
                     "message": "Provider returned error",
                     "metadata": {
-                        "raw": '{"error":{"message":"Rate limit exceeded. Please retry after 30s."}}'
-                    }
-                }
+                        "raw": '{"error":{"message":"Rate limit exceeded. Please retry after 30s."}}',
+                    },
+                },
             },
         )
         result = classify_api_error(e, provider="openrouter")
@@ -1365,9 +1376,9 @@ class TestAdversarialEdgeCases:
                 "error": {
                     "message": "Provider returned error",
                     "metadata": {
-                        "raw": '{"error":{"message":"The model gpt-99 does not exist"}}'
-                    }
-                }
+                        "raw": '{"error":{"message":"The model gpt-99 does not exist"}}',
+                    },
+                },
             },
         )
         result = classify_api_error(e, provider="openrouter")
@@ -1394,8 +1405,8 @@ class TestAdversarialEdgeCases:
                             "type": "extra_forbidden",
                             "loc": ["body", "think"],
                             "msg": "Extra inputs are not permitted",
-                        }
-                    ]
+                        },
+                    ],
                 },
             },
         )
@@ -1416,10 +1427,10 @@ class TestAdversarialEdgeCases:
                 "error": {
                     "message": {
                         "detail": [
-                            {"type": "missing", "loc": ["body", "required"]}
-                        ]
-                    }
-                }
+                            {"type": "missing", "loc": ["body", "required"]},
+                        ],
+                    },
+                },
             },
         )
         result = classify_api_error(e, approx_tokens=1000)
@@ -1435,9 +1446,9 @@ class TestAdversarialEdgeCases:
                 "error": {
                     "message": "Provider error",
                     "metadata": {
-                        "raw": '{"error":{"message":{"detail":[{"type":"invalid"}]}}}'
-                    }
-                }
+                        "raw": '{"error":{"message":{"detail":[{"type":"invalid"}]}}}',
+                    },
+                },
             },
         )
         result = classify_api_error(e)
@@ -1491,7 +1502,8 @@ class TestSSLTransientPatterns:
     def test_openssl_3x_format_classifies_as_timeout(self):
         """New format `ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC` still matches
         because we key on both space- and underscore-separated forms of
-        the stable `bad_record_mac` token."""
+        the stable `bad_record_mac` token.
+        """
         e = Exception("ERR_SSL_SSL/TLS_ALERT_BAD_RECORD_MAC during streaming")
         result = classify_api_error(e)
         assert result.reason == FailoverReason.timeout
@@ -1551,7 +1563,8 @@ class TestSSLTransientPatterns:
 
     def test_real_ssl_error_type_classifies_as_timeout(self):
         """Real ssl.SSLError instance — the type name alone (not message)
-        should route to the transport bucket."""
+        should route to the transport bucket.
+        """
         import ssl
         e = ssl.SSLError("arbitrary ssl error")
         result = classify_api_error(e)
@@ -1560,13 +1573,16 @@ class TestSSLTransientPatterns:
 
 # ── Test: RateLimitError without status_code (Copilot/GitHub Models) ──────────
 
+
 class TestRateLimitErrorWithoutStatusCode:
     """Regression tests for the Copilot/GitHub Models edge case where the
-    OpenAI SDK raises RateLimitError but does not populate .status_code."""
+    OpenAI SDK raises RateLimitError but does not populate .status_code.
+    """
 
     def _make_rate_limit_error(self, status_code=None):
         """Create an exception whose class name is 'RateLimitError' with
-        an optionally missing status_code, mirroring the OpenAI SDK shape."""
+        an optionally missing status_code, mirroring the OpenAI SDK shape.
+        """
         cls = type("RateLimitError", (Exception,), {})
         e = cls("You have exceeded your rate limit.")
         e.status_code = status_code  # None simulates the Copilot case
@@ -1591,7 +1607,6 @@ class TestRateLimitErrorWithoutStatusCode:
         e.status_code = None
         result = classify_api_error(e, provider="copilot", model="gpt-4o")
         assert result.reason != FailoverReason.rate_limit
-
 
 
 # ── Test: multimodal_tool_content_unsupported pattern ───────────────────

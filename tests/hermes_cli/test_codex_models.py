@@ -17,9 +17,9 @@ def test_get_codex_model_ids_prioritizes_default_and_cache(tmp_path, monkeypatch
                     {"slug": "gpt-5.1-codex", "priority": 5, "supported_in_api": True},
                     {"slug": "gpt-5.4", "priority": 1, "supported_in_api": True},
                     {"slug": "gpt-5-hidden-codex", "priority": 2, "visibility": "hidden"},
-                ]
-            }
-        )
+                ],
+            },
+        ),
     )
     monkeypatch.setenv("CODEX_HOME", str(codex_home))
 
@@ -85,6 +85,7 @@ def test_fetch_from_api_keeps_supported_in_api_false_models(monkeypatch):
     the separate signal that *should* still filter entries out.
     """
     import sys
+
     from hermes_cli import codex_models
 
     class _FakeResp:
@@ -96,7 +97,7 @@ def test_fetch_from_api_keeps_supported_in_api_false_models(monkeypatch):
                     {"slug": "gpt-5.5", "priority": 0, "supported_in_api": True},
                     {"slug": "gpt-5.3-codex-spark", "priority": 7, "supported_in_api": False},
                     {"slug": "gpt-5-internal", "priority": 99, "visibility": "hidden"},
-                ]
+                ],
             }
 
     class _FakeHttpx:
@@ -136,7 +137,6 @@ def test_model_command_uses_runtime_access_token_for_codex_list(monkeypatch):
     def _fake_prompt_model_selection(model_ids, current_model="", **_kwargs):
         captured["model_ids"] = list(model_ids)
         captured["current_model"] = current_model
-        return None
 
     monkeypatch.setattr(
         "hermes_cli.codex_models.get_codex_model_ids",
@@ -310,7 +310,8 @@ class TestNormalizeModelForProvider:
 
     def test_any_provider_prefix_stripped(self):
         """anthropic/claude-opus-4.6 → claude-opus-4.6 (strip prefix only).
-        User explicitly chose this — let the API decide if it works."""
+        User explicitly chose this — let the API decide if it works.
+        """
         cli = _make_cli(model="anthropic/claude-opus-4.6")
         changed = cli._normalize_model_for_provider("openai-codex")
         assert changed is True

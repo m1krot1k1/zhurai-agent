@@ -1,5 +1,4 @@
-"""
-Interactive setup wizard for the WhatsApp Cloud API adapter.
+"""Interactive setup wizard for the WhatsApp Cloud API adapter.
 
 Entry point: ``hermes whatsapp-cloud`` (dispatched from
 ``cmd_whatsapp_cloud`` in ``hermes_cli/main.py``).
@@ -37,8 +36,6 @@ from __future__ import annotations
 import re
 import secrets
 import sys
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # Field-shape validators
@@ -49,7 +46,7 @@ from typing import Optional
 # trip with Meta's 401 / 400 errors.
 
 
-def _validate_phone_number_id(value: str) -> tuple[bool, Optional[str]]:
+def _validate_phone_number_id(value: str) -> tuple[bool, str | None]:
     """Phone Number ID is a 15-17 digit numeric ID assigned by Meta.
 
     It's NOT a phone number. The #1 setup mistake is pasting the actual
@@ -80,7 +77,7 @@ def _validate_phone_number_id(value: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _validate_waba_id(value: str) -> tuple[bool, Optional[str]]:
+def _validate_waba_id(value: str) -> tuple[bool, str | None]:
     """WABA ID is numeric, similar length range as Phone Number ID."""
     if not value:
         return False, "WABA ID is required"
@@ -92,7 +89,7 @@ def _validate_waba_id(value: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _validate_app_id(value: str) -> tuple[bool, Optional[str]]:
+def _validate_app_id(value: str) -> tuple[bool, str | None]:
     """Meta App ID is numeric, typically 15-16 digits."""
     if not value:
         return False, "App ID is required"
@@ -104,7 +101,7 @@ def _validate_app_id(value: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _validate_app_secret(value: str) -> tuple[bool, Optional[str]]:
+def _validate_app_secret(value: str) -> tuple[bool, str | None]:
     """App Secret is a 32-character lowercase hex string."""
     if not value:
         return False, "App Secret is required"
@@ -120,7 +117,7 @@ def _validate_app_secret(value: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-def _validate_access_token(value: str) -> tuple[bool, Optional[str]]:
+def _validate_access_token(value: str) -> tuple[bool, str | None]:
     """Meta access tokens start with ``EAA`` and are 100-300+ characters.
 
     Both temp tokens (24h) and System User permanent tokens share this
@@ -162,7 +159,7 @@ def _validate_access_token(value: str) -> tuple[bool, Optional[str]]:
 # ---------------------------------------------------------------------------
 
 
-def _prompt(message: str, default: Optional[str] = None, secret: bool = False) -> str:
+def _prompt(message: str, default: str | None = None, secret: bool = False) -> str:
     """Read one line of input. Returns "" on EOF / Ctrl+C / empty input.
 
     The ``default`` parameter is shown to the user but NOT auto-applied
@@ -191,10 +188,10 @@ def _prompt_validated(
     message: str,
     validator,
     *,
-    current: Optional[str] = None,
-    help_text: Optional[str] = None,
+    current: str | None = None,
+    help_text: str | None = None,
     secret: bool = False,
-) -> Optional[str]:
+) -> str | None:
     """Repeat the prompt until the user enters a valid value or aborts.
 
     Returns the validated value, or None if the user gave up (empty
@@ -442,10 +439,10 @@ def run_whatsapp_cloud_setup() -> int:
     print("  recipient whitelist for app-development mode.)")
     print()
     current_allow = get_env_value("WHATSAPP_CLOUD_ALLOWED_USERS") or None
-    allow_default = current_allow if current_allow else None
+    allow_default = current_allow or None
     try:
         allowed = input(
-            f"  → Allowed users{' [' + allow_default + ']' if allow_default else ''}: "
+            f"  → Allowed users{' [' + allow_default + ']' if allow_default else ''}: ",
         ).strip() or (allow_default or "")
     except (EOFError, KeyboardInterrupt):
         allowed = ""

@@ -1,5 +1,4 @@
-"""
-Dump command for hermes CLI.
+"""Dump command for hermes CLI.
 
 Outputs a compact, plain-text summary of the user's Hermes setup
 that can be copy-pasted into Discord/GitHub/Telegram for support context.
@@ -13,10 +12,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from hermes_cli.config import get_hermes_home, get_env_path, get_project_root, load_config
+from agent.skill_utils import is_excluded_skill_path
+from hermes_cli.config import (
+    get_env_path,
+    get_hermes_home,
+    get_project_root,
+    load_config,
+)
 from hermes_cli.env_loader import load_hermes_dotenv
 from hermes_constants import display_hermes_home
-from agent.skill_utils import is_excluded_skill_path
 
 
 def _get_git_commit(project_root: Path) -> str:
@@ -135,7 +139,7 @@ def _cron_summary(hermes_home: Path) -> str:
     if not jobs_file.exists():
         return "0"
     try:
-        with open(jobs_file, encoding="utf-8") as f:
+        with Path(jobs_file).open(encoding="utf-8") as f:
             data = json.load(f)
         jobs = data.get("jobs", [])
         active = sum(1 for j in jobs if j.get("enabled", True))
@@ -171,7 +175,7 @@ def _memory_provider(config: dict) -> str:
     """Return the active memory provider name."""
     mem = config.get("memory", {})
     provider = mem.get("provider", "")
-    return provider if provider else "built-in"
+    return provider or "built-in"
 
 
 def _get_model_and_provider(config: dict) -> tuple[str, str]:

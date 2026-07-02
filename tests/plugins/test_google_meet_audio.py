@@ -16,7 +16,7 @@ def _isolate_home(tmp_path, monkeypatch):
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    yield hermes_home
+    return hermes_home
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ def test_chrome_fake_audio_flags_linux():
     with patch("plugins.google_meet.audio_bridge.platform.system",
                return_value="Linux"):
         flags = chrome_fake_audio_flags(
-            {"platform": "linux", "device_name": "hermes_meet_src"}
+            {"platform": "linux", "device_name": "hermes_meet_src"},
         )
     assert "--use-fake-ui-for-media-stream" in flags
 
@@ -241,7 +241,7 @@ def test_chrome_fake_audio_flags_darwin():
     with patch("plugins.google_meet.audio_bridge.platform.system",
                return_value="Darwin"):
         flags = chrome_fake_audio_flags(
-            {"platform": "darwin", "device_name": "BlackHole 2ch"}
+            {"platform": "darwin", "device_name": "BlackHole 2ch"},
         )
     assert "--use-fake-ui-for-media-stream" in flags
 
@@ -250,9 +250,8 @@ def test_chrome_fake_audio_flags_windows_raises():
     from plugins.google_meet.audio_bridge import chrome_fake_audio_flags
 
     with patch("plugins.google_meet.audio_bridge.platform.system",
-               return_value="Windows"):
-        with pytest.raises(RuntimeError):
-            chrome_fake_audio_flags({"platform": "windows"})
+               return_value="Windows"), pytest.raises(RuntimeError):
+        chrome_fake_audio_flags({"platform": "windows"})
 
 
 def test_property_access_before_setup_raises():

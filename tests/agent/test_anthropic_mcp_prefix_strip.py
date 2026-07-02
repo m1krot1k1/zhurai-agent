@@ -18,10 +18,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_tool_use_block(name: str, block_id: str = "tc_1", input_data: dict | None = None):
     """Create a fake Anthropic tool_use content block."""
@@ -178,7 +178,8 @@ class TestAnthropicMcpPrefixStrip:
 
 class TestAnthropicOAuthOutgoingPrefix:
     """build_anthropic_kwargs must emit ZERO single-underscore ``mcp_`` names on
-    the OAuth wire — bare names and MCP server names both land on ``mcp__``."""
+    the OAuth wire — bare names and MCP server names both land on ``mcp__``.
+    """
 
     def _build(self, tools, is_oauth=True):
         from agent.anthropic_adapter import build_anthropic_kwargs

@@ -9,6 +9,7 @@ Regression coverage for https://github.com/NousResearch/hermes-agent/issues/1755
 """
 
 import os
+import pathlib
 import shutil
 import tempfile
 import threading
@@ -46,7 +47,8 @@ class TestResolveSafeCwd:
     def test_returns_root_when_only_root_exists(self, monkeypatch):
         """If every ancestor except the filesystem root is gone, the root
         itself is still a valid recovery target — don't skip it just because
-        ``os.path.dirname('/') == '/'`` is the loop's exit condition."""
+        ``os.path.dirname('/') == '/'`` is the loop's exit condition.
+        """
         sep = os.path.sep
         monkeypatch.setattr(os.path, "isdir", lambda p: p == sep)
         assert _resolve_safe_cwd("/no/such/deep/dir") == sep
@@ -98,7 +100,8 @@ class TestRunBashCwdRecovery:
     def test_recovers_when_cwd_deleted_after_init(self, tmp_path, caplog):
         """Reproduces the wedge from #17558: cwd was valid when the
         snapshot was taken, but a subsequent command deleted it before the
-        next ``Popen``."""
+        next ``Popen``.
+        """
         wedged = tmp_path / "wedge-repro"
         wedged.mkdir()
 
@@ -107,7 +110,7 @@ class TestRunBashCwdRecovery:
 
         # The previous tool call deleted the working directory.
         shutil.rmtree(wedged)
-        assert env.cwd == str(wedged) and not os.path.isdir(env.cwd)
+        assert env.cwd == str(wedged) and not pathlib.Path(env.cwd).is_dir()
 
         captured = {}
         fds: list = []
@@ -122,7 +125,7 @@ class TestRunBashCwdRecovery:
 
         # Popen must have been handed a real, existing directory.
         assert captured["cwd"] == str(tmp_path)
-        assert os.path.isdir(captured["cwd"])
+        assert pathlib.Path(captured["cwd"]).is_dir()
 
         # ``self.cwd`` is updated so the next call doesn't re-warn.
         assert env.cwd == str(tmp_path)
@@ -163,8 +166,7 @@ class TestUpdateCwdRejectsMissingPaths:
         # Simulate the stale-marker case: the prior command's ``pwd -P`` left
         # a path in the cwd file, but that path has since been deleted.
         deleted = tmp_path / "wedge-repro"
-        with open(env._cwd_file, "w") as f:
-            f.write(str(deleted))
+        pathlib.Path(env._cwd_file).write_text(str(deleted))
 
         env._update_cwd({"output": "", "returncode": 0})
 
@@ -179,8 +181,7 @@ class TestUpdateCwdRejectsMissingPaths:
         with patch.object(LocalEnvironment, "init_session", autospec=True, return_value=None):
             env = LocalEnvironment(cwd=str(original), timeout=10)
 
-        with open(env._cwd_file, "w") as f:
-            f.write(str(new_dir))
+        pathlib.Path(env._cwd_file).write_text(str(new_dir))
 
         env._update_cwd({"output": "", "returncode": 0})
 

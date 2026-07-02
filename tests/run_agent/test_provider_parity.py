@@ -12,7 +12,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from agent.codex_responses_adapter import _chat_content_to_responses_parts, _chat_messages_to_responses_input, _normalize_codex_response, _preflight_codex_input_items
+
+from agent.codex_responses_adapter import (
+    _chat_content_to_responses_parts,
+    _chat_messages_to_responses_input,
+    _normalize_codex_response,
+    _preflight_codex_input_items,
+)
 
 sys.modules.setdefault("fire", types.SimpleNamespace(Fire=lambda *a, **k: None))
 sys.modules.setdefault("firecrawl", types.SimpleNamespace(Firecrawl=object))
@@ -20,8 +26,8 @@ sys.modules.setdefault("fal_client", types.SimpleNamespace())
 
 from run_agent import AIAgent
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _tool_defs(*names):
     return [
@@ -52,6 +58,7 @@ class _FakeOpenAI:
     def __init__(self, **kw):
         self.api_key = kw.get("api_key", "test")
         self.base_url = kw.get("base_url", "http://test")
+
     def close(self):
         pass
 
@@ -67,7 +74,7 @@ def _reset_auxiliary_provider_state():
 
 def _make_agent(monkeypatch, provider, api_mode="chat_completions", base_url="https://openrouter.ai/api/v1", model=None):
     monkeypatch.setattr("run_agent.get_tool_definitions", lambda **kw: _tool_defs("web_search", "terminal"))
-    monkeypatch.setattr("run_agent.check_toolset_requirements", lambda: {})
+    monkeypatch.setattr("run_agent.check_toolset_requirements", dict)
     monkeypatch.setattr("run_agent.OpenAI", _FakeOpenAI)
     kwargs = dict(
         api_key="test-key",
@@ -83,9 +90,9 @@ def _make_agent(monkeypatch, provider, api_mode="chat_completions", base_url="ht
         kwargs["model"] = model
     elif provider == "nous":
         kwargs["model"] = "gpt-5"
-    base_url="https://openrouter.ai/api/v1",
-    api_key="test-key",
-    base_url="https://openrouter.ai/api/v1",
+    base_url = "https://openrouter.ai/api/v1",
+    api_key = "test-key",
+    base_url = "https://openrouter.ai/api/v1",
     return AIAgent(**kwargs)
 
 
@@ -141,9 +148,9 @@ class TestBuildApiKwargsOpenRouter:
                         "call_id": "call_123",
                         "response_item_id": "fc_123",
                         "type": "function",
-                        "function": {"name": "terminal", "arguments": "{\"command\":\"pwd\"}"},
+                        "function": {"name": "terminal", "arguments": '{"command":"pwd"}'},
                         "extra_content": {"thought_signature": "opaque"},
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "call_123", "content": "/tmp"},
@@ -187,9 +194,9 @@ class TestBuildApiKwargsOpenRouter:
                         "call_id": "call_123",
                         "response_item_id": "fc_123",
                         "type": "function",
-                        "function": {"name": "terminal", "arguments": "{\"command\":\"pwd\"}"},
+                        "function": {"name": "terminal", "arguments": '{"command":"pwd"}'},
                         "extra_content": {"google": {"thought_signature": "opaque"}},
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "call_123", "content": "/tmp"},
@@ -206,7 +213,7 @@ class TestBuildApiKwargsOpenRouter:
         assert messages[1]["tool_calls"][0]["call_id"] == "call_123"
         assert messages[1]["tool_calls"][0]["response_item_id"] == "fc_123"
         assert messages[1]["tool_calls"][0]["extra_content"] == {
-            "google": {"thought_signature": "opaque"}
+            "google": {"thought_signature": "opaque"},
         }
 
     def test_gemini_native_passes_base_url_for_top_level_thinking_config(self, monkeypatch):
@@ -272,7 +279,7 @@ class TestBuildApiKwargsOpenRouter:
         agent = _make_agent(monkeypatch, "openrouter")
         api_msg = self._api_msg_with_extra_content()
         result = agent._sanitize_tool_calls_for_strict_api(
-            api_msg, model="accounts/fireworks/models/llama-v3p1-70b"
+            api_msg, model="accounts/fireworks/models/llama-v3p1-70b",
         )
         assert "extra_content" not in result["tool_calls"][0]
         assert "call_id" not in result["tool_calls"][0]
@@ -289,10 +296,10 @@ class TestBuildApiKwargsOpenRouter:
         agent = _make_agent(monkeypatch, "openrouter")
         api_msg = self._api_msg_with_extra_content()
         result = agent._sanitize_tool_calls_for_strict_api(
-            api_msg, model="google/gemini-3-pro-preview"
+            api_msg, model="google/gemini-3-pro-preview",
         )
         assert result["tool_calls"][0]["extra_content"] == {
-            "google": {"thought_signature": "SIG_123"}
+            "google": {"thought_signature": "SIG_123"},
         }
         # call_id/response_item_id still stripped regardless of model
         assert "call_id" not in result["tool_calls"][0]
@@ -481,9 +488,9 @@ class TestBuildApiKwargsCustomEndpoint:
                         "type": "function",
                         "function": {
                             "name": "terminal",
-                            "arguments": "{\"command\":\"pwd\"}",
+                            "arguments": '{"command":"pwd"}',
                         },
-                    }
+                    },
                 ],
             },
             {"role": "tool", "tool_call_id": "call_fw_123", "content": "/tmp"},
@@ -722,13 +729,13 @@ class TestChatContentToResponsesParts:
 
     def test_explicit_user_role_emits_input_text(self):
         result = _chat_content_to_responses_parts(
-            [{"type": "text", "text": "hello"}], role="user"
+            [{"type": "text", "text": "hello"}], role="user",
         )
         assert result[0]["type"] == "input_text"
 
     def test_assistant_role_emits_output_text(self):
         result = _chat_content_to_responses_parts(
-            [{"type": "text", "text": "hello"}], role="assistant"
+            [{"type": "text", "text": "hello"}], role="assistant",
         )
         assert result[0]["type"] == "output_text"
 
@@ -875,7 +882,7 @@ class TestNormalizeCodexResponse:
         response = SimpleNamespace(
             output=[
                 SimpleNamespace(type="function_call", status="completed",
-                    call_id="call_1", name="web_search", arguments='{}', id="fc_1"),
+                    call_id="call_1", name="web_search", arguments="{}", id="fc_1"),
             ],
             status="completed",
         )
@@ -960,7 +967,8 @@ class TestBuildAssistantMessage:
 
     def test_openrouter_reasoning_details_preserved_unmodified(self, monkeypatch):
         """reasoning_details must be passed back exactly as received for
-        multi-turn continuity (OpenRouter, Anthropic, OpenAI all need this)."""
+        multi-turn continuity (OpenRouter, Anthropic, OpenAI all need this).
+        """
         agent = _make_agent(monkeypatch, "openrouter")
         original_detail = {
             "type": "thinking",

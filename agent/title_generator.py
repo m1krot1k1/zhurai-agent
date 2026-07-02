@@ -6,7 +6,7 @@ adds latency to the user-facing reply.
 
 import logging
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from agent.auxiliary_client import call_llm
 
@@ -42,7 +42,7 @@ def _title_language() -> str:
         return str(
             ((load_config() or {}).get("auxiliary") or {})
             .get("title_generation", {})
-            .get("language", "")
+            .get("language", ""),
         ).strip()
     except Exception:
         return ""
@@ -52,9 +52,9 @@ def generate_title(
     user_message: str,
     assistant_response: str,
     timeout: float = 30.0,
-    failure_callback: Optional[FailureCallback] = None,
+    failure_callback: FailureCallback | None = None,
     main_runtime: dict = None,
-) -> Optional[str]:
+) -> str | None:
     """Generate a session title from the first exchange.
 
     Uses the main runtime's model when available, falling back to the
@@ -95,7 +95,7 @@ def generate_title(
         # Enforce reasonable length
         if len(title) > 80:
             title = title[:77] + "..."
-        return title if title else None
+        return title or None
     except Exception as e:
         # Log at WARNING so this shows up in agent.log without debug mode.
         # Full detail at debug level for operators who need the stack.
@@ -114,9 +114,9 @@ def auto_title_session(
     session_id: str,
     user_message: str,
     assistant_response: str,
-    failure_callback: Optional[FailureCallback] = None,
+    failure_callback: FailureCallback | None = None,
     main_runtime: dict = None,
-    title_callback: Optional[TitleCallback] = None,
+    title_callback: TitleCallback | None = None,
 ) -> None:
     """Generate and set a session title if one doesn't already exist.
 
@@ -138,7 +138,7 @@ def auto_title_session(
         return
 
     title = generate_title(
-        user_message, assistant_response, failure_callback=failure_callback, main_runtime=main_runtime
+        user_message, assistant_response, failure_callback=failure_callback, main_runtime=main_runtime,
     )
     if not title:
         return
@@ -161,9 +161,9 @@ def maybe_auto_title(
     user_message: str,
     assistant_response: str,
     conversation_history: list,
-    failure_callback: Optional[FailureCallback] = None,
+    failure_callback: FailureCallback | None = None,
     main_runtime: dict = None,
-    title_callback: Optional[TitleCallback] = None,
+    title_callback: TitleCallback | None = None,
 ) -> None:
     """Fire-and-forget title generation after the first exchange.
 

@@ -1,5 +1,4 @@
-"""
-Top-level argparse construction for the hermes CLI.
+"""Top-level argparse construction for the hermes CLI.
 
 Lives in its own module so other modules (e.g. ``relaunch.py``) can
 introspect the parser to discover which flags exist without running the
@@ -11,7 +10,6 @@ because its dispatch is tightly coupled to module-level ``cmd_*`` functions.
 """
 
 import argparse
-
 
 # `--profile` / `-p` is consumed by ``main._apply_profile_override`` before
 # argparse runs (it sets ``HERMES_HOME`` and strips itself from ``sys.argv``),
@@ -96,7 +94,7 @@ def build_top_level_parser():
     )
 
     parser.add_argument(
-        "--version", "-V", action="store_true", help="Show version and exit"
+        "--version", "-V", action="store_true", help="Show version and exit",
     )
     parser.add_argument(
         "-z",
@@ -254,17 +252,17 @@ def build_top_level_parser():
         description="Start an interactive chat session with Hermes Agent",
     )
     chat_parser.add_argument(
-        "-q", "--query", help="Single query (non-interactive mode)"
+        "-q", "--query", help="Single query (non-interactive mode)",
     )
     chat_parser.add_argument(
-        "--image", help="Optional local image path to attach to a single query"
+        "--image", help="Optional local image path to attach to a single query",
     )
     _inherited_flag(
         chat_parser,
         "-m", "--model", help="Model to use (e.g., anthropic/claude-sonnet-4)",
     )
     chat_parser.add_argument(
-        "-t", "--toolsets", help="Comma-separated toolsets to enable"
+        "-t", "--toolsets", help="Comma-separated toolsets to enable",
     )
     _inherited_flag(
         chat_parser,

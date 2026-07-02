@@ -7,14 +7,13 @@ the task is skipped (existing behavior preserved).
 from __future__ import annotations
 
 import json
-import os
 import sys
 import tempfile
 
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_kanban_home(monkeypatch):
     """Spin up a fresh HERMES_HOME with a clean kanban DB."""
     test_home = tempfile.mkdtemp(prefix="kanban_default_assignee_test_")
@@ -24,7 +23,7 @@ def isolated_kanban_home(monkeypatch):
         if mod.startswith("hermes_cli") or mod.startswith("hermes_state") or mod == "hermes_constants":
             del sys.modules[mod]
     from hermes_cli import kanban_db
-    yield kanban_db, test_home
+    return kanban_db, test_home
     # Cleanup is best-effort; tempfile dir survives but pytest isolation
     # gives each test its own monkeypatched HERMES_HOME so no cross-test
     # contamination.
@@ -38,7 +37,8 @@ def _fake_spawn(*args, **kwargs):
 def test_unassigned_task_skipped_without_default_assignee(isolated_kanban_home):
     """Baseline: with no default_assignee, an unassigned ready task is
     skipped via the existing `skipped_unassigned` bucket and the DB row
-    is untouched."""
+    is untouched.
+    """
     kb, _home = isolated_kanban_home
     with kb.connect_closing() as conn:
         kb.create_board(slug="default", name="Test")
@@ -56,7 +56,8 @@ def test_unassigned_task_skipped_without_default_assignee(isolated_kanban_home):
 def test_unassigned_task_auto_assigned_with_default_assignee(isolated_kanban_home):
     """Core #27145 contract: with default_assignee set, an unassigned ready
     task gets the assignment applied and dispatched on the same tick. The
-    DB row is mutated (assignee column + an 'assigned' event)."""
+    DB row is mutated (assignee column + an 'assigned' event).
+    """
     kb, _home = isolated_kanban_home
     with kb.connect_closing() as conn:
         kb.create_board(slug="default", name="Test")
@@ -92,7 +93,8 @@ def test_dry_run_with_default_assignee_reports_without_mutating(isolated_kanban_
     """Dry-run mode: reports what WOULD happen (task in auto_assigned_default,
     spawn entry) but does NOT mutate the DB. Operators using
     `hermes kanban dispatch --dry-run` see the routing decision before
-    committing."""
+    committing.
+    """
     kb, _home = isolated_kanban_home
     with kb.connect_closing() as conn:
         kb.create_board(slug="default", name="Test")
@@ -113,7 +115,8 @@ def test_dry_run_with_default_assignee_reports_without_mutating(isolated_kanban_
 def test_whitespace_default_assignee_treated_as_none(isolated_kanban_home):
     """Empty / whitespace-only default_assignee values must be treated as
     'no fallback set' so a misconfigured kanban.default_assignee=' '
-    doesn't surprise operators by silently routing unassigned tasks."""
+    doesn't surprise operators by silently routing unassigned tasks.
+    """
     kb, _home = isolated_kanban_home
     with kb.connect_closing() as conn:
         kb.create_board(slug="default", name="Test")
@@ -130,7 +133,8 @@ def test_whitespace_default_assignee_treated_as_none(isolated_kanban_home):
 def test_explicitly_assigned_task_untouched_by_default_assignee(isolated_kanban_home):
     """A task with an explicit assignee must NOT be touched by the
     default_assignee logic — that fallback only applies to genuinely
-    unassigned rows."""
+    unassigned rows.
+    """
     kb, _home = isolated_kanban_home
     with kb.connect_closing() as conn:
         kb.create_board(slug="default", name="Test")
@@ -147,7 +151,8 @@ def test_explicitly_assigned_task_untouched_by_default_assignee(isolated_kanban_
 def test_dispatch_result_has_auto_assigned_default_field():
     """Schema-level invariant: DispatchResult exposes the
     auto_assigned_default field so CLI / dashboard / gateway can surface
-    the new routing decisions."""
+    the new routing decisions.
+    """
     from hermes_cli.kanban_db import DispatchResult
     r = DispatchResult()
     assert hasattr(r, "auto_assigned_default")

@@ -6,7 +6,7 @@ Handler injected to avoid importing ``main``.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_uninstall_parser(subparsers, *, cmd_uninstall: Callable) -> None:
@@ -36,6 +36,6 @@ def build_uninstall_parser(subparsers, *, cmd_uninstall: Callable) -> None:
         "(used by the desktop app to gate uninstall options)",
     )
     uninstall_parser.add_argument(
-        "--yes", "-y", action="store_true", help="Skip confirmation prompts"
+        "--yes", "-y", action="store_true", help="Skip confirmation prompts",
     )
     uninstall_parser.set_defaults(func=cmd_uninstall)

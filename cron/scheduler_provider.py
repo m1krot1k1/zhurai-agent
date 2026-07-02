@@ -68,8 +68,9 @@ class CronScheduler(ABC):
     def stop(self) -> None:
         """Optional eager teardown hook. Default no-op; setting the stop_event
         is the primary stop signal. Override for providers holding external
-        resources (queue consumers, HTTP servers)."""
-        return None
+        resources (queue consumers, HTTP servers).
+        """
+        return
 
     # --- Optional hooks for external providers (added Phase 4). --------------
     # All default-safe so the built-in inherits working behavior without
@@ -79,8 +80,9 @@ class CronScheduler(ABC):
         """Called after a successful store mutation (create/update/remove/
         pause/resume). External providers reconcile their registry here (e.g.
         Chronos re-provisions/cancels the affected one-shot via NAS).
-        Built-in: no-op (it re-reads jobs.json on every tick)."""
-        return None
+        Built-in: no-op (it re-reads jobs.json on every tick).
+        """
+        return
 
     def fire_due(self, job_id: str, *, adapters: Any = None, loop: Any = None) -> bool:
         """Run a single job NOW via the shared orchestrator. Called by the
@@ -107,11 +109,12 @@ class CronScheduler(ABC):
     def reconcile(self) -> None:
         """Converge the external registry toward jobs.json (the desired state):
         arm missing one-shots, cancel orphaned ones, re-arm changed times.
-        Built-in: no-op."""
-        return None
+        Built-in: no-op.
+        """
+        return
 
 
-def resolve_cron_scheduler() -> "CronScheduler":
+def resolve_cron_scheduler() -> CronScheduler:
     """Return the active cron scheduler provider.
 
     Reads ``cron.provider`` from config. Empty/absent → built-in. A named
@@ -146,7 +149,7 @@ def resolve_cron_scheduler() -> "CronScheduler":
         return provider
     except Exception as e:
         logger.warning(
-            "Failed to load cron.provider '%s' (%s); using built-in ticker", name, e
+            "Failed to load cron.provider '%s' (%s); using built-in ticker", name, e,
         )
         return InProcessCronScheduler()
 
@@ -165,8 +168,9 @@ class InProcessCronScheduler(CronScheduler):
 
     def start(self, stop_event, *, adapters=None, loop=None, interval=60):
         import logging
-        from cron.scheduler import tick as cron_tick
+
         from cron.jobs import record_ticker_heartbeat
+        from cron.scheduler import tick as cron_tick
 
         logger = logging.getLogger("cron.scheduler_provider")
         logger.info("In-process cron scheduler started (interval=%ds)", interval)

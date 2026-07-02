@@ -40,7 +40,7 @@ def main() -> int:
         index = []
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT, "w", encoding="utf-8") as f:
+    with Path(OUTPUT).open("w", encoding="utf-8") as f:
         json.dump(index, f, separators=(",", ":"))
     sys.stderr.write(f"extract-automation-blueprints: wrote {len(index)} blueprints -> {OUTPUT}\n")
     return 0

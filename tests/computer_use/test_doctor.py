@@ -23,13 +23,13 @@ import json
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
-
 # ── helpers ────────────────────────────────────────────────────────────────
 
 
 def _fake_proc_with_responses(*responses: dict) -> MagicMock:
     """Build a MagicMock subprocess.Popen handle that yields one JSON-RPC
-    response per `readline()` call, then returns "" (EOF)."""
+    response per `readline()` call, then returns "" (EOF).
+    """
     lines = [json.dumps(r) + "\n" for r in responses] + [""]
     proc = MagicMock()
     proc.stdin = MagicMock()
@@ -108,7 +108,8 @@ class TestDoctorExitCodes:
 
     def test_failed_overall_exits_1(self):
         """`failed` overall (every check failed) is also exit 1, not 2 —
-        the tool ran successfully; the diagnosis was bad."""
+        the tool ran successfully; the diagnosis was bad.
+        """
         from tools.computer_use import doctor
 
         report = _degraded_report()
@@ -133,7 +134,8 @@ class TestDoctorExitCodes:
 
     def test_protocol_error_exits_2(self, capsys):
         """An empty stdout response (driver crashed during handshake) is a
-        protocol failure → exit 2."""
+        protocol failure → exit 2.
+        """
         from tools.computer_use import doctor
 
         proc = MagicMock()
@@ -176,7 +178,8 @@ class TestResponseShapeParsing:
 
     def test_falls_back_to_text_content_when_structuredContent_absent(self):
         """Older cua-driver builds may emit health_report as a text content
-        item carrying the JSON — the doctor should still parse it."""
+        item carrying the JSON — the doctor should still parse it.
+        """
         from tools.computer_use import doctor
 
         proc = _fake_proc_with_responses(
@@ -252,7 +255,8 @@ class TestArgPassthrough:
     def test_no_filters_sends_empty_arguments(self):
         """When neither include nor skip is given, the arguments object is
         empty — not present-but-null — so the driver's default 'run every
-        check' branch fires."""
+        check' branch fires.
+        """
         from tools.computer_use import doctor
 
         proc = _fake_proc_with_responses(

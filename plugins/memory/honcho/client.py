@@ -13,17 +13,17 @@ Resolution order for host-specific settings:
 
 from __future__ import annotations
 
-import json
-import os
-import logging
 import hashlib
+import json
+import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from hermes_constants import get_hermes_home
 from hermes_cli.profiles import _get_default_hermes_home
+from hermes_constants import get_hermes_home
 from plugins.plugin_utils import SingletonSlot
-from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from honcho import Honcho
@@ -161,7 +161,7 @@ def _parse_string_map(host_obj: dict, root_obj: dict, key: str) -> dict[str, str
 
 
 def _parse_optional_string(
-    host_obj: dict, root_obj: dict, key: str, default: str = ""
+    host_obj: dict, root_obj: dict, key: str, default: str = "",
 ) -> str:
     """Parse a string field where host-level empty string can override root."""
     if key in host_obj:
@@ -283,9 +283,6 @@ def _resolve_observation(
         "ai_observe_me": ai_block.get("observeMe", preset["ai_observe_me"]),
         "ai_observe_others": ai_block.get("observeOthers", preset["ai_observe_others"]),
     }
-
-
-
 
 
 @dataclass
@@ -587,7 +584,7 @@ class HonchoClientConfig:
             recall_mode=_normalize_recall_mode(
                 host_block.get("recallMode")
                 or raw.get("recallMode")
-                or "hybrid"
+                or "hybrid",
             ),
             init_on_session_start=_resolve_bool(
                 host_block.get("initOnSessionStart"),
@@ -602,13 +599,13 @@ class HonchoClientConfig:
             observation_mode=_normalize_observation_mode(
                 host_block.get("observationMode")
                 or raw.get("observationMode")
-                or ("unified" if _explicitly_configured else "directional")
+                or ("unified" if _explicitly_configured else "directional"),
             ),
             **_resolve_observation(
                 _normalize_observation_mode(
                     host_block.get("observationMode")
                     or raw.get("observationMode")
-                    or ("unified" if _explicitly_configured else "directional")
+                    or ("unified" if _explicitly_configured else "directional"),
                 ),
                 host_block.get("observation") or raw.get("observation"),
             ),
@@ -696,7 +693,7 @@ class HonchoClientConfig:
         # Gateway per-chat key wins everywhere — gateways (telegram/discord/…)
         # need per-chat isolation no cwd/strategy name can provide.
         if gateway_session_key:
-            sanitized = re.sub(r'[^a-zA-Z0-9_-]+', '-', gateway_session_key).strip('-')
+            sanitized = re.sub(r"[^a-zA-Z0-9_-]+", "-", gateway_session_key).strip("-")
             if sanitized:
                 return self._enforce_session_id_limit(sanitized, gateway_session_key)
 
@@ -715,7 +712,7 @@ class HonchoClientConfig:
 
         # /title mid-session remap (non-per-session).
         if session_title:
-            sanitized = re.sub(r'[^a-zA-Z0-9_-]+', '-', session_title).strip('-')
+            sanitized = re.sub(r"[^a-zA-Z0-9_-]+", "-", session_title).strip("-")
             if sanitized:
                 if self.session_peer_prefix and self.peer_name:
                     return f"{self.peer_name}-{sanitized}"
@@ -758,7 +755,7 @@ def _apply_fresh_oauth_token(config: HonchoClientConfig) -> None:
         logger.warning("Honcho OAuth pre-build refresh failed", exc_info=True)
 
 
-def _refresh_cached_oauth(client: "Honcho", config: HonchoClientConfig | None) -> None:
+def _refresh_cached_oauth(client: Honcho, config: HonchoClientConfig | None) -> None:
     """Rotate the cached client's Bearer in place when its OAuth token is stale.
 
     If the SDK shape changed and the in-place rotation can't apply, the slot is
@@ -802,7 +799,7 @@ def get_honcho_client(config: HonchoClientConfig | None = None) -> Honcho:
             "Honcho API key not found. "
             "Get your API key at https://app.honcho.dev, "
             "then run 'hermes honcho setup' or set HONCHO_API_KEY. "
-            "For local instances, set HONCHO_BASE_URL instead."
+            "For local instances, set HONCHO_BASE_URL instead.",
         )
 
     # Everything below is the expensive part the issue flags: lazy SDK
@@ -810,13 +807,14 @@ def get_honcho_client(config: HonchoClientConfig | None = None) -> Honcho:
     # slot's factory so it executes exactly once even when several threads
     # race the first call — the slot's double-checked lock serializes them and
     # the losers get the winner's client instead of building their own.
-    def _build() -> "Honcho":
+    def _build() -> Honcho:
         # Lazy-install the honcho SDK on demand. ensure() honors
         # security.allow_lazy_installs (default true). On failure we surface
         # the original ImportError-shape message so existing callers still get
         # the "go run hermes honcho setup" hint they used to.
         try:
-            from tools.lazy_deps import FeatureUnavailable, ensure as _lazy_ensure
+            from tools.lazy_deps import FeatureUnavailable
+            from tools.lazy_deps import ensure as _lazy_ensure
             _lazy_ensure("memory.honcho", prompt=False)
         except ImportError:
             # lazy_deps module missing — fall through to the raw import below.
@@ -832,7 +830,7 @@ def get_honcho_client(config: HonchoClientConfig | None = None) -> Honcho:
             raise ImportError(
                 "honcho-ai is required for Honcho integration. "
                 "Install it with: pip install honcho-ai  "
-                "(or run `hermes honcho setup` to configure)."
+                "(or run `hermes honcho setup` to configure).",
             )
 
         # Allow config.yaml honcho.base_url to override the SDK's environment

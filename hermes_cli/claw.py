@@ -16,19 +16,18 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from hermes_cli.config import get_hermes_home, get_config_path, load_config, save_config
-from hermes_constants import get_optional_skills_dir
+from hermes_cli.config import get_config_path, get_hermes_home, load_config, save_config
 from hermes_cli.setup import (
     Colors,
     color,
+    print_error,
     print_header,
     print_info,
     print_success,
-    print_error,
     prompt_yes_no,
 )
+from hermes_constants import get_optional_skills_dir
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +53,7 @@ _OPENCLAW_SCRIPT_INSTALLED = (
 
 # Known OpenClaw directory names (current + legacy)
 _OPENCLAW_DIR_NAMES = (".openclaw", ".clawdbot", ".moltbot")
+
 
 def _detect_openclaw_processes() -> list[str]:
     """Detect running OpenClaw processes and services.
@@ -134,7 +134,7 @@ def _warn_if_openclaw_running(auto_yes: bool) -> None:
     print_info(
         "Messaging platforms (Telegram, Discord, Slack) only allow one "
         "active session per bot token. If you continue, both OpenClaw and "
-        "Hermes may try to use the same token, causing disconnects."
+        "Hermes may try to use the same token, causing disconnects.",
     )
     print_info("Recommendation: stop OpenClaw before migrating.")
     print()
@@ -170,18 +170,19 @@ def _warn_if_gateway_running(auto_yes: bool) -> None:
     print()
     print_error(
         "Hermes gateway is running with active connections: "
-        + ", ".join(connected)
+        + ", ".join(connected),
     )
     print_info(
         "Migrating bot tokens while the gateway is active will cause "
         "conflicts (Telegram, Discord, and Slack only allow one active "
-        "session per token)."
+        "session per token).",
     )
     print_info("Recommendation: stop the gateway first with 'hermes gateway stop'.")
     print()
     if not auto_yes and not prompt_yes_no("Continue anyway?", default=False):
         print_info("Migration cancelled. Stop the gateway and try again.")
         sys.exit(0)
+
 
 # State files commonly found in OpenClaw workspace directories — listed
 # during cleanup to help the user decide whether to archive
@@ -344,19 +345,19 @@ def _cmd_migrate(args):
         color(
             "┌─────────────────────────────────────────────────────────┐",
             Colors.MAGENTA,
-        )
+        ),
     )
     print(
         color(
             "│          ⚕ Hermes — OpenClaw Migration                 │",
             Colors.MAGENTA,
-        )
+        ),
     )
     print(
         color(
             "└─────────────────────────────────────────────────────────┘",
             Colors.MAGENTA,
-        )
+        ),
     )
 
     # Check source directory
@@ -460,7 +461,7 @@ def _cmd_migrate(args):
         print_header(f"Migration Preview — {preview_count} item(s) would be imported")
     else:
         print_header(
-            f"Migration Preview — {preview_conflicts} conflict(s), nothing would be imported"
+            f"Migration Preview — {preview_conflicts} conflict(s), nothing would be imported",
         )
     print_info("No changes have been made yet. Review the list below:")
     _print_migration_report(preview_report, dry_run=True)
@@ -477,12 +478,12 @@ def _cmd_migrate(args):
     if preview_conflicts > 0 and not overwrite:
         print()
         print_error(
-            f"Plan has {preview_conflicts} conflict(s). Refusing to apply."
+            f"Plan has {preview_conflicts} conflict(s). Refusing to apply.",
         )
         print_info(
             "Each conflict is an item whose target already exists in ~/.hermes/. "
             "Re-run with --overwrite to replace conflicting targets (item-level "
-            "backups are written to the migration report directory)."
+            "backups are written to the migration report directory).",
         )
         print_info("Or re-run with --dry-run to review the full plan.")
         return
@@ -505,10 +506,10 @@ def _cmd_migrate(args):
     # restorable with `hermes import`.  Mirrors OpenClaw's
     # createPreMigrationBackup posture — one atomic restore point before
     # any mutation, auto-pruned to the last 5 pre-migration zips.
-    backup_archive: Optional[Path] = None
+    backup_archive: Path | None = None
     if not no_backup:
         try:
-            from hermes_cli.backup import create_pre_migration_backup, _format_size
+            from hermes_cli.backup import _format_size, create_pre_migration_backup
             backup_archive = create_pre_migration_backup(hermes_home=hermes_home)
             if backup_archive:
                 size_str = _format_size(backup_archive.stat().st_size)
@@ -519,7 +520,7 @@ def _cmd_migrate(args):
             print()
             print_error(f"Could not create pre-migration backup: {e}")
             print_info(
-                "Re-run with --no-backup to skip, or free up disk space under the Hermes home."
+                "Re-run with --no-backup to skip, or free up disk space under the Hermes home.",
             )
             logger.debug("Pre-migration backup error", exc_info=True)
             return
@@ -570,19 +571,19 @@ def _cmd_cleanup(args):
         color(
             "┌─────────────────────────────────────────────────────────┐",
             Colors.MAGENTA,
-        )
+        ),
     )
     print(
         color(
             "│          ⚕ Hermes — OpenClaw Cleanup                   │",
             Colors.MAGENTA,
-        )
+        ),
     )
     print(
         color(
             "└─────────────────────────────────────────────────────────┘",
             Colors.MAGENTA,
-        )
+        ),
     )
 
     # Find OpenClaw directories
@@ -606,7 +607,7 @@ def _cmd_cleanup(args):
             print_info(f"  * {detail}")
         print_info(
             "Archiving .openclaw/ while the service is active may cause it to "
-            "immediately recreate an empty skeleton directory, destroying your config."
+            "immediately recreate an empty skeleton directory, destroying your config.",
         )
         print_info("Stop OpenClaw first: systemctl --user stop openclaw-gateway.service")
         print()
@@ -687,13 +688,13 @@ def _cmd_cleanup(args):
         _n_dirs = len(dirs_to_check)
         print_info(
             f"Dry run complete. {_n_dirs} "
-            f"{'directory' if _n_dirs == 1 else 'directories'} would be archived."
+            f"{'directory' if _n_dirs == 1 else 'directories'} would be archived.",
         )
         print_info("Run without --dry-run to archive them.")
     elif total_archived:
         print_success(
             f"Cleaned up {total_archived} OpenClaw "
-            f"{'directory' if total_archived == 1 else 'directories'}."
+            f"{'directory' if total_archived == 1 else 'directories'}.",
         )
         print_info("Directories were renamed, not deleted. You can undo by renaming them back.")
     else:

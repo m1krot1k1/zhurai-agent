@@ -1,5 +1,4 @@
-"""
-`hermes computer-use doctor` — thin client for cua-driver's `health_report` MCP tool.
+"""`hermes computer-use doctor` — thin client for cua-driver's `health_report` MCP tool.
 
 cua-driver owns the health model (#1908 / be761fac on `main`). This module
 just drives the stdio JSON-RPC handshake, calls `health_report`, and
@@ -20,8 +19,8 @@ import os
 import shutil
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Sequence
-
+from collections.abc import Sequence
+from typing import Any
 
 # Match the ALLOWED_STATUS_VALUES + ALLOWED_OVERALL_VALUES the cua-driver
 # integration test pins. If health_report widens its vocabulary, add here.
@@ -37,7 +36,7 @@ _OVERALL_GLYPH = {
 }
 
 
-def _cua_child_env() -> Dict[str, str]:
+def _cua_child_env() -> dict[str, str]:
     """cua-driver child env with the Hermes telemetry policy applied.
 
     Delegates to ``cua_backend.cua_driver_child_env`` (telemetry disabled by
@@ -58,7 +57,7 @@ def _drive_health_report(
     include: Sequence[str] = (),
     skip: Sequence[str] = (),
     timeout: float = 12.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Spawn `<binary> mcp`, perform the JSON-RPC handshake, call
     `health_report`, and return the parsed `structuredContent` dict.
 
@@ -67,7 +66,7 @@ def _drive_health_report(
     that has failing checks — the tool's contract is to always return a
     well-formed report with `overall` set, never to set `isError`.
     """
-    args: Dict[str, Any] = {}
+    args: dict[str, Any] = {}
     if include:
         args["include"] = list(include)
     if skip:
@@ -101,7 +100,7 @@ def _drive_health_report(
             stderr_tail = (proc.stderr.read() or "").strip().splitlines()[-3:]
             raise RuntimeError(
                 f"cua-driver mcp produced no initialize response. "
-                f"stderr tail: {stderr_tail or '(empty)'}"
+                f"stderr tail: {stderr_tail or '(empty)'}",
             )
 
         # 2. tools/call health_report
@@ -155,13 +154,14 @@ def _drive_health_report(
 
     raise RuntimeError(
         "health_report response carried neither structuredContent nor a parseable "
-        f"JSON text block. Result keys: {list(result.keys())}"
+        f"JSON text block. Result keys: {list(result.keys())}",
     )
 
 
-def _print_text_report(report: Dict[str, Any], color: bool) -> None:
+def _print_text_report(report: dict[str, Any], color: bool) -> None:
     """Render the report in the same style as `cua-driver call health_report`
-    would (one line per check + a summary footer)."""
+    would (one line per check + a summary footer).
+    """
     schema = report.get("schema_version", "?")
     platform = report.get("platform", "?")
     driver_v = report.get("driver_version", "?")
@@ -184,7 +184,7 @@ def _print_text_report(report: Dict[str, Any], color: bool) -> None:
 
     print(
         f"{header_glyph} cua-driver {driver_v} on {platform} — "
-        f"{col_for}{overall}{col_reset}"
+        f"{col_for}{overall}{col_reset}",
     )
 
     for check in report.get("checks", []):
@@ -214,12 +214,12 @@ def _print_text_report(report: Dict[str, Any], color: bool) -> None:
 
 
 def run_doctor(
-    driver_cmd: Optional[str] = None,
+    driver_cmd: str | None = None,
     *,
     include: Sequence[str] = (),
     skip: Sequence[str] = (),
     json_output: bool = False,
-    color: Optional[bool] = None,
+    color: bool | None = None,
 ) -> int:
     """Resolve the cua-driver binary, call `health_report`, render the result.
 

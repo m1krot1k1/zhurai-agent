@@ -6,7 +6,6 @@ tests pin the config the writers produce and the invariant that the toolset
 resolver + tool-schema builder yield exactly the file/terminal tools.
 """
 
-import pytest
 
 from hermes_cli.setup import (
     _blank_slate_minimal_toolsets,
@@ -51,10 +50,10 @@ class TestBlankSlateMinimalToolsets:
         _blank_slate_minimize_config(cfg)
         enabled = sorted(_get_platform_tools(cfg, "cli"))
         defs = model_tools.get_tool_definitions(
-            enabled_toolsets=enabled, disabled_toolsets=None, quiet_mode=True
+            enabled_toolsets=enabled, disabled_toolsets=None, quiet_mode=True,
         )
         names = sorted(
-            {(d.get("function") or {}).get("name") or d.get("name") for d in defs}
+            {(d.get("function") or {}).get("name") or d.get("name") for d in defs},
         )
         assert names == ["patch", "process", "read_file", "search_files",
                          "terminal", "write_file"]

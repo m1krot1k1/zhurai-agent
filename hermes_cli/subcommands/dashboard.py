@@ -7,11 +7,11 @@ Handler injected to avoid importing ``main``.
 from __future__ import annotations
 
 import argparse
-from typing import Callable
+from collections.abc import Callable
 
 
 def build_dashboard_parser(
-    subparsers, *, cmd_dashboard: Callable, cmd_dashboard_register: Callable
+    subparsers, *, cmd_dashboard: Callable, cmd_dashboard_register: Callable,
 ) -> None:
     """Attach the ``dashboard`` subcommand (and its ``register`` action)."""
     # =========================================================================
@@ -23,13 +23,13 @@ def build_dashboard_parser(
         description="Launch the Hermes Agent web dashboard for managing config, API keys, and sessions",
     )
     dashboard_parser.add_argument(
-        "--port", type=int, default=9119, help="Port (default 9119, 0 for auto-assign by OS)"
+        "--port", type=int, default=9119, help="Port (default 9119, 0 for auto-assign by OS)",
     )
     dashboard_parser.add_argument(
-        "--host", default="127.0.0.1", help="Host (default 127.0.0.1)"
+        "--host", default="127.0.0.1", help="Host (default 127.0.0.1)",
     )
     dashboard_parser.add_argument(
-        "--no-open", action="store_true", help="Don't open browser automatically"
+        "--no-open", action="store_true", help="Don't open browser automatically",
     )
     dashboard_parser.add_argument(
         "--insecure",
@@ -109,7 +109,7 @@ def build_dashboard_parser(
     # Nested subparser so bare `hermes dashboard` keeps launching the server
     # (set_defaults(func=cmd_dashboard) above remains the default).
     dashboard_subparsers = dashboard_parser.add_subparsers(
-        dest="dashboard_subcommand"
+        dest="dashboard_subcommand",
     )
     dashboard_register_parser = dashboard_subparsers.add_parser(
         "register",

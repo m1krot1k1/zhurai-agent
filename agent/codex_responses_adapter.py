@@ -16,7 +16,7 @@ import logging
 import re
 import uuid
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agent.prompt_builder import DEFAULT_AGENT_IDENTITY
 
@@ -28,7 +28,7 @@ def _classify_responses_issuer(
     is_xai_responses: bool = False,
     is_github_responses: bool = False,
     is_codex_backend: bool = False,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
 ) -> str:
     """Stable identifier for the Responses endpoint that mints encrypted_content.
 
@@ -76,7 +76,7 @@ _TOOL_CALL_LEAK_PATTERN = re.compile(
 # Multimodal content helpers
 # ---------------------------------------------------------------------------
 
-def _chat_content_to_responses_parts(content: Any, *, role: str = "user") -> List[Dict[str, Any]]:
+def _chat_content_to_responses_parts(content: Any, *, role: str = "user") -> list[dict[str, Any]]:
     """Convert chat-style multimodal content to Responses API input parts.
 
     Input:  ``[{"type":"text"|"image_url", ...}]`` (native OpenAI Chat format)
@@ -96,7 +96,7 @@ def _chat_content_to_responses_parts(content: Any, *, role: str = "user") -> Lis
     text_type = "output_text" if role == "assistant" else "input_text"
     if not isinstance(content, list):
         return []
-    converted: List[Dict[str, Any]] = []
+    converted: list[dict[str, Any]] = []
     for part in content:
         if isinstance(part, str):
             if part:
@@ -120,7 +120,7 @@ def _chat_content_to_responses_parts(content: Any, *, role: str = "user") -> Lis
                 url = image_ref
             if not isinstance(url, str) or not url:
                 continue
-            image_part: Dict[str, Any] = {"type": "input_image", "image_url": url}
+            image_part: dict[str, Any] = {"type": "input_image", "image_url": url}
             if isinstance(detail, str) and detail.strip():
                 image_part["detail"] = detail.strip()
             converted.append(image_part)
@@ -148,7 +148,7 @@ def _summarize_user_message_for_log(content: Any, *, sep: str = " ") -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        text_bits: List[str] = []
+        text_bits: list[str] = []
         image_count = 0
         for part in content:
             if isinstance(part, str):
@@ -191,7 +191,7 @@ def _deterministic_call_id(fn_name: str, arguments: str, index: int = 0) -> str:
     return f"call_{digest}"
 
 
-def _split_responses_tool_id(raw_id: Any) -> tuple[Optional[str], Optional[str]]:
+def _split_responses_tool_id(raw_id: Any) -> tuple[str | None, str | None]:
     """Split a stored tool id into (call_id, response_item_id)."""
     if not isinstance(raw_id, str):
         return None, None
@@ -210,7 +210,7 @@ def _split_responses_tool_id(raw_id: Any) -> tuple[Optional[str], Optional[str]]
 
 def _derive_responses_function_call_id(
     call_id: str,
-    response_item_id: Optional[str] = None,
+    response_item_id: str | None = None,
 ) -> str:
     """Build a valid Responses `function_call.id` (must start with `fc_`)."""
     if isinstance(response_item_id, str):
@@ -241,12 +241,12 @@ def _derive_responses_function_call_id(
 # Schema conversion
 # ---------------------------------------------------------------------------
 
-def _responses_tools(tools: Optional[List[Dict[str, Any]]] = None) -> Optional[List[Dict[str, Any]]]:
+def _responses_tools(tools: list[dict[str, Any]] | None = None) -> list[dict[str, Any]] | None:
     """Convert chat-completions tool schemas to Responses function-tool schemas."""
     if not tools:
         return None
 
-    converted: List[Dict[str, Any]] = []
+    converted: list[dict[str, Any]] = []
     for item in tools:
         fn = item.get("function", {}) if isinstance(item, dict) else {}
         name = fn.get("name")
@@ -304,12 +304,12 @@ def _normalize_responses_message_status(value: Any, *, default: str = "completed
 
 
 def _chat_messages_to_responses_input(
-    messages: List[Dict[str, Any]],
+    messages: list[dict[str, Any]],
     *,
     is_xai_responses: bool = False,
     replay_encrypted_reasoning: bool = True,
-    current_issuer_kind: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    current_issuer_kind: str | None = None,
+) -> list[dict[str, Any]]:
     """Convert internal chat-style messages to Responses input items.
 
     ``is_xai_responses`` is kept for transport signature compatibility but
@@ -344,7 +344,7 @@ def _chat_messages_to_responses_input(
     (drops ALL replay); ``current_issuer_kind`` is the per-item filter
     that runs only when replay is still enabled.
     """
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     seen_item_ids: set = set()
 
     for msg in messages:
@@ -496,7 +496,7 @@ def _chat_messages_to_responses_input(
                             continue
 
                         embedded_call_id, embedded_response_item_id = _split_responses_tool_id(
-                            tc.get("id")
+                            tc.get("id"),
                         )
                         call_id = tc.get("call_id")
                         if not isinstance(call_id, str) or not call_id.strip():
@@ -576,11 +576,11 @@ def _chat_messages_to_responses_input(
 # Input preflight / validation
 # ---------------------------------------------------------------------------
 
-def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
+def _preflight_codex_input_items(raw_items: Any) -> list[dict[str, Any]]:
     if not isinstance(raw_items, list):
         raise ValueError("Codex Responses input must be a list of input items.")
 
-    normalized: List[Dict[str, Any]] = []
+    normalized: list[dict[str, Any]] = []
     seen_ids: set = set()
     for idx, item in enumerate(raw_items):
         if not isinstance(item, dict):
@@ -608,7 +608,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                     "call_id": call_id.strip(),
                     "name": name.strip(),
                     "arguments": arguments,
-                }
+                },
             )
             continue
 
@@ -626,7 +626,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
             if isinstance(output, list):
                 # Validate each item is a recognised content shape; drop
                 # anything else to avoid 4xx from the API.
-                cleaned: List[Dict[str, Any]] = []
+                cleaned: list[dict[str, Any]] = []
                 for part in output:
                     if not isinstance(part, dict):
                         continue
@@ -638,7 +638,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                     elif ptype == "input_image":
                         url = part.get("image_url")
                         if isinstance(url, str) and url:
-                            entry: Dict[str, Any] = {"type": "input_image", "image_url": url}
+                            entry: dict[str, Any] = {"type": "input_image", "image_url": url}
                             detail = part.get("detail")
                             if isinstance(detail, str) and detail.strip():
                                 entry["detail"] = detail.strip()
@@ -647,8 +647,8 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                     {
                         "type": "function_call_output",
                         "call_id": call_id.strip(),
-                        "output": cleaned if cleaned else "",
-                    }
+                        "output": cleaned or "",
+                    },
                 )
                 continue
             if not isinstance(output, str):
@@ -659,7 +659,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                     "type": "function_call_output",
                     "call_id": call_id.strip(),
                     "output": output,
-                }
+                },
             )
             continue
 
@@ -695,12 +695,12 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
             for part_idx, part in enumerate(content):
                 if not isinstance(part, dict):
                     raise ValueError(
-                        f"Codex Responses input[{idx}] message content[{part_idx}] must be an object."
+                        f"Codex Responses input[{idx}] message content[{part_idx}] must be an object.",
                     )
                 part_type = part.get("type")
                 if part_type not in {"output_text", "text"}:
                     raise ValueError(
-                        f"Codex Responses input[{idx}] message content[{part_idx}] has unsupported type {part_type!r}."
+                        f"Codex Responses input[{idx}] message content[{part_idx}] has unsupported type {part_type!r}.",
                     )
                 text = part.get("text", "")
                 if text is None:
@@ -710,7 +710,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                 normalized_content.append({"type": "output_text", "text": text})
             if not normalized_content:
                 raise ValueError(f"Codex Responses input[{idx}] message item must contain at least one text part.")
-            normalized_item: Dict[str, Any] = {
+            normalized_item: dict[str, Any] = {
                 "type": "message",
                 "role": "assistant",
                 "status": _normalize_responses_message_status(item.get("status")),
@@ -737,7 +737,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                 # Use the correct text type for the role — ``output_text`` for
                 # assistant messages, ``input_text`` for user messages.
                 text_type = "output_text" if role == "assistant" else "input_text"
-                validated: List[Dict[str, Any]] = []
+                validated: list[dict[str, Any]] = []
                 for part_idx, part in enumerate(content):
                     if isinstance(part, str):
                         if part:
@@ -745,7 +745,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                         continue
                     if not isinstance(part, dict):
                         raise ValueError(
-                            f"Codex Responses input[{idx}].content[{part_idx}] must be an object or string."
+                            f"Codex Responses input[{idx}].content[{part_idx}] must be an object or string.",
                         )
                     ptype = str(part.get("type") or "").strip().lower()
                     if ptype in {"input_text", "text", "output_text"}:
@@ -763,13 +763,13 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
                             url = image_ref
                         if not isinstance(url, str):
                             url = str(url or "")
-                        image_part: Dict[str, Any] = {"type": "input_image", "image_url": url}
+                        image_part: dict[str, Any] = {"type": "input_image", "image_url": url}
                         if isinstance(detail, str) and detail.strip():
                             image_part["detail"] = detail.strip()
                         validated.append(image_part)
                     else:
                         raise ValueError(
-                            f"Codex Responses input[{idx}].content[{part_idx}] has unsupported type {part.get('type')!r}."
+                            f"Codex Responses input[{idx}].content[{part_idx}] has unsupported type {part.get('type')!r}.",
                         )
                 normalized.append({"role": role, "content": validated})
                 continue
@@ -780,7 +780,7 @@ def _preflight_codex_input_items(raw_items: Any) -> List[Dict[str, Any]]:
             continue
 
         raise ValueError(
-            f"Codex Responses input[{idx}] has unsupported item shape (type={item_type!r}, role={role!r})."
+            f"Codex Responses input[{idx}] has unsupported item shape (type={item_type!r}, role={role!r}).",
         )
 
     return normalized
@@ -790,7 +790,7 @@ def _preflight_codex_api_kwargs(
     api_kwargs: Any,
     *,
     allow_stream: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     if not isinstance(api_kwargs, dict):
         raise ValueError("Codex Responses request must be a dict.")
 
@@ -864,7 +864,7 @@ def _preflight_codex_api_kwargs(
                     "description": description,
                     "strict": strict,
                     "parameters": parameters,
-                }
+                },
             )
 
     store = api_kwargs.get("store", False)
@@ -877,7 +877,7 @@ def _preflight_codex_api_kwargs(
         "tool_choice", "parallel_tool_calls", "prompt_cache_key", "service_tier",
         "extra_headers", "extra_body", "timeout",
     }
-    normalized: Dict[str, Any] = {
+    normalized: dict[str, Any] = {
         "model": model,
         "instructions": instructions,
         "input": normalized_input,
@@ -922,7 +922,7 @@ def _preflight_codex_api_kwargs(
     if extra_headers is not None:
         if not isinstance(extra_headers, dict):
             raise ValueError("Codex Responses request 'extra_headers' must be an object.")
-        normalized_headers: Dict[str, str] = {}
+        normalized_headers: dict[str, str] = {}
         for key, value in extra_headers.items():
             if not isinstance(key, str) or not key.strip():
                 raise ValueError("Codex Responses request 'extra_headers' keys must be non-empty strings.")
@@ -978,7 +978,7 @@ def _preflight_codex_api_kwargs(
     unexpected = sorted(key for key in api_kwargs if key not in allowed_keys)
     if unexpected:
         raise ValueError(
-            f"Codex Responses request has unsupported field(s): {', '.join(unexpected)}."
+            f"Codex Responses request has unsupported field(s): {', '.join(unexpected)}.",
         )
 
     return normalized
@@ -994,7 +994,7 @@ def _extract_responses_message_text(item: Any) -> str:
     if not isinstance(content, list):
         return ""
 
-    chunks: List[str] = []
+    chunks: list[str] = []
     for part in content:
         ptype = getattr(part, "type", None)
         if ptype not in {"output_text", "text"}:
@@ -1009,7 +1009,7 @@ def _extract_responses_reasoning_text(item: Any) -> str:
     """Extract a compact reasoning text from a Responses reasoning item."""
     summary = getattr(item, "summary", None)
     if isinstance(summary, list):
-        chunks: List[str] = []
+        chunks: list[str] = []
         for part in summary:
             text = getattr(part, "text", None)
             if isinstance(text, str) and text:
@@ -1071,7 +1071,7 @@ def _format_responses_error(error_obj: Any, response_status: str) -> str:
 def _normalize_codex_response(
     response: Any,
     *,
-    issuer_kind: Optional[str] = None,
+    issuer_kind: str | None = None,
 ) -> tuple[Any, str]:
     """Normalize a Responses API object to an assistant_message-like object.
 
@@ -1110,11 +1110,11 @@ def _normalize_codex_response(
         error_msg = _format_responses_error(error_obj, response_status)
         raise RuntimeError(error_msg)
 
-    content_parts: List[str] = []
-    reasoning_parts: List[str] = []
-    reasoning_items_raw: List[Dict[str, Any]] = []
-    message_items_raw: List[Dict[str, Any]] = []
-    tool_calls: List[Any] = []
+    content_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    reasoning_items_raw: list[dict[str, Any]] = []
+    message_items_raw: list[dict[str, Any]] = []
+    tool_calls: list[Any] = []
     has_incomplete_items = response_status in {"queued", "in_progress", "incomplete"}
     saw_streaming_or_item_incomplete = response_status in {"queued", "in_progress"}
     saw_commentary_phase = False
@@ -1175,7 +1175,7 @@ def _normalize_codex_response(
             message_text = _extract_responses_message_text(item)
             if message_text:
                 content_parts.append(message_text)
-                raw_message_item: Dict[str, Any] = {
+                raw_message_item: dict[str, Any] = {
                     "type": "message",
                     "role": "assistant",
                     "status": _normalize_responses_message_status(item_status),
@@ -1317,11 +1317,7 @@ def _normalize_codex_response(
 
     if tool_calls:
         finish_reason = "tool_calls"
-    elif leaked_tool_call_text:
-        finish_reason = "incomplete"
-    elif saw_streaming_or_item_incomplete:
-        finish_reason = "incomplete"
-    elif (has_incomplete_items or saw_commentary_phase) and not saw_final_answer_phase:
+    elif leaked_tool_call_text or saw_streaming_or_item_incomplete or ((has_incomplete_items or saw_commentary_phase) and not saw_final_answer_phase):
         finish_reason = "incomplete"
     elif (reasoning_items_raw or reasoning_parts or saw_reasoning_item) and not final_text:
         # Response contains only reasoning (encrypted thinking state and/or

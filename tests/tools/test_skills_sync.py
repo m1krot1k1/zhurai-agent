@@ -1,22 +1,23 @@
 """Tests for tools/skills_sync.py — manifest-based skill seeding and updating."""
 
-import shutil
 import json
-import pytest
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from tools.skills_sync import (
+    _compute_relative_dest,
+    _dir_hash,
+    _discover_bundled_skills,
     _get_bundled_dir,
     _read_manifest,
     _read_skill_name,
     _write_manifest,
-    _discover_bundled_skills,
-    _compute_relative_dest,
-    _dir_hash,
-    sync_skills,
     reset_bundled_skill,
     restore_official_optional_skill,
+    sync_skills,
 )
 
 
@@ -161,7 +162,7 @@ class TestReadSkillName:
         skill_dir = tmp_path / "category" / "audiocraft"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: audiocraft-audio-generation\n---\n# Skill"
+            "---\nname: audiocraft-audio-generation\n---\n# Skill",
         )
         skills = _discover_bundled_skills(tmp_path)
         assert skills[0][0] == "audiocraft-audio-generation"
@@ -202,7 +203,7 @@ class TestRmtreeWritableScopeGuard:
 
     def test_refuses_root_path(self, tmp_path):
         """``Path('/')`` is the entire filesystem — must always be rejected."""
-        from tools.skills_sync import _rmtree_writable, SKILLS_DIR
+        from tools.skills_sync import _rmtree_writable
 
         skills = tmp_path / "skills"
         skills.mkdir()
@@ -602,7 +603,7 @@ class TestSyncSkills:
         optional_skill = optional / "mlops" / "training" / "trl-fine-tuning"
         optional_skill.mkdir(parents=True)
         (optional_skill / "SKILL.md").write_text(
-            "---\nname: fine-tuning-with-trl\n---\n# TRL\n"
+            "---\nname: fine-tuning-with-trl\n---\n# TRL\n",
         )
         (optional_skill / "references").mkdir()
         (optional_skill / "references" / "api.md").write_text("api\n")
@@ -612,7 +613,7 @@ class TestSyncSkills:
         active = skills_dir / "mlops" / "training" / "trl-fine-tuning"
         active.mkdir(parents=True)
         (active / "SKILL.md").write_text(
-            "---\nname: fine-tuning-with-trl\n---\n# TRL\n"
+            "---\nname: fine-tuning-with-trl\n---\n# TRL\n",
         )
         (active / "references").mkdir()
         (active / "references" / "api.md").write_text("api\n")
@@ -656,7 +657,7 @@ class TestSyncSkills:
         optional_skill = optional / "mlops" / "training" / "trl-fine-tuning"
         optional_skill.mkdir(parents=True)
         (optional_skill / "SKILL.md").write_text(
-            "---\nname: fine-tuning-with-trl\n---\n# Official TRL\n"
+            "---\nname: fine-tuning-with-trl\n---\n# Official TRL\n",
         )
 
         skills_dir = tmp_path / "user_skills"
@@ -664,7 +665,7 @@ class TestSyncSkills:
         wrong = skills_dir / "mlops" / "trl-fine-tuning"
         wrong.mkdir(parents=True)
         (wrong / "SKILL.md").write_text(
-            "---\nname: fine-tuning-with-trl\n---\n# Curator mangled\n"
+            "---\nname: fine-tuning-with-trl\n---\n# Curator mangled\n",
         )
 
         with self._patches(bundled, skills_dir, manifest_file):
@@ -837,7 +838,7 @@ class TestResetBundledSkill:
         bundled = tmp_path / "bundled_skills"
         (bundled / "productivity" / "google-workspace").mkdir(parents=True)
         (bundled / "productivity" / "google-workspace" / "SKILL.md").write_text(
-            "---\nname: google-workspace\n---\n# GW v2 (upstream)\n"
+            "---\nname: google-workspace\n---\n# GW v2 (upstream)\n",
         )
         return bundled
 
@@ -962,8 +963,8 @@ class TestResetBundledSkill:
     def test_reset_restore_succeeds_on_readonly_nix_tree(self, tmp_path):
         """#34972: --restore must succeed even when the user copy is a fully
         read-only tree (r-xr-xr-x dirs + files), as produced by copying a
-        Nix-store source. The manifest is re-baselined and bundled re-copied."""
-        import os
+        Nix-store source. The manifest is re-baselined and bundled re-copied.
+        """
         import stat
 
         bundled = self._setup_bundled(tmp_path)
@@ -976,7 +977,7 @@ class TestResetBundledSkill:
         (dest / "SKILL.md").write_text("# user version\n")
         (sub / "ref.md").write_text("# nested ref\n")
         manifest_file.write_text(
-            "google-workspace:STALEHASH000000000000000000000000\n"
+            "google-workspace:STALEHASH000000000000000000000000\n",
         )
 
         # Read-only files AND directories — the real Nix-store case.
@@ -984,10 +985,10 @@ class TestResetBundledSkill:
             stat.S_IRUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP
             | stat.S_IROTH | stat.S_IXOTH
         )
-        os.chmod(sub / "ref.md", stat.S_IREAD)
-        os.chmod(dest / "SKILL.md", stat.S_IREAD)
-        os.chmod(sub, ro_dir)
-        os.chmod(dest, ro_dir)
+        Path(sub / "ref.md").chmod(stat.S_IREAD)
+        Path(dest / "SKILL.md").chmod(stat.S_IREAD)
+        Path(sub).chmod(ro_dir)
+        Path(dest).chmod(ro_dir)
 
         try:
             with self._patches(bundled, skills_dir, manifest_file):
@@ -1005,12 +1006,13 @@ class TestResetBundledSkill:
             # Restore perms so tmp_path teardown can remove anything left.
             for p in (sub, dest):
                 if p.exists():
-                    os.chmod(p, stat.S_IRWXU)
+                    Path(p).chmod(stat.S_IRWXU)
 
     def test_reset_restore_preserves_manifest_on_rmtree_failure(self, tmp_path):
         """#34972: when the user copy genuinely cannot be removed, the manifest
         entry must NOT be deleted — otherwise the skill enters a limbo state
-        where future syncs silently skip it forever."""
+        where future syncs silently skip it forever.
+        """
         bundled = self._setup_bundled(tmp_path)
         skills_dir = tmp_path / "user_skills"
         manifest_file = skills_dir / ".bundled_manifest"
@@ -1019,7 +1021,7 @@ class TestResetBundledSkill:
         dest.mkdir(parents=True)
         (dest / "SKILL.md").write_text("# user version\n")
         manifest_file.write_text(
-            "google-workspace:STALEHASH000000000000000000000000\n"
+            "google-workspace:STALEHASH000000000000000000000000\n",
         )
 
         # Simulate an unremovable tree (e.g. a busy mountpoint or a path even
@@ -1028,7 +1030,7 @@ class TestResetBundledSkill:
             raise PermissionError(13, "Permission denied")
 
         with self._patches(bundled, skills_dir, manifest_file), patch(
-            "tools.skills_sync._rmtree_writable", side_effect=_boom
+            "tools.skills_sync._rmtree_writable", side_effect=_boom,
         ):
             result = reset_bundled_skill("google-workspace", restore=True)
 
@@ -1110,7 +1112,8 @@ class TestOptOutToggleAndRemove:
 
     def test_marker_toggle(self, tmp_path):
         from tools.skills_sync import (
-            set_bundled_skills_opt_out, is_bundled_skills_opt_out,
+            is_bundled_skills_opt_out,
+            set_bundled_skills_opt_out,
         )
         home = tmp_path / "home"
         home.mkdir()
@@ -1129,7 +1132,8 @@ class TestOptOutToggleAndRemove:
 
     def test_remove_keeps_user_modified(self, tmp_path):
         from tools.skills_sync import (
-            sync_skills, remove_pristine_bundled_skills,
+            remove_pristine_bundled_skills,
+            sync_skills,
         )
         bundled = self._setup_bundled(tmp_path)
         skills_dir = tmp_path / "user_skills"

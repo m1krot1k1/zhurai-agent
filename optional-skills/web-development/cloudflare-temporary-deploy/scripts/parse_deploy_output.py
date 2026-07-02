@@ -25,7 +25,7 @@ _CLAIM_URL = re.compile(r"https://\S*claim\S*claimToken=\S+", re.IGNORECASE)
 # Account names can contain spaces (e.g. "Serene Temple"), so capture everything
 # up to the trailing "(state)" marker rather than a single token.
 _ACCOUNT = re.compile(
-    r"Account:\s*(?P<name>.+?)\s*\((?P<state>created|reused)\)", re.IGNORECASE
+    r"Account:\s*(?P<name>.+?)\s*\((?P<state>created|reused)\)", re.IGNORECASE,
 )
 # "Claim within:   60 minutes"
 _CLAIM_WITHIN = re.compile(r"Claim within:\s*(?P<minutes>\d+)\s*minutes?", re.IGNORECASE)

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Todo Tool Module - Planning & Task Management
+"""Todo Tool Module - Planning & Task Management
 
 Provides an in-memory task list the agent uses to decompose complex tasks,
 track progress, and maintain focus across long conversations. The state
@@ -15,8 +14,7 @@ Design:
 """
 
 import json
-from typing import Dict, Any, List, Optional
-
+from typing import Any
 
 # Valid status values for todo items
 VALID_STATUSES = {"pending", "in_progress", "completed", "cancelled"}
@@ -34,8 +32,7 @@ _TRUNCATION_MARKER = "… [truncated]"
 
 
 class TodoStore:
-    """
-    In-memory todo list. One instance per AIAgent (one per session).
+    """In-memory todo list. One instance per AIAgent (one per session).
 
     Items are ordered -- list position is priority. Each item has:
       - id: unique string identifier (agent-chosen)
@@ -44,16 +41,16 @@ class TodoStore:
     """
 
     def __init__(self):
-        self._items: List[Dict[str, str]] = []
+        self._items: list[dict[str, str]] = []
 
-    def write(self, todos: List[Dict[str, Any]], merge: bool = False) -> List[Dict[str, str]]:
-        """
-        Write todos. Returns the full current list after writing.
+    def write(self, todos: list[dict[str, Any]], merge: bool = False) -> list[dict[str, str]]:
+        """Write todos. Returns the full current list after writing.
 
         Args:
             todos: list of {id, content, status} dicts
             merge: if False, replace the entire list. If True, update
                    existing items by id and append new ones.
+
         """
         if not merge:
             # Replace mode: new list entirely
@@ -68,9 +65,9 @@ class TodoStore:
 
                 if item_id in existing:
                     # Update only the fields the LLM actually provided
-                    if "content" in t and t["content"]:
+                    if t.get("content"):
                         existing[item_id]["content"] = self._cap_content(str(t["content"]).strip())
-                    if "status" in t and t["status"]:
+                    if t.get("status"):
                         status = str(t["status"]).strip().lower()
                         if status in VALID_STATUSES:
                             existing[item_id]["status"] = status
@@ -95,7 +92,7 @@ class TodoStore:
             self._items = self._items[:MAX_TODO_ITEMS]
         return self.read()
 
-    def read(self) -> List[Dict[str, str]]:
+    def read(self) -> list[dict[str, str]]:
         """Return a copy of the current list."""
         return [item.copy() for item in self._items]
 
@@ -103,9 +100,8 @@ class TodoStore:
         """Check if there are any items in the list."""
         return bool(self._items)
 
-    def format_for_injection(self) -> Optional[str]:
-        """
-        Render the todo list for post-compression injection.
+    def format_for_injection(self) -> str | None:
+        """Render the todo list for post-compression injection.
 
         Returns a human-readable string to append to the compressed
         message history, or None if the list is empty.
@@ -151,9 +147,8 @@ class TodoStore:
         return content
 
     @staticmethod
-    def _validate(item: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Validate and normalize a todo item.
+    def _validate(item: dict[str, Any]) -> dict[str, str]:
+        """Validate and normalize a todo item.
 
         Ensures required fields exist and status is valid.
         Returns a clean dict with only {id, content, status}.
@@ -175,9 +170,9 @@ class TodoStore:
         return {"id": item_id, "content": content, "status": status}
 
     @staticmethod
-    def _dedupe_by_id(todos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _dedupe_by_id(todos: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Collapse duplicate ids, keeping the last occurrence in its position."""
-        last_index: Dict[str, int] = {}
+        last_index: dict[str, int] = {}
         for i, item in enumerate(todos):
             item_id = str(item.get("id", "")).strip() or "?"
             last_index[item_id] = i
@@ -185,12 +180,11 @@ class TodoStore:
 
 
 def todo_tool(
-    todos: Optional[List[Dict[str, Any]]] = None,
+    todos: list[dict[str, Any]] | None = None,
     merge: bool = False,
-    store: Optional[TodoStore] = None,
+    store: TodoStore | None = None,
 ) -> str:
-    """
-    Single entry point for the todo tool. Reads or writes depending on params.
+    """Single entry point for the todo tool. Reads or writes depending on params.
 
     Args:
         todos: if provided, write these items. If None, read current list.
@@ -199,6 +193,7 @@ def todo_tool(
 
     Returns:
         JSON string with the full current list and summary metadata.
+
     """
     if store is None:
         return tool_error("TodoStore not initialized")
@@ -265,20 +260,20 @@ TODO_SCHEMA = {
                     "properties": {
                         "id": {
                             "type": "string",
-                            "description": "Unique item identifier"
+                            "description": "Unique item identifier",
                         },
                         "content": {
                             "type": "string",
-                            "description": "Task description"
+                            "description": "Task description",
                         },
                         "status": {
                             "type": "string",
                             "enum": ["pending", "in_progress", "completed", "cancelled"],
-                            "description": "Current status"
-                        }
+                            "description": "Current status",
+                        },
                     },
-                    "required": ["id", "content", "status"]
-                }
+                    "required": ["id", "content", "status"],
+                },
             },
             "merge": {
                 "type": "boolean",
@@ -286,11 +281,11 @@ TODO_SCHEMA = {
                     "true: update existing items by id, add new ones. "
                     "false (default): replace the entire list."
                 ),
-                "default": False
-            }
+                "default": False,
+            },
         },
-        "required": []
-    }
+        "required": [],
+    },
 }
 
 

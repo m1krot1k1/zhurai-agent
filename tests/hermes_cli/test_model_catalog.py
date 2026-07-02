@@ -21,6 +21,7 @@ def isolated_home(tmp_path, monkeypatch):
 
     # Force a fresh catalog module state for each test.
     import importlib
+
     from hermes_cli import model_catalog
     importlib.reload(model_catalog)
     yield home
@@ -99,7 +100,7 @@ class TestFetchSuccess:
         from hermes_cli import model_catalog
         manifest = _valid_manifest()
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=manifest
+            model_catalog, "_fetch_manifest", return_value=manifest,
         ) as fetch:
             result = model_catalog.get_catalog(force_refresh=True)
 
@@ -108,14 +109,14 @@ class TestFetchSuccess:
 
         cache_file = model_catalog._cache_path()
         assert cache_file.exists()
-        with open(cache_file) as fh:
+        with Path(cache_file).open() as fh:
             assert json.load(fh) == manifest
 
     def test_second_call_uses_in_process_cache(self, isolated_home):
         from hermes_cli import model_catalog
         manifest = _valid_manifest()
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=manifest
+            model_catalog, "_fetch_manifest", return_value=manifest,
         ) as fetch:
             model_catalog.get_catalog(force_refresh=True)
             model_catalog.get_catalog()  # should not hit network again
@@ -125,7 +126,7 @@ class TestFetchSuccess:
         from hermes_cli import model_catalog
         manifest = _valid_manifest()
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=manifest
+            model_catalog, "_fetch_manifest", return_value=manifest,
         ) as fetch:
             model_catalog.get_catalog(force_refresh=True)
             model_catalog.get_catalog(force_refresh=True)
@@ -159,7 +160,7 @@ class TestFetchFailure:
         # Write stale cache directly (mtime in the past).
         cache = model_catalog._cache_path()
         cache.parent.mkdir(parents=True, exist_ok=True)
-        with open(cache, "w") as fh:
+        with Path(cache).open("w") as fh:
             json.dump(manifest, fh)
         old = time.time() - 30 * 24 * 3600  # 30 days ago
         import os as _os
@@ -228,7 +229,8 @@ class TestFallbackChain:
 
     def test_dedupes_when_primary_equals_fallback(self, isolated_home):
         """Operator who configured ``model_catalog.url`` to the raw GitHub URL
-        should not get a duplicate fetch from the fallback list."""
+        should not get a duplicate fetch from the fallback list.
+        """
         from hermes_cli import model_catalog
 
         with patch.object(model_catalog, "_fetch_manifest", return_value=None) as fetch:
@@ -238,7 +240,8 @@ class TestFallbackChain:
 
     def test_get_catalog_uses_fallback_chain(self, isolated_home):
         """End-to-end: ``get_catalog`` routes through the fallback helper so
-        a primary URL failure transparently produces a working catalog."""
+        a primary URL failure transparently produces a working catalog.
+        """
         from hermes_cli import model_catalog
         manifest = _valid_manifest()
         calls: list[str] = []
@@ -260,7 +263,7 @@ class TestCuratedAccessors:
     def test_openrouter_returns_tuples(self, isolated_home):
         from hermes_cli import model_catalog
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=_valid_manifest()
+            model_catalog, "_fetch_manifest", return_value=_valid_manifest(),
         ):
             result = model_catalog.get_curated_openrouter_models()
         assert result == [
@@ -272,7 +275,7 @@ class TestCuratedAccessors:
     def test_nous_returns_ids(self, isolated_home):
         from hermes_cli import model_catalog
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=_valid_manifest()
+            model_catalog, "_fetch_manifest", return_value=_valid_manifest(),
         ):
             result = model_catalog.get_curated_nous_models()
         assert result == ["anthropic/claude-opus-4.7", "moonshotai/kimi-k2.6"]
@@ -300,9 +303,8 @@ class TestDisabled:
                 "ttl_hours": 24.0,
                 "providers": {},
             },
-        ):
-            with patch.object(model_catalog, "_fetch_manifest") as fetch:
-                result = model_catalog.get_catalog()
+        ), patch.object(model_catalog, "_fetch_manifest") as fetch:
+            result = model_catalog.get_catalog()
         assert result == {}
         fetch.assert_not_called()
 
@@ -317,8 +319,8 @@ class TestProviderOverride:
                 "openrouter": {
                     "models": [
                         {"id": "override/model", "description": "custom"},
-                    ]
-                }
+                    ],
+                },
             },
         }
 
@@ -336,9 +338,8 @@ class TestProviderOverride:
                 "ttl_hours": 24.0,
                 "providers": {"openrouter": {"url": "http://override"}},
             },
-        ):
-            with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-                result = model_catalog.get_curated_openrouter_models()
+        ), patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
+            result = model_catalog.get_curated_openrouter_models()
 
         assert result == [("override/model", "custom")]
 
@@ -347,10 +348,10 @@ class TestIntegrationWithModelsModule:
     """Exercise the fallback paths via the real callers in hermes_cli.models."""
 
     def test_curated_nous_ids_falls_back_to_hardcoded_on_empty_catalog(
-        self, isolated_home
+        self, isolated_home,
     ):
         from hermes_cli import model_catalog
-        from hermes_cli.models import get_curated_nous_model_ids, _PROVIDER_MODELS
+        from hermes_cli.models import _PROVIDER_MODELS, get_curated_nous_model_ids
 
         with patch.object(model_catalog, "_fetch_manifest", return_value=None):
             result = get_curated_nous_model_ids()
@@ -362,7 +363,7 @@ class TestIntegrationWithModelsModule:
         from hermes_cli.models import get_curated_nous_model_ids
 
         with patch.object(
-            model_catalog, "_fetch_manifest", return_value=_valid_manifest()
+            model_catalog, "_fetch_manifest", return_value=_valid_manifest(),
         ):
             result = get_curated_nous_model_ids()
 
@@ -382,6 +383,7 @@ class TestIntegrationWithModelsModule:
         # seat-belt thinks is the "real" user store. Use the autouse
         # ``_hermetic_environment`` HERMES_HOME directly instead.
         import importlib
+
         from hermes_cli import model_catalog
         from hermes_cli.models import get_curated_nous_model_ids
         importlib.reload(model_catalog)
@@ -394,8 +396,8 @@ class TestIntegrationWithModelsModule:
                     {
                         "providers": {"nous": {"access_token": "fake"}},
                         "credential_pool": {},
-                    }
-                )
+                    },
+                ),
             )
 
             # Stub the Portal recommendation union so the row is deterministic
@@ -404,7 +406,7 @@ class TestIntegrationWithModelsModule:
             # (``curated["nous"] = get_curated_nous_model_ids()``), so the test
             # stays an invariant — it can't rot as the curated/manifest list grows.
             with patch.object(
-                model_catalog, "_fetch_manifest", return_value=_valid_manifest()
+                model_catalog, "_fetch_manifest", return_value=_valid_manifest(),
             ), patch("hermes_cli.models.check_nous_free_tier", return_value=False), patch(
                 "hermes_cli.models.union_with_portal_free_recommendations",
                 side_effect=lambda ids, *a, **k: (ids, {}),
@@ -414,7 +416,7 @@ class TestIntegrationWithModelsModule:
             ):
                 expected = get_curated_nous_model_ids()
                 picker = list_picker_providers(
-                    current_provider="nous", max_models=99
+                    current_provider="nous", max_models=99,
                 )
         finally:
             model_catalog.reset_cache()
@@ -431,6 +433,7 @@ class TestIntegrationWithModelsModule:
         a ``if max_models`` (falsy) check would conflate ``0`` with unlimited.
         """
         import importlib
+
         from hermes_cli import model_catalog
         from hermes_cli.models import get_curated_nous_model_ids
         importlib.reload(model_catalog)
@@ -446,11 +449,11 @@ class TestIntegrationWithModelsModule:
                     {
                         "providers": {"nous": {"access_token": "fake"}},
                         "credential_pool": {},
-                    }
-                )
+                    },
+                ),
             )
             with patch.object(
-                model_catalog, "_fetch_manifest", return_value=_valid_manifest()
+                model_catalog, "_fetch_manifest", return_value=_valid_manifest(),
             ), patch("hermes_cli.models.check_nous_free_tier", return_value=False), patch(
                 "hermes_cli.models.union_with_portal_free_recommendations",
                 side_effect=lambda ids, *a, **k: (ids, {}),
@@ -465,7 +468,7 @@ class TestIntegrationWithModelsModule:
                 # path); the picker variant drops empty-model rows entirely, so
                 # the empty-list contract lives on the auth-providers call.
                 zero = list_authenticated_providers(
-                    current_provider="nous", max_models=0
+                    current_provider="nous", max_models=0,
                 )
         finally:
             model_catalog.reset_cache()
@@ -533,7 +536,7 @@ class TestManifestMatchesInRepoLists:
         spec.loader.exec_module(mod)
         expected = mod.build_catalog()
 
-        with open(manifest_path, encoding="utf-8") as fh:
+        with Path(manifest_path).open(encoding="utf-8") as fh:
             actual = json.load(fh)
 
         assert self._strip_volatile(actual) == self._strip_volatile(expected), (

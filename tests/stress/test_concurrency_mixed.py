@@ -49,7 +49,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
                 # Try to unblock a blocked task.
                 row = conn.execute(
                     "SELECT id FROM tasks WHERE status='blocked' "
-                    "ORDER BY RANDOM() LIMIT 1"
+                    "ORDER BY RANDOM() LIMIT 1",
                 ).fetchone()
                 if row:
                     try:
@@ -65,7 +65,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
                 # Try to archive a done task.
                 row = conn.execute(
                     "SELECT id FROM tasks WHERE status='done' "
-                    "ORDER BY RANDOM() LIMIT 1"
+                    "ORDER BY RANDOM() LIMIT 1",
                 ).fetchone()
                 if row:
                     try:
@@ -80,7 +80,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
             # Default: claim + complete-or-block.
             row = conn.execute(
                 "SELECT id FROM tasks WHERE status='ready' "
-                "AND claim_lock IS NULL LIMIT 1"
+                "AND claim_lock IS NULL LIMIT 1",
             ).fetchone()
             if row is None:
                 idle_rounds += 1
@@ -137,7 +137,7 @@ def worker_loop(worker_id: int, hermes_home: str, result_file: str) -> None:
         finally:
             conn.close()
 
-    with open(result_file, "w") as f:
+    with Path(result_file).open("w") as f:
         json.dump(events, f)
 
 
@@ -165,7 +165,7 @@ def reclaimer_loop(hermes_home: str, result_file: str) -> None:
             conn.close()
         time.sleep(0.2)
 
-    with open(result_file, "w") as f:
+    with Path(result_file).open("w") as f:
         json.dump(events, f)
 
 
@@ -213,14 +213,14 @@ def main():
     # Aggregate.
     all_events = []
     for i, f in enumerate(worker_results):
-        if os.path.isfile(f):
-            with open(f) as fh:
+        if Path(f).is_file():
+            with Path(f).open() as fh:
                 all_events.extend(json.load(fh))
         else:
             print(f"  WORKER {i} died with no result file!")
     reclaim_events = []
-    if os.path.isfile(reclaim_result):
-        with open(reclaim_result) as fh:
+    if Path(reclaim_result).is_file():
+        with Path(reclaim_result).open() as fh:
             reclaim_events = json.load(fh)
 
     # ============ INVARIANT CHECKS ============
@@ -247,12 +247,12 @@ def main():
             # a run it didn't claim. But let me check if reclaim happened first.
             failures.append(
                 f"COMPLETION WITHOUT CLAIM: task {comp['task']} run {comp['run_id']} "
-                f"by worker {comp['worker']}"
+                f"by worker {comp['worker']}",
             )
         elif claim["worker"] != comp["worker"]:
             failures.append(
                 f"CROSS-WORKER COMPLETION: run {comp['run_id']} claimed by "
-                f"worker {claim['worker']} but completed by worker {comp['worker']}"
+                f"worker {claim['worker']} but completed by worker {comp['worker']}",
             )
 
     # SQLite errors that escaped the retry layer
@@ -277,7 +277,7 @@ def main():
         for row in inconsistent:
             failures.append(
                 f"INVARIANT VIOLATION: task {row['id']} status={row['status']} "
-                f"has current_run_id={row['current_run_id']} but run is ended"
+                f"has current_run_id={row['current_run_id']} but run is ended",
             )
 
         # Invariant: no orphan open runs
@@ -289,21 +289,21 @@ def main():
         """).fetchall()
         for row in orphans:
             failures.append(
-                f"ORPHAN OPEN RUN: run {row['id']} on task {row['task_id']}"
+                f"ORPHAN OPEN RUN: run {row['id']} on task {row['task_id']}",
             )
 
         # Counts — should roughly balance.
         status_counts = dict(
-            conn.execute("SELECT status, COUNT(*) FROM tasks GROUP BY status").fetchall()
+            conn.execute("SELECT status, COUNT(*) FROM tasks GROUP BY status").fetchall(),
         )
         run_outcome_counts = dict(
             conn.execute(
                 "SELECT outcome, COUNT(*) FROM task_runs "
-                "WHERE ended_at IS NOT NULL GROUP BY outcome"
-            ).fetchall()
+                "WHERE ended_at IS NOT NULL GROUP BY outcome",
+            ).fetchall(),
         )
         active_runs = conn.execute(
-            "SELECT COUNT(*) FROM task_runs WHERE ended_at IS NULL"
+            "SELECT COUNT(*) FROM task_runs WHERE ended_at IS NULL",
         ).fetchone()[0]
 
     finally:
@@ -327,7 +327,7 @@ def main():
     for s, n in sorted(status_counts.items()):
         print(f"  {s:<10} {n}")
     print("Final run outcomes:")
-    for o, n in sorted(run_outcome_counts.items(), key=lambda x: (x[0] or '',)):
+    for o, n in sorted(run_outcome_counts.items(), key=lambda x: (x[0] or "",)):
         print(f"  {o:<12} {n}")
     print(f"  active       {active_runs}")
 

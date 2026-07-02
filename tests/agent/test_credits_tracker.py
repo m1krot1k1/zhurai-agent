@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
+
 import pytest
 
 from agent.credits_tracker import CreditsState, parse_credits_headers
-
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -64,7 +63,7 @@ HEALTHY_HEADERS = _base_headers(
         "x-nous-tool-pool-gated-off": "true",
         "x-nous-credits-denominator-kind": "subscription_cap",
         "x-nous-credits-paid-access": "true",
-    }
+    },
 )
 
 SUB_90PCT_HEADERS = _base_headers(
@@ -79,7 +78,7 @@ SUB_90PCT_HEADERS = _base_headers(
         "x-nous-credits-purchased-usd": "0.00",
         "x-nous-credits-denominator-kind": "subscription_cap",
         "x-nous-credits-paid-access": "true",
-    }
+    },
 )
 
 GRANT_EXHAUSTED_HEADERS = _base_headers(
@@ -94,7 +93,7 @@ GRANT_EXHAUSTED_HEADERS = _base_headers(
         "x-nous-credits-purchased-usd": "12.34",
         "x-nous-credits-denominator-kind": "subscription_cap",
         "x-nous-credits-paid-access": "true",
-    }
+    },
 )
 
 PURCHASED_ONLY_HEADERS = _base_headers(
@@ -108,7 +107,7 @@ PURCHASED_ONLY_HEADERS = _base_headers(
         "x-nous-credits-denominator-kind": "none",
         "x-nous-credits-paid-access": "true",
         # No limit pair — denominator_kind=none
-    }
+    },
 )
 
 TOOL_POOL_FREE_HEADERS = _base_headers(
@@ -118,7 +117,7 @@ TOOL_POOL_FREE_HEADERS = _base_headers(
         "x-nous-tool-pool-micros": micros(0.05),
         "x-nous-tool-pool-gated-off": "false",
         "x-nous-credits-paid-access": "true",
-    }
+    },
 )
 
 DEPLETED_HEADERS = _base_headers(
@@ -131,7 +130,7 @@ DEPLETED_HEADERS = _base_headers(
         "x-nous-credits-purchased-usd": "0.00",
         "x-nous-credits-paid-access": "false",
         "x-nous-credits-disabled-reason": "out_of_credits",
-    }
+    },
 )
 
 DEBT_HEADERS = _base_headers(
@@ -143,7 +142,7 @@ DEBT_HEADERS = _base_headers(
         "x-nous-credits-purchased-micros": micros(0),
         "x-nous-credits-purchased-usd": "0.00",
         "x-nous-credits-paid-access": "false",
-    }
+    },
 )
 
 
@@ -526,7 +525,7 @@ class TestHalfPairLimit:
             **{
                 "x-nous-credits-subscription-limit-micros": micros(20.00),
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -539,7 +538,7 @@ class TestHalfPairLimit:
             **{
                 "x-nous-credits-subscription-limit-usd": "20.00",
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -552,7 +551,7 @@ class TestHalfPairLimit:
             **{
                 "x-nous-credits-subscription-limit-micros": micros(20.00),
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -567,7 +566,7 @@ class TestHalfPairLimit:
                 "x-nous-credits-subscription-limit-micros": micros(20.00),
                 "x-nous-credits-subscription-limit-usd": "20.00",
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -598,7 +597,7 @@ class TestNegativeValues:
                 "x-nous-credits-subscription-limit-micros": "-1000",
                 "x-nous-credits-subscription-limit-usd": "-0.00",
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         assert parse_credits_headers(headers) is None
 
@@ -622,7 +621,7 @@ class TestUsdValidation:
         assert state.remaining_usd == "18.00"
 
     def test_usd_one_decimal_returns_none(self):
-        """'18.0' does not match ^-?\d+\.\d{2}$"""
+        r"""'18.0' does not match ^-?\d+\.\d{2}$"""
         headers = _base_headers(**{"x-nous-credits-remaining-usd": "18.0"})
         assert parse_credits_headers(headers) is None
 
@@ -644,7 +643,7 @@ class TestUsdValidation:
             **{
                 "x-nous-credits-subscription-micros": "-5000000",
                 "x-nous-credits-subscription-usd": "-5.00",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -694,7 +693,7 @@ class TestDenominatorKind:
                 "x-nous-credits-denominator-kind": "subscription_cap",
                 "x-nous-credits-subscription-limit-micros": micros(20.00),
                 "x-nous-credits-subscription-limit-usd": "20.00",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -722,7 +721,7 @@ class TestZeroDivisionGuard:
                 "x-nous-credits-subscription-limit-micros": "0",
                 "x-nous-credits-subscription-limit-usd": "0.00",
                 "x-nous-credits-denominator-kind": "subscription_cap",
-            }
+            },
         )
         state = parse_credits_headers(headers)
         assert state is not None
@@ -830,7 +829,7 @@ class TestCreditsStateDefaults:
 
 class TestDepletedProperty:
     def test_depleted_equals_not_paid_access(self):
-        """depleted must be exactly `not paid_access`, never `remaining==0`."""
+        """Depleted must be exactly `not paid_access`, never `remaining==0`."""
         state = CreditsState(paid_access=False, remaining_micros=0, captured_at=time.time())
         assert state.depleted is True
 

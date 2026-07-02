@@ -44,7 +44,7 @@ def test_normalize_codex_response_drops_transient_rs_tmp_reasoning_items():
             "encrypted_content": "opaque-stable",
             "id": "rs_456",
             "summary": [{"type": "summary_text", "text": "stable summary"}],
-        }
+        },
     ]
 
 
@@ -57,7 +57,7 @@ def test_normalize_codex_response_treats_summary_only_reasoning_as_incomplete():
                 id="rs_tmp_789",
                 encrypted_content="opaque-transient",
                 summary=[SimpleNamespace(text="still thinking")],
-            )
+            ),
         ],
     )
 
@@ -85,7 +85,8 @@ def test_normalize_codex_response_treats_summary_only_reasoning_as_incomplete():
 
 def test_normalize_codex_response_ignores_in_progress_server_side_tool_calls():
     """A completed response with a final message + lingering in_progress
-    server-side web_search_call items resolves to 'stop', not 'incomplete'."""
+    server-side web_search_call items resolves to 'stop', not 'incomplete'.
+    """
     response = SimpleNamespace(
         status="completed",
         incomplete_details=None,
@@ -120,7 +121,8 @@ def test_normalize_codex_response_ignores_in_progress_server_side_tool_calls():
 def test_normalize_codex_response_in_progress_message_still_incomplete():
     """Guard scope: an in_progress *message* item (genuine model output that
     is still streaming) must still mark the turn incomplete — only
-    server-side ``*_call`` items are exempted."""
+    server-side ``*_call`` items are exempted.
+    """
     response = SimpleNamespace(
         status="completed",
         incomplete_details=None,
@@ -247,7 +249,8 @@ def test_format_responses_error_ignores_non_string_code_message():
 def test_normalize_codex_response_failed_includes_code_in_error():
     """Regression: response_status == 'failed' should surface the error
     code, not just the message. Used to leak a bare 'Slow down' string
-    that was indistinguishable from a generic stream truncation."""
+    that was indistinguishable from a generic stream truncation.
+    """
     # ``output`` non-empty so we don't trip the "no output items" guard
     # before reaching the failed-status branch. Real failed responses
     # often DO carry a partial message item alongside the error.
@@ -269,7 +272,8 @@ def test_normalize_codex_response_failed_includes_code_in_error():
 
 def test_normalize_codex_response_failed_with_message_only():
     """Backwards-compat: a failed response with only a message field
-    (no code) should still surface that message verbatim."""
+    (no code) should still surface that message verbatim.
+    """
     response = SimpleNamespace(
         status="failed",
         output=[

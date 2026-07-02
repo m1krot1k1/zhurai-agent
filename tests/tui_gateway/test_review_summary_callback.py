@@ -16,13 +16,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def server():
     with patch.dict(
         "sys.modules",
         {
             "hermes_constants": MagicMock(
-                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_review_summary")
+                get_hermes_home=MagicMock(return_value="/tmp/hermes_test_review_summary"),
             ),
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
@@ -48,7 +48,8 @@ def server():
 
 def test_init_session_attaches_background_review_callback(server, monkeypatch):
     """After _init_session, agent.background_review_callback is set to a
-    function that emits 'review.summary' for the session's sid."""
+    function that emits 'review.summary' for the session's sid.
+    """
     # Neutralize side-effect calls inside _init_session so we're testing
     # just the callback wiring.
     monkeypatch.setattr(server, "_SlashWorker", lambda *a, **kw: object())
@@ -63,7 +64,7 @@ def test_init_session_attaches_background_review_callback(server, monkeypatch):
         server,
         "_emit",
         lambda event, sid, payload=None: captured_emits.append(
-            (event, sid, payload)
+            (event, sid, payload),
         ),
     )
 
@@ -95,14 +96,15 @@ def test_init_session_attaches_background_review_callback(server, monkeypatch):
     event, sid, payload = matched[0]
     assert sid == "sid-abc"
     assert payload == {
-        "text": "💾 Self-improvement review: Skill 'hermes-release' patched"
+        "text": "💾 Self-improvement review: Skill 'hermes-release' patched",
     }
 
 
 def test_review_summary_callback_survives_agent_without_attribute(server, monkeypatch):
     """If the agent is a bare object that doesn't allow attribute
     assignment (e.g. some stubbed test double), _init_session must not
-    raise — session startup stays robust."""
+    raise — session startup stays robust.
+    """
     monkeypatch.setattr(server, "_SlashWorker", lambda *a, **kw: object())
     monkeypatch.setattr(server, "_wire_callbacks", lambda sid: None)
     monkeypatch.setattr(server, "_notify_session_boundary", lambda *a, **kw: None)
@@ -125,7 +127,8 @@ def test_review_summary_callback_survives_agent_without_attribute(server, monkey
 def test_init_session_sets_memory_notifications_from_config(server, monkeypatch):
     """_init_session must apply display.memory_notifications to the agent so
     the TUI/desktop honors the same off/on/verbose toggle as the messaging
-    gateway and CLI. Without this the review always behaved as 'on'."""
+    gateway and CLI. Without this the review always behaved as 'on'.
+    """
     monkeypatch.setattr(server, "_SlashWorker", lambda *a, **kw: object())
     monkeypatch.setattr(server, "_wire_callbacks", lambda sid: None)
     monkeypatch.setattr(server, "_notify_session_boundary", lambda *a, **kw: None)
@@ -160,8 +163,8 @@ def test_init_session_sets_memory_notifications_from_config(server, monkeypatch)
 )
 def test_load_memory_notifications_normalization(server, monkeypatch, raw, expected):
     """_load_memory_notifications mirrors the gateway's bool→str normalization
-    and defaults to 'on' when the key is absent."""
+    and defaults to 'on' when the key is absent.
+    """
     display = {} if raw is None else {"memory_notifications": raw}
     monkeypatch.setattr(server, "_load_cfg", lambda: {"display": display})
     assert server._load_memory_notifications() == expected
-

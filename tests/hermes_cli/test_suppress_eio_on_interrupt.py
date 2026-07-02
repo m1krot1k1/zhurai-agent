@@ -17,10 +17,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # _suppress_closed_loop_errors – asyncio exception handler
 # ---------------------------------------------------------------------------
+
 
 def _make_suppress_fn():
     """Build a standalone copy of ``_suppress_closed_loop_errors``.
@@ -153,7 +153,7 @@ def _make_signal_handler(logger, agent_state):
                 agent_state["agent"].interrupt(f"received signal {signum}")
         except Exception:
             pass  # never block signal handling
-        raise KeyboardInterrupt()
+        raise KeyboardInterrupt
     return _signal_handler
 
 

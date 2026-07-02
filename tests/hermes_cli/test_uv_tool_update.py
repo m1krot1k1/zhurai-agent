@@ -87,7 +87,8 @@ class TestIsUvToolInstall:
         when the active install is pip/venv but the machine also has
         ``uv tool install hermes-agent`` somewhere on disk. Copilot review on
         PR #29703 flagged this; the fix is to never call ``uv tool list``
-        from the detection path."""
+        from the detection path.
+        """
         from hermes_cli import config
 
         with patch.object(config.sys, "prefix", "/some/unrelated/venv"), \
@@ -100,11 +101,12 @@ class TestIsUvToolInstall:
         """Match must be case-insensitive — Windows paths preserve case
         (e.g. ``...AppData\\Local\\UV\\Tools\\hermes-agent``) and a case-sensitive
         check would miss them. We exercise the lower-cased compare path here
-        without monkey-patching ``os.sep``, which would break the whole suite."""
+        without monkey-patching ``os.sep``, which would break the whole suite.
+        """
         from hermes_cli import config
 
         with patch.object(
-            config.sys, "prefix", "/HOME/USER/.local/share/UV/Tools/hermes-agent"
+            config.sys, "prefix", "/HOME/USER/.local/share/UV/Tools/hermes-agent",
         ):
             assert config.is_uv_tool_install() is True
 
@@ -132,7 +134,8 @@ class TestRecommendedUpdateCommandForUvTool:
 
     def test_uv_tool_install_recommends_uv_tool_upgrade_even_without_uv_on_path(self):
         """Recommendation reflects the *install method*, not whether ``uv`` is
-        currently on PATH — the user needs to know the right command to run."""
+        currently on PATH — the user needs to know the right command to run.
+        """
         from hermes_cli import config
 
         with patch("shutil.which", return_value=None), \
@@ -161,7 +164,8 @@ class TestRecommendedUpdateCommandForUvTool:
         """Computing the recommendation string must be cheap — no ``uv tool list``
         spawn. Copilot review on PR #29703 flagged the prior subprocess hop
         as adding overhead and a multi-second timeout window for what is
-        purely a display string."""
+        purely a display string.
+        """
         from hermes_cli import config
 
         with patch.object(config.sys, "prefix", "/some/unrelated/venv"), \
@@ -237,7 +241,8 @@ class TestCmdUpdatePipUsesUvTool:
         """If the running interpreter looks like a uv-tool install but ``uv`` is
         somehow missing from PATH, surface a clear hint instead of silently
         falling back to ``python -m pip``, which would either fail (no venv)
-        or upgrade the wrong copy."""
+        or upgrade the wrong copy.
+        """
         from hermes_cli.main import _cmd_update_pip
 
         with patch("shutil.which", return_value=None), \
@@ -283,7 +288,7 @@ class TestCmdUpdatePipInstallLayouts:
 
     @patch("subprocess.run")
     def test_pipx_layout_without_pipx_binary_treated_as_venv(
-        self, mock_run, monkeypatch
+        self, mock_run, monkeypatch,
     ):
         from hermes_cli import main as hm
 

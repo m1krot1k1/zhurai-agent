@@ -71,7 +71,7 @@ def _find_compression_exhausted_reset_block() -> ast.If:
     raise AssertionError(
         "Could not locate the compression-exhausted auto-reset block "
         "(if agent_result.get('compression_exhausted') ... reset_session) "
-        "in gateway/run.py — the structure changed or the AST walker is stale."
+        "in gateway/run.py — the structure changed or the AST walker is stale.",
     )
 
 
@@ -79,7 +79,8 @@ class TestAutoResetBlockReSyncsBinding:
     def test_reset_session_return_is_captured(self):
         """``reset_session`` must be assigned, not called-and-discarded —
         the fresh entry is needed to re-point the binding and drop the stale
-        reference to the bloated compressed child (#35809)."""
+        reference to the bloated compressed child (#35809).
+        """
         block = _find_compression_exhausted_reset_block()
         captured = False
         for stmt in ast.walk(block):
@@ -100,7 +101,8 @@ class TestAutoResetBlockReSyncsBinding:
 
     def test_topic_binding_is_resynced_after_reset(self):
         """The block must re-sync the topic binding so the next inbound message
-        cannot ``switch_session`` back onto the bloated compressed child."""
+        cannot ``switch_session`` back onto the bloated compressed child.
+        """
         block = _find_compression_exhausted_reset_block()
         sync_calls = [
             sub
@@ -142,7 +144,8 @@ def _bloat(n):
 class TestAutoResetLoadsCleanContext:
     """#35809: after the gateway auto-resets a session because compression
     was exhausted, the NEXT turn must load an EMPTY transcript for the new
-    session_id — never the bloated compressed-child transcript."""
+    session_id — never the bloated compressed-child transcript.
+    """
 
     def test_next_turn_transcript_is_empty_after_auto_reset(self, tmp_path):
         store = _make_store(tmp_path)
@@ -152,7 +155,7 @@ class TestAutoResetLoadsCleanContext:
         session_key = entry.session_key
         bloated_sid = entry.session_id
         store._db.create_session(
-            session_id=bloated_sid, source="telegram", user_id="u1"
+            session_id=bloated_sid, source="telegram", user_id="u1",
         )
         store._db.replace_messages(bloated_sid, _bloat(120))
         assert len(store.load_transcript(bloated_sid)) == 120  # precondition
@@ -174,13 +177,14 @@ class TestAutoResetLoadsCleanContext:
 
     def test_clean_context_survives_gateway_restart(self, tmp_path):
         """The fresh, empty session must still be the one loaded after a
-        gateway restart (sessions.json + state.db round-trip)."""
+        gateway restart (sessions.json + state.db round-trip).
+        """
         store = _make_store(tmp_path)
         source = _make_source()
         entry = store.get_or_create_session(source)
         bloated_sid = entry.session_id
         store._db.create_session(
-            session_id=bloated_sid, source="telegram", user_id="u1"
+            session_id=bloated_sid, source="telegram", user_id="u1",
         )
         store._db.replace_messages(bloated_sid, _bloat(120))
 

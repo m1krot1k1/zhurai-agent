@@ -1,5 +1,4 @@
-"""
-Tests for custom command-type TTS providers.
+"""Tests for custom command-type TTS providers.
 
 These tests cover the ``tts.providers.<name>`` registry: built-in
 precedence, command resolution, placeholder rendering, shell-quote
@@ -42,10 +41,10 @@ from tools.tts_tool import (
     text_to_speech_tool,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _python_copy_command(output_placeholder: str = "{output_path}") -> str:
     """Return a cross-platform shell command that copies {input_path} -> output."""
@@ -105,7 +104,8 @@ class TestResolveCommandProviderConfig:
 
     def test_native_piper_cannot_be_shadowed_by_command_entry(self):
         """Regression guard for PR that added native Piper as a built-in.
-        A user's ``tts.providers.piper`` must not override the built-in."""
+        A user's ``tts.providers.piper`` must not override the built-in.
+        """
         cfg = {
             "providers": {
                 "piper": {"type": "command", "command": "some-script"},
@@ -123,7 +123,7 @@ class TestGetNamedProviderConfig:
     def test_legacy_tts_name_block_still_resolves(self):
         cfg = {"voxcpm": {"type": "command", "command": "legacy"}}
         assert _get_named_provider_config(cfg, "voxcpm") == {
-            "type": "command", "command": "legacy"
+            "type": "command", "command": "legacy",
         }
 
     def test_builtin_names_do_not_leak_through_legacy_path(self):
@@ -204,7 +204,7 @@ class TestConfigGetters:
         assert _get_command_tts_output_format({"format": "m4a"}) == DEFAULT_COMMAND_TTS_OUTPUT_FORMAT
 
     def test_output_format_supported_set(self):
-        assert COMMAND_TTS_OUTPUT_FORMATS == frozenset({"mp3", "wav", "ogg", "flac"})
+        assert frozenset({"mp3", "wav", "ogg", "flac"}) == COMMAND_TTS_OUTPUT_FORMATS
 
     def test_voice_compatible_boolean(self):
         assert _is_command_tts_voice_compatible({"voice_compatible": True}) is True
@@ -245,7 +245,7 @@ class TestMaxTextLengthForCommandProviders:
 
 class TestShellQuoteContext:
     def test_bare_context(self):
-        tpl = 'tts {output_path}'
+        tpl = "tts {output_path}"
         pos = tpl.index("{output_path}")
         assert _shell_quote_context(tpl, pos) is None
 
@@ -452,7 +452,8 @@ class TestTextToSpeechToolWithCommandProvider:
 
     def test_voice_compatible_opt_in_toggles_flag(self, tmp_path):
         """voice_compatible=true is reflected in the response when the
-        file is already .ogg (no ffmpeg needed)."""
+        file is already .ogg (no ffmpeg needed).
+        """
         cfg = {
             "provider": "py-copy-ogg",
             "providers": {
@@ -476,7 +477,8 @@ class TestTextToSpeechToolWithCommandProvider:
     def test_missing_command_falls_through_to_builtin(self, tmp_path):
         """A provider entry with an empty command is not a command
         provider; the tool should not raise a "command not configured"
-        error but fall through to the built-in resolution path."""
+        error but fall through to the built-in resolution path.
+        """
         cfg = {
             "provider": "broken",
             "providers": {

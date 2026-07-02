@@ -13,12 +13,11 @@ from unittest.mock import patch
 
 import pytest
 
-
 pytest.importorskip("mcp.types")
 
-from mcp.types import ElicitResult  # noqa: E402  -- after importorskip
+from mcp.types import ElicitResult
 
-from tools.mcp_tool import (  # noqa: E402
+from tools.mcp_tool import (
     ElicitationHandler,
     _format_elicitation_schema_summary,
 )
@@ -100,7 +99,8 @@ class TestElicitationHandlerFormMode:
         """request_elicitation_consent returns 'cancel' when the gateway
         wait times out (resolved=False). The handler should propagate
         that as ElicitResult(action='cancel') so the server can
-        distinguish 'no answer' from 'no'."""
+        distinguish 'no answer' from 'no'.
+        """
         handler = ElicitationHandler("pay", {"timeout": 5})
         params = _form_params()
 
@@ -145,7 +145,7 @@ class TestElicitationHandlerFailureModes:
         # handler timeout. Default grace is 5s, which makes stall durations
         # tight and the test flaky.
         monkeypatch.setattr(
-            ElicitationHandler, "_OUTER_TIMEOUT_GRACE_SECONDS", 0
+            ElicitationHandler, "_OUTER_TIMEOUT_GRACE_SECONDS", 0,
         )
         # _safe_numeric clamps `timeout` to a minimum of 1s, so the
         # effective wait_for budget is 1s here. Stall longer than that
@@ -179,7 +179,8 @@ class TestElicitationHandlerWiring:
         """The server task initializer checks ``elicitation.enabled`` --
         an explicit ``False`` should suppress handler creation. The unit
         of that decision lives in MCPServerTask, but the handler itself
-        must remain harmless to instantiate with arbitrary config."""
+        must remain harmless to instantiate with arbitrary config.
+        """
         handler = ElicitationHandler("pay", {"enabled": False, "timeout": 10})
         # Just confirm it instantiates and reads timeout; the gate lives
         # at the higher layer.
@@ -192,18 +193,20 @@ class TestElicitationHandlerContextBridge:
     handler reads ``owner._pending_call_context`` -- a snapshot captured
     by the MCP tool wrapper around ``session.call_tool`` -- and replays
     it before invoking the approval router so gateway-session detection
-    survives the task hop. Regression tests for that bridge."""
+    survives the task hop. Regression tests for that bridge.
+    """
 
     def test_captured_context_is_replayed_in_consent_call(self):
         """The captured context's contextvar values must be observable
         when ``request_elicitation_consent`` runs -- otherwise the
         gateway-platform detection in approval.py sees an empty platform
-        string and falls back to the CLI path (the bug this fixes)."""
+        string and falls back to the CLI path (the bug this fixes).
+        """
         import contextvars
         from types import SimpleNamespace
 
         probe: contextvars.ContextVar[str] = contextvars.ContextVar(
-            "elicitation_test_probe", default=""
+            "elicitation_test_probe", default="",
         )
         seen: list[str] = []
 
@@ -238,7 +241,8 @@ class TestElicitationHandlerContextBridge:
         """Without an owner (or with an owner that hasn't entered a tool
         call) the handler must still invoke the consent router -- just
         without the contextvar replay. Otherwise CLI/TUI sessions, which
-        don't set HERMES_SESSION_PLATFORM, would break."""
+        don't set HERMES_SESSION_PLATFORM, would break.
+        """
         handler = ElicitationHandler("pay", {"timeout": 5}, owner=None)
         params = _form_params()
 
@@ -252,12 +256,13 @@ class TestElicitationHandlerContextBridge:
         """A single tool call may trigger more than one elicitation
         (e.g. the agent retries an MCP call within the same wrapper).
         ``Context.run`` raises if a context is re-entered, so the handler
-        must ``.copy()`` before each run."""
+        must ``.copy()`` before each run.
+        """
         import contextvars
         from types import SimpleNamespace
 
         probe: contextvars.ContextVar[str] = contextvars.ContextVar(
-            "elicitation_test_probe_multi", default=""
+            "elicitation_test_probe_multi", default="",
         )
         seen: list[str] = []
 
@@ -283,7 +288,8 @@ class TestElicitationHandlerContextBridge:
 
     def test_pending_call_context_none_does_not_crash(self):
         """``owner._pending_call_context`` is set to None between tool
-        calls. An elicitation arriving in that window must not crash."""
+        calls. An elicitation arriving in that window must not crash.
+        """
         from types import SimpleNamespace
 
         owner = SimpleNamespace(_pending_call_context=None)

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import re
 import sys
-import os
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 MIRROR_ROOT = ROOT / ".cursor"
@@ -55,8 +55,7 @@ def read_text_robust(
         "cp1252",
     ),
 ) -> str:
-    """
-    Read text files with legacy encoding fallback.
+    """Read text files with legacy encoding fallback.
 
     This keeps repository validators/benchmarks resilient to files not saved as UTF-8.
     """
@@ -155,19 +154,19 @@ for path in walk("agents"):
     if path.suffix == ".md" and path.name != "README.md":
         if first_non_empty_line(path) != "---":
             fail(
-                f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"'
+                f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"',
             )
 
 for path in walk("rules"):
     if path.suffix == ".mdc" and first_non_empty_line(path) != "---":
         fail(
-            f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"'
+            f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"',
         )
 
 for path in walk("skills"):
     if path.name == "SKILL.md" and first_non_empty_line(path) != "---":
         fail(
-            f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"'
+            f'[frontmatter] {path.relative_to(ROOT).as_posix()} must start with frontmatter delimiter "---"',
         )
 
 
@@ -261,6 +260,5 @@ if warnings:
     print(f"- Warnings: {len(warnings)}")
     for warning in warnings:
         print(f"  * {warning}")
-else:
-    if not mirror_check_enabled():
-        print(f"- Mirror drift check: skipped (set {MIRROR_CHECK_ENV}=1 to enable)")
+elif not mirror_check_enabled():
+    print(f"- Mirror drift check: skipped (set {MIRROR_CHECK_ENV}=1 to enable)")

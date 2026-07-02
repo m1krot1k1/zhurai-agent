@@ -1,7 +1,8 @@
 """Tests for the ChatCompletionsTransport."""
 
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from agent.transports import get_transport
 from agent.transports.types import NormalizedResponse
@@ -81,7 +82,7 @@ class TestChatCompletionsBasic:
             msgs = self._msg_with_extra_content()
             result = transport.convert_messages(msgs, model=model)
             assert result[0]["tool_calls"][0]["extra_content"] == {
-                "google": {"thought_signature": "SIG_123"}
+                "google": {"thought_signature": "SIG_123"},
             }, model
 
     def test_convert_messages_strips_tool_name(self, transport):
@@ -125,7 +126,8 @@ class TestChatCompletionsBasic:
 
     def test_convert_messages_no_copy_without_timestamp(self, transport):
         """A timestamp-free message list needs no sanitize pass and is
-        returned by identity (preserves the deepcopy-on-demand contract)."""
+        returned by identity (preserves the deepcopy-on-demand contract).
+        """
         msgs = [{"role": "user", "content": "hi"}]
         assert transport.convert_messages(msgs) is msgs
 
@@ -209,7 +211,7 @@ class TestChatCompletionsBuildKwargs:
             openrouter_min_coding_score=0.65,
         )
         assert kw["extra_body"]["plugins"] == [
-            {"id": "pareto-router", "min_coding_score": 0.65}
+            {"id": "pareto-router", "min_coding_score": 0.65},
         ]
 
     def test_openrouter_pareto_score_ignored_for_other_models(self, transport):
@@ -258,7 +260,7 @@ class TestChatCompletionsBuildKwargs:
             openrouter_min_coding_score=0.8,
         )
         assert kw["extra_body"]["plugins"] == [
-            {"id": "pareto-router", "min_coding_score": 0.8}
+            {"id": "pareto-router", "min_coding_score": 0.8},
         ]
 
     def test_nous_tags(self, transport):
@@ -536,7 +538,7 @@ class TestChatCompletionsBuildKwargs:
 
     def test_omit_temperature(self, transport):
         """Omit temperature is set via ProviderProfile with OMIT_TEMPERATURE sentinel."""
-        from providers.base import ProviderProfile, OMIT_TEMPERATURE
+        from providers.base import OMIT_TEMPERATURE, ProviderProfile
         msgs = [{"role": "user", "content": "Hi"}]
         kw = transport.build_kwargs(
             model="gpt-4o", messages=msgs,
@@ -782,7 +784,8 @@ class TestChatCompletionsNormalize:
         """Gemini 3 thinking models attach extra_content with thought_signature
         on tool_calls.  Without this replay on the next turn, the API rejects
         the request with 400.  The transport MUST surface extra_content so the
-        agent loop can write it back into the assistant message."""
+        agent loop can write it back into the assistant message.
+        """
         tc = SimpleNamespace(
             id="call_gem",
             function=SimpleNamespace(name="terminal", arguments='{"command": "ls"}'),
@@ -797,13 +800,14 @@ class TestChatCompletionsNormalize:
         )
         nr = transport.normalize_response(r)
         assert nr.tool_calls[0].provider_data == {
-            "extra_content": {"google": {"thought_signature": "SIG_ABC123"}}
+            "extra_content": {"google": {"thought_signature": "SIG_ABC123"}},
         }
 
     def test_reasoning_content_preserved_separately(self, transport):
         """DeepSeek/Moonshot use reasoning_content distinct from reasoning.
         Don't merge them — the thinking-prefill retry check reads each field
-        separately."""
+        separately.
+        """
         r = SimpleNamespace(
             choices=[SimpleNamespace(
                 message=SimpleNamespace(
@@ -859,7 +863,8 @@ class TestChatCompletionsNormalize:
         surface a Claude refusal via ``message.refusal`` with empty content and
         ``finish_reason="stop"``. Promote it to content + a ``content_filter``
         finish reason so the agent loop's refusal handler surfaces it instead
-        of retrying an empty response three times and giving up."""
+        of retrying an empty response three times and giving up.
+        """
         r = SimpleNamespace(
             choices=[SimpleNamespace(
                 message=SimpleNamespace(
@@ -895,7 +900,8 @@ class TestChatCompletionsNormalize:
     def test_refusal_preserves_explicit_content_filter_finish_reason(self, transport):
         """When the proxy already sets ``finish_reason="content_filter"`` and
         also provides refusal text, surface the text without disturbing the
-        finish reason."""
+        finish reason.
+        """
         r = SimpleNamespace(
             choices=[SimpleNamespace(
                 message=SimpleNamespace(
@@ -918,7 +924,8 @@ class TestChatCompletionsNormalize:
         transport must pass that finish reason straight through so the loop's
         content_filter refusal handler fires; no ``message.refusal`` required.
         This is the OpenRouter coverage path (OpenRouter uses the default
-        chat_completions transport)."""
+        chat_completions transport).
+        """
         r = SimpleNamespace(
             choices=[SimpleNamespace(
                 message=SimpleNamespace(
@@ -937,7 +944,8 @@ class TestChatCompletionsNormalize:
         """If the model emitted real text *and* a refusal note, the turn is a
         normal usable response: keep the visible text, record the refusal in
         provider_data, and do NOT promote to a terminal content_filter (which
-        would discard the model's actual work by reframing it as a failure)."""
+        would discard the model's actual work by reframing it as a failure).
+        """
         r = SimpleNamespace(
             choices=[SimpleNamespace(
                 message=SimpleNamespace(
@@ -956,7 +964,8 @@ class TestChatCompletionsNormalize:
     def test_refusal_with_tool_calls_is_not_promoted(self, transport):
         """A response that carries tool calls alongside a refusal note is a
         usable tool turn — record the refusal but keep the tool calls and do
-        NOT terminate it as a content_filter refusal."""
+        NOT terminate it as a content_filter refusal.
+        """
         tc = SimpleNamespace(
             id="call_1", type="function",
             function=SimpleNamespace(name="do_thing", arguments="{}"),

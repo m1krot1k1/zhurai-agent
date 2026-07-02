@@ -9,9 +9,8 @@ Exercises the full flow through the ACP server layer:
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 import acp
+import pytest
 from acp.schema import (
     EnvVariable,
     HttpHeader,
@@ -28,18 +27,17 @@ from acp_adapter.server import HermesACPAgent
 from acp_adapter.session import SessionManager
 from acp_adapter.tools import build_tool_start
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_manager():
     return SessionManager(agent_factory=lambda: MagicMock(name="MockAIAgent"))
 
 
-@pytest.fixture()
+@pytest.fixture
 def acp_agent(mock_manager):
     return HermesACPAgent(session_manager=mock_manager)
 
@@ -105,7 +103,7 @@ class TestMcpRegistrationE2E:
         # Verify agent tool surface was refreshed
         assert state.agent.tools == fake_tools
         assert state.agent.valid_tool_names == {
-            "mcp_test_fs_read", "mcp_test_fs_write", "mcp_test_api_search", "terminal"
+            "mcp_test_fs_read", "mcp_test_fs_write", "mcp_test_api_search", "terminal",
         }
 
     @pytest.mark.asyncio
@@ -128,13 +126,13 @@ class TestMcpRegistrationE2E:
             # 1) Agent fires tool_progress_callback (ToolCallStart)
             if agent.tool_progress_callback:
                 agent.tool_progress_callback(
-                    "tool.started", "terminal", "$ echo hello", {"command": "echo hello"}
+                    "tool.started", "terminal", "$ echo hello", {"command": "echo hello"},
                 )
 
             # 2) Agent fires step_callback with tool results (ToolCallUpdate)
             if agent.step_callback:
                 agent.step_callback(1, [
-                    {"name": "terminal", "result": '{"output": "hello\\n", "exit_code": 0}'}
+                    {"name": "terminal", "result": '{"output": "hello\\n", "exit_code": 0}'},
                 ])
 
             return {
@@ -260,6 +258,7 @@ class TestMcpSanitizationE2E:
         ]
 
         registered_configs = {}
+
         def mock_register(config_map):
             registered_configs.update(config_map)
             return ["mcp_ai_exa_exa_search"]
@@ -293,6 +292,7 @@ class TestSessionLifecycleMcpE2E:
         ]
 
         registered = {}
+
         def mock_register(config_map):
             registered.update(config_map)
             return []
@@ -320,6 +320,7 @@ class TestSessionLifecycleMcpE2E:
         ]
 
         registered = {}
+
         def mock_register(config_map):
             registered.update(config_map)
             return []
@@ -347,6 +348,7 @@ class TestSessionLifecycleMcpE2E:
         ]
 
         registered = {}
+
         def mock_register(config_map):
             registered.update(config_map)
             return []
@@ -355,7 +357,7 @@ class TestSessionLifecycleMcpE2E:
         with patch("tools.mcp_tool.register_mcp_servers", side_effect=mock_register), \
              patch("model_tools.get_tool_definitions", return_value=[]):
             fork_resp = await acp_agent.fork_session(
-                cwd="/tmp", session_id=sid, mcp_servers=servers
+                cwd="/tmp", session_id=sid, mcp_servers=servers,
             )
 
         assert fork_resp.session_id != ""

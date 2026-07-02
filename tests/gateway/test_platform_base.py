@@ -1,23 +1,24 @@
 """Tests for gateway/platforms/base.py — MessageEvent, media extraction, message truncation."""
 
 import os
+import pathlib
 import time
 from unittest.mock import patch
 
 import pytest
 
 from gateway.platforms.base import (
-    BasePlatformAdapter,
     GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE,
+    BasePlatformAdapter,
     MessageEvent,
+    _log_safe_path,
+    _prefix_within_utf16_limit,
     cache_audio_from_bytes,
     cache_image_from_bytes,
     cache_video_from_bytes,
     safe_url_for_log,
     utf16_len,
     validate_inbound_media_size,
-    _log_safe_path,
-    _prefix_within_utf16_limit,
 )
 
 
@@ -28,42 +29,42 @@ class TestInboundMediaSizeCap:
 
     def test_default_cap_is_128_mib(self, monkeypatch):
         # No config override -> default. Patch loader to return empty config.
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: base.DEFAULT_INBOUND_MEDIA_MAX_BYTES)
         assert base.DEFAULT_INBOUND_MEDIA_MAX_BYTES == 128 * 1024 * 1024
 
     def test_image_bytes_rejected_when_oversized(self, monkeypatch):
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: 16)
         with pytest.raises(ValueError, match="Inbound image payload is too large"):
             cache_image_from_bytes(self._PNG, ext=".png")
 
     def test_audio_bytes_rejected_when_oversized(self, monkeypatch):
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: 4)
         with pytest.raises(ValueError, match="Inbound audio payload is too large"):
             cache_audio_from_bytes(b"x" * 8, ext=".ogg")
 
     def test_video_bytes_rejected_when_oversized(self, monkeypatch):
         # Video was the gap in the original report — verify it's covered.
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: 4)
         with pytest.raises(ValueError, match="Inbound video payload is too large"):
             cache_video_from_bytes(b"x" * 8, ext=".mp4")
 
     def test_legit_image_accepted_under_cap(self, monkeypatch):
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: 128 * 1024 * 1024)
         path = cache_image_from_bytes(self._PNG, ext=".png")
-        assert os.path.exists(path)
-        assert os.path.getsize(path) == len(self._PNG)
+        assert pathlib.Path(path).exists()
+        assert pathlib.Path(path).stat().st_size == len(self._PNG)
 
     def test_cap_of_zero_disables_check(self, monkeypatch):
-        import gateway.platforms.base as base
+        from gateway.platforms import base
         monkeypatch.setattr(base, "get_inbound_media_max_bytes", lambda: 0)
         # A would-be-oversized video passes through when the cap is disabled.
         path = cache_video_from_bytes(b"x" * 5000, ext=".mp4")
-        assert os.path.exists(path)
+        assert pathlib.Path(path).exists()
 
     def test_validate_helper_respects_explicit_max_bytes(self):
         # max_bytes arg overrides the configured cap.
@@ -296,7 +297,8 @@ class TestExtractImages:
 
     def test_non_image_link_preserved_when_mixed_with_images(self):
         """Regression: non-image markdown links must not be silently removed
-        when the response also contains real images."""
+        when the response also contains real images.
+        """
         content = (
             "Here is the image: ![photo](https://fal.media/cat.png)\n"
             "And a doc: ![report](https://example.com/report.pdf)"
@@ -388,7 +390,8 @@ class TestExtractMedia:
     def test_as_document_directive_stripped_from_cleaned_text(self):
         """[[as_document]] is a routing directive — strip it from
         user-visible text just like [[audio_as_voice]]. Callers detect the
-        directive on the original content (before extract_media)."""
+        directive on the original content (before extract_media).
+        """
         content = "Here is your infographic:\n[[as_document]]\nMEDIA:/tmp/x.jpg"
         media, cleaned = BasePlatformAdapter.extract_media(content)
         assert media == [("/tmp/x.jpg", False)]
@@ -397,7 +400,8 @@ class TestExtractMedia:
 
     def test_as_document_directive_alone_does_not_attach_voice_flag(self):
         """[[as_document]] is independent of [[audio_as_voice]] — combining
-        them in the same response should not entangle the flags."""
+        them in the same response should not entangle the flags.
+        """
         content = "[[as_document]]\nMEDIA:/tmp/x.jpg"
         media, cleaned = BasePlatformAdapter.extract_media(content)
         assert media == [("/tmp/x.jpg", False)]  # voice flag stays False
@@ -406,7 +410,8 @@ class TestExtractMedia:
     def test_both_directives_can_coexist(self):
         """A response could (rarely) contain both [[audio_as_voice]] for an
         ogg file AND [[as_document]] for an attached image. The voice flag
-        propagates per-tuple; [[as_document]] is detected at dispatch."""
+        propagates per-tuple; [[as_document]] is detected at dispatch.
+        """
         content = "[[audio_as_voice]]\n[[as_document]]\nMEDIA:/tmp/x.ogg"
         media, cleaned = BasePlatformAdapter.extract_media(content)
         # Voice flag is propagated to every media tuple (this matches the
@@ -421,7 +426,7 @@ class TestExtractMedia:
     def test_media_tag_windows_backslash_path(self):
         """extract_media should recognise Windows backslash paths."""
         media, cleaned = BasePlatformAdapter.extract_media(
-            r"MEDIA:C:\Users\kotsu\file.pdf"
+            r"MEDIA:C:\Users\kotsu\file.pdf",
         )
         assert len(media) == 1
         assert media[0][0].endswith("file.pdf")
@@ -429,7 +434,7 @@ class TestExtractMedia:
     def test_media_tag_windows_forward_slash_path(self):
         """extract_media should recognise Windows forward-slash paths."""
         media, cleaned = BasePlatformAdapter.extract_media(
-            "MEDIA:C:/Users/kotsu/file.pdf"
+            "MEDIA:C:/Users/kotsu/file.pdf",
         )
         assert len(media) == 1
         assert media[0][0].endswith("file.pdf")
@@ -437,7 +442,7 @@ class TestExtractMedia:
     def test_media_tag_windows_drive_root(self):
         """extract_media should recognise a path at the drive root."""
         media, cleaned = BasePlatformAdapter.extract_media(
-            r"MEDIA:D:\report.md"
+            r"MEDIA:D:\report.md",
         )
         assert len(media) == 1
         assert media[0][0].endswith("report.md")
@@ -451,7 +456,7 @@ class TestExtractMedia:
     def test_relative_path_still_ignored(self):
         """Relative Windows-style paths (no drive letter) must not match."""
         media, _ = BasePlatformAdapter.extract_media(
-            r"MEDIA:Users\kotsu\file.pdf"
+            r"MEDIA:Users\kotsu\file.pdf",
         )
         assert media == []
 
@@ -487,7 +492,8 @@ class TestExtractMedia:
 
     def test_media_mixed_code_and_prose(self):
         """Real MEDIA: in prose + example in code block: only prose extracted,
-        and the code block survives verbatim in the delivered text."""
+        and the code block survives verbatim in the delivered text.
+        """
         content = (
             "Here is your file:\n"
             "MEDIA:/output/report.pdf\n"
@@ -507,7 +513,8 @@ class TestExtractMedia:
 
     def test_inline_code_survives_when_real_media_present(self):
         """When a real MEDIA: tag is delivered, an inline-code example in the
-        same reply must not be blanked to whitespace."""
+        same reply must not be blanked to whitespace.
+        """
         content = "See MEDIA:/r/a.png and `MEDIA:/ex/b.png` inline"
         media, cleaned = BasePlatformAdapter.extract_media(content)
         assert [p for p, _ in media] == ["/r/a.png"]
@@ -558,7 +565,7 @@ class TestMediaInsideSerializedJson:
 
     def test_media_after_prose_same_line_still_extracted(self):
         media, _ = BasePlatformAdapter.extract_media(
-            "Here is your file: MEDIA:/out/report.pdf"
+            "Here is your file: MEDIA:/out/report.pdf",
         )
         assert len(media) == 1 and media[0][0] == "/out/report.pdf"
 
@@ -569,13 +576,13 @@ class TestMediaInsideSerializedJson:
     def test_quoted_path_media_still_extracted(self):
         """MEDIA:"..." quoted-path form (a real LLM output) is not JSON-masked."""
         media, _ = BasePlatformAdapter.extract_media(
-            'MEDIA:"/path/with space/file.png"'
+            'MEDIA:"/path/with space/file.png"',
         )
         assert len(media) == 1 and media[0][0] == "/path/with space/file.png"
 
     def test_tts_two_line_still_extracted(self):
         media, _ = BasePlatformAdapter.extract_media(
-            "[[audio_as_voice]]\nMEDIA:/tmp/v.ogg"
+            "[[audio_as_voice]]\nMEDIA:/tmp/v.ogg",
         )
         assert len(media) == 1 and media[0][0] == "/tmp/v.ogg"
         assert media[0][1] is True  # voice flag
@@ -584,7 +591,8 @@ class TestMediaInsideSerializedJson:
 
     def test_json_embedded_media_kept_verbatim_in_cleaned_text(self):
         """A real tag is delivered+stripped; a JSON-embedded MEDIA: stays as
-        literal text (stored data must read back unchanged)."""
+        literal text (stored data must read back unchanged).
+        """
         content = 'MEDIA:/real/r.png\nlog: {"old":"MEDIA:/stale/s.png"}'
         media, cleaned = BasePlatformAdapter.extract_media(content)
         assert [p for p, _ in media] == ["/real/r.png"]
@@ -593,7 +601,8 @@ class TestMediaInsideSerializedJson:
 
     def test_cleaned_text_after_directive_not_truncated(self):
         """Stripping a tag preceded by a [[as_document]] directive must not
-        shift offsets and chop the path or trailing text."""
+        shift offsets and chop the path or trailing text.
+        """
         content = "See [[as_document]] MEDIA:/d/report.pdf now"
         media, cleaned = BasePlatformAdapter.extract_media(content)
         assert [p for p, _ in media] == ["/d/report.pdf"]
@@ -632,7 +641,8 @@ class TestMediaExtensionAllowlistParity:
     def test_unknown_extension_not_black_holed_by_cleanup(self):
         """A MEDIA: tag with an unknown extension is NOT stripped from the
         body — it survives so extract_local_files can still see the bare path,
-        rather than vanishing entirely (the core of issue #34517)."""
+        rather than vanishing entirely (the core of issue #34517).
+        """
         from gateway.platforms.base import MEDIA_TAG_CLEANUP_RE
         text = "Saved to MEDIA:/tmp/data.weirdext done"
         media, _ = BasePlatformAdapter.extract_media(text)
@@ -1561,6 +1571,7 @@ class TestProxyKwargsForAiohttp:
     def test_http_proxy_uses_connector_when_aiohttp_socks_available(self):
         pytest.importorskip("aiohttp_socks")
         from unittest.mock import MagicMock
+
         from gateway.platforms.base import proxy_kwargs_for_aiohttp
 
         sentinel = MagicMock(name="ProxyConnector")
@@ -1575,6 +1586,7 @@ class TestProxyKwargsForAiohttp:
     def test_socks_proxy_uses_connector(self):
         pytest.importorskip("aiohttp_socks")
         from unittest.mock import MagicMock
+
         from gateway.platforms.base import proxy_kwargs_for_aiohttp
 
         sentinel = MagicMock(name="ProxyConnector")

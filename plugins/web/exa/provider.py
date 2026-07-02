@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from agent.web_search_provider import WebSearchProvider
 
@@ -55,7 +55,7 @@ def _get_exa_client() -> Any:
     if not api_key:
         raise ValueError(
             "EXA_API_KEY environment variable not set. "
-            "Get your API key at https://exa.ai"
+            "Get your API key at https://exa.ai",
         )
 
     try:
@@ -67,7 +67,7 @@ def _get_exa_client() -> Any:
     except Exception as exc:  # noqa: BLE001 — lazy_deps surfaces install hints
         raise ImportError(str(exc))
 
-    from exa_py import Exa  # noqa: WPS433 — deliberately lazy
+    from exa_py import Exa
 
     client = Exa(api_key=api_key)
     client.headers["x-exa-integration"] = "hermes-agent"
@@ -108,7 +108,7 @@ class ExaWebSearchProvider(WebSearchProvider):
     def supports_extract(self) -> bool:
         return True
 
-    def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Execute an Exa search.
 
         Returns ``{"success": True, "data": {"web": [{...}, ...]}}`` on
@@ -137,7 +137,7 @@ class ExaWebSearchProvider(WebSearchProvider):
                         "title": result.title or "",
                         "description": " ".join(highlights) if highlights else "",
                         "position": i + 1,
-                    }
+                    },
                 )
 
             return {"success": True, "data": {"web": web_results}}
@@ -150,7 +150,7 @@ class ExaWebSearchProvider(WebSearchProvider):
             logger.warning("Exa search error: %s", exc)
             return {"success": False, "error": f"Exa search failed: {exc}"}
 
-    def extract(self, urls: List[str], **kwargs: Any) -> List[Dict[str, Any]]:
+    def extract(self, urls: list[str], **kwargs: Any) -> list[dict[str, Any]]:
         """Extract content from one or more URLs via Exa.
 
         Returns a list of result dicts shaped for the legacy LLM
@@ -168,7 +168,7 @@ class ExaWebSearchProvider(WebSearchProvider):
             logger.info("Exa extract: %d URL(s)", len(urls))
             response = _get_exa_client().get_contents(urls, text=True)
 
-            results: List[Dict[str, Any]] = []
+            results: list[dict[str, Any]] = []
             for result in response.results or []:
                 content = result.text or ""
                 url = result.url or ""
@@ -180,7 +180,7 @@ class ExaWebSearchProvider(WebSearchProvider):
                         "content": content,
                         "raw_content": content,
                         "metadata": {"sourceURL": url, "title": title},
-                    }
+                    },
                 )
             return results
         except ValueError as exc:
@@ -197,7 +197,7 @@ class ExaWebSearchProvider(WebSearchProvider):
                 for u in urls
             ]
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Exa",
             "badge": "paid",

@@ -34,8 +34,6 @@ Substrate facts (verified May 2026):
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Optional
-
 
 # ─── Public types ───────────────────────────────────────────────────────
 
@@ -56,10 +54,10 @@ class ConfigContext:
     def with_overrides(
         self,
         *,
-        current_provider: Optional[str] = None,
-        current_model: Optional[str] = None,
-        current_base_url: Optional[str] = None,
-    ) -> "ConfigContext":
+        current_provider: str | None = None,
+        current_model: str | None = None,
+        current_base_url: str | None = None,
+    ) -> ConfigContext:
         """Return a copy with truthy overrides applied.
 
         Truthy-only because the TUI reads agent attributes that may be
@@ -269,7 +267,7 @@ def _apply_capabilities(rows: list[dict]) -> None:
 
 def _append_unconfigured_rows(rows: list[dict], ctx: ConfigContext) -> list[dict]:
     """Build skeleton rows for canonical providers missing from ``rows``."""
-    from hermes_cli.models import CANONICAL_PROVIDERS, _PROVIDER_LABELS
+    from hermes_cli.models import _PROVIDER_LABELS, CANONICAL_PROVIDERS
 
     seen = {r["slug"].lower() for r in rows}
     cur = (ctx.current_provider or "").lower()
@@ -286,7 +284,7 @@ def _append_unconfigured_rows(rows: list[dict], ctx: ConfigContext) -> list[dict
                 "models": [],
                 "total_models": 0,
                 "source": "canonical",
-            }
+            },
         )
     return extras
 
@@ -380,7 +378,7 @@ def _apply_pricing(
     )
 
     # Resolve Nous free-tier once (cached in models.py for the TTL window).
-    nous_free_tier: Optional[bool] = None
+    nous_free_tier: bool | None = None
 
     for row in rows:
         slug = str(row.get("slug", "")).lower()
@@ -421,12 +419,12 @@ def _apply_pricing(
             try:
                 if nous_free_tier is None:
                     nous_free_tier = check_nous_free_tier(
-                        force_fresh=force_fresh_nous_tier
+                        force_fresh=force_fresh_nous_tier,
                     )
                 row["free_tier"] = bool(nous_free_tier)
                 if nous_free_tier:
                     _selectable, unavailable = partition_nous_models_by_tier(
-                        list(models), raw_pricing, free_tier=True
+                        list(models), raw_pricing, free_tier=True,
                     )
                     row["unavailable_models"] = unavailable
                 else:

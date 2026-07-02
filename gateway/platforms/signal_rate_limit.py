@@ -1,5 +1,4 @@
-"""
-Signal attachment rate-limit scheduler.
+"""Signal attachment rate-limit scheduler.
 
 Process-wide token-bucket simulator that mirrors the per-account
 attachment rate limit signal-cli/Signal-Server enforce. Producers
@@ -19,7 +18,7 @@ import asyncio
 import logging
 import re
 import time
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +40,7 @@ SIGNAL_RPC_ERROR_RATELIMIT = -5  # signal-cli (v0.14.3+) JSON-RPC error code for
 # ---------------------------------------------------------------------------
 
 class SignalRateLimitError(Exception):
-    """
-    Raised by ``SignalAdapter._rpc`` for rate-limit responses when the
+    """Raised by ``SignalAdapter._rpc`` for rate-limit responses when the
     caller has opted in via ``raise_on_rate_limit=True``.
 
     Carries the server-supplied per-token Retry-After (in seconds) on
@@ -50,13 +48,14 @@ class SignalRateLimitError(Exception):
     ``retry_after`` is None when the version doesn't expose it.
     """
 
-    def __init__(self, message: str, retry_after: Optional[float] = None) -> None:
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
         super().__init__(message)
         self.retry_after = retry_after
 
 
 class SignalSchedulerError(Exception):
     pass
+
 
 # ---------------------------------------------------------------------------
 # Detection helpers — used to fish a 429 out of signal-cli's various error
@@ -71,7 +70,7 @@ class SignalSchedulerError(Exception):
 _RETRY_AFTER_RE = re.compile(r"Retry after (\d+(?:\.\d+)?)\s*second", re.IGNORECASE)
 
 
-def _extract_retry_after_seconds(err: Any) -> Optional[float]:
+def _extract_retry_after_seconds(err: Any) -> float | None:
     """Pull the per-token Retry-After window from a signal-cli rate-limit error.
 
     Tries two sources, in order:
@@ -300,7 +299,7 @@ class SignalAttachmentScheduler:
             n_attachments, self.refill_rate,
         )
 
-    def feedback(self, retry_after: Optional[float], n_attempted: int) -> None:
+    def feedback(self, retry_after: float | None, n_attempted: int) -> None:
         """Apply server feedback after a 429.
 
         ``retry_after`` is the per-*token* refill window the server
@@ -345,7 +344,7 @@ class SignalAttachmentScheduler:
 # Process-wide singleton
 # ---------------------------------------------------------------------------
 
-_scheduler: Optional[SignalAttachmentScheduler] = None
+_scheduler: SignalAttachmentScheduler | None = None
 
 
 def get_scheduler() -> SignalAttachmentScheduler:
@@ -364,6 +363,7 @@ def get_scheduler() -> SignalAttachmentScheduler:
 
 def _reset_scheduler() -> None:
     """Drop the cached scheduler so the next ``get_scheduler`` call
-    builds a fresh one. Test-only — never call from production paths."""
+    builds a fresh one. Test-only — never call from production paths.
+    """
     global _scheduler
     _scheduler = None

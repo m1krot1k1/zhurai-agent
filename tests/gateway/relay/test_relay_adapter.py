@@ -83,7 +83,7 @@ class _CaptureTransport:
     def __init__(self):
         self.sent = None
 
-    def set_inbound_handler(self, h):  # noqa: D401
+    def set_inbound_handler(self, h):
         self._h = h
 
     async def send_outbound(self, action):
@@ -110,7 +110,8 @@ async def test_send_reattaches_guild_id_from_inbound_scope():
     metadata.guild_id; the gateway's generic delivery path drops it, so the
     relay adapter must re-attach the guild scope learned from the inbound event.
     Regression for live 'discord egress declined: target not routed to an
-    onboarded tenant'."""
+    onboarded tenant'.
+    """
     t = _CaptureTransport()
     a = RelayAdapter(PlatformConfig(), make_desc(platform="discord"), transport=t)
     # Simulate the connector delivering an inbound message in guild-9 / chan-1,
@@ -125,7 +126,8 @@ async def test_send_reattaches_guild_id_from_inbound_scope():
 @pytest.mark.asyncio
 async def test_send_without_known_scope_omits_guild_id():
     """A chat we never saw inbound (e.g. a DM) gets no guild_id — no-op, never
-    invents a scope."""
+    invents a scope.
+    """
     t = _CaptureTransport()
     a = RelayAdapter(PlatformConfig(), make_desc(platform="discord"), transport=t)
     await a.send("unknown-chat", "hi")

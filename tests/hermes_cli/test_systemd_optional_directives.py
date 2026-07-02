@@ -12,9 +12,6 @@ from both the installed and expected text before comparison.
 
 from __future__ import annotations
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # _strip_optional_systemd_directives
 # ---------------------------------------------------------------------------
@@ -125,10 +122,10 @@ WantedBy=default.target
 
         # With optional-directive stripping, they match
         norm_installed = _normalize_service_definition(
-            _strip_optional_systemd_directives(installed)
+            _strip_optional_systemd_directives(installed),
         )
         norm_expected = _normalize_service_definition(
-            _strip_optional_systemd_directives(expected)
+            _strip_optional_systemd_directives(expected),
         )
         assert norm_installed == norm_expected
 
@@ -141,7 +138,8 @@ WantedBy=default.target
 class TestSystemdUnitIsCurrent:
     def test_unit_without_optional_directives_is_current(self, tmp_path, monkeypatch):
         """Installed unit missing RestartMaxDelaySec/RestartSteps should be
-        considered current when the generated unit includes them."""
+        considered current when the generated unit includes them.
+        """
         from hermes_cli import gateway as gw
 
         installed = """[Unit]

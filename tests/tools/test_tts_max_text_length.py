@@ -6,7 +6,7 @@ MiniMax allows 10000, and ElevenLabs allows 5000-40000 depending on model.
 """
 
 import json
-
+import pathlib
 
 from tools.tts_tool import (
     FALLBACK_MAX_TEXT_LENGTH,
@@ -117,7 +117,8 @@ class TestResolveMaxTextLength:
 
 class TestTextToSpeechToolTruncation:
     """End-to-end: verify the resolver actually drives the text_to_speech_tool
-    truncation path rather than the old 4000-char global."""
+    truncation path rather than the old 4000-char global.
+    """
 
     def test_openai_truncates_at_4096_not_4000(self, tmp_path, monkeypatch, caplog):
         import logging
@@ -129,8 +130,7 @@ class TestTextToSpeechToolTruncation:
 
         def fake_openai(t, out, cfg):
             captured_text["text"] = t
-            with open(out, "wb") as f:
-                f.write(b"\x00")
+            pathlib.Path(out).write_bytes(b"\x00")
             return out
 
         monkeypatch.setattr("tools.tts_tool._generate_openai_tts", fake_openai)
@@ -154,8 +154,7 @@ class TestTextToSpeechToolTruncation:
 
         def fake_xai(t, out, cfg):
             captured_text["text"] = t
-            with open(out, "wb") as f:
-                f.write(b"\x00")
+            pathlib.Path(out).write_bytes(b"\x00")
             return out
 
         monkeypatch.setattr("tools.tts_tool._generate_xai_tts", fake_xai)
@@ -177,8 +176,7 @@ class TestTextToSpeechToolTruncation:
 
         def fake_openai(t, out, cfg):
             captured_text["text"] = t
-            with open(out, "wb") as f:
-                f.write(b"\x00")
+            pathlib.Path(out).write_bytes(b"\x00")
             return out
 
         monkeypatch.setattr("tools.tts_tool._generate_openai_tts", fake_openai)

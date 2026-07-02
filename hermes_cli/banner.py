@@ -11,9 +11,10 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
 from hermes_constants import get_hermes_home
-from typing import TYPE_CHECKING, Dict, List, Optional
 
 # rich and prompt_toolkit are imported lazily (inside the functions that use
 # them) rather than at module level.  Importing this module is on the TUI
@@ -59,7 +60,9 @@ def _skin_color(key: str, fallback: str) -> str:
 # ASCII Art & Branding
 # =========================================================================
 
-from hermes_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
+
+from hermes_cli import __release_date__ as RELEASE_DATE
+from hermes_cli import __version__ as VERSION
 
 HERMES_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
 [bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
@@ -85,12 +88,11 @@ HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀�
 [#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
 
 
-
 # =========================================================================
 # Skills scanning
 # =========================================================================
 
-def get_available_skills() -> Dict[str, List[str]]:
+def get_available_skills() -> dict[str, list[str]]:
     """Return skills grouped by category, filtered by platform and disabled state.
 
     Delegates to ``_find_all_skills()`` from ``tools/skills_tool`` which already
@@ -103,7 +105,7 @@ def get_available_skills() -> Dict[str, List[str]]:
     except Exception:
         return {}
 
-    skills_by_category: Dict[str, List[str]] = {}
+    skills_by_category: dict[str, list[str]] = {}
     for skill in all_skills:
         category = skill.get("category") or "general"
         skills_by_category.setdefault(category, []).append(skill["name"])
@@ -139,8 +141,7 @@ def _canonical_github_remote(url: str | None) -> str:
         if parsed.netloc and parsed.path:
             value = f"{parsed.netloc}{parsed.path}"
     value = value.strip().rstrip("/")
-    if value.endswith(".git"):
-        value = value[:-4]
+    value = value.removesuffix(".git")
     return value.lower()
 
 
@@ -155,7 +156,7 @@ def _is_official_ssh_remote(url: str | None) -> bool:
     return _is_ssh_remote(url) and _canonical_github_remote(url) == _OFFICIAL_REPO_CANONICAL
 
 
-def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> Optional[str]:
+def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> str | None:
     try:
         result = subprocess.run(
             ["git", *args],
@@ -171,7 +172,7 @@ def _git_stdout(args: list[str], *, cwd: Path, timeout: int = 5) -> Optional[str
     return (result.stdout or "").strip()
 
 
-def _check_via_rev(local_rev: str) -> Optional[int]:
+def _check_via_rev(local_rev: str) -> int | None:
     """Compare an embedded git revision to upstream main via ls-remote.
 
     Returns 0 if up-to-date, ``UPDATE_AVAILABLE_NO_COUNT`` if behind,
@@ -192,7 +193,7 @@ def _check_via_rev(local_rev: str) -> Optional[int]:
     return 0 if upstream_rev == local_rev else UPDATE_AVAILABLE_NO_COUNT
 
 
-def _check_via_local_git(repo_dir: Path) -> Optional[int]:
+def _check_via_local_git(repo_dir: Path) -> int | None:
     """Count commits behind origin/main in a local checkout."""
     origin_url = _git_stdout(["remote", "get-url", "origin"], cwd=repo_dir)
     if _is_official_ssh_remote(origin_url):
@@ -260,7 +261,7 @@ def _version_tuple(v: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _fetch_pypi_latest(package: str = "hermes-agent") -> Optional[str]:
+def _fetch_pypi_latest(package: str = "hermes-agent") -> str | None:
     """Fetch the latest version of a package from PyPI. Returns None on failure."""
     try:
         import urllib.request
@@ -273,7 +274,7 @@ def _fetch_pypi_latest(package: str = "hermes-agent") -> Optional[str]:
         return None
 
 
-def check_via_pypi() -> Optional[int]:
+def check_via_pypi() -> int | None:
     """Compare installed version against PyPI latest.
 
     Returns 0 if up-to-date, 1 if behind, None on failure.
@@ -291,7 +292,7 @@ def check_via_pypi() -> Optional[int]:
         return 1 if latest != VERSION else 0
 
 
-def check_for_updates() -> Optional[int]:
+def check_for_updates() -> int | None:
     """Check whether a Hermes update is available.
 
     Two paths: if ``HERMES_REVISION`` is set (nix builds embed it), compare
@@ -359,7 +360,7 @@ def check_for_updates() -> Optional[int]:
 
     try:
         cache_file.write_text(
-            json.dumps({"ts": now, "behind": behind, "rev": embedded_rev, "ver": VERSION})
+            json.dumps({"ts": now, "behind": behind, "rev": embedded_rev, "ver": VERSION}),
         )
     except Exception:
         pass
@@ -367,7 +368,7 @@ def check_for_updates() -> Optional[int]:
     return behind
 
 
-def _resolve_repo_dir() -> Optional[Path]:
+def _resolve_repo_dir() -> Path | None:
     """Return the active Hermes git checkout, or None if this isn't a git install.
 
     Prefers the running code's location over the profile-scoped path
@@ -381,7 +382,7 @@ def _resolve_repo_dir() -> Optional[Path]:
     return repo_dir if (repo_dir / ".git").exists() else None
 
 
-def _git_short_hash(repo_dir: Path, rev: str) -> Optional[str]:
+def _git_short_hash(repo_dir: Path, rev: str) -> str | None:
     """Resolve a git revision to an 8-character short hash."""
     try:
         result = subprocess.run(
@@ -399,7 +400,7 @@ def _git_short_hash(repo_dir: Path, rev: str) -> Optional[str]:
     return value or None
 
 
-def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
+def get_git_banner_state(repo_dir: Path | None = None) -> dict | None:
     """Return upstream/local git hashes for the startup banner.
 
     For source installs and dev images this runs ``git rev-parse`` against
@@ -456,10 +457,10 @@ def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
 
 
 _RELEASE_URL_BASE = "https://github.com/m1krot1k1/zhurai-agent/releases/tag"
-_latest_release_cache: Optional[tuple] = None  # (tag, url) once resolved
+_latest_release_cache: tuple | None = None  # (tag, url) once resolved
 
 
-def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
+def get_latest_release_tag(repo_dir: Path | None = None) -> tuple | None:
     """Return ``(tag, release_url)`` for the latest git tag, or None.
 
     Local-only — runs ``git describe --tags --abbrev=0`` against the
@@ -523,7 +524,7 @@ def format_banner_version_label() -> str:
 # Non-blocking update check
 # =========================================================================
 
-_update_result: Optional[int] = None
+_update_result: int | None = None
 _update_check_done = threading.Event()
 
 
@@ -537,7 +538,7 @@ def prefetch_update_check():
     t.start()
 
 
-def get_update_result(timeout: float = 0.5) -> Optional[int]:
+def get_update_result(timeout: float = 0.5) -> int | None:
     """Get result of prefetched check. Returns None if not ready."""
     _update_check_done.wait(timeout=timeout)
     return _update_result
@@ -555,7 +556,7 @@ def _format_context_length(tokens: int) -> str:
         if abs(val - rounded) < 0.05:
             return f"{rounded}M"
         return f"{val:.1f}M"
-    elif tokens >= 1_000:
+    if tokens >= 1_000:
         val = tokens / 1_000
         rounded = round(val)
         if abs(val - rounded) < 0.05:
@@ -569,15 +570,13 @@ def _display_toolset_name(toolset_name: str) -> str:
     if not toolset_name:
         return "unknown"
     return (
-        toolset_name[:-6]
-        if toolset_name.endswith("_tools")
-        else toolset_name
+        toolset_name.removesuffix("_tools")
     )
 
 
 def build_welcome_banner(console: "Console", model: str, cwd: str,
-                         tools: List[dict] = None,
-                         enabled_toolsets: List[str] = None,
+                         tools: list[dict] = None,
+                         enabled_toolsets: list[str] = None,
                          session_id: str = None,
                          get_toolset_for_tool=None,
                          context_length: int = None):
@@ -592,10 +591,12 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
         session_id: Session identifier.
         get_toolset_for_tool: Callable to map tool name -> toolset name.
         context_length: Model's context window size in tokens.
+
     """
-    from model_tools import check_tool_availability, TOOLSET_REQUIREMENTS
     from rich.panel import Panel
     from rich.table import Table
+
+    from model_tools import TOOLSET_REQUIREMENTS, check_tool_availability
     if get_toolset_for_tool is None:
         from model_tools import get_toolset_for_tool
 
@@ -643,14 +644,13 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     try:
         from hermes_cli.skin_engine import get_active_skin
         _bskin = get_active_skin()
-        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else HERMES_CADUCEUS
+        _hero = _bskin.banner_hero if hasattr(_bskin, "banner_hero") and _bskin.banner_hero else HERMES_CADUCEUS
     except Exception:
         _bskin = None
         _hero = HERMES_CADUCEUS
     left_lines = ["", _hero, ""]
-    model_short = model.split("/")[-1] if "/" in model else model
-    if model_short.endswith(".gguf"):
-        model_short = model_short[:-5]
+    model_short = model.rsplit("/", maxsplit=1)[-1] if "/" in model else model
+    model_short = model_short.removesuffix(".gguf")
     if len(model_short) > 28:
         model_short = model_short[:25] + "..."
     ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
@@ -664,7 +664,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     left_content = "\n".join(left_lines)
 
     right_lines = [f"[bold {accent}]Available Tools[/]"]
-    toolsets_dict: Dict[str, list] = {}
+    toolsets_dict: dict[str, list] = {}
 
     for tool in tools:
         tool_name = tool["function"]["name"]
@@ -737,27 +737,27 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
             if srv["connected"]:
                 right_lines.append(
                     f"[dim {dim}]{srv['name']}[/] [{text}]({srv['transport']})[/] "
-                    f"[dim {dim}]—[/] [{text}]{srv['tools']} tool(s)[/]"
+                    f"[dim {dim}]—[/] [{text}]{srv['tools']} tool(s)[/]",
                 )
             elif srv.get("disabled") or status == "disabled":
                 right_lines.append(
                     f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[dim {dim}]— disabled[/]"
+                    f"[dim {dim}]— disabled[/]",
                 )
             elif status == "connecting":
                 right_lines.append(
                     f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[yellow]— connecting[/]"
+                    f"[yellow]— connecting[/]",
                 )
             elif status == "configured":
                 right_lines.append(
                     f"[dim {dim}]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[dim {dim}]— configured[/]"
+                    f"[dim {dim}]— configured[/]",
                 )
             else:
                 right_lines.append(
                     f"[red]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[red]— failed[/]"
+                    f"[red]— failed[/]",
                 )
 
     right_lines.append("")
@@ -805,7 +805,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
         if get_current_runtime(_load_cfg()) == "codex_app_server":
             right_lines.append(
                 f"[bold {accent}]Runtime:[/] [{text}]codex app-server[/] "
-                f"[dim {dim}](terminal/file ops/MCP run inside codex)[/]"
+                f"[dim {dim}](terminal/file ops/MCP run inside codex)[/]",
             )
     except Exception:
         pass
@@ -824,12 +824,15 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     try:
         behind = get_update_result(timeout=0.5)
         if behind is not None and behind != 0:
-            from hermes_cli.config import get_managed_update_command, recommended_update_command
+            from hermes_cli.config import (
+                get_managed_update_command,
+                recommended_update_command,
+            )
             if behind > 0:
                 commits_word = "commit" if behind == 1 else "commits"
                 right_lines.append(
                     f"[bold yellow]⚠ {behind} {commits_word} behind[/]"
-                    f"[dim yellow] — run [bold]{recommended_update_command()}[/bold] to update[/]"
+                    f"[dim yellow] — run [bold]{recommended_update_command()}[/bold] to update[/]",
                 )
             else:
                 # UPDATE_AVAILABLE_NO_COUNT: nix-built hermes; we know an update
@@ -853,7 +856,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
             right_lines.append(
                 "[bold yellow]⚠ pip install not officially supported[/]"
                 "[dim yellow] — exists for reasons other than user install; "
-                "expect instability and an inability to support issues[/]"
+                "expect instability and an inability to support issues[/]",
             )
     except Exception:
         pass  # Never break the banner over the install-method check
@@ -880,7 +883,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     console.print()
     term_width = shutil.get_terminal_size().columns
     if term_width >= 95:
-        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else HERMES_AGENT_LOGO
+        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, "banner_logo") and _bskin.banner_logo else HERMES_AGENT_LOGO
         console.print(_logo)
         console.print()
     console.print(outer_panel)

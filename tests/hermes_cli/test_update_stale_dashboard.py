@@ -16,7 +16,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -45,9 +45,7 @@ def _refresh_bindings_against_live_module():
     ordering within the worker.  The fix lives in the test module because
     the two pollutants above are load-bearing for their own tests.
     """
-    global _find_stale_dashboard_pids
-    global _kill_stale_dashboard_processes
-    global _warn_stale_dashboard_processes
+    global _find_stale_dashboard_pids, _kill_stale_dashboard_processes, _warn_stale_dashboard_processes
 
     live = sys.modules.get("hermes_cli.main")
     if live is None:
@@ -56,7 +54,6 @@ def _refresh_bindings_against_live_module():
     _find_stale_dashboard_pids = live._find_stale_dashboard_pids
     _kill_stale_dashboard_processes = live._kill_stale_dashboard_processes
     _warn_stale_dashboard_processes = live._warn_stale_dashboard_processes
-    yield
 
 
 def _ps_line(pid: int, cmd: str) -> str:
@@ -239,7 +236,8 @@ class TestKillStaleDashboardPosix:
 
     def test_sigterm_graceful_exit(self, capsys):
         """Processes that exit on SIGTERM (the probe gets ProcessLookupError)
-        are reported as stopped and SIGKILL is never sent."""
+        are reported as stopped and SIGKILL is never sent.
+        """
         import signal as _signal
 
         killed_signals: list[tuple[int, int]] = []
@@ -302,7 +300,8 @@ class TestKillStaleDashboardPosix:
     def test_permission_error_is_reported_not_raised(self, capsys):
         """os.kill raising PermissionError (e.g. another user's process)
         must not abort hermes update — it's reported as a failure and we
-        move on."""
+        move on.
+        """
         def fake_kill(pid, sig):
             raise PermissionError("Operation not permitted")
 
@@ -318,7 +317,8 @@ class TestKillStaleDashboardPosix:
 
     def test_process_already_gone_counts_as_stopped(self, capsys):
         """ProcessLookupError on the initial SIGTERM means the process
-        already exited between detection and the kill — treat as success."""
+        already exited between detection and the kill — treat as success.
+        """
         def fake_kill(pid, sig):
             raise ProcessLookupError
 
@@ -380,7 +380,8 @@ class TestKillStaleDashboardWindows:
 
 class TestBackCompatAlias:
     """``_warn_stale_dashboard_processes`` is kept as an alias for the
-    new kill function so old imports don't break."""
+    new kill function so old imports don't break.
+    """
 
     def test_alias_is_the_kill_function(self):
         assert _warn_stale_dashboard_processes is _kill_stale_dashboard_processes
@@ -394,7 +395,8 @@ class TestWindowsWmicEncoding:
     def test_wmic_invoked_with_utf8_ignore_errors(self, monkeypatch):
         """The wmic subprocess.run call must pass encoding='utf-8' and
         errors='ignore' so the subprocess reader thread cannot raise
-        UnicodeDecodeError on non-UTF-8 wmic output."""
+        UnicodeDecodeError on non-UTF-8 wmic output.
+        """
         monkeypatch.setattr(sys, "platform", "win32")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
@@ -426,11 +428,12 @@ class TestWindowsWmicEncoding:
         is what Python 3.11 leaves behind when the reader thread silently
         crashed on UnicodeDecodeError before this fix landed — detection
         must short-circuit instead of raising AttributeError on
-        ``None.split('\\n')`` and aborting `hermes update` (#17049)."""
+        ``None.split('\\n')`` and aborting `hermes update` (#17049).
+        """
         monkeypatch.setattr(sys, "platform", "win32")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
-                returncode=0, stdout=None, stderr=""
+                returncode=0, stdout=None, stderr="",
             )
             # Must not raise.
             assert _find_stale_dashboard_pids() == []

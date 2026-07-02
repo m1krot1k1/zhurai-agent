@@ -2,16 +2,16 @@
 
 import json
 import os
+import pathlib
 
 import pytest
 
 from hermes_cli.auth import (
     PROVIDER_REGISTRY,
-    resolve_provider,
     get_api_key_provider_status,
     resolve_api_key_provider_credentials,
+    resolve_provider,
 )
-
 
 # Other provider env vars to clear during auto-detection tests
 _OTHER_PROVIDER_KEYS = (
@@ -227,7 +227,8 @@ class TestTencentTokenhubNormalization:
 
     def test_vendor_prefixed_passthrough(self):
         """tencent/hy3-preview is not stripped since tencent-tokenhub is not in
-        _MATCHING_PREFIX_STRIP_PROVIDERS — the slash survives."""
+        _MATCHING_PREFIX_STRIP_PROVIDERS — the slash survives.
+        """
         from hermes_cli.model_normalize import normalize_model_for_provider
         result = normalize_model_for_provider("tencent/hy3-preview", "tencent-tokenhub")
         # Direct providers not in any special set → passthrough
@@ -235,7 +236,8 @@ class TestTencentTokenhubNormalization:
 
     def test_not_in_matching_prefix_strip_set(self):
         """tencent-tokenhub does NOT need prefix stripping — it only has
-        one model (hy3-preview) and users won't copy vendor/ form."""
+        one model (hy3-preview) and users won't copy vendor/ form.
+        """
         from hermes_cli.model_normalize import _MATCHING_PREFIX_STRIP_PROVIDERS
         assert "tencent-tokenhub" not in _MATCHING_PREFIX_STRIP_PROVIDERS
 
@@ -421,6 +423,7 @@ class TestTencentTokenhubCLIDispatch:
         so ``hermes model`` routes it through the generic api_key_provider flow.
         """
         import inspect
+
         from hermes_cli import main as main_mod
         source = inspect.getsource(main_mod)
         # The source should contain tencent-tokenhub in the dispatch block
@@ -441,9 +444,9 @@ class TestTencentTokenhubModelCatalogJSON:
             "..", "..",
             "website", "static", "api", "model-catalog.json",
         )
-        if not os.path.isfile(catalog_path):
+        if not pathlib.Path(catalog_path).is_file():
             pytest.skip("model-catalog.json not found in workspace")
-        with open(catalog_path) as f:
+        with pathlib.Path(catalog_path).open() as f:
             data = json.load(f)
         # Collect all model IDs across all provider lists.
         # providers is a dict keyed by provider name, each value has a "models" list.
@@ -451,12 +454,10 @@ class TestTencentTokenhubModelCatalogJSON:
         providers = data.get("providers", {})
         if isinstance(providers, dict):
             for provider_entry in providers.values():
-                for model in provider_entry.get("models", []):
-                    all_ids.add(model.get("id", ""))
+                all_ids.update(model.get("id", "") for model in provider_entry.get("models", []))
         else:
             for provider_entry in providers:
-                for model in provider_entry.get("models", []):
-                    all_ids.add(model.get("id", ""))
+                all_ids.update(model.get("id", "") for model in provider_entry.get("models", []))
         assert "tencent/hy3-preview:free" in all_ids
         assert "tencent/hy3-preview" in all_ids
 
@@ -505,4 +506,3 @@ class TestTencentTokenhubKnownProviderNames:
     def test_alias_known(self, alias):
         from hermes_cli.models import _KNOWN_PROVIDER_NAMES
         assert alias in _KNOWN_PROVIDER_NAMES
-

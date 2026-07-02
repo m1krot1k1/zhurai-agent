@@ -16,7 +16,6 @@ from agent.tool_dispatch_helpers import (
     make_tool_result_message,
 )
 
-
 # =========================================================================
 # Tool classification
 # =========================================================================
@@ -146,7 +145,7 @@ class TestMakeToolResultMessage:
         assert msg["tool_call_id"] == "call_2"
         assert isinstance(msg["content"], str)
         assert msg["content"].startswith(
-            '<untrusted_tool_result source="web_extract">'
+            '<untrusted_tool_result source="web_extract">',
         )
         assert SAMPLE_LONG_TEXT in msg["content"]
 

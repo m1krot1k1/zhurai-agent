@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-auto_fix_deps.py — Run check_deps.py, then attempt to install whatever is missing.
+"""auto_fix_deps.py — Run check_deps.py, then attempt to install whatever is missing.
 
 For local servers:
   - Missing custom nodes → `comfy node install <package>`
@@ -31,11 +30,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DEFAULT_LOCAL_HOST, ENV_API_KEY, emit_json, log, resolve_api_key,
+from _common import (
+    DEFAULT_LOCAL_HOST,
+    ENV_API_KEY,
+    emit_json,
+    log,
+    resolve_api_key,
+    unwrap_workflow,
 )
-from check_deps import check_deps  # noqa: E402
-from _common import unwrap_workflow  # noqa: E402
+from check_deps import check_deps
 
 
 def comfy_cli_available() -> str | None:

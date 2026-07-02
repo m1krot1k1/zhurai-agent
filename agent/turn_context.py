@@ -26,7 +26,7 @@ import logging
 import threading
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from agent.iteration_budget import IterationBudget
 from agent.model_metadata import estimate_request_tokens_rough
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 def _compression_made_progress(
-    orig_len: int, new_len: int, orig_tokens: int, new_tokens: int
+    orig_len: int, new_len: int, orig_tokens: int, new_tokens: int,
 ) -> bool:
     """Return ``True`` if a compression pass materially reduced the request.
 
@@ -62,11 +62,11 @@ class TurnContext:
     # Clean message preserved for transcripts / memory queries (no nudge injection).
     original_user_message: Any
     # Working message list for this turn (loop appends to it).
-    messages: List[Dict[str, Any]]
+    messages: list[dict[str, Any]]
     # May be reset to None by preflight compression (new session created).
-    conversation_history: Optional[List[Dict[str, Any]]]
+    conversation_history: list[dict[str, Any]] | None
     # Cached system prompt active for this turn (may be rebuilt by compression).
-    active_system_prompt: Optional[str]
+    active_system_prompt: str | None
     # Task / turn identifiers.
     effective_task_id: str
     turn_id: str
@@ -104,12 +104,12 @@ def _emit_prologue_progress(agent, text: str) -> None:
 def build_turn_context(
     agent,
     user_message: str,
-    system_message: Optional[str],
-    conversation_history: Optional[List[Dict[str, Any]]],
-    task_id: Optional[str],
+    system_message: str | None,
+    conversation_history: list[dict[str, Any]] | None,
+    task_id: str | None,
     stream_callback,
-    persist_user_message: Optional[str],
-    persist_user_timestamp: Optional[float] = None,
+    persist_user_message: str | None,
+    persist_user_timestamp: float | None = None,
     *,
     restore_or_build_system_prompt,
     install_safe_stdio,
@@ -216,7 +216,7 @@ def build_turn_context(
                 agent._emit_status(
                     "🔌 Detected stale connections from a previous provider "
                     "issue — cleaned up automatically. Proceeding with fresh "
-                    "connection."
+                    "connection.",
                 )
         except Exception:
             pass
@@ -325,7 +325,7 @@ def build_turn_context(
             agent._emit_status(
                 f"📦 Preflight compression: ~{_preflight_tokens:,} tokens "
                 f">= {_compressor.threshold_tokens:,} threshold. "
-                "This may take a moment."
+                "This may take a moment.",
             )
             for _pass in range(3):
                 _orig_len = len(messages)
@@ -344,7 +344,7 @@ def build_turn_context(
                     tools=agent.tools or None,
                 )
                 if not _compression_made_progress(
-                    _orig_len, len(messages), _orig_tokens, _preflight_tokens
+                    _orig_len, len(messages), _orig_tokens, _preflight_tokens,
                 ):
                     break  # Cannot compress further: neither rows nor tokens moved
                 conversation_history = None
@@ -423,17 +423,16 @@ def build_turn_context(
         from agent.orchestrator_router import (
             build_orchestration_injection,
             build_orchestrator_recon_injection,
-            build_root_synthesis_injection,
             is_ecosystem_orchestrator_subagent,
         )
         from tools.process_registry import is_async_delegation_notification_text
 
         if isinstance(original_user_message, str) and not is_async_delegation_notification_text(
-            original_user_message
+            original_user_message,
         ):
             if is_ecosystem_orchestrator_subagent(agent):
                 orchestration_user_context = build_orchestrator_recon_injection(
-                    agent, original_user_message
+                    agent, original_user_message,
                 )
                 if orchestration_user_context:
                     logger.info(
@@ -455,14 +454,13 @@ def build_turn_context(
                             "Orchestration injection: %d chars",
                             len(orchestration_user_context),
                         )
-        else:
-            # Reconsume a per-turn check also needed for async notifications — the
-            # "recon" passes a full list of running children. Guard here so a
-            # synthetic /branch or /resume prompt doesn't silently lap it.
-            if is_ecosystem_orchestrator_subagent(agent):
-                orchestration_user_context = build_orchestrator_recon_injection(
-                    agent, original_user_message
-                )
+        # Reconsume a per-turn check also needed for async notifications — the
+        # "recon" passes a full list of running children. Guard here so a
+        # synthetic /branch or /resume prompt doesn't silently lap it.
+        elif is_ecosystem_orchestrator_subagent(agent):
+            orchestration_user_context = build_orchestrator_recon_injection(
+                agent, original_user_message,
+            )
     except Exception as exc:
         logger.warning("orchestration injection failed: %s", exc)
 

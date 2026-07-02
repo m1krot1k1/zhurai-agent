@@ -1,5 +1,4 @@
-"""
-DingTalk Device Flow authorization.
+"""DingTalk Device Flow authorization.
 
 Implements the same 3-step registration flow as dingtalk-openclaw-connector:
   1. POST /app/registration/init   → get nonce
@@ -13,11 +12,10 @@ automatically.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import time
-import logging
-from typing import Optional, Tuple
 
 import requests
 
@@ -26,7 +24,7 @@ logger = logging.getLogger(__name__)
 # ── Configuration ──────────────────────────────────────────────────────────
 
 REGISTRATION_BASE_URL = os.environ.get(
-    "DINGTALK_REGISTRATION_BASE_URL", "https://oapi.dingtalk.com"
+    "DINGTALK_REGISTRATION_BASE_URL", "https://oapi.dingtalk.com",
 ).rstrip("/")
 
 REGISTRATION_SOURCE = os.environ.get("DINGTALK_REGISTRATION_SOURCE", "openClaw")
@@ -107,8 +105,8 @@ def wait_for_registration_success(
     device_code: str,
     interval: int = 3,
     expires_in: int = 7200,
-    on_waiting: Optional[callable] = None,
-) -> Tuple[str, str]:
+    on_waiting: callable | None = None,
+) -> tuple[str, str]:
     """Block until the registration succeeds or times out.
 
     Returns (client_id, client_secret).
@@ -156,7 +154,7 @@ def wait_for_registration_success(
 def _ensure_qrcode_installed() -> bool:
     """Try to import qrcode; if missing, auto-install it via pip/uv."""
     try:
-        import qrcode  # noqa: F401
+        import qrcode
         return True
     except ImportError:
         pass
@@ -170,7 +168,7 @@ def _ensure_qrcode_installed() -> bool:
     ):
         try:
             subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            import qrcode  # noqa: F401,F811
+            import qrcode  # noqa: F401
             return True
         except (subprocess.CalledProcessError, ImportError, FileNotFoundError):
             continue
@@ -227,13 +225,13 @@ def render_qr_to_terminal(url: str) -> bool:
 
 # ── High-level entry point for the setup wizard ───────────────────────────
 
-def dingtalk_qr_auth() -> Optional[Tuple[str, str]]:
+def dingtalk_qr_auth() -> tuple[str, str] | None:
     """Run the interactive QR-code device-flow authorization.
 
     Returns (client_id, client_secret) on success, or None if the user
     cancelled or the flow failed.
     """
-    from hermes_cli.setup import print_info, print_success, print_warning, print_error
+    from hermes_cli.setup import print_error, print_info, print_success, print_warning
 
     print()
     print_info("  Initializing DingTalk device authorization...")
@@ -257,7 +255,7 @@ def dingtalk_qr_auth() -> Optional[Tuple[str, str]]:
     print()
 
     if not render_qr_to_terminal(url):
-        print_warning(f"  QR code render failed, please open the link below to authorize:")
+        print_warning("  QR code render failed, please open the link below to authorize:")
 
     print()
     print_info(f"  Or open this link manually: {url}")

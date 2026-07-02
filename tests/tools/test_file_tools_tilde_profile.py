@@ -15,17 +15,14 @@ See: https://github.com/NousResearch/hermes-agent/issues/48552
 """
 
 import os
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 import tools.file_tools as ft
-
 
 # ---------------------------------------------------------------------------
 # _expand_tilde() unit tests
 # ---------------------------------------------------------------------------
+
 
 class TestExpandTilde:
     """Verify the _expand_tilde() helper resolves ~ to the profile home."""

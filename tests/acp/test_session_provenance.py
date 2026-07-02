@@ -13,10 +13,10 @@ from acp_adapter.provenance import build_session_provenance, session_provenance_
 from hermes_state import SessionDB
 
 
-@pytest.fixture()
+@pytest.fixture
 def db(tmp_path):
     d = SessionDB(db_path=tmp_path / "state.db")
-    yield d
+    return d
 
 
 def _mk(db, sid, parent=None):
@@ -43,7 +43,7 @@ def test_compression_split_continuation(db):
     _mk(db, "new", parent="old")
 
     prov = build_session_provenance(
-        db, "acp-1", "new", previous_hermes_session_id="old"
+        db, "acp-1", "new", previous_hermes_session_id="old",
     )
     assert prov["sessionKind"] == "continuation"
     assert prov["parentHermesSessionId"] == "old"
@@ -83,7 +83,7 @@ def test_no_false_rotation_when_head_unchanged(db):
     _mk(db, "s")
     # previous == current → no rotation reason emitted.
     prov = build_session_provenance(
-        db, "acp-1", "s", previous_hermes_session_id="s"
+        db, "acp-1", "s", previous_hermes_session_id="s",
     )
     assert "reason" not in prov
     assert "creatorKind" not in prov

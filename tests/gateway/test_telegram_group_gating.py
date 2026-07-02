@@ -314,7 +314,12 @@ def test_observed_group_context_replays_normally_without_telegram_prompt():
 
 
 def test_observed_group_context_preserves_slash_command_text_for_dispatch():
-    from gateway.platforms.base import MessageEvent, MessageType, Platform, SessionSource
+    from gateway.platforms.base import (
+        MessageEvent,
+        MessageType,
+        Platform,
+        SessionSource,
+    )
 
     adapter = _make_adapter(
         require_mention=True,
@@ -532,7 +537,7 @@ def test_exclusive_bot_mentions_can_be_disabled_for_legacy_groups():
     )
 
     assert adapter._should_process_message(
-        _group_message("@research_bot hi", reply_to_bot=True)
+        _group_message("@research_bot hi", reply_to_bot=True),
     ) is True
 
 
@@ -604,7 +609,7 @@ def test_allowed_topics_drop_other_forum_topics_before_other_gates():
     assert adapter._should_process_message(_group_message("hello", chat_id=-100, thread_id=8)) is True
     assert adapter._should_process_message(_group_message("hello", chat_id=-100, thread_id=11)) is False
     assert adapter._should_process_message(
-        _group_message("hi @hermes_bot", chat_id=-100, thread_id=11, entities=[_mention_entity("hi @hermes_bot")])
+        _group_message("hi @hermes_bot", chat_id=-100, thread_id=11, entities=[_mention_entity("hi @hermes_bot")]),
     ) is False
 
 
@@ -646,13 +651,13 @@ def test_config_bridges_telegram_group_settings(monkeypatch, tmp_path):
         "  exclusive_bot_mentions: true\n"
         "  observe_unmentioned_group_messages: true\n"
         "  mention_patterns:\n"
-        "    - \"^\\\\s*chompy\\\\b\"\n"
+        '    - "^\\\\s*chompy\\\\b"\n'
         "  free_response_chats:\n"
-        "    - \"-123\"\n"
+        '    - "-123"\n'
         "  allowed_chats:\n"
-        "    - \"-100\"\n"
+        '    - "-100"\n'
         "  group_allowed_chats:\n"
-        "    - \"-100\"\n"
+        '    - "-100"\n'
         "  allowed_topics:\n"
         "    - 8\n",
         encoding="utf-8",
@@ -697,12 +702,12 @@ def test_config_bridges_telegram_user_allowlists(monkeypatch, tmp_path):
     (hermes_home / "config.yaml").write_text(
         "telegram:\n"
         "  allow_from:\n"
-        "    - \"111\"\n"
-        "    - \"222\"\n"
+        '    - "111"\n'
+        '    - "222"\n'
         "  group_allow_from:\n"
-        "    - \"333\"\n"
+        '    - "333"\n'
         "  group_allowed_chats:\n"
-        "    - \"-100\"\n",
+        '    - "-100"\n',
         encoding="utf-8",
     )
 
@@ -724,8 +729,8 @@ def test_config_env_overrides_telegram_user_allowlists(monkeypatch, tmp_path):
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "telegram:\n"
-        "  allow_from: \"111\"\n"
-        "  group_allow_from: \"222\"\n",
+        '  allow_from: "111"\n'
+        '  group_allow_from: "222"\n',
         encoding="utf-8",
     )
 
@@ -811,7 +816,7 @@ def test_config_bridges_telegram_ignored_threads(monkeypatch, tmp_path):
         "telegram:\n"
         "  ignored_threads:\n"
         "    - 31\n"
-        "    - \"42\"\n",
+        '    - "42"\n',
         encoding="utf-8",
     )
 
@@ -891,7 +896,7 @@ def _group_voice_message(
         video=None,
         audio=None,
         voice=SimpleNamespace(
-            get_file=AsyncMock(side_effect=Exception("simulated download failure"))
+            get_file=AsyncMock(side_effect=Exception("simulated download failure")),
         ),
         document=None,
     )

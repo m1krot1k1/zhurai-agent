@@ -30,15 +30,15 @@ from aiohttp.test_utils import TestClient, TestServer
 from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import SendResult
 from gateway.platforms.webhook import (
-    WebhookAdapter,
     _INSECURE_NO_AUTH,
+    WebhookAdapter,
     check_webhook_requirements,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(
     routes=None,
@@ -93,7 +93,7 @@ def _mock_request(headers=None, body=b"", content_length=None, match_info=None):
 def _github_signature(body: bytes, secret: str) -> str:
     """Compute X-Hub-Signature-256 for *body* using *secret*."""
     return "sha256=" + hmac.new(
-        secret.encode(), body, hashlib.sha256
+        secret.encode(), body, hashlib.sha256,
     ).hexdigest()
 
 
@@ -161,7 +161,8 @@ class TestValidateSignature:
     def test_validate_no_secret_allows_all(self):
         """When the secret is empty/falsy, the validator is never even called
         by the handler (secret check is 'if secret and secret != _INSECURE...').
-        Verify that an empty secret isn't accidentally passed to the validator."""
+        Verify that an empty secret isn't accidentally passed to the validator.
+        """
         # This tests the semantics: empty secret means skip validation entirely.
         # The handler code does: if secret and secret != _INSECURE_NO_AUTH: validate
         # So with an empty secret, _validate_signature is never reached.
@@ -197,7 +198,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, secret) is True
 
@@ -215,7 +216,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, received_body, secret) is False
 
@@ -232,7 +233,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, secret) is False
 
@@ -249,7 +250,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": "v1,wrong " + sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, secret) is True
 
@@ -272,7 +273,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, secret) is False
 
@@ -284,14 +285,14 @@ class TestValidateSignature:
         msg_id = "msg_123"
         timestamp = str(int(time.time()))
         raw_sig = _svix_signature(
-            body, malformed_secret.removeprefix("whsec_"), msg_id, timestamp
+            body, malformed_secret.removeprefix("whsec_"), msg_id, timestamp,
         )
         req = _mock_request(
             headers={
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": raw_sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, malformed_secret) is False
 
@@ -308,7 +309,7 @@ class TestValidateSignature:
                 "svix-id": msg_id,
                 "svix-timestamp": timestamp,
                 "svix-signature": sig,
-            }
+            },
         )
         assert adapter._validate_signature(req, body, secret) is True
 
@@ -387,7 +388,7 @@ class TestEventFilter:
                 "secret": _INSECURE_NO_AUTH,
                 "events": ["pull_request"],
                 "prompt": "PR: {action}",
-            }
+            },
         }
         adapter = _make_adapter(routes=routes)
         # Stub handle_message to avoid running the agent
@@ -410,7 +411,7 @@ class TestEventFilter:
                 "secret": _INSECURE_NO_AUTH,
                 "events": ["pull_request"],
                 "prompt": "test",
-            }
+            },
         }
         adapter = _make_adapter(routes=routes)
 
@@ -432,7 +433,7 @@ class TestEventFilter:
             "all": {
                 "secret": _INSECURE_NO_AUTH,
                 "prompt": "got it",
-            }
+            },
         }
         adapter = _make_adapter(routes=routes)
         adapter.handle_message = AsyncMock()
@@ -454,7 +455,7 @@ class TestEventFilter:
                 "secret": _INSECURE_NO_AUTH,
                 "events": ["message.received"],
                 "prompt": "got it",
-            }
+            },
         }
         adapter = _make_adapter(routes=routes)
         adapter.handle_message = AsyncMock()
@@ -919,7 +920,7 @@ class TestRawTemplateToken:
         adapter = _make_adapter()
         payload = {"action": "opened", "number": 42}
         result = adapter._render_prompt(
-            "Payload: {__raw__}", payload, "push", "test"
+            "Payload: {__raw__}", payload, "push", "test",
         )
         expected_json = json.dumps(payload, indent=2)
         assert result == f"Payload: {expected_json}"
@@ -937,7 +938,7 @@ class TestRawTemplateToken:
         adapter = _make_adapter()
         payload = {"action": "closed", "number": 7}
         result = adapter._render_prompt(
-            "Action={action} Raw={__raw__}", payload, "push", "test"
+            "Action={action} Raw={__raw__}", payload, "push", "test",
         )
         assert result.startswith("Action=closed Raw=")
         assert '"action": "closed"' in result
@@ -973,11 +974,11 @@ class TestDeliverCrossPlatformThreadId:
             "deliver_extra": {
                 "chat_id": "12345",
                 "thread_id": "999",
-            }
+            },
         }
         await adapter._deliver_cross_platform("telegram", "hello", delivery)
         mock_target.send.assert_awaited_once_with(
-            "12345", "hello", metadata={"thread_id": "999"}
+            "12345", "hello", metadata={"thread_id": "999"},
         )
 
     @pytest.mark.asyncio
@@ -988,11 +989,11 @@ class TestDeliverCrossPlatformThreadId:
             "deliver_extra": {
                 "chat_id": "12345",
                 "message_thread_id": "888",
-            }
+            },
         }
         await adapter._deliver_cross_platform("telegram", "hello", delivery)
         mock_target.send.assert_awaited_once_with(
-            "12345", "hello", metadata={"thread_id": "888"}
+            "12345", "hello", metadata={"thread_id": "888"},
         )
 
     @pytest.mark.asyncio
@@ -1002,18 +1003,19 @@ class TestDeliverCrossPlatformThreadId:
         delivery = {
             "deliver_extra": {
                 "chat_id": "12345",
-            }
+            },
         }
         await adapter._deliver_cross_platform("telegram", "hello", delivery)
         mock_target.send.assert_awaited_once_with(
-            "12345", "hello", metadata=None
+            "12345", "hello", metadata=None,
         )
 
 
 class TestInsecureNoAuthSafetyRail:
     """connect() refuses to start when INSECURE_NO_AUTH is combined with a
     non-loopback bind. Guards against accidentally exposing an unauthenticated
-    webhook endpoint on a public interface."""
+    webhook endpoint on a public interface.
+    """
 
     @pytest.mark.asyncio
     async def test_connect_rejects_insecure_no_auth_on_public_bind(self):
@@ -1084,4 +1086,3 @@ class TestInsecureNoAuthSafetyRail:
             assert result is True
         finally:
             await adapter.disconnect()
-

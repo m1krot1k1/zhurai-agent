@@ -10,10 +10,10 @@ from unittest.mock import patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_hermes_tree(root: Path) -> None:
     """Create a realistic ~/.hermes directory structure for testing."""
@@ -100,7 +100,8 @@ class TestShouldExclude:
 
     def test_excludes_checkpoints(self):
         """checkpoints/ is session-local trajectory cache — hash-keyed,
-        regenerated per-session, won't port to another machine anyway."""
+        regenerated per-session, won't port to another machine anyway.
+        """
         from hermes_cli.backup import _should_exclude
         assert _should_exclude(Path("checkpoints/abc123/trajectory.json"))
         assert _should_exclude(Path("checkpoints/deadbeef/step_0001.json"))
@@ -113,7 +114,8 @@ class TestShouldExclude:
     def test_excludes_sqlite_sidecars(self):
         """SQLite WAL/SHM/journal sidecars must not ship alongside the
         safe-copied .db — pairing a fresh snapshot with stale sidecar state
-        produces a torn restore."""
+        produces a torn restore.
+        """
         from hermes_cli.backup import _should_exclude
         assert _should_exclude(Path("state.db-wal"))
         assert _should_exclude(Path("state.db-shm"))
@@ -148,7 +150,8 @@ class TestShouldExclude:
 
     def test_includes_nested_hermes_agent_in_skills(self):
         """skills/autonomous-ai-agents/hermes-agent/ must NOT be excluded —
-        only the root-level hermes-agent/ repo is skipped."""
+        only the root-level hermes-agent/ repo is skipped.
+        """
         from hermes_cli.backup import _should_exclude
         assert not _should_exclude(Path("skills/autonomous-ai-agents/hermes-agent/SKILL.md"))
         assert not _should_exclude(Path("skills/autonomous-ai-agents/hermes-agent/sub/item.txt"))
@@ -170,13 +173,15 @@ class TestShouldExclude:
     )
     def test_excludes_regeneratable_dependency_and_cache_dirs(self, rel):
         """Python dep trees and tool caches under HERMES_HOME must be skipped —
-        these are what balloon a backup to hundreds of thousands of files."""
+        these are what balloon a backup to hundreds of thousands of files.
+        """
         from hermes_cli.backup import _should_exclude
         assert _should_exclude(Path(rel))
 
     def test_does_not_exclude_curator_archive(self):
         """skills/.archive/ holds restorable archived skills and MUST survive
-        a backup — it is intentionally NOT in the exclusion set."""
+        a backup — it is intentionally NOT in the exclusion set.
+        """
         from hermes_cli.backup import _should_exclude
         assert not _should_exclude(Path("skills/.archive/old-skill/SKILL.md"))
 
@@ -189,6 +194,7 @@ class TestShouldExclude:
 # ---------------------------------------------------------------------------
 # Backup tests
 # ---------------------------------------------------------------------------
+
 
 class TestBackup:
     def test_creates_zip(self, tmp_path, monkeypatch):
@@ -228,7 +234,8 @@ class TestBackup:
     def test_db_snapshots_staged_beside_output_zip(self, tmp_path, monkeypatch):
         """SQLite staging temp files must be created on the output zip's
         filesystem (dir=out_path.parent), NOT the system /tmp default — a
-        small tmpfs there silently drops large DBs from the backup (#35376)."""
+        small tmpfs there silently drops large DBs from the backup (#35376).
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
@@ -259,7 +266,8 @@ class TestBackup:
 
     def test_pre_update_db_snapshots_staged_beside_output_zip(self, tmp_path, monkeypatch):
         """The pre-update/pre-migration zip path (_write_full_zip_backup) must
-        also stage SQLite snapshots beside its output zip, not in /tmp."""
+        also stage SQLite snapshots beside its output zip, not in /tmp.
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
@@ -308,7 +316,8 @@ class TestBackup:
     def test_excludes_dependency_and_cache_trees(self, tmp_path, monkeypatch):
         """A plugin venv / site-packages / pip cache under HERMES_HOME must be
         pruned by the walk, while real data (skills, config) is preserved.
-        This is the regression guard for the ballooning-backup bug."""
+        This is the regression guard for the ballooning-backup bug.
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         _make_hermes_tree(hermes_home)
@@ -643,7 +652,8 @@ class TestImport:
 
     def test_does_not_seed_gateway_state_when_absent(self, tmp_path, monkeypatch):
         """A backup's gateway_state.json is dropped, not written, when the
-        target has none — a foreign state must never seed the reconciler."""
+        target has none — a foreign state must never seed the reconciler.
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -666,7 +676,8 @@ class TestImport:
     def test_preserves_per_profile_gateway_state(self, tmp_path, monkeypatch):
         """The skip is matched by basename, so a named profile's
         gateway_state.json (profiles/<name>/gateway_state.json) is preserved
-        the same way the root profile's is."""
+        the same way the root profile's is.
+        """
         hermes_home = tmp_path / ".hermes"
         (hermes_home / "profiles" / "coder").mkdir(parents=True)
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -696,7 +707,8 @@ class TestImport:
     def test_preserves_runtime_pid_and_process_files(self, tmp_path, monkeypatch):
         """gateway.pid / cron.pid / gateway.lock / processes.json from a backup
         reference the source machine's process namespace and must never be
-        written over the target's."""
+        written over the target's.
+        """
         hermes_home = tmp_path / ".hermes"
         hermes_home.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
@@ -885,6 +897,7 @@ class TestValidation:
     def test_validate_with_config(self):
         """Zip with config.yaml passes validation."""
         import io
+
         from hermes_cli.backup import _validate_backup_zip
 
         buf = io.BytesIO()
@@ -898,6 +911,7 @@ class TestValidation:
     def test_validate_with_env(self):
         """Zip with .env passes validation."""
         import io
+
         from hermes_cli.backup import _validate_backup_zip
 
         buf = io.BytesIO()
@@ -911,6 +925,7 @@ class TestValidation:
     def test_validate_rejects_random(self):
         """Zip without hermes markers fails validation."""
         import io
+
         from hermes_cli.backup import _validate_backup_zip
 
         buf = io.BytesIO()
@@ -924,6 +939,7 @@ class TestValidation:
     def test_detect_prefix_hermes(self):
         """Detects .hermes/ prefix wrapping all entries."""
         import io
+
         from hermes_cli.backup import _detect_prefix
 
         buf = io.BytesIO()
@@ -937,6 +953,7 @@ class TestValidation:
     def test_detect_prefix_none(self):
         """No prefix when entries are at root."""
         import io
+
         from hermes_cli.backup import _detect_prefix
 
         buf = io.BytesIO()
@@ -950,6 +967,7 @@ class TestValidation:
     def test_detect_prefix_only_dirs(self):
         """Prefix detection returns empty for zip with only directory entries."""
         import io
+
         from hermes_cli.backup import _detect_prefix
 
         buf = io.BytesIO()
@@ -1310,7 +1328,7 @@ class TestProfileRestoration:
         args = Namespace(zipfile=str(zip_path), force=True)
 
         # Simulate profiles module not being available
-        original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+        original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
 
         def fake_import(name, *a, **kw):
             if name == "hermes_cli.profiles":
@@ -1384,7 +1402,7 @@ class TestQuickSnapshot:
         (home / ".env").write_text("OPENROUTER_API_KEY=test-key-123\n")
         (home / "auth.json").write_text('{"providers": {}}\n')
         (home / "channel_aliases.json").write_text(
-            '{"whatsapp": {"120363408391911677@g.us": "general"}}\n'
+            '{"whatsapp": {"120363408391911677@g.us": "general"}}\n',
         )
         (home / "cron").mkdir()
         (home / "cron" / "jobs.json").write_text('{"jobs": []}\n')
@@ -1438,7 +1456,7 @@ class TestQuickSnapshot:
     def test_missing_files_skipped(self, hermes_home):
         from hermes_cli.backup import create_quick_snapshot
         snap_id = create_quick_snapshot(hermes_home=hermes_home)
-        with open(hermes_home / "state-snapshots" / snap_id / "manifest.json") as f:
+        with Path(hermes_home / "state-snapshots" / snap_id / "manifest.json").open() as f:
             meta = json.load(f)
         # gateway_state.json etc. don't exist in fixture
         assert "gateway_state.json" not in meta["files"]
@@ -1498,14 +1516,22 @@ class TestQuickSnapshot:
         assert restore_quick_snapshot("nonexistent", hermes_home=hermes_home) is False
 
     def test_auto_prune(self, hermes_home):
-        from hermes_cli.backup import create_quick_snapshot, list_quick_snapshots, _QUICK_DEFAULT_KEEP
+        from hermes_cli.backup import (
+            _QUICK_DEFAULT_KEEP,
+            create_quick_snapshot,
+            list_quick_snapshots,
+        )
         for i in range(_QUICK_DEFAULT_KEEP + 5):
             create_quick_snapshot(label=f"snap-{i:03d}", hermes_home=hermes_home)
         snaps = list_quick_snapshots(limit=100, hermes_home=hermes_home)
         assert len(snaps) <= _QUICK_DEFAULT_KEEP
 
     def test_manual_prune(self, hermes_home):
-        from hermes_cli.backup import create_quick_snapshot, prune_quick_snapshots, list_quick_snapshots
+        from hermes_cli.backup import (
+            create_quick_snapshot,
+            list_quick_snapshots,
+            prune_quick_snapshots,
+        )
         for i in range(10):
             create_quick_snapshot(label=f"s{i}", hermes_home=hermes_home)
         deleted = prune_quick_snapshots(keep=3, hermes_home=hermes_home)
@@ -1515,25 +1541,26 @@ class TestQuickSnapshot:
     def test_snapshot_includes_pairing_directories(self, hermes_home):
         """Pairing JSONs live outside state.db — snapshot must capture them
         recursively (generic + per-platform) so approved-user lists survive
-        disasters like #15733."""
+        disasters like #15733.
+        """
         from hermes_cli.backup import create_quick_snapshot
 
         # Generic pairing store (new location)
         (hermes_home / "platforms" / "pairing").mkdir(parents=True)
         (hermes_home / "platforms" / "pairing" / "telegram-approved.json").write_text(
-            '{"12345": {"user_name": "alice"}}'
+            '{"12345": {"user_name": "alice"}}',
         )
         (hermes_home / "platforms" / "pairing" / "discord-approved.json").write_text(
-            '{"67890": {"user_name": "bob"}}'
+            '{"67890": {"user_name": "bob"}}',
         )
         # Legacy pairing store (old location)
         (hermes_home / "pairing").mkdir()
         (hermes_home / "pairing" / "matrix-approved.json").write_text(
-            '{"@charlie:server": {"user_name": "charlie"}}'
+            '{"@charlie:server": {"user_name": "charlie"}}',
         )
         # Feishu's separate JSON
         (hermes_home / "feishu_comment_pairing.json").write_text(
-            '{"doc_abc": {"allow_from": ["user_xyz"]}}'
+            '{"doc_abc": {"allow_from": ["user_xyz"]}}',
         )
 
         snap_id = create_quick_snapshot(hermes_home=hermes_home)
@@ -1545,7 +1572,7 @@ class TestQuickSnapshot:
         assert (snap_dir / "pairing" / "matrix-approved.json").exists()
         assert (snap_dir / "feishu_comment_pairing.json").exists()
 
-        with open(snap_dir / "manifest.json") as f:
+        with Path(snap_dir / "manifest.json").open() as f:
             meta = json.load(f)
         files = meta["files"]
         assert "platforms/pairing/telegram-approved.json" in files
@@ -1608,7 +1635,8 @@ class TestQuickSnapshot:
         layout that would otherwise satisfy ``snap_dir.is_dir()``.
 
         Regression for the path-traversal surface where ``root /
-        snapshot_id`` could resolve above the snapshots root."""
+        snapshot_id`` could resolve above the snapshots root.
+        """
         from hermes_cli.backup import restore_quick_snapshot
 
         hostile_ids = [
@@ -1622,13 +1650,14 @@ class TestQuickSnapshot:
         ]
         for hostile in hostile_ids:
             assert restore_quick_snapshot(
-                hostile, hermes_home=hermes_home
+                hostile, hermes_home=hermes_home,
             ) is False, f"hostile snapshot_id was not rejected: {hostile!r}"
 
     def test_restore_rejects_manifest_rel_traversal(self, hermes_home):
         """A snapshot whose manifest.json contains a rel path that escapes
         the snapshot directory (e.g. ``../../outside.txt``) must skip that
-        entry rather than restoring outside HERMES_HOME."""
+        entry rather than restoring outside HERMES_HOME.
+        """
         from hermes_cli.backup import create_quick_snapshot, restore_quick_snapshot
 
         snap_id = create_quick_snapshot(hermes_home=hermes_home)
@@ -1639,10 +1668,10 @@ class TestQuickSnapshot:
         # file outside the snapshot directory so a vulnerable implementation
         # would actually write something at the escaped destination.
         manifest_path = snap_dir / "manifest.json"
-        with open(manifest_path) as f:
+        with Path(manifest_path).open() as f:
             meta = json.load(f)
         meta["files"]["../../outside.txt"] = 9
-        with open(manifest_path, "w") as f:
+        with Path(manifest_path).open("w") as f:
             json.dump(meta, f)
 
         # Source: ../../outside.txt resolves above the snapshot root.
@@ -1666,9 +1695,11 @@ class TestQuickSnapshot:
         # Cleanup the seeded escape source so the test is hermetic.
         escape_src.unlink()
 
+
 class TestPreUpdateBackup:
     """Tests for create_pre_update_backup — the auto-backup ``hermes update``
-    runs before touching anything."""
+    runs before touching anything.
+    """
 
     @pytest.fixture
     def hermes_home(self, tmp_path):
@@ -1688,7 +1719,8 @@ class TestPreUpdateBackup:
 
     def test_backup_contents_match_full_backup(self, hermes_home):
         """Pre-update backup should include the same user data that
-        ``hermes backup`` would, and should exclude the same directories."""
+        ``hermes backup`` would, and should exclude the same directories.
+        """
         from hermes_cli.backup import create_pre_update_backup
         out = create_pre_update_backup(hermes_home=hermes_home)
         assert out is not None
@@ -1709,7 +1741,8 @@ class TestPreUpdateBackup:
 
     def test_does_not_recurse_into_prior_backups(self, hermes_home):
         """The ``backups/`` directory must be excluded so that each backup
-        doesn't grow exponentially by including all prior backups."""
+        doesn't grow exponentially by including all prior backups.
+        """
         from hermes_cli.backup import create_pre_update_backup
         # First backup
         out1 = create_pre_update_backup(hermes_home=hermes_home)
@@ -1726,8 +1759,10 @@ class TestPreUpdateBackup:
 
     def test_rotation_keeps_only_n(self, hermes_home):
         """After more than ``keep`` backups are created, older ones are
-        pruned automatically."""
+        pruned automatically.
+        """
         import time as _t
+
         from hermes_cli.backup import create_pre_update_backup
 
         created = []
@@ -1749,8 +1784,10 @@ class TestPreUpdateBackup:
 
     def test_rotation_preserves_manual_files(self, hermes_home):
         """Hand-dropped zips in ``backups/`` must not be touched by
-        rotation — it only prunes files matching ``pre-update-*.zip``."""
+        rotation — it only prunes files matching ``pre-update-*.zip``.
+        """
         import time as _t
+
         from hermes_cli.backup import create_pre_update_backup
 
         (hermes_home / "backups").mkdir(exist_ok=True)
@@ -1784,7 +1821,8 @@ class TestPreUpdateBackup:
 
     def test_keep_negative_does_not_delete_freshly_created_backup(self, hermes_home):
         """Mirror coverage: any value <1 should be floored, not literally
-        applied as a slice index."""
+        applied as a slice index.
+        """
         from hermes_cli.backup import create_pre_update_backup
         out = create_pre_update_backup(hermes_home=hermes_home, keep=-3)
         assert out is not None
@@ -1796,6 +1834,7 @@ class TestPreUpdateBackup:
         still remove pre-existing backups beyond the (floored) limit of 1.
         """
         import time as _t
+
         from hermes_cli.backup import create_pre_update_backup
 
         first = create_pre_update_backup(hermes_home=hermes_home, keep=5)
@@ -1832,7 +1871,8 @@ class TestPreUpdateBackup:
 
 class TestRunPreUpdateBackup:
     """Tests for the ``_run_pre_update_backup`` wrapper in main.py —
-    covers config gate, ``--no-backup`` flag, and user-facing output."""
+    covers config gate, ``--no-backup`` flag, and user-facing output.
+    """
 
     @pytest.fixture
     def hermes_home(self, tmp_path, monkeypatch):
@@ -1887,12 +1927,13 @@ class TestRunPreUpdateBackup:
         assert "Creating pre-update backup" not in out
         # No backup written
         assert not (hermes_home / "backups").exists() or not list(
-            (hermes_home / "backups").glob("pre-update-*.zip")
+            (hermes_home / "backups").glob("pre-update-*.zip"),
         )
 
     def test_config_enabled_creates_backup(self, hermes_home, capsys):
         """Users who explicitly set updates.pre_update_backup: true still get
-        a backup on every update — this is the opt-in legacy behavior."""
+        a backup on every update — this is the opt-in legacy behavior.
+        """
         import yaml
         (hermes_home / "config.yaml").write_text(yaml.safe_dump({
             "_config_version": 22,
@@ -1913,7 +1954,8 @@ class TestRunPreUpdateBackup:
 
     def test_config_disabled_is_silent(self, hermes_home, capsys):
         """Explicit pre_update_backup: false behaves the same as the default —
-        silent no-op, no message spam."""
+        silent no-op, no message spam.
+        """
         import yaml
         (hermes_home / "config.yaml").write_text(yaml.safe_dump({
             "_config_version": 22,
@@ -1956,7 +1998,8 @@ class TestRunPreUpdateBackup:
 
 class TestPreMigrationBackup:
     """Tests for create_pre_migration_backup — the auto-backup
-    ``hermes claw migrate`` runs before mutating ~/.hermes/."""
+    ``hermes claw migrate`` runs before mutating ~/.hermes/.
+    """
 
     @pytest.fixture
     def hermes_home(self, tmp_path):
@@ -1978,7 +2021,8 @@ class TestPreMigrationBackup:
 
     def test_backup_uses_shared_exclusion_rules(self, hermes_home):
         """Pre-migration backup reuses the same exclusion rules as
-        ``hermes backup`` / ``create_pre_update_backup`` — no drift."""
+        ``hermes backup`` / ``create_pre_update_backup`` — no drift.
+        """
         from hermes_cli.backup import create_pre_migration_backup
         out = create_pre_migration_backup(hermes_home=hermes_home)
         assert out is not None
@@ -1995,8 +2039,9 @@ class TestPreMigrationBackup:
 
     def test_restorable_with_hermes_import(self, hermes_home, tmp_path):
         """The zip produced by pre-migration backup must be a valid Hermes
-        backup — `hermes import` should accept it."""
-        from hermes_cli.backup import create_pre_migration_backup, _validate_backup_zip
+        backup — `hermes import` should accept it.
+        """
+        from hermes_cli.backup import _validate_backup_zip, create_pre_migration_backup
         out = create_pre_migration_backup(hermes_home=hermes_home)
         assert out is not None
         with zipfile.ZipFile(out) as zf:
@@ -2015,6 +2060,7 @@ class TestPreMigrationBackup:
 
     def test_rotation_keeps_only_n(self, hermes_home):
         import time as _t
+
         from hermes_cli.backup import create_pre_migration_backup
 
         created = []
@@ -2036,8 +2082,12 @@ class TestPreMigrationBackup:
 
     def test_does_not_touch_pre_update_backups(self, hermes_home):
         """Pre-migration rotation must only prune pre-migration-*.zip files,
-        leaving pre-update-*.zip backups untouched."""
-        from hermes_cli.backup import create_pre_update_backup, create_pre_migration_backup
+        leaving pre-update-*.zip backups untouched.
+        """
+        from hermes_cli.backup import (
+            create_pre_migration_backup,
+            create_pre_update_backup,
+        )
         update_backup = create_pre_update_backup(hermes_home=hermes_home, keep=5)
         assert update_backup is not None and update_backup.exists()
         # Spin up a lot of migration backups with keep=1
@@ -2057,7 +2107,8 @@ class TestPreMigrationBackup:
 class TestRestoreCronJobsIfEmptied:
     """`hermes update` config migration can leave cron/jobs.json valid-but-empty,
     silently dropping every scheduled job. `restore_cron_jobs_if_emptied` is the
-    post-migration safety net that restores from the pre-update snapshot."""
+    post-migration safety net that restores from the pre-update snapshot.
+    """
 
     @staticmethod
     def _seed_jobs(path: Path, jobs):
@@ -2115,7 +2166,8 @@ class TestRestoreCronJobsIfEmptied:
 
     def test_noop_when_live_file_unreadable(self, tmp_path):
         """An unparseable live file is left alone — that's a different failure
-        mode the user should see, not silently overwrite."""
+        mode the user should see, not silently overwrite.
+        """
         from hermes_cli.backup import restore_cron_jobs_if_emptied
         hermes_home = tmp_path / ".hermes"
         jobs_path = hermes_home / "cron" / "jobs.json"
@@ -2138,7 +2190,8 @@ class TestRestoreCronJobsIfEmptied:
 
     def test_restores_legacy_bare_list_snapshot_shape(self, tmp_path):
         """A legacy snapshot storing a bare JSON list (not {"jobs": [...]}) is
-        still counted and restored."""
+        still counted and restored.
+        """
         from hermes_cli.backup import restore_cron_jobs_if_emptied
         hermes_home = tmp_path / ".hermes"
         jobs_path = hermes_home / "cron" / "jobs.json"
@@ -2167,7 +2220,8 @@ class TestMemoryProviderExternalPaths:
 
     def test_backup_captures_external_paths_under_external_prefix(self, tmp_path, monkeypatch):
         """Provider state under ~/.honcho is archived beneath _external/,
-        encoded relative to the home directory."""
+        encoded relative to the home directory.
+        """
         hermes_home = tmp_path / ".hermes"
         self._make_min_tree(hermes_home)
         # External provider state living OUTSIDE HERMES_HOME.
@@ -2182,7 +2236,7 @@ class TestMemoryProviderExternalPaths:
 
         import hermes_cli.backup as backup_mod
         monkeypatch.setattr(
-            backup_mod, "_collect_memory_provider_external_paths", lambda: [honcho]
+            backup_mod, "_collect_memory_provider_external_paths", lambda: [honcho],
         )
 
         out_zip = tmp_path / "backup.zip"
@@ -2197,7 +2251,8 @@ class TestMemoryProviderExternalPaths:
 
     def test_backup_skips_external_paths_outside_home(self, tmp_path, monkeypatch):
         """A declared path outside the home dir is not portable and must be
-        skipped, never archived."""
+        skipped, never archived.
+        """
         hermes_home = tmp_path / ".hermes"
         self._make_min_tree(hermes_home)
         outside = tmp_path.parent / "outside-home-secret"
@@ -2209,7 +2264,7 @@ class TestMemoryProviderExternalPaths:
 
         import hermes_cli.backup as backup_mod
         monkeypatch.setattr(
-            backup_mod, "_collect_memory_provider_external_paths", lambda: [outside]
+            backup_mod, "_collect_memory_provider_external_paths", lambda: [outside],
         )
 
         out_zip = tmp_path / "backup.zip"
@@ -2224,7 +2279,8 @@ class TestMemoryProviderExternalPaths:
 
     def test_import_restores_external_to_home_relative_location(self, tmp_path, monkeypatch):
         """_external/ members restore to ~/<relpath>, not under HERMES_HOME,
-        and credential-shaped files get 0600."""
+        and credential-shaped files get 0600.
+        """
         dst_home = tmp_path / "dst"
         dst_home.mkdir()
         hermes_home = dst_home / ".hermes"

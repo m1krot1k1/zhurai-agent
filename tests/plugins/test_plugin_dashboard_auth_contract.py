@@ -22,7 +22,6 @@ explaining why NOT to use it), add the file to ``_ALLOWED_FILES`` with a note.
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -49,7 +48,8 @@ def _plugin_frontend_bundles() -> list[Path]:
 
 def test_there_are_plugin_bundles_to_check() -> None:
     """Sanity: the glob actually finds the bundles, so a future layout change
-    doesn't silently turn this guard into a no-op."""
+    doesn't silently turn this guard into a no-op.
+    """
     bundles = _plugin_frontend_bundles()
     names = {b.parent.parent.parent.name for b in bundles}
     # kanban + hermes-achievements are bundled today; assert at least one is
@@ -91,5 +91,5 @@ def test_plugin_bundle_does_not_read_session_token(bundle: Path) -> None:
         f"{rel} reads {_FORBIDDEN} directly — this bypasses gated-mode auth "
         f"and 401/1008s on OAuth-gated dashboards. Use the plugin SDK instead: "
         f"SDK.fetchJSON (JSON), SDK.authedFetch (uploads/downloads), or "
-        f"SDK.buildWsUrl (WebSockets). Offending lines:\n" + "\n".join(offending)
+        f"SDK.buildWsUrl (WebSockets). Offending lines:\n" + "\n".join(offending),
     )

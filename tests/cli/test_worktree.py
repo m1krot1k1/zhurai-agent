@@ -7,8 +7,9 @@ Verifies worktree creation, cleanup, .worktreeinclude handling,
 import os
 import shutil
 import subprocess
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture
@@ -173,7 +174,7 @@ def _cleanup_worktree(info):
     repo_root = info["repo_root"]
 
     if not Path(wt_path).exists():
-        return
+        return None
 
     if _has_unpushed_commits(wt_path, timeout=10):
         return False  # Did not clean up — has unpushed commits
@@ -335,7 +336,7 @@ class TestWorktreeCleanup:
         assert not Path(info["path"]).exists()
 
     def test_clean_worktree_removed_without_remote_tracking_refs(
-        self, git_repo_remote_no_tracking
+        self, git_repo_remote_no_tracking,
     ):
         """Configured remotes without fetched refs should not block cleanup."""
         info = _setup_worktree(str(git_repo_remote_no_tracking))
@@ -417,7 +418,7 @@ class TestWorktreeInclude:
         (git_repo / ".worktreeinclude").write_text(
             "# This is a comment\n"
             "\n"
-            "  # Another comment\n"
+            "  # Another comment\n",
         )
         info = _setup_worktree(str(git_repo))
         assert info is not None
@@ -441,7 +442,7 @@ class TestGitignoreManagement:
         _ignore_entry = ".worktrees/"
         existing = gitignore.read_text() if gitignore.exists() else ""
         if _ignore_entry not in existing.splitlines():
-            with open(gitignore, "a") as f:
+            with Path(gitignore).open("a") as f:
                 if existing and not existing.endswith("\n"):
                     f.write("\n")
                 f.write(f"{_ignore_entry}\n")
@@ -519,10 +520,10 @@ class TestWorktreeDirectorySymlink:
         (venv_dir / "marker.txt").write_text("venv marker")
         (git_repo / ".gitignore").write_text(".venv/\n.worktrees/\n")
         subprocess.run(
-            ["git", "add", ".gitignore"], cwd=str(git_repo), capture_output=True
+            ["git", "add", ".gitignore"], cwd=str(git_repo), capture_output=True,
         )
         subprocess.run(
-            ["git", "commit", "-m", "gitignore"], cwd=str(git_repo), capture_output=True
+            ["git", "commit", "-m", "gitignore"], cwd=str(git_repo), capture_output=True,
         )
 
         (git_repo / ".worktreeinclude").write_text(".venv/\n")
@@ -537,7 +538,7 @@ class TestWorktreeDirectorySymlink:
         # Manually symlink (mirrors cli.py logic)
         if not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(str(src.resolve()), str(dst))
+            Path(str(dst)).symlink_to(str(src.resolve()))
 
         assert dst.is_symlink()
         assert (dst / "lib" / "marker.txt").read_text() == "venv marker"
@@ -684,7 +685,7 @@ class TestStaleWorktreePruning:
         assert not Path(info["path"]).exists()
 
     def test_prunes_old_clean_worktree_without_remote_tracking_refs(
-        self, git_repo_remote_no_tracking
+        self, git_repo_remote_no_tracking,
     ):
         """Old clean worktrees with no fetched remote refs should be pruned."""
         import time
@@ -973,7 +974,7 @@ class TestOrphanedBranchPruning:
         assert info["branch"] in active_branches  # Protected
 
     def test_preserves_main_branch(self, git_repo):
-        """main branch should never be pruned."""
+        """Main branch should never be pruned."""
         result = subprocess.run(
             ["git", "branch", "--format=%(refname:short)"],
             capture_output=True, text=True, cwd=str(git_repo),

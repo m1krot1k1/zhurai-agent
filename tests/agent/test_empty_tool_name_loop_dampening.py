@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
@@ -42,7 +43,7 @@ class _MockHandler(BaseHTTPRequestHandler):
     captured_requests: list = []
     response_queue: list = []
 
-    def do_POST(self):  # noqa: N802 (http.server API)
+    def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         req = json.loads(self.rfile.read(length).decode())
         type(self).captured_requests.append(req)
@@ -103,7 +104,7 @@ def _text_resp(text: str) -> dict:
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def agent_env():
     """Spin up the mock provider + an isolated HERMES_HOME, yield (agent, helpers)."""
     _MockHandler.captured_requests = []
@@ -115,9 +116,8 @@ def agent_env():
 
     test_home = tempfile.mkdtemp(prefix="hermes_e2e_47967_")
     hermes_home = os.path.join(test_home, ".hermes")
-    os.makedirs(hermes_home)
-    with open(os.path.join(hermes_home, "config.yaml"), "w", encoding="utf-8") as f:
-        f.write("headroom:\n  enabled: false\n")
+    pathlib.Path(hermes_home).mkdir(parents=True)
+    pathlib.Path(os.path.join(hermes_home, "config.yaml")).write_text("headroom:\n  enabled: false\n", encoding="utf-8")
     prev_home = os.environ.get("HERMES_HOME")
     os.environ["HERMES_HOME"] = hermes_home
 

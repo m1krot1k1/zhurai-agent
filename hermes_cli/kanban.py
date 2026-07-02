@@ -22,12 +22,10 @@ import shlex
 import sys
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from hermes_cli import kanban_db as kb
 from hermes_cli import kanban_swarm as ks
-from hermes_cli.profiles import get_active_profile_name
-
 
 # ---------------------------------------------------------------------------
 # Small formatting helpers
@@ -37,14 +35,14 @@ _STATUS_ICONS = {
     "todo":     "◻",
     "ready":    "▶",
     "running":  "●",
-    "scheduled":"⏱",
+    "scheduled": "⏱",
     "blocked":  "⊘",
     "done":     "✓",
     "archived": "—",
 }
 
 
-def _fmt_ts(ts: Optional[int]) -> str:
+def _fmt_ts(ts: int | None) -> str:
     if not ts:
         return ""
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts))
@@ -82,7 +80,7 @@ def _task_to_dict(t: kb.Task) -> dict[str, Any]:
     }
 
 
-def _run_state_kwargs(args: argparse.Namespace) -> Optional[dict[str, str]]:
+def _run_state_kwargs(args: argparse.Namespace) -> dict[str, str] | None:
     st = getattr(args, "state_type", None)
     sn = getattr(args, "state_name", None)
     if (st is None) != (sn is None):
@@ -92,7 +90,7 @@ def _run_state_kwargs(args: argparse.Namespace) -> Optional[dict[str, str]]:
     return {"state_type": st, "state_name": sn}
 
 
-def _parse_workspace_flag(value: str) -> tuple[str, Optional[str]]:
+def _parse_workspace_flag(value: str) -> tuple[str, str | None]:
     """Parse ``--workspace`` into ``(kind, path|None)``.
 
     Accepts: ``scratch``, ``worktree``, ``worktree:<path>``, ``dir:<path>``.
@@ -108,16 +106,16 @@ def _parse_workspace_flag(value: str) -> tuple[str, Optional[str]]:
         path = v[len(prefix):].strip()
         if not path:
             raise argparse.ArgumentTypeError(
-                f"--workspace {prefix} requires a path after the colon"
+                f"--workspace {prefix} requires a path after the colon",
             )
         return (kind, os.path.expanduser(path))
     raise argparse.ArgumentTypeError(
         f"unknown --workspace value {value!r}: use scratch, worktree, "
-        "worktree:<path>, or dir:<path>"
+        "worktree:<path>, or dir:<path>",
     )
 
 
-def _parse_branch_flag(value: Optional[str]) -> Optional[str]:
+def _parse_branch_flag(value: str | None) -> str | None:
     """Normalize an optional branch name from ``kanban create --branch``."""
     if value is None:
         return None
@@ -172,7 +170,7 @@ def _check_dispatcher_presence() -> tuple[bool, str]:
             "Gateway is running but kanban.dispatch_in_gateway=false in "
             "config.yaml — the task will sit in 'ready' until you flip it "
             "back on and restart the gateway, OR run the legacy "
-            "standalone daemon (`hermes kanban daemon --force`)."
+            "standalone daemon (`hermes kanban daemon --force`).",
         )
     return (
         False,
@@ -181,7 +179,7 @@ def _check_dispatcher_presence() -> tuple[bool, str]:
         "    hermes gateway start\n"
         "The gateway hosts an embedded dispatcher (tick interval 60s by "
         "default); your task will be picked up on the next tick after "
-        "the gateway comes up."
+        "the gateway comes up.",
     )
 
 
@@ -1028,7 +1026,7 @@ def _board_task_counts(slug: str) -> dict[str, int]:
             return {}
         with kb.connect_closing(board=slug) as conn:
             rows = conn.execute(
-                "SELECT status, COUNT(*) AS n FROM tasks GROUP BY status"
+                "SELECT status, COUNT(*) AS n FROM tasks GROUP BY status",
             ).fetchall()
         return {r["status"]: int(r["n"]) for r in rows}
     except Exception:
@@ -1194,7 +1192,7 @@ def _cmd_boards_set_default_workdir(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _parse_duration(val) -> Optional[int]:
+def _parse_duration(val) -> int | None:
     """Parse ``30s`` / ``5m`` / ``2h`` / ``1d`` or a raw integer → seconds.
 
     Returns None for empty input. Raises ValueError on malformed input so
@@ -1248,7 +1246,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
     print(
         "The gateway hosts an embedded dispatcher that ticks every 60 seconds\n"
         "by default (config: kanban.dispatch_interval_seconds). Without a\n"
-        "running gateway, tasks stay in 'ready' forever."
+        "running gateway, tasks stay in 'ready' forever.",
     )
     return 0
 
@@ -1418,7 +1416,7 @@ def _cmd_list(args: argparse.Namespace) -> int:
         print(
             f"Board: {current} "
             f"({other_count} other board{'s' if other_count != 1 else ''} — "
-            f"`hermes kanban boards list`)\n"
+            f"`hermes kanban boards list`)\n",
         )
     if not tasks:
         print("(no matching tasks)")
@@ -1644,7 +1642,7 @@ def _cmd_reassign(args: argparse.Namespace) -> int:
     print(
         f"Reassigned {args.task_id} to "
         f"{profile or '(unassigned)'}"
-        + (" (claim reclaimed)" if getattr(args, "reclaim", False) else "")
+        + (" (claim reclaimed)" if getattr(args, "reclaim", False) else ""),
     )
     return 0
 
@@ -1671,12 +1669,12 @@ def _cmd_diagnostics(args: argparse.Namespace) -> int:
                     kb.list_events(conn, args.task),
                     kb.list_runs(conn, args.task),
                     config=diag_config,
-                )
+                ),
             }
         else:
             # Fleet mode: pull all non-archived tasks + their events/runs.
             rows = list(conn.execute(
-                "SELECT * FROM tasks WHERE status != 'archived'"
+                "SELECT * FROM tasks WHERE status != 'archived'",
             ).fetchall())
             ids = [r["id"] for r in rows]
             if not ids:
@@ -1752,7 +1750,7 @@ def _cmd_diagnostics(args: argparse.Namespace) -> int:
     total = sum(len(dl) for dl in diags_by_task.values())
     print(
         f"{total} active diagnostic(s) across "
-        f"{len(diags_by_task)} task(s):\n"
+        f"{len(diags_by_task)} task(s):\n",
     )
     for tid, dl in diags_by_task.items():
         m = meta.get(tid, {})
@@ -1835,7 +1833,7 @@ def _cmd_comment(args: argparse.Namespace) -> int:
     return 0
 
 
-def _worker_run_id_for(task_id: str) -> Optional[int]:
+def _worker_run_id_for(task_id: str) -> int | None:
     if os.environ.get("HERMES_KANBAN_TASK") != task_id:
         return None
     raw = os.environ.get("HERMES_KANBAN_RUN_ID")
@@ -2107,14 +2105,14 @@ def _cmd_dispatch(args: argparse.Namespace) -> int:
             return ival if ival >= 1 else None
 
         max_in_progress_per_profile = _coerce_positive_int(
-            _kanban_cfg.get("max_in_progress_per_profile")
+            _kanban_cfg.get("max_in_progress_per_profile"),
         )
         max_in_progress = _coerce_positive_int(_kanban_cfg.get("max_in_progress"))
         # CLI --max overrides config kanban.max_spawn when both are present;
         # CLI is the more explicit signal so it wins.
         cli_max = getattr(args, "max", None)
         max_spawn = cli_max if cli_max is not None else _coerce_positive_int(
-            _kanban_cfg.get("max_spawn")
+            _kanban_cfg.get("max_spawn"),
         )
     except Exception:
         default_assignee = None
@@ -2173,19 +2171,19 @@ def _cmd_dispatch(args: argparse.Namespace) -> int:
     if res.auto_assigned_default:
         print(
             f"Auto-assigned to kanban.default_assignee={default_assignee!r}: "
-            f"{', '.join(res.auto_assigned_default)}"
+            f"{', '.join(res.auto_assigned_default)}",
         )
     if res.skipped_unassigned:
         print(f"Skipped (unassigned): {', '.join(res.skipped_unassigned)}")
     if res.skipped_per_profile_capped:
         for tid, who, current in res.skipped_per_profile_capped:
             print(
-                f"Deferred ({who} at per-profile cap, {current} running): {tid}"
+                f"Deferred ({who} at per-profile cap, {current} running): {tid}",
             )
     if res.skipped_nonspawnable:
         print(
             f"Skipped (non-spawnable assignee — terminal lane, OK): "
-            f"{', '.join(res.skipped_nonspawnable)}"
+            f"{', '.join(res.skipped_nonspawnable)}",
         )
     return 0
 
@@ -2342,7 +2340,7 @@ def _cmd_watch(args: argparse.Namespace) -> int:
     # Seed cursor at the latest id so we don't replay history.
     with kb.connect_closing() as conn:
         row = conn.execute(
-            "SELECT COALESCE(MAX(id), 0) AS m FROM task_events"
+            "SELECT COALESCE(MAX(id), 0) AS m FROM task_events",
         ).fetchone()
         cursor = int(row["m"])
 
@@ -2516,7 +2514,8 @@ def _cmd_context(args: argparse.Namespace) -> int:
 
 def _cmd_specify(args: argparse.Namespace) -> int:
     """Flesh out a triage task (or all of them) via auxiliary LLM,
-    then promote to todo. Thin wrapper over ``kanban_specify``."""
+    then promote to todo. Thin wrapper over ``kanban_specify``.
+    """
     from hermes_cli import kanban_specify as spec
 
     all_flag = bool(getattr(args, "all_triage", False))
@@ -2590,7 +2589,8 @@ def _cmd_specify(args: argparse.Namespace) -> int:
 def _cmd_decompose(args: argparse.Namespace) -> int:
     """Fan a triage task (or all of them) out into a graph of child
     tasks via the auxiliary LLM, routed to specialist profiles by
-    description. Thin wrapper over ``kanban_decompose``."""
+    description. Thin wrapper over ``kanban_decompose``.
+    """
     from hermes_cli import kanban_decompose as decomp
 
     all_flag = bool(getattr(args, "all_triage", False))
@@ -2646,7 +2646,7 @@ def _cmd_decompose(args: argparse.Namespace) -> int:
                 child_summary = ", ".join(outcome.child_ids)
                 print(
                     f"Decomposed {outcome.task_id} → {len(outcome.child_ids)} "
-                    f"children ({child_summary}); root promoted to todo"
+                    f"children ({child_summary}); root promoted to todo",
                 )
             else:
                 title_suffix = (
@@ -2656,7 +2656,7 @@ def _cmd_decompose(args: argparse.Namespace) -> int:
                 )
                 print(
                     f"Specified {outcome.task_id} → todo "
-                    f"(no fanout){title_suffix}"
+                    f"(no fanout){title_suffix}",
                 )
         else:
             print(
@@ -2670,13 +2670,14 @@ def _cmd_decompose(args: argparse.Namespace) -> int:
 
 def _cmd_gc(args: argparse.Namespace) -> int:
     """Remove scratch workspaces of archived tasks, prune old events, and
-    delete old worker logs."""
+    delete old worker logs.
+    """
     import shutil
     scratch_root = kb.workspaces_root()
     removed_ws = 0
     with kb.connect_closing() as conn:
         rows = conn.execute(
-            "SELECT id, workspace_kind, workspace_path FROM tasks WHERE status = 'archived'"
+            "SELECT id, workspace_kind, workspace_path FROM tasks WHERE status = 'archived'",
         ).fetchall()
     for row in rows:
         if row["workspace_kind"] != "scratch":
@@ -2743,8 +2744,8 @@ def run_slash(rest: str) -> str:
     both the interactive CLI (``self._handle_kanban_command``) and the
     gateway (``_handle_kanban_command``) so formatting is identical.
     """
-    import io
     import contextlib
+    import io
 
     tokens = shlex.split(rest) if rest and rest.strip() else []
 
@@ -2811,4 +2812,4 @@ def run_slash(rest: str) -> str:
     err = buf_err.getvalue().rstrip()
     if err and out:
         return f"{out}\n{err}"
-    return err if err else (out or "(no output)")
+    return err or (out or "(no output)")

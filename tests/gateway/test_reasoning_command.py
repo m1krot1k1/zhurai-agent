@@ -246,7 +246,7 @@ class TestReasoningCommand:
                 source=source,
                 session_id="session-1",
                 session_key="agent:main:local:dm",
-            )
+            ),
         )
 
         assert result["final_response"] == "ok"
@@ -296,7 +296,7 @@ class TestReasoningCommand:
                 source=source,
                 session_id="session-1",
                 session_key=session_key,
-            )
+            ),
         )
 
         assert result["final_response"] == "ok"
@@ -353,7 +353,7 @@ class TestReasoningCommand:
                 source=source,
                 session_id="session-1",
                 session_key="agent:main:local:dm",
-            )
+            ),
         )
 
         assert result["final_response"] == "ok"
@@ -405,7 +405,7 @@ class TestReasoningCommand:
                 source=source,
                 session_id="session-1",
                 session_key="agent:main:homeassistant:dm",
-            )
+            ),
         )
 
         assert result["final_response"] == "ok"
@@ -444,11 +444,11 @@ class TestLoadShowReasoningCoercion:
     def test_bare_true_is_true(self, tmp_path, monkeypatch):
         assert self._load_with_config(
             tmp_path, monkeypatch,
-            'display:\n  show_reasoning: true\n',
+            "display:\n  show_reasoning: true\n",
         ) is True
 
     def test_missing_is_false(self, tmp_path, monkeypatch):
         assert self._load_with_config(
             tmp_path, monkeypatch,
-            'display: {}\n',
+            "display: {}\n",
         ) is False

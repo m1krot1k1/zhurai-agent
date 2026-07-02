@@ -55,7 +55,8 @@ class TestRedactApprovalCommand:
 
     def test_forces_redaction_even_when_disabled(self, monkeypatch):
         """force=True must redact even if security.redact_secrets is off -- the
-        approval prompt is a hard secret-egress boundary regardless of config."""
+        approval prompt is a hard secret-egress boundary regardless of config.
+        """
         raw = "curl -H 'Authorization: token " + _FAKE_GHP + "' https://api.github.com"
         # With redaction globally disabled, the seam must STILL redact (force=True).
         monkeypatch.setattr("agent.redact._REDACT_ENABLED", False, raising=False)
@@ -75,7 +76,8 @@ class TestApprovalCommandWiring:
     REASSIGN the redacted value before any send/enqueue (so the raw command
     cannot reach a client). Uses AST (not char-offset string slicing) so a
     benign refactor doesn't cause a false failure, and so a discarded-result
-    call (`_redact(cmd); send(cmd)`) does NOT pass."""
+    call (`_redact(cmd); send(cmd)`) does NOT pass.
+    """
 
     def _assert_redacts_then_uses(self, module, func_name: str, sink_substr: str):
         """Parse `module`'s full AST, locate the (possibly nested) function
@@ -83,7 +85,8 @@ class TestApprovalCommandWiring:
         `<x> = _redact_approval_command(...)` whose result is then used by a
         statement matching `sink_substr` on a LATER line. Walking the real AST
         (not a source slice) is refactor-robust and rejects discarded-result
-        calls (the call must be an assignment, not a bare expression)."""
+        calls (the call must be an assignment, not a bare expression).
+        """
         import ast
         import inspect
 
@@ -118,7 +121,7 @@ class TestApprovalCommandWiring:
         )
 
     def test_chat_platform_path_redacts_before_send(self):
-        import gateway.run as run
+        from gateway import run
 
         self._assert_redacts_then_uses(run, "_approval_notify_sync", "send_exec_approval")
 

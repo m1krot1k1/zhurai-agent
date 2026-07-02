@@ -1,5 +1,4 @@
-"""
-Sticker description cache for Telegram.
+"""Sticker description cache for Telegram.
 
 When users send stickers, we describe them via the vision tool and cache
 the descriptions keyed by file_unique_id so we don't re-analyze the same
@@ -10,12 +9,11 @@ Cache location: ~/.hermes/sticker_cache.json
 
 import json
 import os
+import pathlib
 import tempfile
 import time
-from typing import Optional
 
 from hermes_cli.config import get_hermes_home
-
 
 CACHE_PATH = get_hermes_home() / "sticker_cache.json"
 
@@ -40,28 +38,28 @@ def _save_cache(cache: dict) -> None:
     """Save the sticker cache to disk atomically."""
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(
-        dir=str(CACHE_PATH.parent), suffix=".tmp"
+        dir=str(CACHE_PATH.parent), suffix=".tmp",
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp_path, str(CACHE_PATH))
+        pathlib.Path(tmp_path).replace(str(CACHE_PATH))
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            pathlib.Path(tmp_path).unlink()
         except OSError:
             pass
         raise
 
 
-def get_cached_description(file_unique_id: str) -> Optional[dict]:
-    """
-    Look up a cached sticker description.
+def get_cached_description(file_unique_id: str) -> dict | None:
+    """Look up a cached sticker description.
 
     Returns:
         dict with keys {description, emoji, set_name, cached_at} or None.
+
     """
     cache = _load_cache()
     return cache.get(file_unique_id)
@@ -73,14 +71,14 @@ def cache_sticker_description(
     emoji: str = "",
     set_name: str = "",
 ) -> None:
-    """
-    Store a sticker description in the cache.
+    """Store a sticker description in the cache.
 
     Args:
         file_unique_id: Telegram's stable sticker identifier.
         description:    Vision-generated description text.
         emoji:          Associated emoji (e.g. "😀").
         set_name:       Sticker set name if available.
+
     """
     cache = _load_cache()
     cache[file_unique_id] = {
@@ -97,24 +95,22 @@ def build_sticker_injection(
     emoji: str = "",
     set_name: str = "",
 ) -> str:
-    """
-    Build the warm-style injection text for a sticker description.
+    """Build the warm-style injection text for a sticker description.
 
     Returns a string like:
       [The user sent a sticker 😀 from "MyPack"~ It shows: "A cat waving" (=^.w.^=)]
     """
     context = ""
     if set_name and emoji:
-        context = f" {emoji} from \"{set_name}\""
+        context = f' {emoji} from "{set_name}"'
     elif emoji:
         context = f" {emoji}"
 
-    return f"[The user sent a sticker{context}~ It shows: \"{description}\" (=^.w.^=)]"
+    return f'[The user sent a sticker{context}~ It shows: "{description}" (=^.w.^=)]'
 
 
 def build_animated_sticker_injection(emoji: str = "") -> str:
-    """
-    Build injection text for animated/video stickers we can't analyze.
+    """Build injection text for animated/video stickers we can't analyze.
     """
     if emoji:
         return (

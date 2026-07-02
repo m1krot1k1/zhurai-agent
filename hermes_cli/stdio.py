@@ -30,6 +30,7 @@ sort it out.  Python doesn't get that luxury.
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 
 __all__ = ["configure_windows_stdio", "is_windows"]
@@ -191,7 +192,6 @@ def _default_windows_editor() -> str:
     return ""
 
 
-
 def _augment_path_with_known_tools() -> None:
     """Prepend well-known Hermes-managed tool directories to os.environ['PATH'].
 
@@ -215,7 +215,6 @@ def _augment_path_with_known_tools() -> None:
     """
     if not is_windows():
         return
-
 
     local_appdata = os.environ.get("LOCALAPPDATA", "")
     if not local_appdata:
@@ -244,7 +243,7 @@ def _augment_path_with_known_tools() -> None:
     existing_lower = {p.lower() for p in existing.split(os.pathsep) if p}
     prepend = []
     for d in candidate_dirs:
-        if os.path.isdir(d) and d.lower() not in existing_lower:
+        if pathlib.Path(d).is_dir() and d.lower() not in existing_lower:
             prepend.append(d)
 
     if prepend:

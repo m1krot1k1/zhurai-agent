@@ -44,11 +44,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from hermes_constants import get_hermes_home
 
@@ -81,7 +80,7 @@ def write_approval_enabled(subsystem: str) -> bool:
     if subsystem not in _SUBSYSTEMS:
         return False
     try:
-        from hermes_cli.config import load_config, cfg_get
+        from hermes_cli.config import cfg_get, load_config
         cfg = load_config()
         raw = cfg_get(cfg, subsystem, CONFIG_KEY, default=False)
     except Exception:
@@ -111,8 +110,8 @@ def _pending_dir(subsystem: str) -> Path:
     return get_hermes_home() / "pending" / subsystem
 
 
-def stage_write(subsystem: str, payload: Dict[str, Any],
-                *, summary: str, origin: str) -> Dict[str, Any]:
+def stage_write(subsystem: str, payload: dict[str, Any],
+                *, summary: str, origin: str) -> dict[str, Any]:
     """Persist a pending write and return a short record describing it.
 
     Args:
@@ -128,6 +127,7 @@ def stage_write(subsystem: str, payload: Dict[str, Any],
     Returns a dict with ``id`` and metadata. Best-effort: on disk failure it
     logs and still returns a record (the write is simply lost, which is the
     safe failure for an approval gate — nothing is silently committed).
+
     """
     pid = uuid.uuid4().hex[:8]
     record = {
@@ -145,18 +145,18 @@ def stage_write(subsystem: str, payload: Dict[str, Any],
         path = d / f"{pid}.json"
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-        os.replace(tmp, path)
+        Path(tmp).replace(path)
     except Exception as e:  # pragma: no cover - disk failure path
         logger.error("Failed to stage pending %s write: %s", subsystem, e, exc_info=True)
     return record
 
 
-def list_pending(subsystem: str) -> List[Dict[str, Any]]:
+def list_pending(subsystem: str) -> list[dict[str, Any]]:
     """Return all pending records for ``subsystem``, oldest first."""
     d = _pending_dir(subsystem)
     if not d.exists():
         return []
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     for p in d.glob("*.json"):
         try:
             records.append(json.loads(p.read_text(encoding="utf-8")))
@@ -166,7 +166,7 @@ def list_pending(subsystem: str) -> List[Dict[str, Any]]:
     return records
 
 
-def get_pending(subsystem: str, pending_id: str) -> Optional[Dict[str, Any]]:
+def get_pending(subsystem: str, pending_id: str) -> dict[str, Any] | None:
     """Return a single pending record by id, or None."""
     path = _pending_dir(subsystem) / f"{pending_id}.json"
     if not path.exists():
@@ -241,7 +241,7 @@ class GateDecision:
         user-facing "staged for approval" note.
     """
 
-    __slots__ = ("allow", "blocked", "stage", "message")
+    __slots__ = ("allow", "blocked", "message", "stage")
 
     def __init__(self, *, allow=False, blocked=False, stage=False, message=""):
         self.allow = allow
@@ -270,6 +270,7 @@ def evaluate_gate(subsystem: str, *, inline_summary: str = "",
     Note: there is no config-driven "blocked" outcome — the gate only ever
     delays a write for approval, never silently refuses it. ``blocked`` is
     still produced when the user *actively denies* an inline prompt.
+
     """
     if not write_approval_enabled(subsystem):
         return GateDecision(allow=True)
@@ -334,7 +335,7 @@ def _interactive_approval_available() -> bool:
         return False
 
 
-def _prompt_inline_memory_approval(summary: str, detail: str) -> Optional[bool]:
+def _prompt_inline_memory_approval(summary: str, detail: str) -> bool | None:
     """Prompt the user inline to approve a memory write.
 
     Returns True (approved), False (denied), or None (no interactive prompt
@@ -361,7 +362,7 @@ def _prompt_inline_memory_approval(summary: str, detail: str) -> Optional[bool]:
     header = summary.strip() or "Save to memory?"
     body = detail.strip()
     description = f"Save to memory: {header}"
-    command = body if body else header
+    command = body or header
     # Invoke the callback directly instead of via prompt_dangerous_approval:
     # that wrapper swallows callback exceptions into "deny", which would
     # silently refuse the write. Direct invocation lets a crashed prompt fall
@@ -426,7 +427,7 @@ def _frontmatter_description(content: str) -> str:
     return desc[:140]
 
 
-def skill_pending_diff(record: Dict[str, Any]) -> str:
+def skill_pending_diff(record: dict[str, Any]) -> str:
     """Build a full unified diff (or full content) for a staged skill write.
 
     Used by /skills diff <id> on a surface that can render it (CLI pager, web

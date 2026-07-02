@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-OSS Forensics Evidence Store Manager
+"""OSS Forensics Evidence Store Manager
 Manages a JSON-based evidence store for forensic investigations.
 
 Commands:
@@ -21,11 +20,11 @@ Usage example:
   python3 evidence-store.py --store evidence.json export > evidence-table.md
 """
 
-import json
 import argparse
-import os
 import datetime
 import hashlib
+import json
+import pathlib
 import sys
 
 EVIDENCE_TYPES = [
@@ -36,7 +35,7 @@ EVIDENCE_TYPES = [
     "ioc",           # Indicator of Compromise (SHA, domain, IP, package name, etc.)
     "analysis",      # Derived analysis / cross-source correlation result
     "manual",        # Manually noted observation
-    "vendor_report", # External security vendor report excerpt
+    "vendor_report",  # External security vendor report excerpt
 ]
 
 VERIFICATION_STATES = ["unverified", "single_source", "multi_source_verified"]
@@ -49,7 +48,7 @@ IOC_TYPES = [
 
 
 def _now_iso():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds") + "Z"
+    return datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds") + "Z"
 
 
 def _sha256(content: str) -> str:
@@ -70,18 +69,18 @@ class EvidenceStore:
             "evidence": [],
             "chain_of_custody": [],
         }
-        if os.path.exists(filepath):
+        if pathlib.Path(filepath).exists():
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with pathlib.Path(filepath).open(encoding="utf-8") as f:
                     self.data = json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 print(f"Error loading evidence store '{filepath}': {e}", file=sys.stderr)
                 print("Hint: The file might be corrupted. Check for manual edits or syntax errors.", file=sys.stderr)
                 sys.exit(1)
 
     def _save(self):
         self.data["metadata"]["last_updated"] = _now_iso()
-        with open(self.filepath, "w", encoding="utf-8") as f:
+        with pathlib.Path(self.filepath).open("w", encoding="utf-8") as f:
             json.dump(self.data, f, indent=2, ensure_ascii=False)
 
     def _next_id(self) -> str:
@@ -172,9 +171,9 @@ class EvidenceStore:
             url = e.get("url") or ""
             url_display = f"[link]({url})" if url else ""
             lines.append(
-                f"| {e['id']} | {e.get('type','')} | {e.get('source','')} "
-                f"| {e.get('actor') or ''} | {e.get('verification','')} "
-                f"| {e.get('event_timestamp') or ''} | {url_display} |"
+                f"| {e['id']} | {e.get('type', '')} | {e.get('source', '')} "
+                f"| {e.get('actor') or ''} | {e.get('verification', '')} "
+                f"| {e.get('event_timestamp') or ''} | {url_display} |",
             )
         lines.append("")
         lines.append("## Chain of Custody")
@@ -183,8 +182,8 @@ class EvidenceStore:
         lines.append("|-------------|--------|-----------|--------|")
         for c in self.data["chain_of_custody"]:
             lines.append(
-                f"| {c.get('evidence_id','')} | {c.get('action','')} "
-                f"| {c.get('timestamp','')} | {c.get('source','')} |"
+                f"| {c.get('evidence_id', '')} | {c.get('action', '')} "
+                f"| {c.get('timestamp', '')} | {c.get('source', '')} |",
             )
         return "\n".join(lines)
 

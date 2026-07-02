@@ -11,7 +11,6 @@ import logging
 
 import pytest
 
-
 # ── Namespace helpers ─────────────────────────────────────────────────────
 
 
@@ -245,7 +244,7 @@ class TestSkillViewQualifiedName:
         skill_dir = local_skills / "productivity" / "ticktick"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: ticktick\ndescription: local categorized\n---\nTickTick body.\n"
+            "---\nname: ticktick\ndescription: local categorized\n---\nTickTick body.\n",
         )
         monkeypatch.setattr("tools.skills_tool.SKILLS_DIR", local_skills)
 
@@ -364,7 +363,7 @@ class TestBundleContextBanner:
         content = result["content"]
 
         sibling_line = next(
-            (l for l in content.split("\n") if "Sibling skills:" in l), None
+            (l for l in content.split("\n") if "Sibling skills:" in l), None,
         )
         assert sibling_line is not None
         assert "bar" in sibling_line

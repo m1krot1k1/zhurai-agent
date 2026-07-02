@@ -29,7 +29,7 @@ def _make_runner():
 
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="***")},
     )
     adapter = MagicMock()
     adapter.send = AsyncMock()
@@ -236,7 +236,6 @@ async def test_idle_expiry_fires_finalize_hook(mock_invoke_hook):
 
     def _hook_and_stop(*a, **kw):
         runner._running = False
-        return None
 
     mock_invoke_hook.side_effect = _hook_and_stop
 

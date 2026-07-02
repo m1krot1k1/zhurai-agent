@@ -83,7 +83,7 @@ def test_replace_saves_new_key(profile_env):
     save_env_value("DEEPSEEK_API_KEY", "sk-malformed-junk")
 
     key, abort = _run_prompt(
-        existing_key="sk-malformed-junk", choice="r", new_key="sk-fresh"
+        existing_key="sk-malformed-junk", choice="r", new_key="sk-fresh",
     )
     assert key == "sk-fresh"
     assert abort is False
@@ -96,7 +96,7 @@ def test_replace_cancelled_preserves_key(profile_env):
     save_env_value("DEEPSEEK_API_KEY", "sk-existing")
 
     key, abort = _run_prompt(
-        existing_key="sk-existing", choice="r", new_key=""
+        existing_key="sk-existing", choice="r", new_key="",
     )
     assert key == "sk-existing"
     assert abort is False
@@ -144,7 +144,8 @@ def test_lmstudio_first_time_empty_uses_placeholder(profile_env):
 def test_lmstudio_replace_empty_does_not_overwrite_with_placeholder(profile_env):
     """On REPLACE with empty input, preserve the user's existing key — do NOT
     silently substitute the placeholder.  The placeholder path only fires for
-    first-time configuration where the user has made no explicit choice yet."""
+    first-time configuration where the user has made no explicit choice yet.
+    """
     from hermes_cli.config import get_env_value, save_env_value
     save_env_value("LM_API_KEY", "my-real-lmstudio-key")
 

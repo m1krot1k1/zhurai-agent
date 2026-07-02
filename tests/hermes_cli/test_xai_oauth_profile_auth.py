@@ -23,12 +23,12 @@ def test_read_xai_oauth_tokens_uses_credential_pool_when_provider_tokens_empty(m
                     "refresh_token": "pool-refresh",
                     "token_type": "Bearer",
                     "last_refresh": "2026-06-03T19:00:00Z",
-                }
-            ]
+                },
+            ],
         },
     }
     monkeypatch.setattr(auth, "_load_auth_store", lambda: store)
-    monkeypatch.setattr(auth, "_load_global_auth_store", lambda: {})
+    monkeypatch.setattr(auth, "_load_global_auth_store", dict)
 
     resolved = auth._read_xai_oauth_tokens(_lock=False)
 
@@ -50,8 +50,8 @@ def test_read_xai_oauth_tokens_uses_global_store_when_profile_state_empty(monkey
                     "token_type": "Bearer",
                 },
                 "last_refresh": "2026-06-03T19:05:00Z",
-            }
-        }
+            },
+        },
     }
     monkeypatch.setattr(auth, "_load_auth_store", lambda: profile_store)
     monkeypatch.setattr(auth, "_load_global_auth_store", lambda: global_store)
@@ -70,7 +70,7 @@ def test_read_xai_oauth_tokens_still_requires_usable_tokens(monkeypatch):
         "credential_pool": {"xai-oauth": [{"access_token": "", "refresh_token": ""}]},
     }
     monkeypatch.setattr(auth, "_load_auth_store", lambda: store)
-    monkeypatch.setattr(auth, "_load_global_auth_store", lambda: {})
+    monkeypatch.setattr(auth, "_load_global_auth_store", dict)
 
     with pytest.raises(AuthError) as exc:
         auth._read_xai_oauth_tokens(_lock=False)

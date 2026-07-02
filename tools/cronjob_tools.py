@@ -1,5 +1,4 @@
-"""
-Cron job management tools for Hermes Agent.
+"""Cron job management tools for Hermes Agent.
 
 Expose a single compressed action-oriented tool to avoid schema/context bloat.
 Compatibility wrappers remain for direct Python callers and legacy tests.
@@ -10,7 +9,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from hermes_constants import display_hermes_home
 
@@ -37,7 +36,8 @@ from cron.jobs import (
 
 def _notify_provider_jobs_changed_safe() -> None:
     """Tell the active cron scheduler provider the job set changed (no-op for
-    the built-in). Best-effort — never lets a provider error break the tool."""
+    the built-in). Best-effort — never lets a provider error break the tool.
+    """
     try:
         from cron.scheduler import _notify_provider_jobs_changed
         _notify_provider_jobs_changed()
@@ -77,14 +77,14 @@ def _notify_provider_jobs_changed_safe() -> None:
 
 # Strict patterns — applied to the user prompt only.
 _CRON_THREAT_PATTERNS = [
-    (r'ignore\s+(?:\w+\s+)*(?:previous|all|above|prior)\s+(?:\w+\s+)*instructions', "prompt_injection"),
-    (r'do\s+not\s+tell\s+the\s+user', "deception_hide"),
-    (r'system\s+prompt\s+override', "sys_prompt_override"),
-    (r'disregard\s+(your|all|any)\s+(instructions|rules|guidelines)', "disregard_rules"),
-    (r'cat\s+[^\n]*(\.env|credentials|\.netrc|\.pgpass)', "read_secrets"),
-    (r'authorized_keys', "ssh_backdoor"),
-    (r'/etc/sudoers|visudo', "sudoers_mod"),
-    (r'rm\s+-rf\s+/', "destructive_root_rm"),
+    (r"ignore\s+(?:\w+\s+)*(?:previous|all|above|prior)\s+(?:\w+\s+)*instructions", "prompt_injection"),
+    (r"do\s+not\s+tell\s+the\s+user", "deception_hide"),
+    (r"system\s+prompt\s+override", "sys_prompt_override"),
+    (r"disregard\s+(your|all|any)\s+(instructions|rules|guidelines)", "disregard_rules"),
+    (r"cat\s+[^\n]*(\.env|credentials|\.netrc|\.pgpass)", "read_secrets"),
+    (r"authorized_keys", "ssh_backdoor"),
+    (r"/etc/sudoers|visudo", "sudoers_mod"),
+    (r"rm\s+-rf\s+/", "destructive_root_rm"),
 ]
 
 # Looser pattern set — applied to the assembled prompt when skills are
@@ -95,13 +95,13 @@ _CRON_THREAT_PATTERNS = [
 # obvious injection directives surviving a malicious skill that slipped
 # through install.
 _CRON_SKILL_ASSEMBLED_PATTERNS = [
-    (r'ignore\s+(?:\w+\s+)*(?:previous|all|above|prior)\s+(?:\w+\s+)*instructions', "prompt_injection"),
-    (r'do\s+not\s+tell\s+the\s+user', "deception_hide"),
-    (r'system\s+prompt\s+override', "sys_prompt_override"),
-    (r'disregard\s+(your|all|any)\s+(instructions|rules|guidelines)', "disregard_rules"),
+    (r"ignore\s+(?:\w+\s+)*(?:previous|all|above|prior)\s+(?:\w+\s+)*instructions", "prompt_injection"),
+    (r"do\s+not\s+tell\s+the\s+user", "deception_hide"),
+    (r"system\s+prompt\s+override", "sys_prompt_override"),
+    (r"disregard\s+(your|all|any)\s+(instructions|rules|guidelines)", "disregard_rules"),
 ]
 
-_CRON_SECRET_VAR_RE = r'\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)\w*\}?'
+_CRON_SECRET_VAR_RE = r"\$\{?\w*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|API)\w*\}?"
 _CRON_EXFIL_COMMAND_PATTERNS = [
     # Tighten exfil detection to obvious leak paths: embedding a secret
     # directly in the destination URL, sending it in POST/FORM payloads,
@@ -110,14 +110,14 @@ _CRON_EXFIL_COMMAND_PATTERNS = [
     # pattern that talks to api.github.com.
     (rf'curl\s+[^\n]*https?://[^\s"\'`]*{_CRON_SECRET_VAR_RE}', "exfil_curl_url"),
     (rf'wget\s+[^\n]*https?://[^\s"\'`]*{_CRON_SECRET_VAR_RE}', "exfil_wget_url"),
-    (rf'curl\s+[^\n]*(?:--data(?:-raw|-binary|-urlencode)?|-d|--form|-F)\s+[^\n]*{_CRON_SECRET_VAR_RE}', "exfil_curl_data"),
-    (rf'wget\s+[^\n]*--post-(?:data|file)=[^\n]*{_CRON_SECRET_VAR_RE}', "exfil_wget_post"),
+    (rf"curl\s+[^\n]*(?:--data(?:-raw|-binary|-urlencode)?|-d|--form|-F)\s+[^\n]*{_CRON_SECRET_VAR_RE}", "exfil_curl_data"),
+    (rf"wget\s+[^\n]*--post-(?:data|file)=[^\n]*{_CRON_SECRET_VAR_RE}", "exfil_wget_post"),
     (rf'curl\s+[^\n]*(?:-H|--header)\s+["\']Authorization:\s*(?:Bearer|token)\s+{_CRON_SECRET_VAR_RE}["\']', "exfil_curl_auth_header"),
 ]
 
 _CRON_INVISIBLE_CHARS = {
-    '\u200b', '\u200c', '\u200d', '\u2060', '\ufeff',
-    '\u202a', '\u202b', '\u202c', '\u202d', '\u202e',
+    "\u200b", "\u200c", "\u200d", "\u2060", "\ufeff",
+    "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
 }
 
 # U+200D Zero-Width Joiner is also a legitimate, required part of many
@@ -154,14 +154,14 @@ def _zwj_has_emoji_neighbour(text: str, idx: int) -> bool:
 
 
 def _strip_legitimate_emoji_zwj(prompt: str) -> str:
-    if '\u200d' not in prompt:
+    if "\u200d" not in prompt:
         return prompt
     cleaned: list[str] = []
     for idx, ch in enumerate(prompt):
-        if ch == '\u200d' and _zwj_has_emoji_neighbour(prompt, idx):
+        if ch == "\u200d" and _zwj_has_emoji_neighbour(prompt, idx):
             continue
         cleaned.append(ch)
-    return ''.join(cleaned)
+    return "".join(cleaned)
 
 
 def _strip_cron_safe_constructs(prompt: str) -> str:
@@ -213,13 +213,13 @@ def _strip_invisible_unicode(prompt: str) -> tuple[str, list[str]]:
     cleaned: list[str] = []
     for idx, ch in enumerate(prompt):
         if ch in _CRON_INVISIBLE_CHARS:
-            if ch == '\u200d' and _zwj_has_emoji_neighbour(prompt, idx):
+            if ch == "\u200d" and _zwj_has_emoji_neighbour(prompt, idx):
                 cleaned.append(ch)  # legitimate emoji joiner — keep
                 continue
             removed.add(f"U+{ord(ch):04X}")
             continue
         cleaned.append(ch)
-    return ''.join(cleaned), sorted(removed)
+    return "".join(cleaned), sorted(removed)
 
 
 def _scan_cron_prompt(prompt: str) -> str:
@@ -278,7 +278,7 @@ def _scan_cron_skill_assembled(assembled: str) -> tuple[str, str]:
     return cleaned, ""
 
 
-def _origin_from_env() -> Optional[Dict[str, str]]:
+def _origin_from_env() -> dict[str, str] | None:
     from gateway.session_context import get_session_env
     origin_platform = get_session_env("HERMES_SESSION_PLATFORM")
     origin_chat_id = get_session_env("HERMES_SESSION_CHAT_ID")
@@ -298,7 +298,7 @@ def _origin_from_env() -> Optional[Dict[str, str]]:
     return None
 
 
-def _repeat_display(job: Dict[str, Any]) -> str:
+def _repeat_display(job: dict[str, Any]) -> str:
     times = (job.get("repeat") or {}).get("times")
     completed = (job.get("repeat") or {}).get("completed", 0)
     if times is None:
@@ -308,7 +308,7 @@ def _repeat_display(job: Dict[str, Any]) -> str:
     return f"{completed}/{times}" if completed else f"{times} times"
 
 
-def _canonical_skills(skill: Optional[str] = None, skills: Optional[Any] = None) -> List[str]:
+def _canonical_skills(skill: str | None = None, skills: Any | None = None) -> list[str]:
     if skills is None:
         raw_items = [skill] if skill else []
     elif isinstance(skills, str):
@@ -316,7 +316,7 @@ def _canonical_skills(skill: Optional[str] = None, skills: Optional[Any] = None)
     else:
         raw_items = list(skills)
 
-    normalized: List[str] = []
+    normalized: list[str] = []
     for item in raw_items:
         text = str(item or "").strip()
         if text and text not in normalized:
@@ -324,9 +324,7 @@ def _canonical_skills(skill: Optional[str] = None, skills: Optional[Any] = None)
     return normalized
 
 
-
-
-def _resolve_model_override(model_obj: Optional[Dict[str, Any]]) -> tuple:
+def _resolve_model_override(model_obj: dict[str, Any] | None) -> tuple:
     """Resolve a model override object into (provider, model) for job storage.
 
     If provider is omitted, pins the current main provider from config so the
@@ -368,7 +366,7 @@ def _resolve_model_override(model_obj: Optional[Dict[str, Any]]) -> tuple:
     return (provider_name, model_name)
 
 
-def _normalize_optional_job_value(value: Optional[Any], *, strip_trailing_slash: bool = False) -> Optional[str]:
+def _normalize_optional_job_value(value: Any | None, *, strip_trailing_slash: bool = False) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
@@ -377,7 +375,7 @@ def _normalize_optional_job_value(value: Optional[Any], *, strip_trailing_slash:
     return text or None
 
 
-def _normalize_deliver_param(value: Any) -> Optional[str]:
+def _normalize_deliver_param(value: Any) -> str | None:
     """Normalize a user-supplied ``deliver`` value to the canonical string form.
 
     The cron schema documents ``deliver`` as a string (``"local"``, ``"origin"``,
@@ -398,7 +396,7 @@ def _normalize_deliver_param(value: Any) -> Optional[str]:
     return text or None
 
 
-def _validate_cron_script_path(script: Optional[str]) -> Optional[str]:
+def _validate_cron_script_path(script: str | None) -> str | None:
     """Validate a cron job script path at the API boundary.
 
     Scripts must be relative paths that resolve within HERMES_HOME/scripts/.
@@ -437,7 +435,7 @@ def _validate_cron_script_path(script: Optional[str]) -> Optional[str]:
     return None
 
 
-def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
+def _format_job(job: dict[str, Any]) -> dict[str, Any]:
     prompt = str(job.get("prompt") or "")
     skills = _canonical_skills(job.get("skill"), job.get("skills"))
     job_id = str(job.get("id") or "unknown")
@@ -474,7 +472,7 @@ def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def _execute_job_now(job: Dict[str, Any]) -> Dict[str, Any]:
+def _execute_job_now(job: dict[str, Any]) -> dict[str, Any]:
     """Execute a cron job immediately, outside the scheduler tick.
 
     Atomically claims the job first via ``claim_job_for_fire`` — the same
@@ -521,24 +519,24 @@ def _execute_job_now(job: Dict[str, Any]) -> Dict[str, Any]:
 
 def cronjob(
     action: str,
-    job_id: Optional[str] = None,
-    prompt: Optional[str] = None,
-    schedule: Optional[str] = None,
-    name: Optional[str] = None,
-    repeat: Optional[int] = None,
-    deliver: Optional[str] = None,
+    job_id: str | None = None,
+    prompt: str | None = None,
+    schedule: str | None = None,
+    name: str | None = None,
+    repeat: int | None = None,
+    deliver: str | None = None,
     include_disabled: bool = False,
-    skill: Optional[str] = None,
-    skills: Optional[List[str]] = None,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    reason: Optional[str] = None,
-    script: Optional[str] = None,
-    context_from: Optional[Union[str, List[str]]] = None,
-    enabled_toolsets: Optional[List[str]] = None,
-    workdir: Optional[str] = None,
-    no_agent: Optional[bool] = None,
+    skill: str | None = None,
+    skills: list[str] | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    reason: str | None = None,
+    script: str | None = None,
+    context_from: str | list[str] | None = None,
+    enabled_toolsets: list[str] | None = None,
+    workdir: str | None = None,
+    no_agent: bool | None = None,
     task_id: str = None,
 ) -> str:
     """Unified cron job management tool."""
@@ -706,7 +704,7 @@ def cronjob(
             return json.dumps({"success": True, "job": result}, indent=2)
 
         if normalized == "update":
-            updates: Dict[str, Any] = {}
+            updates: dict[str, Any] = {}
             if prompt is not None:
                 scan_error = _scan_cron_prompt(prompt)
                 if scan_error:
@@ -796,7 +794,6 @@ def cronjob(
         return tool_error(str(e), success=False)
 
 
-
 CRONJOB_SCHEMA = {
     "name": "cronjob",
     "description": """Manage scheduled cron jobs with a single compressed tool.
@@ -821,36 +818,36 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
         "properties": {
             "action": {
                 "type": "string",
-                "description": "One of: create, list, update, pause, resume, remove, run. When action=create, the 'schedule' and 'prompt' fields are REQUIRED."
+                "description": "One of: create, list, update, pause, resume, remove, run. When action=create, the 'schedule' and 'prompt' fields are REQUIRED.",
             },
             "job_id": {
                 "type": "string",
-                "description": "Required for update/pause/resume/remove/run"
+                "description": "Required for update/pause/resume/remove/run",
             },
             "prompt": {
                 "type": "string",
-                "description": "For create: the full self-contained prompt. If skills are also provided, this becomes the task instruction paired with those skills."
+                "description": "For create: the full self-contained prompt. If skills are also provided, this becomes the task instruction paired with those skills.",
             },
             "schedule": {
                 "type": "string",
-                "description": "REQUIRED for action=create. For create/update: '30m', 'every 2h', '0 9 * * *', or ISO timestamp. Examples: '30m' (every 30 minutes), 'every 2h' (every 2 hours), '0 9 * * *' (daily at 9am), '2026-06-01T09:00:00' (one-shot). You MUST include this field when action=create."
+                "description": "REQUIRED for action=create. For create/update: '30m', 'every 2h', '0 9 * * *', or ISO timestamp. Examples: '30m' (every 30 minutes), 'every 2h' (every 2 hours), '0 9 * * *' (daily at 9am), '2026-06-01T09:00:00' (one-shot). You MUST include this field when action=create.",
             },
             "name": {
                 "type": "string",
-                "description": "Optional human-friendly name"
+                "description": "Optional human-friendly name",
             },
             "repeat": {
                 "type": "integer",
-                "description": "Optional repeat count. Omit for defaults (once for one-shot, forever for recurring)."
+                "description": "Optional repeat count. Omit for defaults (once for one-shot, forever for recurring).",
             },
             "deliver": {
                 "type": "string",
-                "description": "Omit this parameter to auto-deliver back to the current chat and topic (recommended). Auto-detection preserves thread/topic context. Only set explicitly when the user asks to deliver somewhere OTHER than the current conversation. Values: 'origin' (same as omitting), 'local' (no delivery, save only), 'all' (fan out to every connected home channel), or platform:chat_id:thread_id for a specific destination. Combine with comma: 'origin,all' delivers to the origin plus every other connected channel. Examples: 'telegram:-1001234567890:17585', 'discord:#engineering', 'sms:+15551234567', 'all'. WARNING: 'platform:chat_id' without :thread_id loses topic targeting. 'all' resolves at fire time, so a job created before a channel was wired up will pick it up automatically once connected."
+                "description": "Omit this parameter to auto-deliver back to the current chat and topic (recommended). Auto-detection preserves thread/topic context. Only set explicitly when the user asks to deliver somewhere OTHER than the current conversation. Values: 'origin' (same as omitting), 'local' (no delivery, save only), 'all' (fan out to every connected home channel), or platform:chat_id:thread_id for a specific destination. Combine with comma: 'origin,all' delivers to the origin plus every other connected channel. Examples: 'telegram:-1001234567890:17585', 'discord:#engineering', 'sms:+15551234567', 'all'. WARNING: 'platform:chat_id' without :thread_id loses topic targeting. 'all' resolves at fire time, so a job created before a channel was wired up will pick it up automatically once connected.",
             },
             "skills": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear attached skills."
+                "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear attached skills.",
             },
             "model": {
                 "type": "object",
@@ -858,18 +855,18 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
                 "properties": {
                     "provider": {
                         "type": "string",
-                        "description": "Provider name (e.g. 'openrouter', 'anthropic', or 'custom:<name>' for a provider defined in custom_providers config — always include the ':<name>' suffix, never pass the bare 'custom'). Omit to use and pin the current provider."
+                        "description": "Provider name (e.g. 'openrouter', 'anthropic', or 'custom:<name>' for a provider defined in custom_providers config — always include the ':<name>' suffix, never pass the bare 'custom'). Omit to use and pin the current provider.",
                     },
                     "model": {
                         "type": "string",
-                        "description": "Model name (e.g. 'anthropic/claude-sonnet-4', 'claude-sonnet-4')"
-                    }
+                        "description": "Model name (e.g. 'anthropic/claude-sonnet-4', 'claude-sonnet-4')",
+                    },
                 },
-                "required": ["model"]
+                "required": ["model"],
             },
             "script": {
                 "type": "string",
-                "description": f"Optional path to a script that runs each tick. In the default mode its stdout is injected into the agent's prompt as context (data-collection / change-detection pattern). With no_agent=True, the script IS the job and its stdout is delivered verbatim (classic watchdog pattern). Relative paths resolve under {display_hermes_home()}/scripts/. ``.sh``/``.bash`` extensions run via bash, everything else via Python. On update, pass empty string to clear."
+                "description": f"Optional path to a script that runs each tick. In the default mode its stdout is injected into the agent's prompt as context (data-collection / change-detection pattern). With no_agent=True, the script IS the job and its stdout is delivered verbatim (classic watchdog pattern). Relative paths resolve under {display_hermes_home()}/scripts/. ``.sh``/``.bash`` extensions run via bash, everything else via Python. On update, pass empty string to clear.",
             },
             "no_agent": {
                 "type": "boolean",
@@ -905,21 +902,20 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
             "enabled_toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional list of toolset names to restrict the job's agent to (e.g. [\"web\", \"terminal\", \"file\", \"delegation\"]). When set, only tools from these toolsets are loaded, significantly reducing input token overhead. When omitted, all default tools are loaded. Infer from the job's prompt — e.g. use \"web\" if it calls web_search, \"terminal\" if it runs scripts, \"file\" if it reads files, \"delegation\" if it calls delegate_task. On update, pass an empty array to clear."
+                "description": "Optional list of toolset names to restrict the job's agent to (e.g. [\"web\", \"terminal\", \"file\", \"delegation\"]). When set, only tools from these toolsets are loaded, significantly reducing input token overhead. When omitted, all default tools are loaded. Infer from the job's prompt — e.g. use \"web\" if it calls web_search, \"terminal\" if it runs scripts, \"file\" if it reads files, \"delegation\" if it calls delegate_task. On update, pass an empty array to clear.",
             },
             "workdir": {
                 "type": "string",
-                "description": "Optional absolute path to run the job from. When set, AGENTS.md / CLAUDE.md / .cursorrules from that directory are injected into the system prompt, and the terminal/file/code_exec tools use it as their working directory — useful for running a job inside a specific project repo. Must be an absolute path that exists. When unset (default), preserves the original behaviour: no project context files, tools use the scheduler's cwd. On update, pass an empty string to clear. Jobs with workdir run sequentially (not parallel) to keep per-job directories isolated."
+                "description": "Optional absolute path to run the job from. When set, AGENTS.md / CLAUDE.md / .cursorrules from that directory are injected into the system prompt, and the terminal/file/code_exec tools use it as their working directory — useful for running a job inside a specific project repo. Must be an absolute path that exists. When unset (default), preserves the original behaviour: no project context files, tools use the scheduler's cwd. On update, pass an empty string to clear. Jobs with workdir run sequentially (not parallel) to keep per-job directories isolated.",
             },
         },
-        "required": ["action"]
-    }
+        "required": ["action"],
+    },
 }
 
 
 def check_cronjob_requirements() -> bool:
-    """
-    Check if cronjob tools can be used.
+    """Check if cronjob tools can be used.
 
     Available in interactive CLI mode and gateway/messaging platforms.
     The cron system is internal (JSON file-based scheduler ticked by the gateway),

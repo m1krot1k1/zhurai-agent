@@ -22,7 +22,8 @@ import contextlib
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+import pathlib
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _resolve_review_runtime(agent: Any) -> Dict[str, Any]:
+def _resolve_review_runtime(agent: Any) -> dict[str, Any]:
     """Resolve provider/model/credentials for the review fork.
 
     Default (auto / unset / same as parent): inherit the parent's live runtime
@@ -99,7 +100,7 @@ def _resolve_review_runtime(agent: Any) -> Dict[str, Any]:
         return parent
 
 
-def _msg_text(m: Dict) -> str:
+def _msg_text(m: dict) -> str:
     c = m.get("content")
     if isinstance(c, str):
         return c.strip()
@@ -108,7 +109,7 @@ def _msg_text(m: Dict) -> str:
     return ""
 
 
-def _digest_history(messages_snapshot: List[Dict], tail: int = 24) -> List[Dict]:
+def _digest_history(messages_snapshot: list[dict], tail: int = 24) -> list[dict]:
     """Compact replay for the routed (different-model) path only.
 
     Keeps the recent ``tail`` messages verbatim, collapses older turns into one
@@ -126,7 +127,7 @@ def _digest_history(messages_snapshot: List[Dict], tail: int = 24) -> List[Dict]
             return msgs
         keep = msgs[-tail:]
     old = msgs[:-len(keep)]
-    lines: List[str] = []
+    lines: list[str] = []
     for m in old:
         if not isinstance(m, dict):
             continue
@@ -358,12 +359,11 @@ _COMBINED_REVIEW_PROMPT = (
 )
 
 
-
 def summarize_background_review_actions(
-    review_messages: List[Dict],
-    prior_snapshot: List[Dict],
+    review_messages: list[dict],
+    prior_snapshot: list[dict],
     notification_mode: str = "on",
-) -> List[str]:
+) -> list[str]:
     """Build the human-facing action summary for a background review pass.
 
     Walks the review agent's session messages and collects successful memory
@@ -431,7 +431,7 @@ def summarize_background_review_actions(
                     "new_string": args.get("new_string", ""),
                 }
 
-    actions: List[str] = []
+    actions: list[str] = []
     for msg in review_messages or []:
         if not isinstance(msg, dict) or msg.get("role") != "tool":
             continue
@@ -495,7 +495,7 @@ def summarize_background_review_actions(
                     )
                     actions.append(
                         f"📝 Skill '{skill_name}' patched: "
-                        f"\"{old_preview}\" → \"{new_preview}\""
+                        f'"{old_preview}" → "{new_preview}"',
                     )
                 elif action == "create" and description:
                     actions.append(f"📝 Skill '{skill_name}' created: {description}")
@@ -544,13 +544,13 @@ def summarize_background_review_actions(
 def build_memory_write_metadata(
     agent: Any,
     *,
-    write_origin: Optional[str] = None,
-    execution_context: Optional[str] = None,
-    task_id: Optional[str] = None,
-    tool_call_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    write_origin: str | None = None,
+    execution_context: str | None = None,
+    task_id: str | None = None,
+    tool_call_id: str | None = None,
+) -> dict[str, Any]:
     """Build provenance metadata for external memory-provider mirrors."""
-    metadata: Dict[str, Any] = {
+    metadata: dict[str, Any] = {
         "write_origin": write_origin or getattr(agent, "_memory_write_origin", "assistant_tool"),
         "execution_context": (
             execution_context
@@ -570,7 +570,7 @@ def build_memory_write_metadata(
 
 def _run_review_in_thread(
     agent: Any,
-    messages_snapshot: List[Dict],
+    messages_snapshot: list[dict],
     prompt: str,
 ) -> None:
     """Worker function executed in the background-review daemon thread.
@@ -600,9 +600,9 @@ def _run_review_in_thread(
         pass
 
     review_agent = None
-    review_messages: List[Dict] = []
+    review_messages: list[dict] = []
     try:
-        with open(os.devnull, "w", encoding="utf-8") as _devnull, \
+        with pathlib.Path(os.devnull).open("w", encoding="utf-8") as _devnull, \
              contextlib.redirect_stdout(_devnull), \
              contextlib.redirect_stderr(_devnull):
             # Inherit the parent agent's live runtime (provider, model,
@@ -736,11 +736,11 @@ def _run_review_in_thread(
             # agent.compression_enabled, so this short-circuits both paths.
             review_agent.compression_enabled = False
 
-            from model_tools import get_tool_definitions
             from hermes_cli.plugins import (
-                set_thread_tool_whitelist,
                 clear_thread_tool_whitelist,
+                set_thread_tool_whitelist,
             )
+            from model_tools import get_tool_definitions
 
             review_whitelist = {
                 t["function"]["name"]
@@ -810,13 +810,13 @@ def _run_review_in_thread(
         if actions:
             summary = " · ".join(dict.fromkeys(actions))
             agent._safe_print(
-                f"  💾 Self-improvement review: {summary}"
+                f"  💾 Self-improvement review: {summary}",
             )
             _bg_cb = agent.background_review_callback
             if _bg_cb:
                 try:
                     _bg_cb(
-                        f"💾 Self-improvement review: {summary}"
+                        f"💾 Self-improvement review: {summary}",
                     )
                 except Exception:
                     pass
@@ -832,7 +832,7 @@ def _run_review_in_thread(
         # on the exception path where redirect_stdout already exited.
         if review_agent is not None:
             try:
-                with open(os.devnull, "w", encoding="utf-8") as _fn, \
+                with pathlib.Path(os.devnull).open("w", encoding="utf-8") as _fn, \
                      contextlib.redirect_stdout(_fn), \
                      contextlib.redirect_stderr(_fn):
                     try:
@@ -855,7 +855,7 @@ def _run_review_in_thread(
 
 def spawn_background_review_thread(
     agent: Any,
-    messages_snapshot: List[Dict],
+    messages_snapshot: list[dict],
     review_memory: bool = False,
     review_skills: bool = False,
 ):
@@ -882,10 +882,10 @@ def spawn_background_review_thread(
 
 
 __all__ = [
+    "_COMBINED_REVIEW_PROMPT",
     "_MEMORY_REVIEW_PROMPT",
     "_SKILL_REVIEW_PROMPT",
-    "_COMBINED_REVIEW_PROMPT",
+    "build_memory_write_metadata",
     "spawn_background_review_thread",
     "summarize_background_review_actions",
-    "build_memory_write_metadata",
 ]

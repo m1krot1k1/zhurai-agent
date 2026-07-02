@@ -13,12 +13,10 @@ from collections import deque
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # Stub mautrix so plugins.platforms.matrix.adapter can be imported without the SDK.
 # ---------------------------------------------------------------------------
+
 
 def _stub_mautrix():
     stub = types.ModuleType("mautrix")
@@ -64,12 +62,15 @@ def _stub_mautrix():
 
 _stub_mautrix()
 
-from plugins.platforms.matrix.adapter import MatrixAdapter, _MatrixApprovalPrompt  # noqa: E402
-
+from plugins.platforms.matrix.adapter import (  # noqa: E402
+    MatrixAdapter,
+    _MatrixApprovalPrompt,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_adapter(allowed_user_ids=None):
     """Construct a MatrixAdapter with only the state needed by _on_reaction."""

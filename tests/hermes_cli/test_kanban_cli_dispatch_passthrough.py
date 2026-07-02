@@ -9,30 +9,30 @@ from __future__ import annotations
 
 import argparse
 import os
+import pathlib
 import sys
 import tempfile
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated_kanban_home(monkeypatch):
     """Spin up a fresh HERMES_HOME with a clean kanban DB."""
     test_home = tempfile.mkdtemp(prefix="kanban_cli_passthrough_")
-    os.makedirs(os.path.join(test_home, "profiles", "default"), exist_ok=True)
+    pathlib.Path(os.path.join(test_home, "profiles", "default")).mkdir(exist_ok=True, parents=True)
     monkeypatch.setenv("HERMES_HOME", test_home)
     for mod in list(sys.modules.keys()):
         if mod.startswith("hermes_cli") or mod.startswith("hermes_state") or mod == "hermes_constants":
             del sys.modules[mod]
-    yield test_home
+    return test_home
 
 
 def test_cli_dispatch_passes_max_in_progress_from_config(isolated_kanban_home, monkeypatch):
     """#33488: hermes kanban dispatch must pass kanban.max_in_progress from
     config to dispatch_once. Without this, the global concurrency cap is
-    unreachable from the CLI even though it works from the gateway."""
+    unreachable from the CLI even though it works from the gateway.
+    """
     from hermes_cli import kanban as kb_cli
     from hermes_cli import kanban_db
 
@@ -43,10 +43,10 @@ def test_cli_dispatch_passes_max_in_progress_from_config(isolated_kanban_home, m
             "max_spawn": 5,
             "default_assignee": "default",
             "max_in_progress_per_profile": 2,
-        }
+        },
     }
     monkeypatch.setattr(
-        "hermes_cli.config.load_config", lambda: fake_config
+        "hermes_cli.config.load_config", lambda: fake_config,
     )
 
     captured = {}
@@ -73,7 +73,8 @@ def test_cli_dispatch_passes_max_in_progress_from_config(isolated_kanban_home, m
 
 def test_cli_max_flag_overrides_config_max_spawn(isolated_kanban_home, monkeypatch):
     """--max on the CLI takes precedence over kanban.max_spawn in config.
-    The CLI flag is the explicit operator signal; config is the default."""
+    The CLI flag is the explicit operator signal; config is the default.
+    """
     from hermes_cli import kanban as kb_cli
     from hermes_cli import kanban_db
 
@@ -96,7 +97,8 @@ def test_cli_max_flag_overrides_config_max_spawn(isolated_kanban_home, monkeypat
 
 def test_cli_invalid_max_in_progress_silently_disables(isolated_kanban_home, monkeypatch):
     """Invalid kanban.max_in_progress values (0, negative, non-int) should
-    silently fall through to None — no crash, no surprise behavior."""
+    silently fall through to None — no crash, no surprise behavior.
+    """
     from hermes_cli import kanban as kb_cli
     from hermes_cli import kanban_db
 
@@ -122,7 +124,8 @@ def test_kanban_swarm_uses_existing_humanizer_skill():
     crashed with 'Unknown skill(s): avoid-ai-writing' on every retry.
 
     Verify the synthesizer card now uses the bundled 'humanizer' skill
-    which actually exists at skills/creative/humanizer/SKILL.md."""
+    which actually exists at skills/creative/humanizer/SKILL.md.
+    """
     import pathlib
 
     swarm_path = (

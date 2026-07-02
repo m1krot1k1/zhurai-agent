@@ -9,8 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+import pytest
+
 from hermes_cli.active_sessions import active_session_registry_snapshot
+from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 from tui_gateway import server
 
 
@@ -130,7 +132,8 @@ def test_handoff_fail_marks_only_inflight_rows(monkeypatch):
 def test_session_context_explicit_cwd_for_ephemeral_task(monkeypatch, tmp_path):
     """Background/preview tasks use ephemeral ids absent from `_sessions`, so the
     parent workspace is passed explicitly; it must pin instead of clearing back
-    to the gateway launch dir."""
+    to the gateway launch dir.
+    """
     from agent.runtime_cwd import resolve_agent_cwd
 
     project = tmp_path / "project"
@@ -178,7 +181,8 @@ def test_profile_configured_cwd_skips_placeholders_and_missing(tmp_path):
 
 def test_completion_cwd_prefers_profile_over_stale_env(monkeypatch, tmp_path):
     """Issue #40334: a new session bound to another profile must use THAT
-    profile's terminal.cwd, not the launch profile's stale TERMINAL_CWD."""
+    profile's terminal.cwd, not the launch profile's stale TERMINAL_CWD.
+    """
     profile_b = tmp_path / "ef-design"
     profile_b.mkdir()
     home = _write_profile_cfg(tmp_path / "home-b", str(profile_b))
@@ -220,9 +224,10 @@ def test_terminal_task_cwd_ssh_uses_remote_path_unvalidated(monkeypatch):
     """SSH (non-local) backend: the configured remote cwd is used verbatim even
     though it does not exist on the local host. This is the jonbohz fix — host
     `isdir()` validation would otherwise discard the remote path and fall back
-    to os.getcwd(), running commands against the wrong machine."""
+    to os.getcwd(), running commands against the wrong machine.
+    """
     remote = "/home/jonboh/workspace/proj"  # does not exist on this host
-    assert not os.path.isdir(remote)
+    assert not Path(remote).is_dir()
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     monkeypatch.setenv("TERMINAL_CWD", remote)
 
@@ -241,7 +246,8 @@ def test_terminal_task_cwd_ssh_falls_back_to_config(monkeypatch):
 
 def test_terminal_task_cwd_ssh_sentinel_cwd_falls_back_to_session(monkeypatch):
     """Sentinel/auto cwd values are not real remote paths, so the SSH branch
-    must defer to the session cwd rather than registering a meaningless dir."""
+    must defer to the session cwd rather than registering a meaningless dir.
+    """
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     monkeypatch.setenv("TERMINAL_CWD", "auto")
     monkeypatch.setattr(server, "_load_cfg", lambda: {"terminal": {"cwd": "."}})
@@ -319,7 +325,7 @@ def test_tui_verbose_tool_details_fail_closed_when_redaction_fails(monkeypatch):
     def fail_redaction(*_args, **_kwargs):
         raise RuntimeError("redaction unavailable")
 
-    setattr(redact_module, "redact_sensitive_text", fail_redaction)
+    redact_module.redact_sensitive_text = fail_redaction
     monkeypatch.setitem(sys.modules, "agent.redact", redact_module)
 
     assert server._redact_tui_verbose_text("api_key=secret") == ""
@@ -358,12 +364,12 @@ def test_tui_verbose_tool_events_omit_details_when_redaction_fails(monkeypatch):
     def fail_redaction(*_args, **_kwargs):
         raise RuntimeError("redaction unavailable")
 
-    setattr(redact_module, "redact_sensitive_text", fail_redaction)
+    redact_module.redact_sensitive_text = fail_redaction
     monkeypatch.setitem(sys.modules, "agent.redact", redact_module)
 
     events: list[tuple[str, str, dict]] = []
     monkeypatch.setattr(
-        server, "_emit", lambda event_type, sid, payload: events.append((event_type, sid, payload))
+        server, "_emit", lambda event_type, sid, payload: events.append((event_type, sid, payload)),
     )
     monkeypatch.setitem(
         server._sessions,
@@ -410,7 +416,7 @@ def test_voice_toggle_returns_configured_record_key(monkeypatch):
         sys.modules,
         "tools.voice_mode",
         types.SimpleNamespace(
-            check_voice_requirements=lambda: {"available": True, "details": ""}
+            check_voice_requirements=lambda: {"available": True, "details": ""},
         ),
     )
     # ``voice.toggle`` action=on mutates ``os.environ["HERMES_VOICE"]``
@@ -421,10 +427,10 @@ def test_voice_toggle_returns_configured_record_key(monkeypatch):
     monkeypatch.setenv("HERMES_VOICE", "0")
 
     on_resp = server.dispatch(
-        {"id": "voice-on", "method": "voice.toggle", "params": {"action": "on"}}
+        {"id": "voice-on", "method": "voice.toggle", "params": {"action": "on"}},
     )
     status_resp = server.dispatch(
-        {"id": "voice-status", "method": "voice.toggle", "params": {"action": "status"}}
+        {"id": "voice-status", "method": "voice.toggle", "params": {"action": "status"}},
     )
 
     assert on_resp["result"]["record_key"] == "ctrl+o"
@@ -444,7 +450,7 @@ def test_voice_toggle_handles_non_dict_voice_cfg(monkeypatch):
         sys.modules,
         "tools.voice_mode",
         types.SimpleNamespace(
-            check_voice_requirements=lambda: {"available": True, "details": ""}
+            check_voice_requirements=lambda: {"available": True, "details": ""},
         ),
     )
 
@@ -456,7 +462,7 @@ def test_voice_toggle_handles_non_dict_voice_cfg(monkeypatch):
                 "id": "voice-status",
                 "method": "voice.toggle",
                 "params": {"action": "status"},
-            }
+            },
         )
 
         assert (
@@ -475,7 +481,7 @@ def test_voice_toggle_handles_non_dict_voice_cfg(monkeypatch):
                 "id": "voice-status-root",
                 "method": "voice.toggle",
                 "params": {"action": "status"},
-            }
+            },
         )
 
         assert (
@@ -502,7 +508,7 @@ def test_voice_record_start_handles_non_dict_voice_cfg(monkeypatch):
         sys.modules,
         "hermes_cli.voice",
         types.SimpleNamespace(
-            start_continuous=fake_start_continuous, stop_continuous=lambda: None
+            start_continuous=fake_start_continuous, stop_continuous=lambda: None,
         ),
     )
     monkeypatch.setenv("HERMES_VOICE", "1")
@@ -516,7 +522,7 @@ def test_voice_record_start_handles_non_dict_voice_cfg(monkeypatch):
                 "id": "voice-record",
                 "method": "voice.record",
                 "params": {"action": "start"},
-            }
+            },
         )
 
         assert (
@@ -544,7 +550,7 @@ def test_voice_record_start_handles_non_dict_voice_cfg(monkeypatch):
                 "id": "voice-record-bool",
                 "method": "voice.record",
                 "params": {"action": "start"},
-            }
+            },
         )
 
         assert "result" in resp, f"voice.record raised for bool cfg={bad_bool_cfg!r}"
@@ -577,7 +583,7 @@ def test_voice_record_stop_forces_transcription(monkeypatch):
             "id": "voice-record-stop",
             "method": "voice.record",
             "params": {"action": "stop"},
-        }
+        },
     )
 
     assert resp["result"]["status"] == "stopped"
@@ -600,7 +606,7 @@ def test_voice_record_stop_updates_event_session_id(monkeypatch):
             "id": "voice-record-stop-session",
             "method": "voice.record",
             "params": {"action": "stop", "session_id": "new-session"},
-        }
+        },
     )
 
     assert resp["result"]["status"] == "stopped"
@@ -624,7 +630,7 @@ def test_voice_record_start_reports_busy_when_stop_is_in_progress(monkeypatch):
             "id": "voice-record-busy",
             "method": "voice.record",
             "params": {"action": "start"},
-        }
+        },
     )
 
     assert resp["result"]["status"] == "busy"
@@ -648,14 +654,14 @@ def test_voice_toggle_tts_branch_also_carries_record_key(monkeypatch):
         sys.modules,
         "tools.voice_mode",
         types.SimpleNamespace(
-            check_voice_requirements=lambda: {"available": True, "details": ""}
+            check_voice_requirements=lambda: {"available": True, "details": ""},
         ),
     )
     monkeypatch.setenv("HERMES_VOICE", "1")
     monkeypatch.delenv("HERMES_VOICE_TTS", raising=False)
 
     tts_resp = server.dispatch(
-        {"id": "voice-tts", "method": "voice.toggle", "params": {"action": "tts"}}
+        {"id": "voice-tts", "method": "voice.toggle", "params": {"action": "tts"}},
     )
 
     assert tts_resp["result"]["record_key"] == "ctrl+space"
@@ -689,14 +695,14 @@ def test_load_enabled_toolsets_accepts_plugin_env_after_discovery(monkeypatch):
     original_validate = toolsets.validate_toolset
 
     def fake_validate(name):
-        return name == "plugin_demo" and discovered["ready"] or original_validate(name)
+        return (name == "plugin_demo" and discovered["ready"]) or original_validate(name)
 
     monkeypatch.setattr(toolsets, "validate_toolset", fake_validate)
     monkeypatch.setitem(
         sys.modules,
         "hermes_cli.plugins",
         types.SimpleNamespace(
-            discover_plugins=lambda: discovered.update({"ready": True})
+            discover_plugins=lambda: discovered.update({"ready": True}),
         ),
     )
 
@@ -719,7 +725,7 @@ def test_load_enabled_toolsets_rejects_disabled_mcp_env(monkeypatch, capsys):
         lambda: {"mcp_servers": {"mcp-off": {"enabled": False}}},
     )
     monkeypatch.setattr(
-        config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}}
+        config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}},
     )
 
     # Sorted: ["kanban", "memory"]. `kanban` is auto-recovered by
@@ -743,7 +749,7 @@ def test_load_enabled_toolsets_falls_back_when_tui_env_invalid(monkeypatch, caps
     import hermes_cli.config as config_mod
 
     monkeypatch.setattr(
-        config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}}
+        config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}},
     )
 
     assert server._load_enabled_toolsets() == ["kanban", "memory"]
@@ -761,7 +767,7 @@ def test_load_enabled_toolsets_warns_when_config_fallback_fails(monkeypatch, cap
     import hermes_cli.config as config_mod
 
     monkeypatch.setattr(
-        config_mod, "load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        config_mod, "load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
     assert server._load_enabled_toolsets() is None
@@ -774,7 +780,7 @@ def test_load_enabled_toolsets_honors_builtin_env_if_config_fails(monkeypatch):
     import hermes_cli.config as config_mod
 
     monkeypatch.setattr(
-        config_mod, "load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        config_mod, "load_config", lambda: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
     assert server._load_enabled_toolsets() == ["web"]
@@ -787,7 +793,7 @@ def test_load_enabled_toolsets_all_env_means_all(monkeypatch):
 
 
 def test_load_enabled_toolsets_all_env_warns_about_ignored_extra_entries(
-    monkeypatch, capsys
+    monkeypatch, capsys,
 ):
     monkeypatch.setenv("HERMES_TUI_TOOLSETS", "all,nope")
 
@@ -831,7 +837,7 @@ def test_history_to_messages_preserves_tool_calls_for_resume_display():
                         "name": "search_files",
                         "arguments": json.dumps({"pattern": "resume"}),
                     },
-                }
+                },
             ],
         },
         {"role": "tool", "content": "{}", "tool_call_id": "call_1"},
@@ -940,11 +946,11 @@ def test_session_resume_uses_parent_lineage_for_display(monkeypatch):
         lambda agent, *a: {"model": "test", "tools": {}, "skills": {}},
     )
     monkeypatch.setattr(
-        server, "_init_session", lambda sid, key, agent, history, cols=80, **_kwargs: None
+        server, "_init_session", lambda sid, key, agent, history, cols=80, **_kwargs: None,
     )
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.resume", "params": {"session_id": "tip"}}
+        {"id": "1", "method": "session.resume", "params": {"session_id": "tip"}},
     )
 
     assert resp["result"]["messages"] == [
@@ -994,15 +1000,15 @@ def test_session_resume_follows_compression_tip(monkeypatch, tmp_path):
     monkeypatch.setattr(server, "_clear_session_context", lambda tokens: None)
     monkeypatch.setattr(server, "_make_agent", fake_make_agent)
     monkeypatch.setattr(
-        server, "_session_info", lambda agent, *a: {"model": "test", "tools": {}, "skills": {}}
+        server, "_session_info", lambda agent, *a: {"model": "test", "tools": {}, "skills": {}},
     )
     monkeypatch.setattr(
-        server, "_init_session", lambda sid, key, agent, history, cols=80, **_kwargs: None
+        server, "_init_session", lambda sid, key, agent, history, cols=80, **_kwargs: None,
     )
 
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.resume", "params": {"session_id": "parent_root"}}
+            {"id": "1", "method": "session.resume", "params": {"session_id": "parent_root"}},
         )
     finally:
         db.close()
@@ -1050,7 +1056,7 @@ def test_session_resume_passes_stored_runtime_to_agent(monkeypatch):
     monkeypatch.setattr(server, "_init_session", fake_init_session)
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.resume", "params": {"session_id": "stored-session"}}
+        {"id": "1", "method": "session.resume", "params": {"session_id": "stored-session"}},
     )
 
     assert resp["result"]["info"] == {"model": "gpt-5.4", "provider": "openai-codex"}
@@ -1131,7 +1137,7 @@ def test_session_resume_profile_uses_profile_db_cwd(monkeypatch, tmp_path):
         lambda _agent, session=None: {"cwd": session.get("cwd") if session else ""},
     )
 
-    import tools.approval as approval
+    from tools import approval
 
     monkeypatch.setattr(approval, "register_gateway_notify", lambda key, cb: None)
     monkeypatch.setattr(approval, "load_permanent_allowlist", lambda: None)
@@ -1142,7 +1148,7 @@ def test_session_resume_profile_uses_profile_db_cwd(monkeypatch, tmp_path):
                 "id": "1",
                 "method": "session.resume",
                 "params": {"session_id": target, "profile": "worker"},
-            }
+            },
         )
 
         assert "error" not in resp
@@ -1176,7 +1182,7 @@ def test_session_cwd_set_profile_session_updates_profile_db(monkeypatch, tmp_pat
 
     profile_db = ProfileDB()
 
-    import tools.terminal_tool as terminal_tool
+    from tools import terminal_tool
 
     monkeypatch.setattr("hermes_state.SessionDB", lambda db_path=None: profile_db)
     monkeypatch.setattr(server, "_get_db", lambda: LaunchDB())
@@ -1215,7 +1221,7 @@ def test_stored_session_runtime_overrides_skips_bare_billing_provider():
 
     # An explicit routable provider in model_config wins over the bare billing bucket.
     ov = server._stored_session_runtime_overrides(
-        {"model": "m", "billing_provider": "custom", "model_config": {"provider": "custom:myendpoint"}}
+        {"model": "m", "billing_provider": "custom", "model_config": {"provider": "custom:myendpoint"}},
     )
     assert ov["provider_override"] == "custom:myendpoint"
     assert ov["model_override"]["provider"] == "custom:myendpoint"
@@ -1295,7 +1301,7 @@ def test_resolve_model_strips_config_model(monkeypatch):
     monkeypatch.delenv("HERMES_MODEL", raising=False)
     monkeypatch.delenv("HERMES_INFERENCE_MODEL", raising=False)
     monkeypatch.setattr(
-        server, "_load_cfg", lambda: {"model": {"default": " nous/hermes-test "}}
+        server, "_load_cfg", lambda: {"model": {"default": " nous/hermes-test "}},
     )
 
     assert server._resolve_model() == "nous/hermes-test"
@@ -1336,7 +1342,7 @@ def test_config_sync_switches_unpinned_session(monkeypatch):
             "sid",
             "new/model --provider nous",
             {"confirm_expensive_model": True, "pin_session_override": False},
-        )
+        ),
     ]
     assert session["config_model_seen"] == ("new/model", "nous")
 
@@ -1424,7 +1430,7 @@ def test_config_sync_failure_emits_error_once_per_edit(monkeypatch):
     monkeypatch.setattr(server, "_apply_model_switch", boom)
     emits = []
     monkeypatch.setattr(
-        server, "_emit", lambda ev, sid, payload: emits.append((ev, payload))
+        server, "_emit", lambda ev, sid, payload: emits.append((ev, payload)),
     )
 
     server._sync_agent_model_with_config("sid", session)
@@ -1487,7 +1493,7 @@ def test_startup_runtime_detects_provider_for_model_env(monkeypatch):
         return "anthropic", "anthropic/claude-sonnet-4.6"
 
     monkeypatch.setattr(
-        "hermes_cli.models.detect_static_provider_for_model", fake_detect
+        "hermes_cli.models.detect_static_provider_for_model", fake_detect,
     )
 
     assert server._resolve_startup_runtime() == (
@@ -1613,7 +1619,7 @@ def test_startup_runtime_resolves_short_alias_without_network(monkeypatch):
     monkeypatch.setattr(
         "hermes_cli.models.fetch_openrouter_models",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("network lookup should not run")
+            AssertionError("network lookup should not run"),
         ),
     )
 
@@ -1631,7 +1637,7 @@ def test_startup_runtime_does_not_call_network_detector(monkeypatch):
     monkeypatch.setattr(
         "hermes_cli.models.detect_provider_for_model",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("network detector called")
+            AssertionError("network detector called"),
         ),
     )
 
@@ -1665,7 +1671,7 @@ def test_session_close_commits_memory_and_fires_finalize_hook(monkeypatch):
     agent = types.SimpleNamespace(session_id="session-key")
     agent.commit_memory_session = lambda history: calls.setdefault("history", history)
     server._sessions["sid"] = _session(
-        agent=agent, history=[{"role": "user", "content": "hello"}]
+        agent=agent, history=[{"role": "user", "content": "hello"}],
     )
     monkeypatch.setattr(
         server,
@@ -1675,7 +1681,7 @@ def test_session_close_commits_memory_and_fires_finalize_hook(monkeypatch):
 
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.close", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.close", "params": {"session_id": "sid"}},
         )
         assert resp["result"]["closed"] is True
         assert calls["history"] == [{"role": "user", "content": "hello"}]
@@ -1873,7 +1879,7 @@ def test_session_title_creates_row_and_sets_immediately_when_not_ready(monkeypat
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "my-custom-name"},
-            }
+            },
         )
 
         # No longer queued — the row is created and the title set immediately.
@@ -1885,7 +1891,7 @@ def test_session_title_creates_row_and_sets_immediately_when_not_ready(monkeypat
 
         # A subsequent read reflects the persisted title.
         get_resp = server.handle_request(
-            {"id": "2", "method": "session.title", "params": {"session_id": "sid"}}
+            {"id": "2", "method": "session.title", "params": {"session_id": "sid"}},
         )
         assert get_resp["result"]["title"] == "my-custom-name"
     finally:
@@ -1932,7 +1938,7 @@ def test_session_title_falls_back_to_queue_when_row_create_fails(monkeypatch):
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "queued title"},
-            }
+            },
         )
 
         assert set_resp["result"]["pending"] is True
@@ -1940,7 +1946,7 @@ def test_session_title_falls_back_to_queue_when_row_create_fails(monkeypatch):
         assert server._sessions["sid"]["pending_title"] == "queued title"
 
         get_resp = server.handle_request(
-            {"id": "2", "method": "session.title", "params": {"session_id": "sid"}}
+            {"id": "2", "method": "session.title", "params": {"session_id": "sid"}},
         )
         assert get_resp["result"]["title"] == "queued title"
     finally:
@@ -1986,7 +1992,7 @@ def test_session_create_does_not_persist_empty_row(monkeypatch):
     )
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.create", "params": {"cols": 80}}
+        {"id": "1", "method": "session.create", "params": {"cols": 80}},
     )
     sid = resp["result"]["session_id"]
     try:
@@ -2003,7 +2009,7 @@ def test_ensure_session_db_row_persists_explicit_cwd(monkeypatch, tmp_path):
     class _FakeDB:
         def create_session(self, key, source=None, model=None, model_config=None, cwd=None):
             created.append(
-                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd}
+                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd},
             )
 
     monkeypatch.setattr(server, "_get_db", lambda: _FakeDB())
@@ -2012,7 +2018,7 @@ def test_ensure_session_db_row_persists_explicit_cwd(monkeypatch, tmp_path):
     server._ensure_session_db_row({"session_key": "k1", "cwd": str(tmp_path), "explicit_cwd": True})
 
     assert created == [
-        {"key": "k1", "source": "tui", "model": "test-model", "model_config": None, "cwd": str(tmp_path)}
+        {"key": "k1", "source": "tui", "model": "test-model", "model_config": None, "cwd": str(tmp_path)},
     ]
 
 
@@ -2022,7 +2028,7 @@ def test_ensure_session_db_row_persists_session_source(monkeypatch):
     class _FakeDB:
         def create_session(self, key, source=None, model=None, model_config=None, cwd=None):
             created.append(
-                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd}
+                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd},
             )
 
     monkeypatch.setattr(server, "_get_db", lambda: _FakeDB())
@@ -2031,19 +2037,20 @@ def test_ensure_session_db_row_persists_session_source(monkeypatch):
     server._ensure_session_db_row({"session_key": "k1", "source": "tool"})
 
     assert created == [
-        {"key": "k1", "source": "tool", "model": "test-model", "model_config": None, "cwd": None}
+        {"key": "k1", "source": "tool", "model": "test-model", "model_config": None, "cwd": None},
     ]
 
 
 def test_ensure_session_db_row_defaults_to_no_workspace(monkeypatch, tmp_path):
     """Without an explicit workspace, cwd is left null so the session groups
-    under "No workspace" rather than the gateway's launch directory."""
+    under "No workspace" rather than the gateway's launch directory.
+    """
     created = []
 
     class _FakeDB:
         def create_session(self, key, source=None, model=None, model_config=None, cwd=None):
             created.append(
-                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd}
+                {"key": key, "source": source, "model": model, "model_config": model_config, "cwd": cwd},
             )
 
     monkeypatch.setattr(server, "_get_db", lambda: _FakeDB())
@@ -2052,7 +2059,7 @@ def test_ensure_session_db_row_defaults_to_no_workspace(monkeypatch, tmp_path):
     server._ensure_session_db_row({"session_key": "k1", "cwd": str(tmp_path)})
 
     assert created == [
-        {"key": "k1", "source": "tui", "model": "test-model", "model_config": None, "cwd": None}
+        {"key": "k1", "source": "tui", "model": "test-model", "model_config": None, "cwd": None},
     ]
 
 
@@ -2070,7 +2077,7 @@ def test_ensure_session_db_row_persists_session_model_override(monkeypatch):
     class _FakeDB:
         def create_session(self, key, source=None, model=None, model_config=None, cwd=None):
             created.append(
-                {"key": key, "model": model, "model_config": model_config, "cwd": cwd}
+                {"key": key, "model": model, "model_config": model_config, "cwd": cwd},
             )
 
     monkeypatch.setattr(server, "_get_db", lambda: _FakeDB())
@@ -2082,7 +2089,7 @@ def test_ensure_session_db_row_persists_session_model_override(monkeypatch):
             "model_override": {"model": "openai/gpt-5.5", "provider": "openrouter"},
             "create_reasoning_override": {"effort": "high"},
             "create_service_tier_override": "priority",
-        }
+        },
     )
 
     assert len(created) == 1
@@ -2096,7 +2103,8 @@ def test_ensure_session_db_row_persists_session_model_override(monkeypatch):
 
 def test_ensure_session_db_row_no_override_uses_global(monkeypatch):
     """A chat that made no explicit pick falls back to the global model and
-    writes no model_config (so it tracks the profile default)."""
+    writes no model_config (so it tracks the profile default).
+    """
     created = []
 
     class _FakeDB:
@@ -2137,7 +2145,7 @@ def test_session_title_clears_pending_after_persist(monkeypatch):
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "fresh"},
-            }
+            },
         )
 
         assert resp["result"]["pending"] is False
@@ -2172,7 +2180,7 @@ def test_session_title_does_not_queue_noop_when_row_exists(monkeypatch):
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "same title"},
-            }
+            },
         )
 
         assert resp["result"]["pending"] is False
@@ -2191,7 +2199,7 @@ def test_session_title_get_falls_back_to_pending_when_db_read_throws(monkeypatch
     monkeypatch.setattr(server, "_get_db", lambda: _FakeDB())
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}},
         )
         assert resp["result"]["title"] == "queued title"
     finally:
@@ -2218,7 +2226,7 @@ def test_session_title_get_retries_persist_for_pending_title(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: db)
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}},
         )
         assert resp["result"]["title"] == "queued title"
         assert server._sessions["sid"]["pending_title"] is None
@@ -2246,7 +2254,7 @@ def test_session_title_get_retries_pending_even_when_db_has_title(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: db)
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.title", "params": {"session_id": "sid"}},
         )
         assert resp["result"]["title"] == "queued title"
         assert server._sessions["sid"]["pending_title"] is None
@@ -2267,7 +2275,7 @@ def test_session_title_rejects_empty_title_with_specific_error_code(monkeypatch)
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "   "},
-            }
+            },
         )
         assert "error" in resp
         assert resp["error"]["code"] == 4021
@@ -2294,7 +2302,7 @@ def test_session_title_set_maps_valueerror_to_user_error(monkeypatch):
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "dup"},
-            }
+            },
         )
         assert "error" in resp
         assert resp["error"]["code"] == 4022
@@ -2322,7 +2330,7 @@ def test_session_title_set_errors_when_row_lookup_fails_after_noop(monkeypatch):
                 "id": "1",
                 "method": "session.title",
                 "params": {"session_id": "sid", "title": "fresh"},
-            }
+            },
         )
         assert "error" in resp
         assert resp["error"]["code"] == 5007
@@ -2385,13 +2393,13 @@ def test_session_create_drops_pending_title_on_valueerror(monkeypatch):
     monkeypatch.setattr(server, "make_stream_renderer", lambda cols: None)
     monkeypatch.setattr(server, "render_message", lambda raw, cols: None)
     monkeypatch.setattr(
-        server, "_sync_session_key_after_compress", lambda *a, **kw: None
+        server, "_sync_session_key_after_compress", lambda *a, **kw: None,
     )
     monkeypatch.setattr(server.threading, "Thread", _ImmediateThread)
 
     try:
         server.handle_request(
-            {"id": "1", "method": "prompt.submit", "params": {"session_id": "sid", "text": "hello"}}
+            {"id": "1", "method": "prompt.submit", "params": {"session_id": "sid", "text": "hello"}},
         )
         assert session["pending_title"] is None
     finally:
@@ -2408,7 +2416,7 @@ def test_config_set_yolo_toggles_session_scope():
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "yolo"},
-            }
+            },
         )
         assert resp_on["result"]["value"] == "1"
         assert is_session_yolo_enabled("session-key") is True
@@ -2418,7 +2426,7 @@ def test_config_set_yolo_toggles_session_scope():
                 "id": "2",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "yolo"},
-            }
+            },
         )
         assert resp_off["result"]["value"] == "0"
         assert is_session_yolo_enabled("session-key") is False
@@ -2440,7 +2448,7 @@ def test_config_set_yolo_global_scope_writes_approvals_mode(tmp_path, monkeypatc
             "id": "1",
             "method": "config.set",
             "params": {"key": "yolo", "scope": "global"},
-        }
+        },
     )
     assert resp_on["result"]["value"] == "1"
     assert resp_on["result"]["scope"] == "global"
@@ -2451,7 +2459,7 @@ def test_config_set_yolo_global_scope_writes_approvals_mode(tmp_path, monkeypatc
             "id": "2",
             "method": "config.set",
             "params": {"key": "yolo", "scope": "global"},
-        }
+        },
     )
     assert resp_off["result"]["value"] == "0"
     assert yaml.safe_load(cfg_path.read_text())["approvals"]["mode"] == "manual"
@@ -2470,7 +2478,7 @@ def test_config_set_yolo_global_scope_honors_explicit_value(tmp_path, monkeypatc
             "id": "1",
             "method": "config.set",
             "params": {"key": "yolo", "scope": "global", "value": "1"},
-        }
+        },
     )
     assert resp["result"]["value"] == "1"
     assert yaml.safe_load(cfg_path.read_text())["approvals"]["mode"] == "off"
@@ -2481,7 +2489,7 @@ def test_config_set_yolo_global_scope_honors_explicit_value(tmp_path, monkeypatc
             "id": "2",
             "method": "config.set",
             "params": {"key": "yolo", "scope": "global", "value": "1"},
-        }
+        },
     )
     assert resp_again["result"]["value"] == "1"
     assert yaml.safe_load(cfg_path.read_text())["approvals"]["mode"] == "off"
@@ -2498,7 +2506,7 @@ def test_config_set_fast_updates_live_agent_and_config(monkeypatch):
     server._sessions["sid"] = _session(agent=agent)
 
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
     monkeypatch.setattr(server, "_session_info", lambda _agent, *a: {"model": "x"})
     monkeypatch.setattr(server, "_emit", lambda *args: emits.append(args))
@@ -2513,7 +2521,7 @@ def test_config_set_fast_updates_live_agent_and_config(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "fast", "value": "fast"},
-            }
+            },
         )
         assert resp["result"]["value"] == "fast"
         assert agent.service_tier == "priority"
@@ -2529,7 +2537,7 @@ def test_config_set_fast_updates_live_agent_and_config(monkeypatch):
                 "id": "2",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "fast", "value": "normal"},
-            }
+            },
         )
         assert resp_normal["result"]["value"] == "normal"
         assert agent.service_tier is None
@@ -2546,7 +2554,7 @@ def test_config_set_fast_status_is_non_mutating(monkeypatch):
     server._sessions["sid"] = _session(agent=agent)
 
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
     monkeypatch.setattr(server, "_emit", lambda *args: emits.append(args))
 
@@ -2556,7 +2564,7 @@ def test_config_set_fast_status_is_non_mutating(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "fast", "value": "status"},
-            }
+            },
         )
         assert resp["result"]["value"] == "fast"
         assert writes == []
@@ -2575,7 +2583,7 @@ def test_config_set_fast_rejects_unsupported_model(monkeypatch):
     server._sessions["sid"] = _session(agent=agent)
 
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
     monkeypatch.setattr(
         "hermes_cli.models.resolve_fast_mode_overrides",
@@ -2588,7 +2596,7 @@ def test_config_set_fast_rejects_unsupported_model(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "fast", "value": "fast"},
-            }
+            },
         )
         assert resp["error"]["code"] == 4002
         assert "not available" in resp["error"]["message"]
@@ -2609,7 +2617,7 @@ def test_config_set_fast_rejects_missing_model(monkeypatch):
     server._sessions["sid"] = _session(agent=agent)
 
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
 
     try:
@@ -2618,7 +2626,7 @@ def test_config_set_fast_rejects_missing_model(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "fast", "value": "fast"},
-            }
+            },
         )
         assert resp["error"]["code"] == 4002
         assert "without a selected model" in resp["error"]["message"]
@@ -2638,11 +2646,11 @@ def test_config_busy_get_and_set(monkeypatch):
         lambda: {"display": {"busy_input_mode": "steer"}},
     )
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
 
     get_resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "busy"}}
+        {"id": "1", "method": "config.get", "params": {"key": "busy"}},
     )
     assert get_resp["result"]["value"] == "steer"
 
@@ -2651,7 +2659,7 @@ def test_config_busy_get_and_set(monkeypatch):
             "id": "2",
             "method": "config.set",
             "params": {"key": "busy", "value": "interrupt"},
-        }
+        },
     )
     assert set_resp["result"]["value"] == "interrupt"
     assert ("display.busy_input_mode", "interrupt") in writes
@@ -2665,7 +2673,7 @@ def test_config_set_yolo_process_scope_treats_false_like_env_as_disabled(monkeyp
             "id": "1",
             "method": "config.set",
             "params": {"key": "yolo"},
-        }
+        },
     )
 
     assert resp["result"]["value"] == "1"
@@ -2676,7 +2684,7 @@ def test_config_get_statusbar_survives_non_dict_display(monkeypatch):
     monkeypatch.setattr(server, "_load_cfg", lambda: {"display": "broken"})
 
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "statusbar"}}
+        {"id": "1", "method": "config.get", "params": {"key": "statusbar"}},
     )
 
     assert resp["result"]["value"] == "top"
@@ -2686,7 +2694,7 @@ def test_config_get_busy_survives_non_dict_display(monkeypatch):
     monkeypatch.setattr(server, "_load_cfg", lambda: {"display": "broken"})
 
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "busy"}}
+        {"id": "1", "method": "config.get", "params": {"key": "busy"}},
     )
 
     assert resp["result"]["value"] == "interrupt"
@@ -2704,7 +2712,7 @@ def test_config_set_statusbar_survives_non_dict_display(tmp_path, monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "statusbar", "value": "bottom"},
-        }
+        },
     )
 
     assert resp["result"]["value"] == "bottom"
@@ -2718,8 +2726,8 @@ def test_config_set_details_mode_pins_all_sections(tmp_path, monkeypatch):
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(
         yaml.safe_dump(
-            {"display": {"sections": {"tools": "expanded", "activity": "hidden"}}}
-        )
+            {"display": {"sections": {"tools": "expanded", "activity": "hidden"}}},
+        ),
     )
     monkeypatch.setattr(server, "_hermes_home", tmp_path)
 
@@ -2728,7 +2736,7 @@ def test_config_set_details_mode_pins_all_sections(tmp_path, monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "details_mode", "value": "collapsed"},
-        }
+        },
     )
 
     assert resp["result"] == {"key": "details_mode", "value": "collapsed"}
@@ -2753,7 +2761,7 @@ def test_config_set_section_writes_per_section_override(tmp_path, monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "details_mode.activity", "value": "hidden"},
-        }
+        },
     )
 
     assert resp["result"] == {"key": "details_mode.activity", "value": "hidden"}
@@ -2767,8 +2775,8 @@ def test_config_set_section_clears_override_on_empty_value(tmp_path, monkeypatch
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text(
         yaml.safe_dump(
-            {"display": {"sections": {"activity": "hidden", "tools": "expanded"}}}
-        )
+            {"display": {"sections": {"activity": "hidden", "tools": "expanded"}}},
+        ),
     )
     monkeypatch.setattr(server, "_hermes_home", tmp_path)
 
@@ -2777,7 +2785,7 @@ def test_config_set_section_clears_override_on_empty_value(tmp_path, monkeypatch
             "id": "1",
             "method": "config.set",
             "params": {"key": "details_mode.activity", "value": ""},
-        }
+        },
     )
 
     assert resp["result"] == {"key": "details_mode.activity", "value": ""}
@@ -2793,7 +2801,7 @@ def test_config_set_section_rejects_unknown_section_or_mode(tmp_path, monkeypatc
             "id": "1",
             "method": "config.set",
             "params": {"key": "details_mode.bogus", "value": "hidden"},
-        }
+        },
     )
     assert bad_section["error"]["code"] == 4002
 
@@ -2802,7 +2810,7 @@ def test_config_set_section_rejects_unknown_section_or_mode(tmp_path, monkeypatc
             "id": "2",
             "method": "config.set",
             "params": {"key": "details_mode.tools", "value": "maximised"},
-        }
+        },
     )
     assert bad_mode["error"]["code"] == 4002
 
@@ -2813,16 +2821,16 @@ def test_config_mouse_uses_documented_key_with_legacy_fallback(monkeypatch):
 
     monkeypatch.setattr(server, "_load_cfg", lambda: cfg)
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
 
     get_legacy = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "mouse"}}
+        {"id": "1", "method": "config.get", "params": {"key": "mouse"}},
     )
     assert get_legacy["result"]["value"] == "off"
 
     set_toggle = server.handle_request(
-        {"id": "2", "method": "config.set", "params": {"key": "mouse"}}
+        {"id": "2", "method": "config.set", "params": {"key": "mouse"}},
     )
     # /mouse (no arg) toggles between 'all' and 'off'. Starting from
     # tui_mouse: False (→ 'off'), the toggle flips to 'all'.
@@ -2831,13 +2839,13 @@ def test_config_mouse_uses_documented_key_with_legacy_fallback(monkeypatch):
 
     cfg["display"] = {"mouse_tracking": 0, "tui_mouse": True}
     get_canonical = server.handle_request(
-        {"id": "3", "method": "config.get", "params": {"key": "mouse"}}
+        {"id": "3", "method": "config.get", "params": {"key": "mouse"}},
     )
     assert get_canonical["result"]["value"] == "off"
 
     cfg["display"] = {"mouse_tracking": None, "tui_mouse": False}
     get_null = server.handle_request(
-        {"id": "4", "method": "config.get", "params": {"key": "mouse"}}
+        {"id": "4", "method": "config.get", "params": {"key": "mouse"}},
     )
     # mouse_tracking present-but-None defers neither to tui_mouse nor to
     # the legacy off bucket: it falls through to the 'all' default.
@@ -2850,7 +2858,7 @@ def test_config_mouse_accepts_preset_strings_and_aliases(monkeypatch):
 
     monkeypatch.setattr(server, "_load_cfg", lambda: cfg)
     monkeypatch.setattr(
-        server, "_write_config_key", lambda path, value: writes.append((path, value))
+        server, "_write_config_key", lambda path, value: writes.append((path, value)),
     )
 
     # Direct preset.
@@ -2859,7 +2867,7 @@ def test_config_mouse_accepts_preset_strings_and_aliases(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "mouse", "value": "wheel"},
-        }
+        },
     )
     assert set_wheel["result"] == {"key": "mouse", "value": "wheel"}
     assert writes[-1] == ("display.mouse_tracking", "wheel")
@@ -2870,7 +2878,7 @@ def test_config_mouse_accepts_preset_strings_and_aliases(monkeypatch):
             "id": "2",
             "method": "config.set",
             "params": {"key": "mouse", "value": "click"},
-        }
+        },
     )
     assert set_click["result"] == {"key": "mouse", "value": "buttons"}
     assert writes[-1] == ("display.mouse_tracking", "buttons")
@@ -2881,7 +2889,7 @@ def test_config_mouse_accepts_preset_strings_and_aliases(monkeypatch):
             "id": "3",
             "method": "config.set",
             "params": {"key": "mouse", "value": "rainbows"},
-        }
+        },
     )
     assert bad["error"]["code"] == 4002
 
@@ -2961,14 +2969,14 @@ def test_complete_slash_drops_removed_provider_alias():
     # `/provider` was folded into a single `/model` command, so autocomplete
     # must no longer offer the dead alias...
     resp = server.handle_request(
-        {"id": "1", "method": "complete.slash", "params": {"text": "/pro"}}
+        {"id": "1", "method": "complete.slash", "params": {"text": "/pro"}},
     )
 
     assert not any(item["text"] == "provider" for item in resp["result"]["items"])
 
     # ...while `/model` stays the canonical command.
     resp_model = server.handle_request(
-        {"id": "2", "method": "complete.slash", "params": {"text": "/mod"}}
+        {"id": "2", "method": "complete.slash", "params": {"text": "/mod"}},
     )
 
     assert any(item["text"] == "model" for item in resp_model["result"]["items"])
@@ -2980,7 +2988,7 @@ def test_complete_slash_returns_plain_string_fields():
     # strings, and shipping the raw list trips Ink's row layout into
     # 1-char truncation of the next column (/goal → /goa).
     resp = server.handle_request(
-        {"id": "1", "method": "complete.slash", "params": {"text": "/g"}}
+        {"id": "1", "method": "complete.slash", "params": {"text": "/g"}},
     )
 
     items = resp["result"]["items"]
@@ -2996,7 +3004,7 @@ def test_complete_slash_returns_plain_string_fields():
 
 def test_complete_slash_includes_tui_details_command():
     resp = server.handle_request(
-        {"id": "1", "method": "complete.slash", "params": {"text": "/det"}}
+        {"id": "1", "method": "complete.slash", "params": {"text": "/det"}},
     )
 
     assert any(item["text"] == "/details" for item in resp["result"]["items"])
@@ -3004,7 +3012,7 @@ def test_complete_slash_includes_tui_details_command():
 
 def test_complete_slash_includes_tui_mouse_command():
     resp = server.handle_request(
-        {"id": "1", "method": "complete.slash", "params": {"text": "/mou"}}
+        {"id": "1", "method": "complete.slash", "params": {"text": "/mou"}},
     )
 
     assert any(item["text"] == "/mouse" for item in resp["result"]["items"])
@@ -3012,17 +3020,17 @@ def test_complete_slash_includes_tui_mouse_command():
 
 def test_complete_slash_details_args():
     resp_root = server.handle_request(
-        {"id": "0", "method": "complete.slash", "params": {"text": "/details"}}
+        {"id": "0", "method": "complete.slash", "params": {"text": "/details"}},
     )
     resp_section = server.handle_request(
-        {"id": "1", "method": "complete.slash", "params": {"text": "/details t"}}
+        {"id": "1", "method": "complete.slash", "params": {"text": "/details t"}},
     )
     resp_mode = server.handle_request(
         {
             "id": "2",
             "method": "complete.slash",
             "params": {"text": "/details thinking e"},
-        }
+        },
     )
 
     assert resp_root["result"]["replace_from"] == len("/details")
@@ -3041,7 +3049,7 @@ def test_config_set_reasoning_updates_live_session_and_agent(tmp_path, monkeypat
             "id": "1",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "reasoning", "value": "low"},
-        }
+        },
     )
     assert resp_effort["result"]["value"] == "low"
     assert agent.reasoning_config == {"enabled": True, "effort": "low"}
@@ -3051,7 +3059,7 @@ def test_config_set_reasoning_updates_live_session_and_agent(tmp_path, monkeypat
             "id": "2",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "reasoning", "value": "show"},
-        }
+        },
     )
     assert resp_show["result"]["value"] == "show"
     assert server._sessions["sid"]["show_reasoning"] is True
@@ -3062,7 +3070,7 @@ def test_config_set_reasoning_updates_live_session_and_agent(tmp_path, monkeypat
             "id": "3",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "reasoning", "value": "hide"},
-        }
+        },
     )
     assert resp_hide["result"]["value"] == "hide"
     assert server._sessions["sid"]["show_reasoning"] is False
@@ -3076,7 +3084,7 @@ def test_config_set_reasoning_updates_live_session_and_agent(tmp_path, monkeypat
             "id": "4",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "reasoning", "value": "full"},
-        }
+        },
     )
     assert resp_full["result"]["value"] == "full"
     cfg_full = server._load_cfg()
@@ -3088,7 +3096,7 @@ def test_config_set_reasoning_updates_live_session_and_agent(tmp_path, monkeypat
             "id": "5",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "reasoning", "value": "clamp"},
-        }
+        },
     )
     assert resp_clamp["result"]["value"] == "clamp"
     cfg_clamp = server._load_cfg()
@@ -3106,7 +3114,7 @@ def test_config_set_verbose_updates_session_mode_and_agent(tmp_path, monkeypatch
             "id": "1",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "verbose", "value": "cycle"},
-        }
+        },
     )
 
     assert resp["result"]["value"] == "verbose"
@@ -3114,12 +3122,10 @@ def test_config_set_verbose_updates_session_mode_and_agent(tmp_path, monkeypatch
     assert agent.verbose_logging is True
 
 
-
 def test_config_set_model_waits_for_lazy_agent_before_switch(monkeypatch):
     """A model switch against a lazy-created live session must apply to the
     real agent, not just process env, before the prompt is dispatched.
     """
-
     agent_ready = threading.Event()
     agent = types.SimpleNamespace(model="old/model", provider="old-provider")
     session = _session(agent=agent)
@@ -3148,13 +3154,14 @@ def test_config_set_model_waits_for_lazy_agent_before_switch(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "model", "value": "new/model"},
-            }
+            },
         )
 
         assert resp["result"]["value"] == "new/model"
         assert calls == [("start", "sid"), ("apply", "sid", agent, "new/model")]
     finally:
         server._sessions.pop("sid", None)
+
 
 def test_config_set_model_uses_live_switch_path(monkeypatch):
     server._sessions["sid"] = _session()
@@ -3170,7 +3177,7 @@ def test_config_set_model_uses_live_switch_path(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "model", "value": "new/model"},
-        }
+        },
     )
 
     assert resp["result"]["value"] == "new/model"
@@ -3207,7 +3214,7 @@ def test_config_set_model_requires_confirmation_for_expensive_model(monkeypatch)
     agent = _Agent()
     server._sessions["sid"] = _session(agent=agent)
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result
+        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result,
     )
     monkeypatch.setattr(server, "_restart_slash_worker", lambda sid, session: None)
     monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
@@ -3221,7 +3228,7 @@ def test_config_set_model_requires_confirmation_for_expensive_model(monkeypatch)
                 "key": "model",
                 "value": "openai/gpt-5.5-pro --provider openrouter",
             },
-        }
+        },
     )
 
     assert resp["result"]["confirm_required"] is True
@@ -3238,7 +3245,7 @@ def test_config_set_model_requires_confirmation_for_expensive_model(monkeypatch)
                 "value": "openai/gpt-5.5-pro --provider openrouter",
                 "confirm_expensive_model": True,
             },
-        }
+        },
     )
 
     assert confirmed["result"]["confirm_required"] is False
@@ -3287,7 +3294,7 @@ def test_config_set_model_global_persists(monkeypatch):
                 "key": "model",
                 "value": "anthropic/claude-sonnet-4.6 --global",
             },
-        }
+        },
     )
 
     assert resp["result"]["value"] == "anthropic/claude-sonnet-4.6"
@@ -3332,7 +3339,7 @@ def test_config_set_model_explicit_provider_skips_broken_default_init(monkeypatc
                     "key": "model",
                     "value": "claude-sonnet-4.6 --provider anthropic",
                 },
-            }
+            },
         )
 
         assert resp["result"]["value"] == "claude-sonnet-4-6"
@@ -3373,7 +3380,7 @@ def test_config_set_model_explicit_provider_surfaces_selected_provider_errors(mo
                     "key": "model",
                     "value": "claude-sonnet-4.6 --provider anthropic",
                 },
-            }
+            },
         )
 
         assert resp["error"]["code"] == 5001
@@ -3419,7 +3426,7 @@ def test_config_set_model_does_not_leak_inference_provider_env(monkeypatch):
     server._sessions["sid"] = session
     monkeypatch.setenv("HERMES_INFERENCE_PROVIDER", "openrouter")
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result
+        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result,
     )
     monkeypatch.setattr(server, "_restart_slash_worker", lambda sid, session: None)
     monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
@@ -3434,7 +3441,7 @@ def test_config_set_model_does_not_leak_inference_provider_env(monkeypatch):
                     "key": "model",
                     "value": "claude-sonnet-4.6 --provider anthropic",
                 },
-            }
+            },
         )
 
         # Shared process env is UNCHANGED (the contamination vector is gone).
@@ -3480,7 +3487,7 @@ def test_config_set_model_records_per_session_override_not_env(monkeypatch):
     monkeypatch.delenv("HERMES_TUI_PROVIDER", raising=False)
     monkeypatch.delenv("HERMES_INFERENCE_PROVIDER", raising=False)
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result
+        "hermes_cli.model_switch.switch_model", lambda **_kwargs: result,
     )
     monkeypatch.setattr(server, "_restart_slash_worker", lambda sid, session: None)
     monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
@@ -3495,7 +3502,7 @@ def test_config_set_model_records_per_session_override_not_env(monkeypatch):
                     "key": "model",
                     "value": "deepseek-v4-pro --provider custom:xuanji",
                 },
-            }
+            },
         )
 
         # No process-global env mutation.
@@ -3553,7 +3560,7 @@ def test_config_set_model_switches_agent_without_touching_env(monkeypatch):
 
         def append_message(self, session_id, role, content=None, **_kwargs):
             self.messages.append(
-                {"session_id": session_id, "role": role, "content": content}
+                {"session_id": session_id, "role": role, "content": content},
             )
 
     agent = Agent()
@@ -3590,7 +3597,7 @@ def test_config_set_model_switches_agent_without_touching_env(monkeypatch):
                     "key": "model",
                     "value": "anthropic/claude-sonnet-4.6 --provider anthropic",
                 },
-            }
+            },
         )
 
         assert resp["result"]["value"] == "anthropic/claude-sonnet-4.6"
@@ -3634,7 +3641,7 @@ def test_config_set_personality_rejects_unknown_name(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "personality", "value": "bogus"},
-        }
+        },
     )
 
     assert "error" in resp
@@ -3643,7 +3650,7 @@ def test_config_set_personality_rejects_unknown_name(monkeypatch):
 
 def test_config_set_personality_preserves_history_and_returns_info(monkeypatch):
     agent = types.SimpleNamespace(
-        ephemeral_system_prompt=None, _cached_system_prompt="old"
+        ephemeral_system_prompt=None, _cached_system_prompt="old",
     )
     session = _session(
         agent=agent,
@@ -3659,7 +3666,7 @@ def test_config_set_personality_preserves_history_and_returns_info(monkeypatch):
         lambda cfg=None: {"helpful": "You are helpful."},
     )
     monkeypatch.setattr(
-        server, "_session_info", lambda agent, *a: {"model": getattr(agent, "model", "?")}
+        server, "_session_info", lambda agent, *a: {"model": getattr(agent, "model", "?")},
     )
     monkeypatch.setattr(server, "_emit", lambda *args: emits.append(args))
     monkeypatch.setattr(server, "_write_config_key", lambda path, value: None)
@@ -3669,7 +3676,7 @@ def test_config_set_personality_preserves_history_and_returns_info(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"session_id": "sid", "key": "personality", "value": "helpful"},
-        }
+        },
     )
 
     assert resp["result"]["history_reset"] is False
@@ -3700,7 +3707,7 @@ def test_session_compress_uses_compress_helper(monkeypatch):
 
     with patch("tui_gateway.server._emit") as emit:
         resp = server.handle_request(
-            {"id": "1", "method": "session.compress", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.compress", "params": {"session_id": "sid"}},
         )
 
     assert resp["result"]["removed"] == 2
@@ -3731,7 +3738,7 @@ def test_session_compress_syncs_session_key_after_rotation(monkeypatch):
     monkeypatch.setattr(server, "_session_info", lambda _agent, *a: {"model": "x"})
     restart_calls = []
     monkeypatch.setattr(
-        server, "_restart_slash_worker", lambda sid, s: restart_calls.append(s)
+        server, "_restart_slash_worker", lambda sid, s: restart_calls.append(s),
     )
 
     try:
@@ -3741,7 +3748,7 @@ def test_session_compress_syncs_session_key_after_rotation(monkeypatch):
                     "id": "1",
                     "method": "session.compress",
                     "params": {"session_id": "sid"},
-                }
+                },
             )
 
         assert server._sessions["sid"]["session_key"] == "rotated-id"
@@ -3758,7 +3765,7 @@ def test_prompt_submit_sets_approval_session_key(monkeypatch):
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             captured["session_key"] = get_current_session_key(default="")
             return {
@@ -3784,7 +3791,7 @@ def test_prompt_submit_sets_approval_session_key(monkeypatch):
             "id": "1",
             "method": "prompt.submit",
             "params": {"session_id": "sid", "text": "ping"},
-        }
+        },
     )
 
     assert resp["result"]["status"] == "streaming"
@@ -3800,7 +3807,7 @@ def test_prompt_submit_expands_context_refs(monkeypatch):
         api_key = ""
 
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             captured["prompt"] = prompt
             return {
@@ -3841,7 +3848,7 @@ def test_prompt_submit_expands_context_refs(monkeypatch):
             "id": "1",
             "method": "prompt.submit",
             "params": {"session_id": "sid", "text": "@diff"},
-        }
+        },
     )
 
     assert captured["prompt"] == "expanded prompt"
@@ -3866,7 +3873,7 @@ def test_image_attach_appends_local_image(monkeypatch):
             "id": "1",
             "method": "image.attach",
             "params": {"session_id": "sid", "path": "/tmp/cat.png"},
-        }
+        },
     )
 
     assert resp["result"]["attached"] is True
@@ -3897,7 +3904,7 @@ def test_image_attach_accepts_unquoted_screenshot_path_with_spaces(monkeypatch):
             "id": "1",
             "method": "image.attach",
             "params": {"session_id": "sid", "path": str(screenshot)},
-        }
+        },
     )
 
     assert resp["result"]["attached"] is True
@@ -3929,7 +3936,7 @@ def test_file_attach_uploads_remote_file_into_session_workspace(monkeypatch, tmp
                     "name": "report.txt",
                     "data_url": "data:text/plain;base64,aGVsbG8gd29ybGQ=",
                 },
-            }
+            },
         )
 
         stored = workspace / ".hermes" / "desktop-attachments" / "report.txt"
@@ -3962,7 +3969,7 @@ def test_file_attach_copies_gateway_visible_file_outside_workspace(monkeypatch, 
                 "id": "1",
                 "method": "file.attach",
                 "params": {"session_id": "sid", "path": str(source)},
-            }
+            },
         )
 
         stored = workspace / ".hermes" / "desktop-attachments" / "outside.txt"
@@ -3994,7 +4001,7 @@ def test_file_attach_uses_in_workspace_file_without_copying(monkeypatch, tmp_pat
                 "id": "1",
                 "method": "file.attach",
                 "params": {"session_id": "sid", "path": str(source)},
-            }
+            },
         )
 
         assert resp["result"]["attached"] is True
@@ -4024,7 +4031,7 @@ def test_file_attach_errors_when_unresolvable_and_no_bytes(monkeypatch, tmp_path
                 "id": "1",
                 "method": "file.attach",
                 "params": {"session_id": "sid", "path": "/Users/alice/missing.txt"},
-            }
+            },
         )
 
         assert "error" in resp
@@ -4055,7 +4062,7 @@ def test_file_attach_quotes_ref_with_spaces(monkeypatch, tmp_path):
                     "name": "my exam schedule.csv",
                     "data_url": "data:text/csv;base64,YSxiCg==",
                 },
-            }
+            },
         )
 
         assert resp["result"]["attached"] is True
@@ -4077,12 +4084,12 @@ def test_commands_catalog_surfaces_quick_commands(monkeypatch):
                     "command": "cat NOTES.md",
                     "description": "Open design notes",
                 },
-            }
+            },
         },
     )
 
     resp = server.handle_request(
-        {"id": "1", "method": "commands.catalog", "params": {}}
+        {"id": "1", "method": "commands.catalog", "params": {}},
     )
 
     pairs = dict(resp["result"]["pairs"])
@@ -4102,7 +4109,7 @@ def test_commands_catalog_surfaces_quick_commands(monkeypatch):
 
 def test_commands_catalog_includes_tui_mouse_command():
     resp = server.handle_request(
-        {"id": "1", "method": "commands.catalog", "params": {}}
+        {"id": "1", "method": "commands.catalog", "params": {}},
     )
 
     pairs = dict(resp["result"]["pairs"])
@@ -4115,7 +4122,7 @@ def test_commands_catalog_includes_tui_mouse_command():
 
 def test_commands_catalog_filters_gateway_only_commands_and_keeps_status_visible():
     resp = server.handle_request(
-        {"id": "1", "method": "commands.catalog", "params": {}}
+        {"id": "1", "method": "commands.catalog", "params": {}},
     )
 
     pairs = dict(resp["result"]["pairs"])
@@ -4158,7 +4165,7 @@ def test_session_status_reads_live_gateway_agent(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.status", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.status", "params": {"session_id": "sid"}},
         )
     finally:
         server._sessions.pop("sid", None)
@@ -4173,7 +4180,7 @@ def test_session_status_reads_live_gateway_agent(monkeypatch):
 
 
 def test_skills_reload_runs_in_gateway_process(monkeypatch):
-    import agent.skill_commands as skill_commands
+    from agent import skill_commands
 
     called = {}
     monkeypatch.setattr(
@@ -4204,7 +4211,7 @@ def test_snapshot_restore_is_blocked_from_tui_worker():
                 "id": "1",
                 "method": "slash.exec",
                 "params": {"command": "snapshot restore latest", "session_id": "sid"},
-            }
+            },
         )
         dispatch_resp = server.handle_request(
             {
@@ -4215,7 +4222,7 @@ def test_snapshot_restore_is_blocked_from_tui_worker():
                     "name": "snapshot",
                     "session_id": "sid",
                 },
-            }
+            },
         )
     finally:
         server._sessions.pop("sid", None)
@@ -4240,12 +4247,12 @@ def test_command_dispatch_exec_nonzero_surfaces_error(monkeypatch):
         server.subprocess,
         "run",
         lambda *args, **kwargs: types.SimpleNamespace(
-            returncode=1, stdout="", stderr="failed"
+            returncode=1, stdout="", stderr="failed",
         ),
     )
 
     resp = server.handle_request(
-        {"id": "1", "method": "command.dispatch", "params": {"name": "boom"}}
+        {"id": "1", "method": "command.dispatch", "params": {"name": "boom"}},
     )
 
     assert "error" in resp
@@ -4255,7 +4262,7 @@ def test_command_dispatch_exec_nonzero_surfaces_error(monkeypatch):
 def test_plugins_list_surfaces_loader_error(monkeypatch):
     with patch("hermes_cli.plugins.get_plugin_manager", side_effect=Exception("boom")):
         resp = server.handle_request(
-            {"id": "1", "method": "plugins.list", "params": {}}
+            {"id": "1", "method": "plugins.list", "params": {}},
         )
 
     assert "error" in resp
@@ -4268,7 +4275,7 @@ def test_complete_slash_surfaces_completer_error(monkeypatch):
         side_effect=Exception("no completer"),
     ):
         resp = server.handle_request(
-            {"id": "1", "method": "complete.slash", "params": {"text": "/mo"}}
+            {"id": "1", "method": "complete.slash", "params": {"text": "/mo"}},
         )
 
     assert "error" in resp
@@ -4291,7 +4298,7 @@ def test_input_detect_drop_attaches_image(monkeypatch):
             "id": "1",
             "method": "input.detect_drop",
             "params": {"session_id": "sid", "text": "/tmp/cat.png"},
-        }
+        },
     )
 
     assert resp["result"]["matched"] is True
@@ -4312,7 +4319,7 @@ def test_input_detect_drop_path_with_spaces(tmp_path):
             "id": "2",
             "method": "input.detect_drop",
             "params": {"session_id": "sid", "text": str(img)},
-        }
+        },
     )
 
     assert resp["result"]["matched"] is True
@@ -4337,7 +4344,7 @@ def test_input_detect_drop_path_with_spaces_and_remainder(tmp_path):
             "id": "3",
             "method": "input.detect_drop",
             "params": {"session_id": "sid", "text": user_input},
-        }
+        },
     )
 
     assert resp["result"]["matched"] is True
@@ -4362,14 +4369,14 @@ def test_rollback_restore_resolves_number_and_file_path():
             return {"success": True, "message": "done"}
 
     server._sessions["sid"] = _session(
-        agent=types.SimpleNamespace(_checkpoint_mgr=_Mgr()), history=[]
+        agent=types.SimpleNamespace(_checkpoint_mgr=_Mgr()), history=[],
     )
     resp = server.handle_request(
         {
             "id": "1",
             "method": "rollback.restore",
             "params": {"session_id": "sid", "hash": "2", "file_path": "src/app.tsx"},
-        }
+        },
     )
 
     assert resp["result"]["success"] is True
@@ -4401,7 +4408,7 @@ def test_session_steer_calls_agent_steer_when_agent_supports_it():
                 "id": "1",
                 "method": "session.steer",
                 "params": {"session_id": "sid", "text": "also check auth.log"},
-            }
+            },
         )
     finally:
         server._sessions.pop("sid", None)
@@ -4415,7 +4422,7 @@ def test_session_steer_calls_agent_steer_when_agent_supports_it():
 
 def test_session_steer_rejects_empty_text():
     server._sessions["sid"] = _session(
-        agent=types.SimpleNamespace(steer=lambda t: True)
+        agent=types.SimpleNamespace(steer=lambda t: True),
     )
     try:
         resp = server.handle_request(
@@ -4423,7 +4430,7 @@ def test_session_steer_rejects_empty_text():
                 "id": "1",
                 "method": "session.steer",
                 "params": {"session_id": "sid", "text": "   "},
-            }
+            },
         )
     finally:
         server._sessions.pop("sid", None)
@@ -4440,7 +4447,7 @@ def test_session_steer_errors_when_agent_has_no_steer_method():
                 "id": "1",
                 "method": "session.steer",
                 "params": {"session_id": "sid", "text": "hi"},
-            }
+            },
         )
     finally:
         server._sessions.pop("sid", None)
@@ -4492,7 +4499,8 @@ def test_session_info_includes_session_title(monkeypatch):
 def test_session_undo_rejects_while_running():
     """Fix for TUI silent-drop #1: /undo must not mutate history
     while the agent is mid-turn — would either clobber the undo or
-    cause prompt.submit to silently drop the agent's response."""
+    cause prompt.submit to silently drop the agent's response.
+    """
     server._sessions["sid"] = _session(
         running=True,
         history=[
@@ -4502,7 +4510,7 @@ def test_session_undo_rejects_while_running():
     )
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.undo", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.undo", "params": {"session_id": "sid"}},
         )
         assert resp.get("error"), "session.undo should reject while running"
         assert resp["error"]["code"] == 4009
@@ -4524,7 +4532,7 @@ def test_session_undo_allowed_when_idle():
     )
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.undo", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.undo", "params": {"session_id": "sid"}},
         )
         assert resp.get("result"), f"got error: {resp.get('error')}"
         assert resp["result"]["removed"] == 2
@@ -4537,7 +4545,7 @@ def test_session_compress_rejects_while_running(monkeypatch):
     server._sessions["sid"] = _session(running=True)
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.compress", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.compress", "params": {"session_id": "sid"}},
         )
         assert resp.get("error")
         assert resp["error"]["code"] == 4009
@@ -4554,7 +4562,7 @@ def test_rollback_restore_rejects_full_history_while_running(monkeypatch):
                 "id": "1",
                 "method": "rollback.restore",
                 "params": {"session_id": "sid", "hash": "abc"},
-            }
+            },
         )
         assert resp.get("error"), "full-history rollback should reject while running"
         assert resp["error"]["code"] == 4009
@@ -4566,14 +4574,15 @@ def test_prompt_submit_history_version_mismatch_surfaces_warning(monkeypatch):
     """Fix for TUI silent-drop #2: the defensive backstop at prompt.submit
     must attach a 'warning' to message.complete when history was
     mutated externally during the turn (instead of silently dropping
-    the agent's output)."""
+    the agent's output).
+    """
     # Agent bumps history_version itself mid-run to simulate an external
     # mutation slipping past the guards.
     session_ref = {"s": None}
 
     class _RacyAgent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             # Simulate: something external bumped history_version
             # while we were running.
@@ -4605,7 +4614,7 @@ def test_prompt_submit_history_version_mismatch_surfaces_warning(monkeypatch):
                 "id": "1",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid", "text": "hi"},
-            }
+            },
         )
         assert resp.get("result"), f"got error: {resp.get('error')}"
 
@@ -4635,7 +4644,7 @@ def test_prompt_submit_history_version_match_persists_normally(monkeypatch):
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": "reply",
@@ -4662,13 +4671,13 @@ def test_prompt_submit_history_version_match_persists_normally(monkeypatch):
                 "id": "1",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid", "text": "hi"},
-            }
+            },
         )
         assert resp.get("result")
 
         # History was written
         assert server._sessions["sid"]["history"] == [
-            {"role": "assistant", "content": "reply"}
+            {"role": "assistant", "content": "reply"},
         ]
         assert server._sessions["sid"]["history_version"] == 1
 
@@ -4683,12 +4692,11 @@ def test_prompt_submit_history_version_match_persists_normally(monkeypatch):
 
 def test_prompt_submit_can_truncate_before_user_ordinal(monkeypatch):
     """Desktop user-message edits should restart the turn from the edited user."""
-
     seen = {}
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             seen["prompt"] = prompt
             seen["history"] = conversation_history
@@ -4741,7 +4749,7 @@ def test_prompt_submit_can_truncate_before_user_ordinal(monkeypatch):
                     "text": "edited second",
                     "truncate_before_user_ordinal": 1,
                 },
-            }
+            },
         )
         assert resp.get("result"), f"got error: {resp.get('error')}"
 
@@ -4769,7 +4777,8 @@ def test_prompt_submit_can_truncate_before_user_ordinal(monkeypatch):
 
 def test_interrupt_only_clears_own_session_pending():
     """session.interrupt on session A must NOT release pending prompts
-    that belong to session B."""
+    that belong to session B.
+    """
     import types
 
     session_a = _session()
@@ -4794,7 +4803,7 @@ def test_interrupt_only_clears_own_session_pending():
                 "id": "1",
                 "method": "session.interrupt",
                 "params": {"session_id": "sid_a"},
-            }
+            },
         )
         assert resp.get("result"), f"got error: {resp.get('error')}"
 
@@ -4820,7 +4829,8 @@ def test_interrupt_only_clears_own_session_pending():
 
 def test_interrupt_clears_multiple_own_pending():
     """When a single session has multiple pending prompts (uncommon but
-    possible via nested tool calls), interrupt must release all of them."""
+    possible via nested tool calls), interrupt must release all of them.
+    """
     import types
 
     sess = _session()
@@ -4833,7 +4843,7 @@ def test_interrupt_clears_multiple_own_pending():
         server._pending["r2"] = ("sid", ev2)
 
         resp = server.handle_request(
-            {"id": "1", "method": "session.interrupt", "params": {"session_id": "sid"}}
+            {"id": "1", "method": "session.interrupt", "params": {"session_id": "sid"}},
         )
         assert resp.get("result")
         assert ev1.is_set() and ev2.is_set()
@@ -4847,7 +4857,8 @@ def test_interrupt_clears_multiple_own_pending():
 
 def test_clear_pending_without_sid_clears_all():
     """_clear_pending(None) is the shutdown path — must still release
-    every pending prompt regardless of owning session."""
+    every pending prompt regardless of owning session.
+    """
     ev1, ev2, ev3 = threading.Event(), threading.Event(), threading.Event()
     server._pending["a"] = ("sid_x", ev1)
     server._pending["b"] = ("sid_y", ev2)
@@ -4871,7 +4882,7 @@ def test_respond_unpacks_sid_tuple_correctly():
                 "id": "1",
                 "method": "clarify.respond",
                 "params": {"request_id": "rid-x", "answer": "the answer"},
-            }
+            },
         )
         assert resp.get("result")
         assert ev.is_set()
@@ -4912,7 +4923,7 @@ def test_config_set_model_rejects_while_running(monkeypatch):
                     "key": "model",
                     "value": "anthropic/claude-sonnet-4.6",
                 },
-            }
+            },
         )
         assert resp.get("error")
         assert resp["error"]["code"] == 4009
@@ -4942,7 +4953,7 @@ def test_config_set_model_allowed_when_idle(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"session_id": "sid", "key": "model", "value": "newmodel"},
-            }
+            },
         )
         assert resp.get("result")
         assert resp["result"]["value"] == "newmodel"
@@ -4955,7 +4966,8 @@ def test_mirror_slash_side_effects_rejects_mutating_commands_while_running(monke
     """Slash worker passthrough (e.g. /model, /personality, /prompt,
     /compress) must reject during an in-flight turn.  Same race as
     config.set — mutates live agent state while run_conversation is
-    reading it."""
+    reading it.
+    """
     import types
 
     applied = {"model": False, "compress": False}
@@ -5016,7 +5028,8 @@ def test_mirror_slash_compress_does_not_prelock_history(monkeypatch):
     """Regression guard: /compress side effect must not hold history_lock
     when calling _compress_session_history (the helper snapshots under
     the same non-reentrant lock internally). It also returns a before/after
-    summary string (#46686)."""
+    summary string (#46686).
+    """
     import types
 
     seen = {"compress": False, "sync": False}
@@ -5066,7 +5079,8 @@ def test_session_create_close_race_does_not_orphan_worker(monkeypatch):
     must detect the orphan and clean up the slash_worker + notify
     registration it's about to install.  Without the cleanup those
     resources leak — the subprocess stays alive until atexit and the
-    notify callback lingers in the global registry."""
+    notify callback lingers in the global registry.
+    """
     import threading
 
     closed_workers: list[str] = []
@@ -5135,7 +5149,7 @@ def test_session_create_close_race_does_not_orphan_worker(monkeypatch):
             "id": "1",
             "method": "session.create",
             "params": {"cols": 80},
-        }
+        },
     )
     assert resp.get("result"), f"got error: {resp.get('error')}"
     sid = resp["result"]["session_id"]
@@ -5155,7 +5169,7 @@ def test_session_create_close_race_does_not_orphan_worker(monkeypatch):
             "id": "2",
             "method": "session.close",
             "params": {"session_id": sid},
-        }
+        },
     )
     assert close_resp.get("result", {}).get("closed") is True
 
@@ -5189,7 +5203,8 @@ def test_session_create_close_race_does_not_orphan_worker(monkeypatch):
 def test_session_create_no_race_keeps_worker_alive(monkeypatch):
     """Regression guard: when session.close does NOT race, the build
     thread must install the worker + notify normally and leave them
-    alone (no over-eager cleanup)."""
+    alone (no over-eager cleanup).
+    """
     closed_workers: list[str] = []
     unregistered_keys: list[str] = []
 
@@ -5244,7 +5259,7 @@ def test_session_create_no_race_keeps_worker_alive(monkeypatch):
                 "id": "1",
                 "method": "session.create",
                 "params": {"cols": 80},
-            }
+            },
         )
         sid = resp["result"]["session_id"]
 
@@ -5317,7 +5332,7 @@ def test_session_create_continues_when_state_db_is_unavailable(monkeypatch):
     monkeypatch.setattr(_approval, "load_permanent_allowlist", lambda: None)
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.create", "params": {"cols": 80}}
+        {"id": "1", "method": "session.create", "params": {"cols": 80}},
     )
     sid = resp["result"]["session_id"]
     session = server._sessions[sid]
@@ -5333,7 +5348,8 @@ def test_session_create_continues_when_state_db_is_unavailable(monkeypatch):
 def test_session_create_lazy_info_reports_desktop_contract(monkeypatch):
     """The lazy session.create info payload must carry desktop_contract, else
     the desktop GUI reads it as undefined and falsely warns "Backend out of
-    date" on every launch even against a current backend."""
+    date" on every launch even against a current backend.
+    """
 
     class _FakeWorker:
         def __init__(self, key, model):
@@ -5348,7 +5364,7 @@ def test_session_create_lazy_info_reports_desktop_contract(monkeypatch):
     monkeypatch.setattr(server, "_start_agent_build", lambda *a, **kw: None)
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.create", "params": {"cols": 80}}
+        {"id": "1", "method": "session.create", "params": {"cols": 80}},
     )
     info = resp["result"]["info"]
 
@@ -5394,7 +5410,7 @@ def test_session_delete_returns_db_unavailable_when_no_db(monkeypatch):
     monkeypatch.setattr(server, "_db_error", "locked")
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.delete", "params": {"session_id": "abc"}}
+        {"id": "1", "method": "session.delete", "params": {"session_id": "abc"}},
     )
 
     assert "error" in resp
@@ -5419,7 +5435,7 @@ def test_session_delete_refuses_active_session(monkeypatch):
                 "id": "1",
                 "method": "session.delete",
                 "params": {"session_id": "key-live"},
-            }
+            },
         )
     finally:
         server._sessions.pop("live", None)
@@ -5434,7 +5450,8 @@ def test_session_delete_fails_closed_when_active_snapshot_raises(monkeypatch):
     """Concurrent ``_sessions`` mutation from another RPC thread can raise
     ``RuntimeError: dictionary changed size during iteration``.  When the
     handler can't enumerate active sessions safely it must refuse the
-    delete (fail closed) rather than fall through and allow it."""
+    delete (fail closed) rather than fall through and allow it.
+    """
 
     class _DB:
         def delete_session(self, *a, **kw):
@@ -5448,7 +5465,7 @@ def test_session_delete_fails_closed_when_active_snapshot_raises(monkeypatch):
     monkeypatch.setattr(server, "_sessions", _ExplodingDict())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.delete", "params": {"session_id": "x"}}
+        {"id": "1", "method": "session.delete", "params": {"session_id": "x"}},
     )
 
     assert "error" in resp
@@ -5464,7 +5481,7 @@ def test_session_delete_returns_4007_when_missing(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.delete", "params": {"session_id": "ghost"}}
+        {"id": "1", "method": "session.delete", "params": {"session_id": "ghost"}},
     )
 
     assert "error" in resp
@@ -5479,7 +5496,7 @@ def test_session_delete_propagates_db_exception(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.delete", "params": {"session_id": "x"}}
+        {"id": "1", "method": "session.delete", "params": {"session_id": "x"}},
     )
 
     assert "error" in resp
@@ -5490,7 +5507,8 @@ def test_session_delete_propagates_db_exception(monkeypatch):
 def test_session_delete_success_returns_deleted_id(monkeypatch):
     """Happy path — DB delete succeeds, response carries the deleted id
     and the on-disk sessions dir is forwarded so transcript files get
-    cleaned up alongside the row."""
+    cleaned up alongside the row.
+    """
     captured: dict = {}
 
     class _DB:
@@ -5502,7 +5520,7 @@ def test_session_delete_success_returns_deleted_id(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.delete", "params": {"session_id": "old-1"}}
+        {"id": "1", "method": "session.delete", "params": {"session_id": "old-1"}},
     )
 
     assert "result" in resp, resp
@@ -5576,7 +5594,8 @@ def test_model_options_does_not_overwrite_curated_models(monkeypatch):
 
 def test_model_options_propagates_list_exception(monkeypatch):
     """If list_authenticated_providers itself raises, surface as an RPC
-    error rather than swallowing to a blank picker."""
+    error rather than swallowing to a blank picker.
+    """
     monkeypatch.setattr(
         server,
         "_load_cfg",
@@ -5612,7 +5631,7 @@ def test_prompt_submit_auto_titles_session_on_complete(monkeypatch):
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": "Rome was founded in 753 BC.",
@@ -5635,7 +5654,7 @@ def test_prompt_submit_auto_titles_session_on_complete(monkeypatch):
                 "id": "1",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid", "text": "Tell me about Rome"},
-            }
+            },
         )
 
     mock_title.assert_called_once()
@@ -5650,7 +5669,7 @@ def test_prompt_submit_skips_auto_title_when_interrupted(monkeypatch):
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": "partial answer",
@@ -5671,7 +5690,7 @@ def test_prompt_submit_skips_auto_title_when_interrupted(monkeypatch):
                 "id": "1",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid", "text": "Tell me about Rome"},
-            }
+            },
         )
 
     mock_title.assert_not_called()
@@ -5682,7 +5701,7 @@ def test_prompt_submit_skips_auto_title_when_response_empty(monkeypatch):
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": "",
@@ -5702,7 +5721,7 @@ def test_prompt_submit_skips_auto_title_when_response_empty(monkeypatch):
                 "id": "1",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid", "text": "Tell me about Rome"},
-            }
+            },
         )
 
     mock_title.assert_not_called()
@@ -5711,11 +5730,12 @@ def test_prompt_submit_skips_auto_title_when_response_empty(monkeypatch):
 def test_prompt_submit_surfaces_backend_error_as_visible_text(monkeypatch):
     """When the backend fails with no visible response (e.g. invalid model slug
     → provider 4xx), the TUI must surface result['error'] as visible text
-    instead of emitting a blank message.complete turn."""
+    instead of emitting a blank message.complete turn.
+    """
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": None,
@@ -5744,7 +5764,7 @@ def test_prompt_submit_surfaces_backend_error_as_visible_text(monkeypatch):
             "id": "1",
             "method": "prompt.submit",
             "params": {"session_id": "sid", "text": "hello"},
-        }
+        },
     )
 
     complete_events = [e for e in emitted if e[0] == "message.complete"]
@@ -5758,11 +5778,12 @@ def test_prompt_submit_surfaces_backend_error_as_visible_text(monkeypatch):
 def test_prompt_submit_preserves_empty_response_without_error(monkeypatch):
     """An empty final_response with NO backend error must stay empty — do not
     synthesize an error string. Preserves the existing None/empty-sentinel
-    semantics owned by downstream handlers."""
+    semantics owned by downstream handlers.
+    """
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None,
         ):
             return {
                 "final_response": None,
@@ -5789,7 +5810,7 @@ def test_prompt_submit_preserves_empty_response_without_error(monkeypatch):
             "id": "1",
             "method": "prompt.submit",
             "params": {"session_id": "sid", "text": "hello"},
-        }
+        },
     )
 
     complete_events = [e for e in emitted if e[0] == "message.complete"]
@@ -5834,7 +5855,7 @@ def test_session_active_list_reports_live_sessions(monkeypatch):
                 "id": "1",
                 "method": "session.active_list",
                 "params": {"current_session_id": "sid-b"},
-            }
+            },
         )
     finally:
         server._sessions.clear()
@@ -5901,7 +5922,7 @@ def test_session_active_list_excludes_finalized_sessions(monkeypatch):
                 "id": "1",
                 "method": "session.active_list",
                 "params": {},
-            }
+            },
         )
     finally:
         server._sessions.clear()
@@ -5909,7 +5930,6 @@ def test_session_active_list_excludes_finalized_sessions(monkeypatch):
 
     session_rows = resp["result"]["sessions"]
     assert [row["id"] for row in session_rows] == ["sid-live"]
-
 
 
 def test_session_activate_returns_inflight_stream_before_completion(monkeypatch):
@@ -5959,7 +5979,7 @@ def test_session_activate_returns_inflight_stream_before_completion(monkeypatch)
                 "id": "submit",
                 "method": "prompt.submit",
                 "params": {"session_id": "sid-live", "text": "write a long answer"},
-            }
+            },
         )
         assert submit["result"]["status"] == "streaming"
         assert started.wait(2), "fake model did not stream before activation"
@@ -5969,7 +5989,7 @@ def test_session_activate_returns_inflight_stream_before_completion(monkeypatch)
                 "id": "activate",
                 "method": "session.activate",
                 "params": {"session_id": "sid-live"},
-            }
+            },
         )
 
         inflight = resp["result"].get("inflight")
@@ -5987,7 +6007,7 @@ def test_session_activate_returns_inflight_stream_before_completion(monkeypatch)
                 "id": "activate-done",
                 "method": "session.activate",
                 "params": {"session_id": "sid-live"},
-            }
+            },
         )
         assert completed["result"].get("inflight") is None
         assert completed["result"]["messages"] == [
@@ -6018,7 +6038,7 @@ def test_session_activate_switches_live_session_without_closing_siblings(monkeyp
     )
     try:
         resp = server.handle_request(
-            {"id": "1", "method": "session.activate", "params": {"session_id": "sid-b"}}
+            {"id": "1", "method": "session.activate", "params": {"session_id": "sid-b"}},
         )
 
         assert "sid-a" in server._sessions
@@ -6053,7 +6073,7 @@ def test_session_most_recent_returns_first_non_denied(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.most_recent", "params": {}}
+        {"id": "1", "method": "session.most_recent", "params": {}},
     )
 
     assert resp["result"]["session_id"] == "tui-1"
@@ -6069,7 +6089,7 @@ def test_session_most_recent_returns_null_when_only_tool_rows(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _DB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.most_recent", "params": {}}
+        {"id": "1", "method": "session.most_recent", "params": {}},
     )
 
     assert resp["result"]["session_id"] is None
@@ -6078,7 +6098,8 @@ def test_session_most_recent_returns_null_when_only_tool_rows(monkeypatch):
 def test_session_most_recent_folds_db_exception_into_null_result(monkeypatch):
     """Per contract, errors are folded into the null-result shape so
     callers don't have to special-case JSON-RPC error envelopes for
-    'no answer' (Copilot review on #17130)."""
+    'no answer' (Copilot review on #17130).
+    """
 
     class _BrokenDB:
         def list_sessions_rich(self, *, source=None, limit=200):
@@ -6087,7 +6108,7 @@ def test_session_most_recent_folds_db_exception_into_null_result(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: _BrokenDB())
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.most_recent", "params": {}}
+        {"id": "1", "method": "session.most_recent", "params": {}},
     )
 
     assert "error" not in resp
@@ -6098,7 +6119,7 @@ def test_session_most_recent_handles_db_unavailable(monkeypatch):
     monkeypatch.setattr(server, "_get_db", lambda: None)
 
     resp = server.handle_request(
-        {"id": "1", "method": "session.most_recent", "params": {}}
+        {"id": "1", "method": "session.most_recent", "params": {}},
     )
 
     assert resp["result"]["session_id"] is None
@@ -6158,7 +6179,7 @@ def test_browser_manage_status_reads_env_var(monkeypatch):
     monkeypatch.setenv("BROWSER_CDP_URL", "http://127.0.0.1:9222")
 
     resp = server.handle_request(
-        {"id": "1", "method": "browser.manage", "params": {"action": "status"}}
+        {"id": "1", "method": "browser.manage", "params": {"action": "status"}},
     )
 
     assert resp["result"]["connected"] is True
@@ -6167,15 +6188,16 @@ def test_browser_manage_status_reads_env_var(monkeypatch):
 
 def test_browser_manage_status_falls_back_to_config_cdp_url(monkeypatch):
     """When env is unset, status surfaces ``browser.cdp_url`` from
-    config.yaml so users see what the next tool call will read."""
+    config.yaml so users see what the next tool call will read.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
 
     fake_cfg = types.SimpleNamespace(
-        read_raw_config=lambda: {"browser": {"cdp_url": "http://lan:9222"}}
+        read_raw_config=lambda: {"browser": {"cdp_url": "http://lan:9222"}},
     )
     with patch.dict(sys.modules, {"hermes_cli.config": fake_cfg}):
         resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "status"}}
+            {"id": "1", "method": "browser.manage", "params": {"action": "status"}},
         )
 
     assert resp["result"] == {"connected": True, "url": "http://lan:9222"}
@@ -6184,17 +6206,18 @@ def test_browser_manage_status_falls_back_to_config_cdp_url(monkeypatch):
 def test_browser_manage_status_does_not_call_get_cdp_override(monkeypatch):
     """Regression guard for Copilot's "status must not block" review:
     status must NOT route through `_get_cdp_override`, which performs a
-    `/json/version` HTTP probe with a multi-second timeout."""
+    `/json/version` HTTP probe with a multi-second timeout.
+    """
     monkeypatch.setenv("BROWSER_CDP_URL", "http://127.0.0.1:9222")
 
     fake = types.SimpleNamespace(
-        _get_cdp_override=lambda: pytest.fail(  # noqa: PT015 — fail loudly if called
-            "_get_cdp_override must not run on /browser status (network I/O)"
-        )
+        _get_cdp_override=lambda: pytest.fail(
+            "_get_cdp_override must not run on /browser status (network I/O)",
+        ),
     )
     with patch.dict(sys.modules, {"tools.browser_tool": fake}):
         resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "status"}}
+            {"id": "1", "method": "browser.manage", "params": {"action": "status"}},
         )
 
     assert resp["result"]["connected"] is True
@@ -6204,7 +6227,8 @@ def test_browser_manage_connect_sets_env_and_cleans_twice(monkeypatch):
     """`/browser connect` must reach the live process: set env, reap browser
     sessions before AND after publishing the new URL.  The double-cleanup
     closes the supervisor swap window where ``_ensure_cdp_supervisor``
-    could re-attach to the *old* CDP endpoint between steps."""
+    could re-attach to the *old* CDP endpoint between steps.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     cleanup_calls: list[str] = []
 
@@ -6222,7 +6246,7 @@ def test_browser_manage_connect_sets_env_and_cleans_twice(monkeypatch):
                 "id": "1",
                 "method": "browser.manage",
                 "params": {"action": "connect", "url": "http://127.0.0.1:9222"},
-            }
+            },
         )
 
     assert resp["result"]["connected"] is True
@@ -6242,7 +6266,7 @@ def test_browser_manage_connect_defaults_to_loopback(monkeypatch):
     with patch.dict(sys.modules, {"tools.browser_tool": fake}):
         urls = _stub_urlopen_capture(monkeypatch, ok=True)
         resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
+            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}},
         )
 
     assert resp["result"]["connected"] is True
@@ -6267,7 +6291,7 @@ def test_browser_manage_connect_default_local_reports_launch_hint(monkeypatch):
         _stub_urlopen(monkeypatch, ok=False)
         with (
             patch(
-                "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=False
+                "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=False,
             ),
             patch(
                 "hermes_cli.browser_connect.get_chrome_debug_candidates",
@@ -6283,7 +6307,7 @@ def test_browser_manage_connect_default_local_reports_launch_hint(monkeypatch):
                         "session_id": "sess-1",
                         "url": "http://localhost:9222",
                     },
-                }
+                },
             )
 
     assert resp["result"]["connected"] is False
@@ -6307,7 +6331,8 @@ def test_browser_manage_connect_default_local_reports_launch_hint(monkeypatch):
 def test_browser_manage_connect_no_session_skips_progress_events(monkeypatch):
     """Without a session_id the TUI prints messages from the response;
     emitting ``browser.progress`` events would double-render. Gate the
-    emit so callers without a session see the bundled list only."""
+    emit so callers without a session see the bundled list only.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     emitted: list[tuple[str, dict]] = []
     monkeypatch.setattr(
@@ -6323,7 +6348,7 @@ def test_browser_manage_connect_no_session_skips_progress_events(monkeypatch):
         _stub_urlopen(monkeypatch, ok=False)
         with (
             patch(
-                "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=False
+                "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=False,
             ),
             patch(
                 "hermes_cli.browser_connect.get_chrome_debug_candidates",
@@ -6335,7 +6360,7 @@ def test_browser_manage_connect_no_session_skips_progress_events(monkeypatch):
                     "id": "1",
                     "method": "browser.manage",
                     "params": {"action": "connect", "url": "http://localhost:9222"},
-                }
+                },
             )
 
     assert resp["result"]["connected"] is False
@@ -6346,7 +6371,8 @@ def test_browser_manage_connect_no_session_skips_progress_events(monkeypatch):
 def test_browser_manage_connect_handles_null_url(monkeypatch):
     """Explicit ``{"url": null}`` (or empty string) must fall back to the
     default loopback URL instead of raising a TypeError that gets swallowed
-    by the outer 5031 catch."""
+    by the outer 5031 catch.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6359,7 +6385,7 @@ def test_browser_manage_connect_handles_null_url(monkeypatch):
                 "id": "1",
                 "method": "browser.manage",
                 "params": {"action": "connect", "url": None},
-            }
+            },
         )
 
     assert resp["result"]["connected"] is True
@@ -6373,7 +6399,7 @@ def test_browser_manage_connect_rejects_non_string_url(monkeypatch):
             "id": "1",
             "method": "browser.manage",
             "params": {"action": "connect", "url": 9222},
-        }
+        },
     )
 
     assert resp["error"]["code"] == 4015
@@ -6409,13 +6435,12 @@ def test_browser_manage_connect_default_local_retries_after_launch(monkeypatch):
     import urllib.request
 
     monkeypatch.setattr(urllib.request, "urlopen", _opener)
-    with patch.dict(sys.modules, {"tools.browser_tool": fake}):
-        with patch(
-            "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=True
-        ):
-            resp = server.handle_request(
-                {"id": "1", "method": "browser.manage", "params": {"action": "connect"}}
-            )
+    with patch.dict(sys.modules, {"tools.browser_tool": fake}), patch(
+        "hermes_cli.browser_connect.try_launch_chrome_debug", return_value=True,
+    ):
+        resp = server.handle_request(
+            {"id": "1", "method": "browser.manage", "params": {"action": "connect"}},
+        )
 
     assert resp["result"]["connected"] is True
     assert resp["result"]["url"] == "http://127.0.0.1:9222"
@@ -6432,7 +6457,7 @@ def test_browser_manage_connect_rejects_unreachable_endpoint(monkeypatch):
     cleanup_calls: list[str] = []
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: cleanup_calls.append(
-            os.environ.get("BROWSER_CDP_URL", "")
+            os.environ.get("BROWSER_CDP_URL", ""),
         ),
         _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
     )
@@ -6443,7 +6468,7 @@ def test_browser_manage_connect_rejects_unreachable_endpoint(monkeypatch):
                 "id": "1",
                 "method": "browser.manage",
                 "params": {"action": "connect", "url": "http://unreachable:9222"},
-            }
+            },
         )
 
     assert "error" in resp
@@ -6455,7 +6480,8 @@ def test_browser_manage_connect_rejects_unreachable_endpoint(monkeypatch):
 def test_browser_manage_connect_normalizes_bare_host_port(monkeypatch):
     """Persist a parsed `scheme://host:port` URL so `_get_cdp_override`
     can normalize it; storing a bare host:port would break subsequent
-    tool calls (Copilot review on #17120)."""
+    tool calls (Copilot review on #17120).
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6468,7 +6494,7 @@ def test_browser_manage_connect_normalizes_bare_host_port(monkeypatch):
                 "id": "1",
                 "method": "browser.manage",
                 "params": {"action": "connect", "url": "127.0.0.1:9222"},
-            }
+            },
         )
 
     assert resp["result"]["connected"] is True
@@ -6481,7 +6507,8 @@ def test_browser_manage_connect_strips_discovery_path(monkeypatch):
     """User-supplied discovery paths like `/json` or `/json/version`
     must collapse to bare `scheme://host:port`; otherwise
     ``_resolve_cdp_override`` will append ``/json/version`` again and
-    produce a duplicate path (Copilot review round-2 on #17120)."""
+    produce a duplicate path (Copilot review round-2 on #17120).
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6494,7 +6521,7 @@ def test_browser_manage_connect_strips_discovery_path(monkeypatch):
                 "id": "1",
                 "method": "browser.manage",
                 "params": {"action": "connect", "url": "http://127.0.0.1:9222/json"},
-            }
+            },
         )
 
     assert resp["result"]["connected"] is True
@@ -6504,7 +6531,8 @@ def test_browser_manage_connect_strips_discovery_path(monkeypatch):
 
 def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch):
     """Concrete devtools websocket endpoints (e.g. Browserbase) must
-    survive verbatim — we only collapse discovery-style paths."""
+    survive verbatim — we only collapse discovery-style paths.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6524,7 +6552,7 @@ def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch)
         # would still pass because _stub_urlopen returned ok=True before;
         # patch it to assert-fail so we prove the HTTP probe is skipped.
         with patch(
-            "urllib.request.urlopen", side_effect=AssertionError("urlopen called")
+            "urllib.request.urlopen", side_effect=AssertionError("urlopen called"),
         ):
             with patch("socket.create_connection", return_value=_OkSocket()):
                 resp = server.handle_request(
@@ -6532,7 +6560,7 @@ def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch)
                         "id": "1",
                         "method": "browser.manage",
                         "params": {"action": "connect", "url": concrete},
-                    }
+                    },
                 )
 
     assert resp["result"]["connected"] is True
@@ -6543,7 +6571,8 @@ def test_browser_manage_connect_preserves_devtools_browser_endpoint(monkeypatch)
 def test_browser_manage_connect_local_devtools_ws_preserves_path(monkeypatch):
     """Regression: ``ws://127.0.0.1:9222/devtools/browser/<id>`` is a real
     connectable endpoint; default-local normalization must not strip the
-    ``/devtools/browser/...`` path or it breaks valid local CDP connects."""
+    ``/devtools/browser/...`` path or it breaks valid local CDP connects.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6565,7 +6594,7 @@ def test_browser_manage_connect_local_devtools_ws_preserves_path(monkeypatch):
                     "id": "1",
                     "method": "browser.manage",
                     "params": {"action": "connect", "url": concrete},
-                }
+                },
             )
 
     assert resp["result"]["connected"] is True
@@ -6580,7 +6609,7 @@ def test_browser_manage_connect_rejects_invalid_port(monkeypatch):
             "id": "1",
             "method": "browser.manage",
             "params": {"action": "connect", "url": "http://localhost:abc"},
-        }
+        },
     )
 
     assert resp["error"]["code"] == 4015
@@ -6595,7 +6624,7 @@ def test_browser_manage_connect_rejects_missing_host(monkeypatch):
             "id": "1",
             "method": "browser.manage",
             "params": {"action": "connect", "url": "http://:9222"},
-        }
+        },
     )
 
     assert resp["error"]["code"] == 4015
@@ -6606,7 +6635,8 @@ def test_browser_manage_connect_rejects_missing_host(monkeypatch):
 def test_browser_manage_connect_concrete_ws_skips_http_probe(monkeypatch):
     """Regression for round-2 Copilot review: a hosted CDP endpoint
     (no HTTP discovery) must connect via TCP-only reachability check.
-    The HTTP probe used to reject these even though they're valid."""
+    The HTTP probe used to reject these even though they're valid.
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6631,7 +6661,7 @@ def test_browser_manage_connect_concrete_ws_skips_http_probe(monkeypatch):
         # urlopen would 404/ECONNREFUSED on a real hosted CDP endpoint;
         # asserting it's never called proves the probe was skipped.
         with patch(
-            "urllib.request.urlopen", side_effect=AssertionError("urlopen called")
+            "urllib.request.urlopen", side_effect=AssertionError("urlopen called"),
         ):
             with patch("socket.create_connection", side_effect=_fake_create_connection):
                 resp = server.handle_request(
@@ -6639,7 +6669,7 @@ def test_browser_manage_connect_concrete_ws_skips_http_probe(monkeypatch):
                         "id": "1",
                         "method": "browser.manage",
                         "params": {"action": "connect", "url": concrete},
-                    }
+                    },
                 )
 
     assert resp["result"] == {"connected": True, "url": concrete}
@@ -6650,7 +6680,8 @@ def test_browser_manage_connect_concrete_ws_skips_http_probe(monkeypatch):
 def test_browser_manage_connect_concrete_ws_tcp_unreachable(monkeypatch):
     """If the TCP reachability check fails for a concrete ws endpoint,
     return a clear 5031 error — no fallback to the HTTP probe (which
-    can never succeed for these URLs anyway)."""
+    can never succeed for these URLs anyway).
+    """
     monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: None,
@@ -6665,7 +6696,7 @@ def test_browser_manage_connect_concrete_ws_tcp_unreachable(monkeypatch):
                     "id": "1",
                     "method": "browser.manage",
                     "params": {"action": "connect", "url": concrete},
-                }
+                },
             )
 
     assert "error" in resp
@@ -6677,13 +6708,13 @@ def test_browser_manage_disconnect_drops_env_and_cleans(monkeypatch):
     cleanup_count = {"n": 0}
     fake = types.SimpleNamespace(
         cleanup_all_browsers=lambda: cleanup_count.__setitem__(
-            "n", cleanup_count["n"] + 1
+            "n", cleanup_count["n"] + 1,
         ),
         _get_cdp_override=lambda: os.environ.get("BROWSER_CDP_URL", ""),
     )
     with patch.dict(sys.modules, {"tools.browser_tool": fake}):
         resp = server.handle_request(
-            {"id": "1", "method": "browser.manage", "params": {"action": "disconnect"}}
+            {"id": "1", "method": "browser.manage", "params": {"action": "disconnect"}},
         )
 
     assert resp["result"] == {"connected": False}
@@ -6697,10 +6728,10 @@ def test_browser_manage_disconnect_drops_env_and_cleans(monkeypatch):
 
 def test_config_get_indicator_returns_known_value_verbatim(monkeypatch):
     monkeypatch.setattr(
-        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": "emoji"}}
+        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": "emoji"}},
     )
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "indicator"}}
+        {"id": "1", "method": "config.get", "params": {"key": "indicator"}},
     )
     assert resp["result"] == {"value": "emoji"}
 
@@ -6710,24 +6741,26 @@ def test_config_get_indicator_normalizes_casing_and_whitespace(monkeypatch):
 
     Frontend's `normalizeIndicatorStyle` lowercases + trims, so config.get
     must do the same — otherwise `/indicator` prints 'EMOJI ' while the
-    UI is actually rendering the kaomoji default."""
+    UI is actually rendering the kaomoji default.
+    """
     monkeypatch.setattr(
-        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": " EMOJI "}}
+        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": " EMOJI "}},
     )
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "indicator"}}
+        {"id": "1", "method": "config.get", "params": {"key": "indicator"}},
     )
     assert resp["result"] == {"value": "emoji"}
 
 
 def test_config_get_indicator_falls_back_to_default_for_unknown(monkeypatch):
     """An unknown value in config.yaml falls back to the same default
-    the frontend uses (`_INDICATOR_DEFAULT`)."""
+    the frontend uses (`_INDICATOR_DEFAULT`).
+    """
     monkeypatch.setattr(
-        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": "rainbow"}}
+        server, "_load_cfg", lambda: {"display": {"tui_status_indicator": "rainbow"}},
     )
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "indicator"}}
+        {"id": "1", "method": "config.get", "params": {"key": "indicator"}},
     )
     assert resp["result"] == {"value": "kaomoji"}
 
@@ -6735,7 +6768,7 @@ def test_config_get_indicator_falls_back_to_default_for_unknown(monkeypatch):
 def test_config_get_indicator_falls_back_when_unset(monkeypatch):
     monkeypatch.setattr(server, "_load_cfg", lambda: {"display": {}})
     resp = server.handle_request(
-        {"id": "1", "method": "config.get", "params": {"key": "indicator"}}
+        {"id": "1", "method": "config.get", "params": {"key": "indicator"}},
     )
     assert resp["result"] == {"value": "kaomoji"}
 
@@ -6755,7 +6788,7 @@ def test_config_set_indicator_accepts_known_value(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "indicator", "value": "EMOJI"},
-        }
+        },
     )
     assert resp["result"] == {"key": "indicator", "value": "emoji"}
     assert written == {"display.tui_status_indicator": "emoji"}
@@ -6764,7 +6797,8 @@ def test_config_set_indicator_accepts_known_value(monkeypatch):
 def test_config_set_indicator_falsy_non_string_surfaces_in_error(monkeypatch):
     """`0` / `False` / `[]` are not valid styles, but the error message
     must still tell the user what they sent — `value or ""` would have
-    erased them to a blank string."""
+    erased them to a blank string.
+    """
     monkeypatch.setattr(server, "_write_config_key", lambda *a, **k: None)
 
     for bad in (0, False, []):
@@ -6773,7 +6807,7 @@ def test_config_set_indicator_falsy_non_string_surfaces_in_error(monkeypatch):
                 "id": "1",
                 "method": "config.set",
                 "params": {"key": "indicator", "value": bad},
-            }
+            },
         )
         assert "error" in resp
         msg = resp["error"]["message"]
@@ -6792,7 +6826,7 @@ def test_config_set_indicator_none_keeps_blank_repr(monkeypatch):
             "id": "1",
             "method": "config.set",
             "params": {"key": "indicator", "value": None},
-        }
+        },
     )
     assert "error" in resp
     assert "unknown indicator: ''" in resp["error"]["message"]
@@ -6803,7 +6837,8 @@ def test_config_set_indicator_none_keeps_blank_repr(monkeypatch):
 
 def test_reload_env_rpc_calls_hermes_cli_reload_env(monkeypatch):
     """reload.env mirrors classic CLI's `/reload` — re-reads ~/.hermes/.env
-    into the gateway process and reports the count of vars updated."""
+    into the gateway process and reports the count of vars updated.
+    """
     calls = {"n": 0}
 
     def _fake_reload():
@@ -6836,7 +6871,7 @@ def test_reload_env_rpc_surfaces_errors(monkeypatch):
 def _setup_make_agent_mocks(monkeypatch, cfg):
     monkeypatch.setattr(server, "_load_cfg", lambda: cfg)
     monkeypatch.setattr(
-        server, "_resolve_startup_runtime", lambda: ("test-model", None)
+        server, "_resolve_startup_runtime", lambda: ("test-model", None),
     )
     monkeypatch.setattr(
         "hermes_cli.runtime_provider.resolve_runtime_provider",
@@ -6887,7 +6922,7 @@ def test_make_agent_waits_for_shared_mcp_discovery(monkeypatch):
 
 def test_make_agent_nested_max_turns_takes_priority(monkeypatch):
     _setup_make_agent_mocks(
-        monkeypatch, {"agent": {"max_turns": 500}, "max_turns": 100}
+        monkeypatch, {"agent": {"max_turns": 500}, "max_turns": 100},
     )
 
     with patch("run_agent.AIAgent") as mock_agent:
@@ -6992,7 +7027,7 @@ def test_background_agent_kwargs_falls_back_to_root_max_turns(monkeypatch):
 
 
 def test_background_agent_kwargs_defaults_to_25(monkeypatch):
-    monkeypatch.setattr(server, "_load_cfg", lambda: {})
+    monkeypatch.setattr(server, "_load_cfg", dict)
 
     kwargs = server._background_agent_kwargs(_FakeAgentForBackground(), "task_1")
 
@@ -7041,6 +7076,7 @@ def test_notification_poller_skips_start_router_handoff(monkeypatch):
     class _ImmediateThread:
         def __init__(self, target=None, daemon=None):
             self._target = target
+
         def start(self):
             self._target()
 
@@ -7103,6 +7139,7 @@ def test_notification_poller_delivers_completion(monkeypatch):
     class _ImmediateThread:
         def __init__(self, target=None, daemon=None):
             self._target = target
+
         def start(self):
             self._target()
 
@@ -7171,6 +7208,7 @@ def test_notification_poller_skips_consumed(monkeypatch):
     class _ImmediateThread:
         def __init__(self, target=None, daemon=None):
             self._target = target
+
         def start(self):
             self._target()
 
@@ -7409,7 +7447,7 @@ def test_notification_event_dedup_key_keeps_completions_one_shot():
     }
 
     assert server._notification_event_dedup_key(first) == server._notification_event_dedup_key(
-        replay
+        replay,
     )
 
 
@@ -7443,7 +7481,7 @@ def test_image_attach_bytes_writes_to_gateway_dir(monkeypatch, tmp_path):
                 "content_base64": _PNG_1X1_B64,
                 "filename": "shot.png",
             },
-        }
+        },
     )
 
     res = resp["result"]
@@ -7469,7 +7507,7 @@ def test_image_attach_bytes_accepts_data_url_prefix(monkeypatch, tmp_path):
                 "session_id": "abx2",
                 "content_base64": f"data:image/png;base64,{_PNG_1X1_B64}",
             },
-        }
+        },
     )
     assert resp["result"]["attached"] is True
 
@@ -7485,7 +7523,7 @@ def test_image_attach_bytes_data_alias_and_magic_sniff(monkeypatch, tmp_path):
             "id": "1",
             "method": "image.attach_bytes",
             "params": {"session_id": "abx3", "data": _PNG_1X1_B64},
-        }
+        },
     )
     res = resp["result"]
     assert res["attached"] is True
@@ -7502,7 +7540,7 @@ def test_image_attach_bytes_rejects_invalid_base64(monkeypatch, tmp_path):
             "id": "1",
             "method": "image.attach_bytes",
             "params": {"session_id": "abx4", "content_base64": "!!!not base64!!!"},
-        }
+        },
     )
     assert "error" in resp
     assert resp["error"]["code"] == 4017
@@ -7522,7 +7560,7 @@ def test_image_attach_bytes_rejects_oversize(monkeypatch, tmp_path):
             "id": "1",
             "method": "image.attach_bytes",
             "params": {"session_id": "abx5", "content_base64": big},
-        }
+        },
     )
     assert "error" in resp
     assert resp["error"]["code"] == 4018
@@ -7543,7 +7581,7 @@ def test_image_attach_bytes_rejects_unsupported_extension(monkeypatch, tmp_path)
                 "content_base64": _PNG_1X1_B64,
                 "filename": "evil.exe",
             },
-        }
+        },
     )
     assert "error" in resp
     assert resp["error"]["code"] == 4016
@@ -7561,7 +7599,7 @@ def test_pdf_attach_requires_poppler(monkeypatch, tmp_path):
             "id": "1",
             "method": "pdf.attach",
             "params": {"session_id": "pdf1", "content_base64": "JVBERi0xLjQK"},
-        }
+        },
     )
     assert "error" in resp
     assert resp["error"]["code"] == 5028
@@ -7581,7 +7619,7 @@ def test_pdf_attach_rejects_non_pdf_bytes(monkeypatch, tmp_path):
             "id": "1",
             "method": "pdf.attach",
             "params": {"session_id": "pdf2", "content_base64": not_pdf},
-        }
+        },
     )
     assert "error" in resp
     assert resp["error"]["code"] == 4017
@@ -7594,7 +7632,7 @@ def test_pdf_attach_requires_path_or_bytes(monkeypatch, tmp_path):
     server._sessions["pdf3"] = _session()
 
     resp = server.handle_request(
-        {"id": "1", "method": "pdf.attach", "params": {"session_id": "pdf3"}}
+        {"id": "1", "method": "pdf.attach", "params": {"session_id": "pdf3"}},
     )
     assert "error" in resp
     assert resp["error"]["code"] == 4015
@@ -7627,7 +7665,7 @@ def test_sniff_image_ext_magic_and_filename():
 
 def test_slash_worker_close_reaps_zombie_and_closes_fds():
     """A hung worker is SIGKILLed, the zombie reaped, all pipes closed — once."""
-    calls = {k: 0 for k in ("terminate", "kill", "wait", "stdin", "stdout", "stderr")}
+    calls = dict.fromkeys(("terminate", "kill", "wait", "stdin", "stdout", "stderr"), 0)
 
     class FakeStream:
         def __init__(self, name):
@@ -7732,7 +7770,8 @@ def test_attach_worker_stores_worker_on_live_session():
 
 def test_restart_slash_worker_closes_orphan_when_session_reaped(monkeypatch):
     """Post-turn restart of a session reaped mid-flight (e.g. close_on_disconnect
-    fired while `running` flipped false) must close the fresh worker, not orphan it."""
+    fired while `running` flipped false) must close the fresh worker, not orphan it.
+    """
     closed = []
 
     class _FakeWorker:
@@ -7777,7 +7816,7 @@ def test_session_close_rpc_delegates_to_close_session_by_id(monkeypatch):
         lambda sid, *, end_reason: bool(seen.append((sid, end_reason))) or True,
     )
     resp = server.handle_request(
-        {"id": "1", "method": "session.close", "params": {"session_id": "s9"}}
+        {"id": "1", "method": "session.close", "params": {"session_id": "s9"}},
     )
     assert resp["result"] == {"closed": True}
     assert seen == [("s9", "tui_close")]
@@ -7809,10 +7848,10 @@ def test_session_create_records_close_on_disconnect_flag(monkeypatch):
     server._sessions.clear()
     try:
         on = server.handle_request(
-            {"id": "1", "method": "session.create", "params": {"close_on_disconnect": True}}
+            {"id": "1", "method": "session.create", "params": {"close_on_disconnect": True}},
         )["result"]["session_id"]
         off = server.handle_request(
-            {"id": "2", "method": "session.create", "params": {}}
+            {"id": "2", "method": "session.create", "params": {}},
         )["result"]["session_id"]
         assert server._sessions[on]["close_on_disconnect"]
         assert not server._sessions[off]["close_on_disconnect"]
@@ -7825,7 +7864,7 @@ def test_session_create_records_source(monkeypatch):
     server._sessions.clear()
     try:
         sid = server.handle_request(
-            {"id": "1", "method": "session.create", "params": {"source": "tool"}}
+            {"id": "1", "method": "session.create", "params": {"source": "tool"}},
         )["result"]["session_id"]
         assert server._sessions[sid]["source"] == "tool"
     finally:

@@ -57,12 +57,11 @@ class TestDotenvFallbackPerProvider:
             mock_import.return_value.assert_called_once_with(api_key="el-dotenv-key")
 
     def test_xai_reads_dotenv_key(self, tmp_path):
-        """xAI TTS now resolves credentials through ``tools.xai_http``; the
+        """XAI TTS now resolves credentials through ``tools.xai_http``; the
         dotenv fallback contract from #17140 is preserved by patching the
         resolver's ``get_env_value`` rather than ``tts_tool.get_env_value``.
         """
-        from tools import tts_tool
-        from tools import xai_http
+        from tools import tts_tool, xai_http
 
         captured: dict = {}
 
@@ -114,7 +113,7 @@ class TestDotenvFallbackPerProvider:
             client.__enter__ = MagicMock(return_value=client)
             client.__exit__ = MagicMock(return_value=False)
             client.audio.speech.complete.return_value = MagicMock(
-                audio_data=base64.b64encode(b"data").decode()
+                audio_data=base64.b64encode(b"data").decode(),
             )
             return client
 
@@ -142,12 +141,12 @@ class TestDotenvFallbackPerProvider:
                                     "inlineData": {
                                         "data": "AAAA",
                                         "mimeType": "audio/L16;codec=pcm;rate=24000",
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                ]
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                ],
             }
             response.raise_for_status = MagicMock()
             return response
@@ -184,6 +183,7 @@ class TestRegressionGuard:
         not freeze that temporary helper into this module forever.
         """
         import importlib
+
         import hermes_cli.config as config_mod
         from tools import tts_tool
 
@@ -211,7 +211,7 @@ class TestRegressionGuard:
                 return_value={"MINIMAX_API_KEY": "dotenv-secret"},
             ), patch("requests.post", side_effect=fake_post):
                 tts_tool._generate_minimax_tts(
-                    "hi", str(tmp_path / "out.mp3"), {}
+                    "hi", str(tmp_path / "out.mp3"), {},
                 )
 
             assert captured["headers"]["Authorization"] == "Bearer dotenv-secret"
@@ -251,7 +251,7 @@ class TestRegressionGuard:
 
             with patch("requests.post", side_effect=fake_post):
                 tts_tool._generate_minimax_tts(
-                    "hi", str(tmp_path / "out.mp3"), {}
+                    "hi", str(tmp_path / "out.mp3"), {},
                 )
 
             assert captured["headers"]["Authorization"] == "Bearer dotenv-secret"

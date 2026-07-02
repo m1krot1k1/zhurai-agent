@@ -1,5 +1,4 @@
-"""
-Email platform adapter for the Hermes gateway.
+"""Email platform adapter for the Hermes gateway.
 
 Allows users to interact with Hermes by sending emails.
 Uses IMAP to receive and SMTP to send messages.
@@ -25,15 +24,16 @@ import smtplib
 import socket
 import ssl
 import uuid
+from email import encoders
 from email.header import decode_header
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
 from email.utils import formatdate
-from email import encoders
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
+from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import (
     BasePlatformAdapter,
     MessageEvent,
@@ -42,7 +42,6 @@ from gateway.platforms.base import (
     cache_document_from_bytes,
     cache_image_from_bytes,
 )
-from gateway.config import Platform, PlatformConfig
 from utils import env_int
 
 logger = logging.getLogger(__name__)
@@ -81,7 +80,7 @@ def _create_ipv4_connection(
     """
     last_error: OSError | None = None
     for family, socktype, proto, _canonname, sockaddr in socket.getaddrinfo(
-        host, port, socket.AF_INET, socket.SOCK_STREAM
+        host, port, socket.AF_INET, socket.SOCK_STREAM,
     ):
         sock = socket.socket(family, socktype, proto)
         sock.settimeout(timeout)
@@ -121,8 +120,10 @@ class _IPv4SMTP_SSL(smtplib.SMTP_SSL):
             server_hostname=getattr(self, "_host", host),
         )
 
+
 # Supported image extensions for inline detection
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
 
 def _send_imap_id(imap: "imaplib.IMAP4") -> None:
     """Send RFC 2971 IMAP ID command identifying this client.
@@ -157,7 +158,8 @@ def _is_automated_sender(address: str, headers: dict) -> bool:
         if value and check(value):
             return True
     return False
-    
+
+
 def check_email_requirements() -> bool:
     """Check if email platform settings are available and non-blank.
 
@@ -210,15 +212,14 @@ def _extract_text_body(msg: email_lib.message.Message) -> str:
                     html = payload.decode(charset, errors="replace")
                     return _strip_html(html)
         return ""
-    else:
-        payload = msg.get_payload(decode=True)
-        if payload:
-            charset = msg.get_content_charset() or "utf-8"
-            text = payload.decode(charset, errors="replace")
-            if msg.get_content_type() == "text/html":
-                return _strip_html(text)
-            return text
-        return ""
+    payload = msg.get_payload(decode=True)
+    if payload:
+        charset = msg.get_content_charset() or "utf-8"
+        text = payload.decode(charset, errors="replace")
+        if msg.get_content_type() == "text/html":
+            return _strip_html(text)
+        return text
+    return ""
 
 
 def _strip_html(html: str) -> str:
@@ -227,10 +228,10 @@ def _strip_html(html: str) -> str:
     text = re.sub(r"<p[^>]*>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"</p>", "\n", text, flags=re.IGNORECASE)
     text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"&nbsp;", " ", text)
-    text = re.sub(r"&amp;", "&", text)
-    text = re.sub(r"&lt;", "<", text)
-    text = re.sub(r"&gt;", ">", text)
+    text = text.replace(r"&nbsp;", " ")
+    text = text.replace(r"&amp;", "&")
+    text = text.replace(r"&lt;", "<")
+    text = text.replace(r"&gt;", ">")
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
@@ -246,7 +247,7 @@ def _extract_email_address(raw: str) -> str:
 def _extract_attachments(
     msg: email_lib.message.Message,
     skip_attachments: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Extract attachment metadata and cache files locally.
 
     When *skip_attachments* is True, all attachment/inline parts are ignored
@@ -335,10 +336,10 @@ class EmailAdapter(BasePlatformAdapter):
         # Track message IDs we've already processed to avoid duplicates
         self._seen_uids: set = set()
         self._seen_uids_max: int = 2000   # cap to prevent unbounded memory growth
-        self._poll_task: Optional[asyncio.Task] = None
+        self._poll_task: asyncio.Task | None = None
 
         # Map chat_id (sender email) -> last subject + message-id for threading
-        self._thread_context: Dict[str, Dict[str, str]] = {}
+        self._thread_context: dict[str, dict[str, str]] = {}
 
         logger.info("[Email] Adapter initialized for %s", self._address)
 
@@ -397,7 +398,7 @@ class EmailAdapter(BasePlatformAdapter):
 
         try:
             return _connect()
-        except (socket.timeout, TimeoutError, ConnectionError, OSError) as exc:
+        except (TimeoutError, ConnectionError, OSError) as exc:
             if isinstance(exc, ssl.SSLError):
                 raise
             # Connection-level failure (may be unreachable IPv6).
@@ -432,7 +433,7 @@ class EmailAdapter(BasePlatformAdapter):
             # used to slip past the startup gate and drive an indefinite retry
             # loop that leaked memory until the host OOM-killed (#40715).
             self._set_fatal_error(
-                "email_missing_configuration", message, retryable=False
+                "email_missing_configuration", message, retryable=False,
             )
             return False
 
@@ -503,7 +504,7 @@ class EmailAdapter(BasePlatformAdapter):
         for msg_data in messages:
             await self._dispatch_message(msg_data)
 
-    def _fetch_new_messages(self) -> List[Dict[str, Any]]:
+    def _fetch_new_messages(self) -> list[dict[str, Any]]:
         """Fetch new (unseen) messages from IMAP. Runs in executor thread."""
         results = []
         try:
@@ -570,7 +571,7 @@ class EmailAdapter(BasePlatformAdapter):
             logger.error("[Email] IMAP fetch error: %s", e)
         return results
 
-    async def _dispatch_message(self, msg_data: Dict[str, Any]) -> None:
+    async def _dispatch_message(self, msg_data: dict[str, Any]) -> None:
         """Convert a fetched email into a MessageEvent and dispatch it."""
         sender_addr = msg_data["sender_addr"]
 
@@ -653,14 +654,14 @@ class EmailAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         content: str,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Send an email reply to the given address."""
         try:
             loop = asyncio.get_running_loop()
             message_id = await loop.run_in_executor(
-                None, self._send_email, chat_id, content, reply_to
+                None, self._send_email, chat_id, content, reply_to,
             )
             return SendResult(success=True, message_id=message_id)
         except Exception as e:
@@ -671,7 +672,7 @@ class EmailAdapter(BasePlatformAdapter):
         self,
         to_addr: str,
         body: str,
-        reply_to_msg_id: Optional[str] = None,
+        reply_to_msg_id: str | None = None,
     ) -> str:
         """Send an email via SMTP. Runs in executor thread."""
         msg = MIMEMultipart()
@@ -710,16 +711,16 @@ class EmailAdapter(BasePlatformAdapter):
         logger.info("[Email] Sent reply to %s (subject: %s)", to_addr, subject)
         return msg_id
 
-    async def send_typing(self, chat_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    async def send_typing(self, chat_id: str, metadata: dict[str, Any] | None = None) -> None:
         """Email has no typing indicator — no-op."""
 
     async def send_image(
         self,
         chat_id: str,
         image_url: str,
-        caption: Optional[str] = None,
-        reply_to: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        caption: str | None = None,
+        reply_to: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SendResult:
         """Send an image URL as part of an email body.
 
@@ -733,8 +734,8 @@ class EmailAdapter(BasePlatformAdapter):
     async def send_multiple_images(
         self,
         chat_id: str,
-        images: List[Tuple[str, str]],
-        metadata: Optional[Dict[str, Any]] = None,
+        images: list[tuple[str, str]],
+        metadata: dict[str, Any] | None = None,
         human_delay: float = 0.0,
     ) -> None:
         """Send a batch of images as a single email with multiple MIME attachments.
@@ -749,8 +750,8 @@ class EmailAdapter(BasePlatformAdapter):
 
         from urllib.parse import unquote as _unquote
 
-        body_parts: List[str] = []
-        local_paths: List[str] = []
+        body_parts: list[str] = []
+        local_paths: list[str] = []
         for image_url, alt_text in images:
             if alt_text:
                 body_parts.append(alt_text)
@@ -786,7 +787,7 @@ class EmailAdapter(BasePlatformAdapter):
         self,
         to_addr: str,
         body: str,
-        file_paths: List[str],
+        file_paths: list[str],
     ) -> str:
         """Send an email with multiple file attachments via SMTP."""
         msg = MIMEMultipart()
@@ -814,7 +815,7 @@ class EmailAdapter(BasePlatformAdapter):
         for file_path in file_paths:
             p = Path(file_path)
             try:
-                with open(p, "rb") as f:
+                with Path(p).open("rb") as f:
                     part = MIMEBase("application", "octet-stream")
                     part.set_payload(f.read())
                     encoders.encode_base64(part)
@@ -840,9 +841,9 @@ class EmailAdapter(BasePlatformAdapter):
         self,
         chat_id: str,
         file_path: str,
-        caption: Optional[str] = None,
-        file_name: Optional[str] = None,
-        reply_to: Optional[str] = None,
+        caption: str | None = None,
+        file_name: str | None = None,
+        reply_to: str | None = None,
         **kwargs,
     ) -> SendResult:
         """Send a file as an email attachment."""
@@ -866,7 +867,7 @@ class EmailAdapter(BasePlatformAdapter):
         to_addr: str,
         body: str,
         file_path: str,
-        file_name: Optional[str] = None,
+        file_name: str | None = None,
     ) -> str:
         """Send an email with a file attachment via SMTP."""
         msg = MIMEMultipart()
@@ -894,7 +895,7 @@ class EmailAdapter(BasePlatformAdapter):
         # Attach file
         p = Path(file_path)
         fname = file_name or p.name
-        with open(p, "rb") as f:
+        with Path(p).open("rb") as f:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(f.read())
             encoders.encode_base64(part)
@@ -913,7 +914,7 @@ class EmailAdapter(BasePlatformAdapter):
 
         return msg_id
 
-    async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
+    async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         """Return basic info about the email chat."""
         ctx = self._thread_context.get(chat_id, {})
         return {
@@ -946,7 +947,8 @@ async def _standalone_send(
     force_document=False,
 ):
     """Out-of-process Email delivery via SMTP (one-shot). Implements the
-    standalone_sender_fn contract; replaces the legacy _send_email helper."""
+    standalone_sender_fn contract; replaces the legacy _send_email helper.
+    """
     import smtplib
     import ssl as _ssl
     from email.mime.text import MIMEText
@@ -988,7 +990,8 @@ async def _standalone_send(
 def _is_connected(config) -> bool:
     """Email is connected when an address is configured (in PlatformConfig.extra
     or via EMAIL_ADDRESS). Mirrors the legacy
-    _PLATFORM_CONNECTED_CHECKERS[Platform.EMAIL] = bool(extra.get('address'))."""
+    _PLATFORM_CONNECTED_CHECKERS[Platform.EMAIL] = bool(extra.get('address')).
+    """
     extra = getattr(config, "extra", {}) or {}
     if extra.get("address"):
         return True

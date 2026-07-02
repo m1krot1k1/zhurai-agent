@@ -67,7 +67,7 @@ class TestMinimaxAuxModelM3:
         ],
     )
     def test_profile_advertises_expected_aux_model(
-        self, provider_id, expected
+        self, provider_id, expected,
     ):
         import model_tools  # noqa: F401
         import providers
@@ -196,7 +196,7 @@ class TestMinimaxM3OpenAIReasoningWireShape:
         ],
     )
     def test_non_m3_or_non_global_openai_routes_emit_no_openai_reasoning_knobs(
-        self, model, base_url
+        self, model, base_url,
     ):
         import model_tools  # noqa: F401
         import providers

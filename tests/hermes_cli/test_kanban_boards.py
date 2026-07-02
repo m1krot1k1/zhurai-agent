@@ -30,10 +30,10 @@ if str(_WORKTREE) not in sys.path:
 
 from hermes_cli import kanban_db as kb
 
-
 # ---------------------------------------------------------------------------
 # Fixture
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def fresh_home(tmp_path, monkeypatch):
@@ -296,7 +296,7 @@ class TestBoardCRUD:
             tables = {
                 row[0]
                 for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
+                    "SELECT name FROM sqlite_master WHERE type='table'",
                 )
             }
         assert "task_events" in tables

@@ -23,8 +23,18 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
+from agent.models_dev import (
+    ModelCapabilities,
+    ModelInfo,
+    get_model_capabilities,
+    get_model_info,
+    list_provider_models,
+)
+from hermes_cli.model_normalize import (
+    normalize_model_for_provider,
+)
 from hermes_cli.providers import (
     ProviderDef,
     custom_provider_slug,
@@ -33,21 +43,11 @@ from hermes_cli.providers import (
     is_aggregator,
     resolve_provider_full,
 )
-from hermes_cli.model_normalize import (
-    normalize_model_for_provider,
-)
-from agent.models_dev import (
-    ModelCapabilities,
-    ModelInfo,
-    get_model_capabilities,
-    get_model_info,
-    list_provider_models,
-)
 
 logger = logging.getLogger(__name__)
 
 
-def _bare_custom_provider_def(current_base_url: str) -> Optional[ProviderDef]:
+def _bare_custom_provider_def(current_base_url: str) -> ProviderDef | None:
     """ProviderDef for a direct ``model.provider: custom`` endpoint."""
     base_url = str(current_base_url or "").strip()
     if not base_url:
@@ -116,6 +116,7 @@ def _check_hermes_model_warning(model_name: str) -> str:
 
 class ModelIdentity(NamedTuple):
     """Vendor slug and family prefix used for catalog resolution."""
+
     vendor: str
     family: str
 
@@ -182,6 +183,7 @@ MODEL_ALIASES: dict[str, ModelIdentity] = {
 
 class DirectAlias(NamedTuple):
     """Exact model mapping that bypasses catalog resolution."""
+
     model: str
     provider: str
     base_url: str
@@ -292,12 +294,13 @@ class ModelSwitchResult:
     warning_message: str = ""
     provider_label: str = ""
     resolved_via_alias: str = ""
-    capabilities: Optional[ModelCapabilities] = None
-    model_info: Optional[ModelInfo] = None
+    capabilities: ModelCapabilities | None = None
+    model_info: ModelInfo | None = None
     is_global: bool = False
 # ---------------------------------------------------------------------------
 # Flag parsing
 # ---------------------------------------------------------------------------
+
 
 def parse_model_flags(raw_args: str) -> tuple[str, str, bool, bool, bool]:
     """Parse --provider, --global, --session, and --refresh flags from /model command args.
@@ -327,7 +330,7 @@ def parse_model_flags(raw_args: str) -> tuple[str, str, bool, bool, bool]:
     # Normalize Unicode dashes (Telegram/iOS auto-converts -- to em/en dash)
     # A single Unicode dash before a flag keyword becomes "--"
     import re as _re
-    raw_args = _re.sub(r'[\u2012\u2013\u2014\u2015](provider|global|session|refresh)', r'--\1', raw_args)
+    raw_args = _re.sub(r"[\u2012\u2013\u2014\u2015](provider|global|session|refresh)", r"--\1", raw_args)
 
     # Extract --global
     if "--global" in raw_args:
@@ -411,8 +414,7 @@ def _model_sort_key(model_id: str, prefix: str) -> tuple:
     """
     # Strip the prefix (and optional "/" separator for aggregator slugs)
     rest = model_id[len(prefix):]
-    if rest.startswith("/"):
-        rest = rest[1:]
+    rest = rest.removeprefix("/")
     rest = rest.lstrip("-").strip()
 
     # Parse version and suffix from the remainder.
@@ -504,7 +506,7 @@ def _model_sort_key(model_id: str, prefix: str) -> tuple:
 def resolve_alias(
     raw_input: str,
     current_provider: str,
-) -> Optional[tuple[str, str, str]]:
+) -> tuple[str, str, str] | None:
     """Resolve a short alias against the current provider's catalog.
 
     Looks up *raw_input* in :data:`MODEL_ALIASES`, then searches the
@@ -516,6 +518,7 @@ def resolve_alias(
         ``(provider, resolved_model_id, alias_name)`` if a match is
         found on the current provider, or ``None`` if the alias doesn't
         exist or no matching model is available.
+
     """
     key = raw_input.strip().lower()
 
@@ -603,7 +606,7 @@ def get_authenticated_provider_slugs(
 def _resolve_alias_fallback(
     raw_input: str,
     authenticated_providers: list[str] = (),
-) -> Optional[tuple[str, str, str]]:
+) -> tuple[str, str, str] | None:
     """Try to resolve an alias on the user's authenticated providers.
 
     Falls back to ``("openrouter", "nous")`` only when no authenticated
@@ -622,10 +625,10 @@ def resolve_display_context_length(
     provider: str,
     base_url: str = "",
     api_key: str = "",
-    model_info: Optional[ModelInfo] = None,
+    model_info: ModelInfo | None = None,
     custom_providers: list | None = None,
     config_context_length: int | None = None,
-) -> Optional[int]:
+) -> int | None:
     """Resolve the context length to show in /model output.
 
     models.dev reports per-vendor context (e.g. gpt-5.5 = 1.05M on openai)
@@ -713,12 +716,13 @@ def switch_model(
 
     Returns:
         ModelSwitchResult with all information the caller needs.
+
     """
     from hermes_cli.models import (
         copilot_model_api_mode,
         detect_provider_for_model,
-        validate_requested_model,
         opencode_model_api_mode,
+        validate_requested_model,
     )
     from hermes_cli.runtime_provider import resolve_runtime_provider
 
@@ -1193,7 +1197,7 @@ import threading as _threading  # noqa: E402
 _picker_prewarm_done = _threading.Event()
 
 
-def prewarm_picker_cache_async() -> Optional["_threading.Thread"]:
+def prewarm_picker_cache_async() -> _threading.Thread | None:
     """Warm the provider-models disk cache in a background daemon thread.
 
     The no-args ``/model`` picker calls ``list_authenticated_providers()``,
@@ -1250,7 +1254,7 @@ def list_authenticated_providers(
     max_models: int | None = None,
     current_model: str = "",
     refresh: bool = False,
-) -> List[dict]:
+) -> list[dict]:
     """Detect which providers have credentials and list their curated models.
 
     Uses the curated model lists from hermes_cli/models.py (OPENROUTER_MODELS,
@@ -1278,16 +1282,23 @@ def list_authenticated_providers(
     opens so they stay snappy on the 1h cache.
     """
     import os
+
     from agent.models_dev import (
         PROVIDER_TO_MODELS_DEV,
         fetch_models_dev,
+    )
+    from agent.models_dev import (
         get_provider_info as _mdev_pinfo,
     )
     from hermes_cli.auth import PROVIDER_REGISTRY
     from hermes_cli.models import (
-        OPENROUTER_MODELS, _PROVIDER_MODELS,
-        _MODELS_DEV_PREFERRED, _merge_with_models_dev, cached_provider_model_ids,
-        clear_provider_models_cache, get_curated_nous_model_ids,
+        _MODELS_DEV_PREFERRED,
+        _PROVIDER_MODELS,
+        OPENROUTER_MODELS,
+        _merge_with_models_dev,
+        cached_provider_model_ids,
+        clear_provider_models_cache,
+        get_curated_nous_model_ids,
     )
 
     # Explicit refresh: drop every provider's cached model-id list so the
@@ -1301,8 +1312,7 @@ def list_authenticated_providers(
         except Exception:
             pass
 
-
-    results: List[dict] = []
+    results: list[dict] = []
     seen_slugs: set = set()  # lowercase-normalized to catch case variants (#9545)
     seen_mdev_ids: set = set()  # prevent duplicate entries for aliases (e.g. kimi-coding + kimi-coding-cn)
     # Effective base URLs of every built-in row we emit (normalized lower+rstrip).
@@ -1320,7 +1330,8 @@ def list_authenticated_providers(
 
         Prefers the live env-override (e.g. DASHSCOPE_BASE_URL) over the
         static inference_base_url so the dedup matches what a user typing
-        that URL into custom_providers would actually hit."""
+        that URL into custom_providers would actually hit.
+        """
         try:
             from hermes_cli.auth import PROVIDER_REGISTRY as _reg
         except Exception:
@@ -1400,8 +1411,8 @@ def list_authenticated_providers(
     if "lmstudio" not in curated and (
         os.environ.get("LM_API_KEY") or os.environ.get("LM_BASE_URL") or current_provider.strip().lower() == "lmstudio"
     ):
-        from hermes_cli.models import fetch_lmstudio_models
         from hermes_cli.auth import AuthError
+        from hermes_cli.models import fetch_lmstudio_models
         is_current_lmstudio = current_provider.strip().lower() == "lmstudio"
         lm_base = (
             os.environ.get("LM_BASE_URL")
@@ -1412,7 +1423,7 @@ def list_authenticated_providers(
             live = fetch_lmstudio_models(
                 api_key=os.environ.get("LM_API_KEY", ""),
                 base_url=lm_base,
-                timeout=1.5, # Smaller timeout for picker
+                timeout=1.5,  # Smaller timeout for picker
             )
         except AuthError:
             live = []
@@ -1506,8 +1517,8 @@ def list_authenticated_providers(
         _record_builtin_endpoint(slug)
 
     # --- 2. Check Hermes-only providers (nous, openai-codex, copilot, opencode-go) ---
-    from hermes_cli.providers import HERMES_OVERLAYS
     from hermes_cli.auth import PROVIDER_REGISTRY as _auth_registry
+    from hermes_cli.providers import HERMES_OVERLAYS
 
     # Build reverse mapping: models.dev ID → Hermes provider ID.
     # HERMES_OVERLAYS keys may be models.dev IDs (e.g. "github-copilot")
@@ -1599,7 +1610,7 @@ def list_authenticated_providers(
         elif overlay.auth_type == "aws_sdk":
             try:
                 _ids = cached_provider_model_ids(hermes_slug)
-                model_ids = _ids if _ids else (curated.get(hermes_slug, []) or curated.get(pid, []))
+                model_ids = _ids or (curated.get(hermes_slug, []) or curated.get(pid, []))
             except Exception:
                 model_ids = curated.get(hermes_slug, []) or curated.get(pid, [])
         elif hermes_slug == "nous":
@@ -1615,13 +1626,19 @@ def list_authenticated_providers(
             # recommendations (e.g. stepfun/step-3.7-flash:free).
             model_ids = curated.get("nous", [])
             try:
+                from hermes_cli.auth import get_provider_auth_state as _nous_state
+                from hermes_cli.models import (
+                    check_nous_free_tier as _nous_free,
+                )
                 from hermes_cli.models import (
                     get_pricing_for_provider as _nous_pricing,
-                    check_nous_free_tier as _nous_free,
+                )
+                from hermes_cli.models import (
                     union_with_portal_free_recommendations as _union_free,
+                )
+                from hermes_cli.models import (
                     union_with_portal_paid_recommendations as _union_paid,
                 )
-                from hermes_cli.auth import get_provider_auth_state as _nous_state
 
                 _pricing = _nous_pricing("nous") or {}
                 _portal = ""
@@ -1715,7 +1732,7 @@ def list_authenticated_providers(
         if _cp_config and getattr(_cp_config, "auth_type", "") == "aws_sdk":
             try:
                 _ids = cached_provider_model_ids(_cp.slug)
-                _cp_model_ids = _ids if _ids else curated.get(_cp.slug, [])
+                _cp_model_ids = _ids or curated.get(_cp.slug, [])
             except Exception:
                 _cp_model_ids = curated.get(_cp.slug, [])
         else:
@@ -1777,11 +1794,7 @@ def list_authenticated_providers(
             # (see hermes_cli/main.py::_save_custom_provider); older
             # configs or hand-edited files may still use a list.
             cfg_models = ep_cfg.get("models", [])
-            if isinstance(cfg_models, dict):
-                for m in cfg_models:
-                    if m and m not in models_list:
-                        models_list.append(m)
-            elif isinstance(cfg_models, list):
+            if isinstance(cfg_models, dict) or isinstance(cfg_models, list):
                 for m in cfg_models:
                     if m and m not in models_list:
                         models_list.append(m)
@@ -1861,7 +1874,7 @@ def list_authenticated_providers(
             and str(
                 _cp.get("base_url", "")
                 or _cp.get("url", "")
-                or _cp.get("api", "")
+                or _cp.get("api", ""),
             ).strip().rstrip("/").lower()
             == str(current_base_url).strip().rstrip("/").lower()
             for _cp in (custom_providers or [])
@@ -1897,7 +1910,7 @@ def list_authenticated_providers(
         # endpoint stays the same.  Keep same-host providers with distinct
         # env-backed credentials or API protocols separate so picker selection
         # cannot route through the wrong credential/mode pair.
-        groups: "OrderedDict[tuple, dict]" = OrderedDict()
+        groups: OrderedDict[tuple, dict] = OrderedDict()
         for entry in custom_providers:
             if not isinstance(entry, dict):
                 continue
@@ -1919,12 +1932,10 @@ def list_authenticated_providers(
             api_mode = str(
                 entry.get("api_mode")
                 or entry.get("transport")
-                or ""
+                or "",
             ).strip().lower()
             credential_identity = (
-                inline_api_key
-                if inline_api_key
-                else (f"env:{key_env}" if key_env else "")
+                inline_api_key or (f"env:{key_env}" if key_env else "")
             )
 
             # Read discover_models from the entry (same semantics as
@@ -1974,11 +1985,7 @@ def list_authenticated_providers(
                 groups[group_key]["models"].append(default_model)
 
             cfg_models = entry.get("models", {})
-            if isinstance(cfg_models, dict):
-                for m in cfg_models:
-                    if m and m not in groups[group_key]["models"]:
-                        groups[group_key]["models"].append(m)
-            elif isinstance(cfg_models, list):
+            if isinstance(cfg_models, dict) or isinstance(cfg_models, list):
                 for m in cfg_models:
                     if m and m not in groups[group_key]["models"]:
                         groups[group_key]["models"].append(m)
@@ -2104,7 +2111,7 @@ def list_picker_providers(
     current_model: str = "",
     *,
     force_refresh: bool = False,
-) -> List[dict]:
+) -> list[dict]:
     """Interactive-picker variant of :func:`list_authenticated_providers`.
 
     Post-processes the base list so the ``/model`` picker (Telegram/Discord
@@ -2141,7 +2148,7 @@ def list_picker_providers(
         current_model=current_model,
     )
 
-    filtered: List[dict] = []
+    filtered: list[dict] = []
     for p in providers:
         slug = str(p.get("slug", "")).lower()
         if slug == "openrouter":

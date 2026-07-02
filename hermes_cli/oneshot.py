@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
 import sys
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Optional
 
 from hermes_cli.fallback_config import get_fallback_chain
 
@@ -79,7 +79,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
         if ignored:
             sys.stderr.write(
                 "hermes -z: --toolsets all enables every toolset; "
-                f"ignoring additional entries: {', '.join(ignored)}\n"
+                f"ignoring additional entries: {', '.join(ignored)}\n",
             )
         return None, None
 
@@ -113,7 +113,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
     if disabled:
         sys.stderr.write(
             "hermes -z: ignoring disabled MCP servers (set enabled: true in config.yaml to use): "
-            f"{', '.join(disabled)}\n"
+            f"{', '.join(disabled)}\n",
         )
 
     if not valid:
@@ -124,8 +124,8 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
 
 def run_oneshot(
     prompt: str,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
+    model: str | None = None,
+    provider: str | None = None,
     toolsets: object = None,
 ) -> int:
     """Execute a single prompt and print only the final content block.
@@ -139,6 +139,7 @@ def run_oneshot(
         toolsets: Optional comma-separated string or iterable of toolsets.
 
     Returns the exit code.  Caller should sys.exit() with the return.
+
     """
     # Silence every stdlib logger for the duration.  AIAgent, tools, and
     # provider adapters all log to stderr through the root logger; file
@@ -156,7 +157,7 @@ def run_oneshot(
     if provider and not ((model or "").strip() or env_model_early):
         sys.stderr.write(
             "hermes -z: --provider requires --model (or HERMES_INFERENCE_MODEL). "
-            "Pass both explicitly, or neither to use your configured defaults.\n"
+            "Pass both explicitly, or neither to use your configured defaults.\n",
         )
         return 2
 
@@ -175,9 +176,9 @@ def run_oneshot(
     # We'll print the final response to the real stdout at the end.
     real_stdout = sys.stdout
     real_stderr = sys.stderr
-    devnull = open(os.devnull, "w", encoding="utf-8")
+    devnull = pathlib.Path(os.devnull).open("w", encoding="utf-8")
 
-    response: Optional[str] = None
+    response: str | None = None
     failure: BaseException | None = None
     try:
         with redirect_stdout(devnull), redirect_stderr(devnull):
@@ -244,13 +245,14 @@ def _create_session_db_for_oneshot():
 
 def _run_agent(
     prompt: str,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
+    model: str | None = None,
+    provider: str | None = None,
     toolsets: object = None,
     use_config_toolsets: bool = True,
 ) -> str:
     """Build an AIAgent exactly like a normal CLI chat turn would, then
-    run a single conversation.  Returns the final response string."""
+    run a single conversation.  Returns the final response string.
+    """
     # Imports are local so they don't run when hermes is invoked for
     # other commands (keeps top-level CLI startup cheap).
     from hermes_cli.config import load_config
@@ -280,7 +282,7 @@ def _run_agent(
     # the user's configured default provider, which may not host the model
     # the caller just asked for.
     effective_provider = (provider or "").strip() or None
-    explicit_base_url_from_alias: Optional[str] = None
+    explicit_base_url_from_alias: str | None = None
     if effective_provider is None and (model or env_model):
         # Only auto-detect when the model was explicitly requested via arg or
         # env var (not when it came from config — that's the "use my defaults"
@@ -369,7 +371,8 @@ def _run_agent(
 
 def _oneshot_clarify_callback(question: str, choices=None) -> str:
     """Clarify is disabled in oneshot mode — tell the agent to pick a
-    default and proceed instead of stalling or erroring."""
+    default and proceed instead of stalling or erroring.
+    """
     if choices:
         return (
             f"[oneshot mode: no user available. Pick the best option from "

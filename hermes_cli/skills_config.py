@@ -1,5 +1,4 @@
-"""
-Skills configuration for Hermes Agent.
+"""Skills configuration for Hermes Agent.
 `hermes skills` enters this module.
 
 Toggle individual skills or categories on/off, globally or per-platform.
@@ -11,10 +10,9 @@ Config stored in ~/.hermes/config.yaml under:
       telegram: [skill-c]
       cli: []
 """
-from typing import List, Optional, Set
 
-from hermes_cli.config import cfg_get, load_config, save_config
 from hermes_cli.colors import Colors, color
+from hermes_cli.config import cfg_get, load_config, save_config
 from hermes_cli.platforms import PLATFORMS as _PLATFORMS
 
 # Backward-compatible view: {key: label_string} so existing code that
@@ -24,7 +22,8 @@ PLATFORMS = {k: info.label for k, info in _PLATFORMS.items() if k != "api_server
 
 # ─── Config Helpers ───────────────────────────────────────────────────────────
 
-def get_disabled_skills(config: dict, platform: Optional[str] = None) -> Set[str]:
+
+def get_disabled_skills(config: dict, platform: str | None = None) -> set[str]:
     """Return disabled skill names: the global list unioned with the
     platform-specific list when a platform is given.
 
@@ -42,7 +41,7 @@ def get_disabled_skills(config: dict, platform: Optional[str] = None) -> Set[str
     return global_disabled | set(platform_disabled)
 
 
-def save_disabled_skills(config: dict, disabled: Set[str], platform: Optional[str] = None):
+def save_disabled_skills(config: dict, disabled: set[str], platform: str | None = None):
     """Persist disabled skill names to config."""
     config.setdefault("skills", {})
     if platform is None:
@@ -55,7 +54,7 @@ def save_disabled_skills(config: dict, disabled: Set[str], platform: Optional[st
 
 # ─── Skill Discovery ─────────────────────────────────────────────────────────
 
-def _list_all_skills() -> List[dict]:
+def _list_all_skills() -> list[dict]:
     """Return all installed skills (ignoring disabled state)."""
     try:
         from tools.skills_tool import _find_all_skills
@@ -64,14 +63,14 @@ def _list_all_skills() -> List[dict]:
         return []
 
 
-def _get_categories(skills: List[dict]) -> List[str]:
+def _get_categories(skills: list[dict]) -> list[str]:
     """Return sorted unique category names (None -> 'uncategorized')."""
     return sorted({s["category"] or "uncategorized" for s in skills})
 
 
 # ─── Platform Selection ──────────────────────────────────────────────────────
 
-def _select_platform() -> Optional[str]:
+def _select_platform() -> str | None:
     """Ask user which platform to configure, or global."""
     options = [("global", "All platforms (global default)")] + list(PLATFORMS.items())
     print()
@@ -97,7 +96,7 @@ def _select_platform() -> Optional[str]:
 
 # ─── Category Toggle ─────────────────────────────────────────────────────────
 
-def _toggle_by_category(skills: List[dict], disabled: Set[str]) -> Set[str]:
+def _toggle_by_category(skills: list[dict], disabled: set[str]) -> set[str]:
     """Toggle all skills in a category at once."""
     from hermes_cli.curses_ui import curses_checklist
 

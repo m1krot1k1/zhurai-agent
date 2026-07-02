@@ -341,7 +341,7 @@ def test_compute_desktop_content_hash_stable(tmp_path, monkeypatch):
     root = _make_desktop_tree(tmp_path)
     (root / "apps" / "desktop" / "main.js").write_text("console.log('hi')", encoding="utf-8")
     (root / "package.json").write_text('{"name":"hermes"}', encoding="utf-8")
-    (root / "package-lock.json").write_text('{}', encoding="utf-8")
+    (root / "package-lock.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
 
     h1 = cli_main._compute_desktop_content_hash(root)
@@ -374,7 +374,7 @@ def test_desktop_build_needed_detects_missing_artifact(tmp_path, monkeypatch):
     cli_main._write_desktop_build_stamp(root, source_mode=False)
     # No packaged executable exists → build needed
     assert cli_main._desktop_build_needed(
-        root / "apps" / "desktop", root, source_mode=False
+        root / "apps" / "desktop", root, source_mode=False,
     ) is True
 
 
@@ -390,7 +390,7 @@ def test_desktop_build_stamp_round_trip(tmp_path, monkeypatch):
     cli_main._write_desktop_build_stamp(root, source_mode=False)
     # Build should NOT be needed
     assert cli_main._desktop_build_needed(
-        root / "apps" / "desktop", root, source_mode=False
+        root / "apps" / "desktop", root, source_mode=False,
     ) is False
 
 
@@ -455,7 +455,8 @@ def test_purge_electron_build_cache_clears_all_zips_and_unpacked_dir(tmp_path, m
     """Purge is unconditional: it removes every electron-*.zip (regardless of
     whether stdlib zipfile thinks it's corrupt) plus the half-written unpacked
     dir, because @electron/get's own SHASUM check on re-download is the real
-    validator — not a self-rolled one."""
+    validator — not a self-rolled one.
+    """
     cache = tmp_path / "electron-cache"
     # A "clean" zip and a prepended-junk zip — the latter is the real-world
     # corruption that zipfile.testzip() silently passes (it reads from the
@@ -486,7 +487,8 @@ def test_purge_electron_build_cache_clears_all_zips_and_unpacked_dir(tmp_path, m
 
 def test_purge_electron_build_cache_empty_when_nothing_present(tmp_path, monkeypatch):
     """No cached zips and no unpacked dir → nothing removed, so the caller
-    knows a retry is pointless."""
+    knows a retry is pointless.
+    """
     cache = tmp_path / "electron-cache"
     cache.mkdir()
     desktop_dir = tmp_path / "apps" / "desktop"
@@ -530,7 +532,8 @@ def test_gui_retries_pack_once_after_purging_build_cache(tmp_path, monkeypatch):
 def test_gui_redownloads_electron_via_mirror_then_repacks(tmp_path, monkeypatch, capsys):
     """Purge clears nothing and the pinned electronDist (#38673) is missing →
     the mirror fallback must drive electron's own downloader (NOT another pack,
-    which never downloads Electron) and only then retry pack (#47266)."""
+    which never downloads Electron) and only then retry pack (#47266).
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -569,7 +572,8 @@ def test_gui_retries_pack_under_mirror_even_when_prefetch_blocked(tmp_path, monk
     mirror), still retry pack under ELECTRON_MIRROR: the build resolves
     electronDist dynamically and lets electron-builder fetch Electron itself
     via @electron/get, which honors the mirror. That retry is no longer
-    pointless (it was, back when electronDist was a static path)."""
+    pointless (it was, back when electronDist was a static path).
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -598,9 +602,10 @@ def test_gui_retries_pack_under_mirror_even_when_prefetch_blocked(tmp_path, monk
 
 
 def test_gui_install_failure_self_heals_electron_and_continues(tmp_path, monkeypatch, capsys):
-    """npm ci failing on electron's blocked binary download must NOT abort the
+    """Npm ci failing on electron's blocked binary download must NOT abort the
     install: with the electron package staged, repopulate its dist and continue
-    to the build instead of sys.exit-ing before pack ever runs (#47266/#48021)."""
+    to the build instead of sys.exit-ing before pack ever runs (#47266/#48021).
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     packaged_exe = _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -633,7 +638,8 @@ def test_gui_install_failure_self_heals_electron_and_continues(tmp_path, monkeyp
 def test_gui_install_failure_hard_fails_when_electron_not_staged(tmp_path, monkeypatch, capsys):
     """A dependency-install failure where electron never even staged is a genuine
     error (not a blocked binary download) — hard-fail with guidance, don't try to
-    self-heal a tree that isn't there."""
+    self-heal a tree that isn't there.
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -653,7 +659,8 @@ def test_gui_install_failure_hard_fails_when_electron_not_staged(tmp_path, monke
 
 def test_gui_install_failure_hard_fails_when_electron_dist_exists(tmp_path, monkeypatch, capsys):
     """If npm install fails but Electron dist is already present, don't classify
-    it as the blocked-download shape; fail fast as a generic install error."""
+    it as the blocked-download shape; fail fast as a generic install error.
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -678,7 +685,8 @@ def test_gui_install_failure_hard_fails_when_electron_dist_exists(tmp_path, monk
 
 def test_gui_does_not_override_user_electron_mirror(tmp_path, monkeypatch, capsys):
     """A user-pinned ELECTRON_MIRROR is respected: no extra mirror fallback
-    attempt (and we never swap in our default mirror)."""
+    attempt (and we never swap in our default mirror).
+    """
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch, platform="linux")
@@ -727,7 +735,7 @@ def test_electron_dist_ok_per_platform(tmp_path, monkeypatch, platform, rel):
 
 
 def test_electron_dir_prefers_workspace_local_package(tmp_path):
-    """npm may nest electron under apps/desktop; resolve there over the root hoist."""
+    """Npm may nest electron under apps/desktop; resolve there over the root hoist."""
     root_electron = tmp_path / "node_modules" / "electron"
     local_electron = tmp_path / "apps" / "desktop" / "node_modules" / "electron"
     root_electron.mkdir(parents=True)
@@ -755,7 +763,8 @@ def test_electron_dist_ok_finds_workspace_local_binary(tmp_path, monkeypatch):
 
 def test_redownload_electron_dist_noop_when_present(tmp_path, monkeypatch):
     """Already-healthy dist → no download, so an unrelated build failure can't
-    trigger a needless ~200 MB refetch."""
+    trigger a needless ~200 MB refetch.
+    """
     monkeypatch.setattr(cli_main.sys, "platform", "linux")
     binp = tmp_path / "node_modules" / "electron" / "dist" / "electron"
     binp.parent.mkdir(parents=True)
@@ -779,7 +788,8 @@ def test_redownload_electron_dist_missing_installer(tmp_path, monkeypatch):
 
 def test_redownload_electron_dist_runs_installer_with_mirror(tmp_path, monkeypatch):
     """Missing dist → wipe any partial dist + version marker, run electron's own
-    install.js with ELECTRON_MIRROR injected, and report success on the binary."""
+    install.js with ELECTRON_MIRROR injected, and report success on the binary.
+    """
     monkeypatch.setattr(cli_main.sys, "platform", "linux")
     electron = tmp_path / "node_modules" / "electron"
     electron.mkdir(parents=True)
@@ -805,7 +815,7 @@ def test_redownload_electron_dist_runs_installer_with_mirror(tmp_path, monkeypat
     with patch("hermes_cli.main.shutil.which", return_value="/usr/bin/node"), \
          patch("hermes_cli.main.subprocess.run", side_effect=fake_run):
         ok = cli_main._redownload_electron_dist(
-            tmp_path, {"PATH": "/x"}, mirror="https://mirror.example/electron/"
+            tmp_path, {"PATH": "/x"}, mirror="https://mirror.example/electron/",
         )
 
     assert ok is True
@@ -819,7 +829,8 @@ def test_redownload_electron_dist_runs_installer_with_mirror(tmp_path, monkeypat
 
 def test_redownload_electron_dist_returns_false_when_download_fails(tmp_path, monkeypatch):
     """install.js ran but produced no binary (still blocked) → False, so the
-    caller skips a doomed pack."""
+    caller skips a doomed pack.
+    """
     monkeypatch.setattr(cli_main.sys, "platform", "linux")
     electron = tmp_path / "node_modules" / "electron"
     electron.mkdir(parents=True)

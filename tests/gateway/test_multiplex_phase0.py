@@ -8,8 +8,9 @@ Covers the three Phase 0 deliverables:
      on, without disturbing the positional key layout downstream parsers rely
      on.
 """
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from gateway.config import GatewayConfig, Platform
 from gateway.session import SessionSource, SessionStore, build_session_key
@@ -25,7 +26,8 @@ def _src(**kw) -> SessionSource:
 class TestSessionKeyByteIdenticalWhenOff:
     """The non-negotiable guard: with no profile (or 'default'), every key is
     byte-for-byte what it was before Phase 0. A diff here orphans every
-    existing session on upgrade."""
+    existing session on upgrade.
+    """
 
     @pytest.mark.parametrize("profile", [None, "default"])
     def test_dm_with_chat_id(self, profile):
@@ -83,7 +85,8 @@ class TestSessionKeyNamespacedWhenOn:
     def test_positional_layout_preserved_for_parsers(self):
         """Downstream parsers split on ':' and read parts[2]=platform,
         parts[3]=chat_type, parts[4]=chat_id (see qqbot adapter
-        _parse_gateway_session_key). The profile must occupy parts[1] only."""
+        _parse_gateway_session_key). The profile must occupy parts[1] only.
+        """
         s = _src(platform=Platform.DISCORD, chat_id="g1", chat_type="group", user_id="alice")
         parts = build_session_key(s, profile="coder").split(":")
         assert parts[0] == "agent"
@@ -130,7 +133,8 @@ class TestMultiplexConfigFlag:
 
 class TestSessionStoreProfileResolution:
     """SessionStore._generate_session_key honors the flag: legacy namespace
-    when off, active-profile namespace when on."""
+    when off, active-profile namespace when on.
+    """
 
     def _store(self, tmp_path, **cfg_kw):
         config = GatewayConfig(**cfg_kw)
@@ -161,5 +165,3 @@ class TestSessionStoreProfileResolution:
         s = _src(chat_id="99", chat_type="dm")
         with patch("hermes_cli.profiles.get_active_profile_name", return_value="default"):
             assert store._generate_session_key(s) == "agent:main:telegram:dm:99"
-
-

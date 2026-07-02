@@ -7,6 +7,7 @@ launching profile preselected. `--isolated` opts out.
 """
 import sys
 import types
+
 import pytest
 
 
@@ -29,7 +30,7 @@ def _args(**kw):
 class TestUnifiedDashboardRouting:
     def test_profile_launch_attaches_to_running_dashboard(self, main_mod, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         monkeypatch.setattr(main_mod, "_dashboard_listening", lambda host, port: True)
         execs = []
@@ -42,9 +43,10 @@ class TestUnifiedDashboardRouting:
 
     def test_profile_launch_attach_opens_scoped_url(self, main_mod, monkeypatch):
         """The attach path must open the browser at ?profile=<name> — that
-        URL is the entire point of attaching (preselects the switcher)."""
+        URL is the entire point of attaching (preselects the switcher).
+        """
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         monkeypatch.setattr(main_mod, "_dashboard_listening", lambda host, port: True)
         opened = []
@@ -59,7 +61,7 @@ class TestUnifiedDashboardRouting:
     def test_profile_launch_reexecs_machine_dashboard(self, main_mod, monkeypatch):
         monkeypatch.delenv("HERMES_HOME", raising=False)
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         monkeypatch.setattr(main_mod, "_dashboard_listening", lambda host, port: False)
         execs = []
@@ -100,7 +102,7 @@ class TestUnifiedDashboardRouting:
         """
         monkeypatch.setenv("HERMES_HOME", "/opt/data/profiles/oracle")
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "oracle"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "oracle",
         )
         monkeypatch.setattr(main_mod, "_dashboard_listening", lambda host, port: False)
         execs = []
@@ -125,10 +127,11 @@ class TestUnifiedDashboardRouting:
         """A desktop-spawned named-profile backend (HERMES_DESKTOP=1) must NOT
         reroute into the machine dashboard. The reroute re-execs as the default
         profile and exits, so the desktop never sees a ready backend → boot
-        loop. The guard keeps desktop pool backends per-profile."""
+        loop. The guard keeps desktop pool backends per-profile.
+        """
         monkeypatch.setenv("HERMES_DESKTOP", "1")
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         listening_calls = []
         monkeypatch.setattr(
@@ -146,7 +149,7 @@ class TestUnifiedDashboardRouting:
 
     def test_isolated_flag_skips_routing(self, main_mod, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         listening_calls = []
         monkeypatch.setattr(
@@ -164,7 +167,7 @@ class TestUnifiedDashboardRouting:
 
     def test_default_profile_launch_skips_routing(self, main_mod, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "default"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "default",
         )
         listening_calls = []
         monkeypatch.setattr(
@@ -179,9 +182,10 @@ class TestUnifiedDashboardRouting:
 
     def test_reexec_child_does_not_reroute(self, main_mod, monkeypatch):
         """The re-exec'd child carries --open-profile; the guard must treat
-        that as 'already routed' and never re-exec again (no exec loop)."""
+        that as 'already routed' and never re-exec again (no exec loop).
+        """
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "worker_x",
         )
         execs = []
         monkeypatch.setattr(main_mod.os, "execvpe", lambda *a, **k: execs.append(a))
@@ -194,9 +198,10 @@ class TestUnifiedDashboardRouting:
     def test_dashboard_starts_mcp_discovery_for_ws_backend(self, main_mod, monkeypatch):
         """The dashboard process serves the /api/ws gateway but never runs
         tui_gateway/entry.py, so it must kick off MCP discovery itself or
-        desktop sessions never see a profile's MCP tools."""
+        desktop sessions never see a profile's MCP tools.
+        """
         monkeypatch.setattr(
-            "hermes_cli.profiles.get_active_profile_name", lambda: "default"
+            "hermes_cli.profiles.get_active_profile_name", lambda: "default",
         )
         monkeypatch.delenv("HERMES_WEB_DIST", raising=False)
         monkeypatch.setattr(main_mod, "_sync_bundled_skills_quietly", lambda: None)
@@ -230,5 +235,5 @@ class TestUnifiedDashboardRouting:
             {
                 "logger": main_mod.logger,
                 "thread_name": "dashboard-mcp-discovery",
-            }
+            },
         ]

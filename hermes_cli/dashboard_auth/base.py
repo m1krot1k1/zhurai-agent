@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -145,7 +144,7 @@ class DashboardAuthProvider(ABC):
     ) -> Session: ...
 
     @abstractmethod
-    def verify_session(self, *, access_token: str) -> Optional[Session]: ...
+    def verify_session(self, *, access_token: str) -> Session | None: ...
 
     @abstractmethod
     def refresh_session(self, *, refresh_token: str) -> Session: ...
@@ -154,8 +153,8 @@ class DashboardAuthProvider(ABC):
     def revoke_session(self, *, refresh_token: str) -> None: ...
 
     def complete_password_login(
-        self, *, username: str, password: str
-    ) -> "Session":
+        self, *, username: str, password: str,
+    ) -> Session:
         """Verify a username/password pair and mint a :class:`Session`.
 
         Only called when ``supports_password`` is True (the
@@ -180,7 +179,7 @@ class DashboardAuthProvider(ABC):
         raise NotImplementedError(
             f"{type(self).__name__} does not support password login "
             "(set supports_password = True and override "
-            "complete_password_login)"
+            "complete_password_login)",
         )
 
 
@@ -207,7 +206,7 @@ def assert_protocol_compliance(cls: type) -> None:
         val = getattr(cls, attr, "")
         if not val:
             raise TypeError(
-                f"{cls.__name__} missing or empty attribute: {attr!r}"
+                f"{cls.__name__} missing or empty attribute: {attr!r}",
             )
     for method in required_methods:
         if not callable(getattr(cls, method, None)):
@@ -216,5 +215,5 @@ def assert_protocol_compliance(cls: type) -> None:
     if getattr(cls, "__abstractmethods__", None):
         raise TypeError(
             f"{cls.__name__} has unimplemented abstract methods: "
-            f"{sorted(cls.__abstractmethods__)}"
+            f"{sorted(cls.__abstractmethods__)}",
         )

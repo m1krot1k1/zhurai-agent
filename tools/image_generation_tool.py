@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Image Generation Tools Module
+"""Image Generation Tools Module
 
 Provides image generation via FAL.ai. Multiple FAL models are supported and
 selectable via ``hermes tools`` → Image Generation; the active model is
@@ -20,13 +19,13 @@ Pricing shown in UI strings is as-of the initial commit; we accept drift and
 update when it's noticed.
 """
 
+import datetime
 import json
 import logging
 import os
-import datetime
 import threading
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 # fal_client is imported lazily — see _load_fal_client(). Pulling it
 # eagerly added ~64 ms to every CLI cold start because
@@ -56,10 +55,12 @@ def _load_fal_client() -> Any:
     return fal_client
 
 
+import pathlib
+
 from tools.debug_helpers import DebugSession
 from tools.fal_common import (
-    _ManagedFalSyncClient,
     _extract_http_status,
+    _ManagedFalSyncClient,
     _normalize_fal_queue_url_format,  # noqa: F401 — re-exported for tests
 )
 from tools.managed_tool_gateway import resolve_managed_tool_gateway
@@ -94,7 +95,7 @@ logger = logging.getLogger(__name__)
 #
 # ``upscale`` controls whether to chain Clarity Upscaler after generation.
 
-FAL_MODELS: Dict[str, Dict[str, Any]] = {
+FAL_MODELS: dict[str, dict[str, Any]] = {
     "fal-ai/flux-2/klein/9b": {
         "display": "FLUX 2 Klein 9B",
         "speed": "<1s",
@@ -456,7 +457,8 @@ _managed_fal_client_lock = threading.Lock()
 # ---------------------------------------------------------------------------
 def _resolve_managed_fal_gateway():
     """Return managed fal-queue gateway config when the user prefers the gateway
-    or direct FAL credentials are absent."""
+    or direct FAL credentials are absent.
+    """
     if fal_key_is_configured() and not prefers_gateway("image_gen"):
         return None
     return resolve_managed_tool_gateway("fal-queue")
@@ -486,7 +488,7 @@ def _get_managed_fal_client(managed_gateway):
         return _managed_fal_client
 
 
-def _submit_fal_request(model: str, arguments: Dict[str, Any]):
+def _submit_fal_request(model: str, arguments: dict[str, Any]):
     """Submit a FAL request using direct credentials or the managed queue gateway."""
     # Trigger the lazy import on first call. Idempotent.
     _load_fal_client()
@@ -524,7 +526,7 @@ def _submit_fal_request(model: str, arguments: Dict[str, Any]):
                 f"the Nous Portal's FAL proxy. Either:\n"
                 f"  • Set FAL_KEY in your environment to use FAL.ai directly, or\n"
                 f"  • Pick a different model via `hermes tools` → Image Generation."
-                f"{gateway_message}"
+                f"{gateway_message}",
             ) from exc
         raise
 
@@ -571,9 +573,9 @@ def _build_fal_payload(
     model_id: str,
     prompt: str,
     aspect_ratio: str = DEFAULT_ASPECT_RATIO,
-    seed: Optional[int] = None,
-    overrides: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    seed: int | None = None,
+    overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a FAL request payload for `model_id` from unified inputs.
 
     Translates aspect_ratio into the model's native size spec (preset enum,
@@ -588,7 +590,7 @@ def _build_fal_payload(
     if aspect not in sizes:
         aspect = DEFAULT_ASPECT_RATIO
 
-    payload: Dict[str, Any] = dict(meta.get("defaults", {}))
+    payload: dict[str, Any] = dict(meta.get("defaults", {}))
     payload["prompt"] = (prompt or "").strip()
 
     if size_style in {"image_size_preset", "gpt_literal"}:
@@ -621,9 +623,9 @@ def _build_fal_edit_payload(
     prompt: str,
     image_urls: list,
     aspect_ratio: str = DEFAULT_ASPECT_RATIO,
-    seed: Optional[int] = None,
-    overrides: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    seed: int | None = None,
+    overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build a FAL *edit* request payload (image-to-image) from unified inputs.
 
     Every FAL edit endpoint takes ``image_urls`` (a list of source/reference
@@ -642,7 +644,7 @@ def _build_fal_edit_payload(
     if aspect not in sizes:
         aspect = DEFAULT_ASPECT_RATIO
 
-    payload: Dict[str, Any] = dict(meta.get("defaults", {}))
+    payload: dict[str, Any] = dict(meta.get("defaults", {}))
     payload["prompt"] = (prompt or "").strip()
     payload["image_urls"] = list(image_urls)
 
@@ -676,7 +678,7 @@ def _build_fal_edit_payload(
 # ---------------------------------------------------------------------------
 # Upscaler
 # ---------------------------------------------------------------------------
-def _upscale_image(image_url: str, original_prompt: str) -> Optional[Dict[str, Any]]:
+def _upscale_image(image_url: str, original_prompt: str) -> dict[str, Any] | None:
     """Upscale an image using FAL.ai's Clarity Upscaler.
 
     Returns upscaled image dict, or None on failure (caller falls back to
@@ -731,7 +733,7 @@ def _looks_like_absolute_file_path(value: str) -> bool:
     lower = value.lower()
     if lower.startswith(("http://", "https://", "data:")):
         return False
-    if os.path.isabs(value):
+    if pathlib.Path(value).is_absolute():
         return True
     return len(value) >= 3 and value[1] == ":" and value[2] in {"/", "\\"}
 
@@ -843,13 +845,13 @@ def _postprocess_image_generate_result(raw: str, task_id: str | None = None) -> 
 def image_generate_tool(
     prompt: str,
     aspect_ratio: str = DEFAULT_ASPECT_RATIO,
-    num_inference_steps: Optional[int] = None,
-    guidance_scale: Optional[float] = None,
-    num_images: Optional[int] = None,
-    output_format: Optional[str] = None,
-    seed: Optional[int] = None,
-    image_url: Optional[str] = None,
-    reference_image_urls: Optional[list] = None,
+    num_inference_steps: int | None = None,
+    guidance_scale: float | None = None,
+    num_images: int | None = None,
+    output_format: str | None = None,
+    seed: int | None = None,
+    image_url: str | None = None,
+    reference_image_urls: list | None = None,
 ) -> str:
     """Generate an image from a text prompt, or edit a source image, via FAL.
 
@@ -917,7 +919,7 @@ def image_generate_tool(
                 f"Model '{meta.get('display', model_id)}' ({model_id}) is not "
                 f"capable of image-to-image / editing. Provide a text-only "
                 f"prompt (omit image_url), or switch to an edit-capable model "
-                f"via `hermes tools` → Image Generation."
+                f"via `hermes tools` → Image Generation.",
             )
 
         aspect_lc = (aspect_ratio or DEFAULT_ASPECT_RATIO).lower().strip()
@@ -928,7 +930,7 @@ def image_generate_tool(
             )
             aspect_lc = DEFAULT_ASPECT_RATIO
 
-        overrides: Dict[str, Any] = {}
+        overrides: dict[str, Any] = {}
         if num_inference_steps is not None:
             overrides["num_inference_steps"] = num_inference_steps
         if guidance_scale is not None:
@@ -1024,7 +1026,7 @@ def image_generate_tool(
 
     except Exception as e:
         generation_time = (datetime.datetime.now() - start_time).total_seconds()
-        error_msg = f"Error generating image: {str(e)}"
+        error_msg = f"Error generating image: {e!s}"
         logger.error("%s", error_msg, exc_info=True)
 
         response_data = {
@@ -1060,7 +1062,7 @@ def _build_no_backend_setup_message() -> str:
     lines.append("Missing requirements:")
     if managed_nous_tools_enabled():
         lines.append(
-            "  - FAL_KEY is not set and the managed FAL gateway is unreachable"
+            "  - FAL_KEY is not set and the managed FAL gateway is unreachable",
         )
     else:
         lines.append("  - FAL_KEY environment variable is not set")
@@ -1073,17 +1075,17 @@ def _build_no_backend_setup_message() -> str:
     lines.append("To enable image generation, do one of:")
     lines.append(
         "  1. Get a free API key at https://fal.ai and set "
-        "FAL_KEY=<your-key> (then restart the session)"
+        "FAL_KEY=<your-key> (then restart the session)",
     )
     if managed_nous_tools_enabled():
         lines.append(
             "  2. Sign in to a Nous account that has the managed FAL "
-            "gateway enabled (`hermes setup`)"
+            "gateway enabled (`hermes setup`)",
         )
     lines.append(
         "  3. Configure a different image_gen provider via `hermes tools` "
         "→ Image Generation (run `hermes plugins list` to see installed "
-        "backends)"
+        "backends)",
     )
     return "\n".join(lines)
 
@@ -1145,7 +1147,7 @@ if __name__ == "__main__":
     print("✅ FAL.ai API key found")
 
     try:
-        import fal_client  # noqa: F401
+        import fal_client
         print("✅ fal_client library available")
     except ImportError:
         print("❌ fal_client library not found — pip install fal-client")
@@ -1279,8 +1281,8 @@ def _read_configured_image_provider():
 def _dispatch_to_plugin_provider(
     prompt: str,
     aspect_ratio: str,
-    image_url: Optional[str] = None,
-    reference_image_urls: Optional[list] = None,
+    image_url: str | None = None,
+    reference_image_urls: list | None = None,
 ):
     """Route the call to a plugin-registered provider when one is selected.
 
@@ -1338,7 +1340,7 @@ def _dispatch_to_plugin_provider(
             "error_type": "provider_not_registered",
         })
 
-    kwargs: Dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}
+    kwargs: dict[str, Any] = {"prompt": prompt, "aspect_ratio": aspect_ratio}
     try:
         if configured_model:
             kwargs["model"] = configured_model
@@ -1449,7 +1451,7 @@ def _handle_image_generate(args, **kw):
 _GENERIC_IMAGE_DESCRIPTION = IMAGE_GENERATE_SCHEMA["description"]
 
 
-def _active_image_capabilities() -> Dict[str, Any]:
+def _active_image_capabilities() -> dict[str, Any]:
     """Best-effort: return the active backend/model's image capabilities.
 
     Resolution order mirrors the runtime dispatch:
@@ -1459,7 +1461,7 @@ def _active_image_capabilities() -> Dict[str, Any]:
     Returns a dict like ``{"modalities": [...], "max_reference_images": N,
     "model": "...", "provider": "..."}``. Never raises.
     """
-    info: Dict[str, Any] = {"modalities": ["text"], "max_reference_images": 0}
+    info: dict[str, Any] = {"modalities": ["text"], "max_reference_images": 0}
 
     configured_provider = _read_configured_image_provider()
     if configured_provider and configured_provider != "fal":
@@ -1502,7 +1504,7 @@ def _active_image_capabilities() -> Dict[str, Any]:
     return info
 
 
-def _build_dynamic_image_schema() -> Dict[str, Any]:
+def _build_dynamic_image_schema() -> dict[str, Any]:
     """Build a description reflecting whether the active model supports editing."""
     parts = [_GENERIC_IMAGE_DESCRIPTION]
 
@@ -1532,18 +1534,18 @@ def _build_dynamic_image_schema() -> Dict[str, Any]:
         parts.append(
             "- supports both text-to-image (omit image_url) and "
             f"image-to-image / editing (pass image_url){ref_note} — "
-            "routes automatically"
+            "routes automatically",
         )
     elif "image" in modalities and "text" not in modalities:
         parts.append(
-            "- this model is image-to-image / edit only — image_url is REQUIRED"
+            "- this model is image-to-image / edit only — image_url is REQUIRED",
         )
     else:
         parts.append(
             "- this model is text-to-image only — it is NOT capable of "
             "image-to-image / editing; do not pass image_url or "
             "reference_image_urls (they will be rejected). Provide a "
-            "text-only prompt."
+            "text-only prompt.",
         )
 
     return {"description": "\n".join(parts)}

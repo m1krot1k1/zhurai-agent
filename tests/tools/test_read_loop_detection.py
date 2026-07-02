@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Tests for the read-loop detection mechanism in file_tools.
+"""Tests for the read-loop detection mechanism in file_tools.
 
 Verifies that:
 1. Only *consecutive* identical reads trigger warnings/blocks
@@ -17,18 +16,19 @@ Run with:  python -m pytest tests/tools/test_read_loop_detection.py -v
 
 import json
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from tools.file_tools import (
+    _read_tracker,
+    notify_other_tool_call,
     read_file_tool,
     search_tool,
-    notify_other_tool_call,
-    _read_tracker,
 )
 
 
 class _FakeReadResult:
     """Minimal stand-in for FileOperations.read_file return value."""
+
     def __init__(self, content="line1\nline2\n", total_lines=2):
         self.content = content
         self._total_lines = total_lines
@@ -43,6 +43,7 @@ def _fake_read_file(path, offset=1, limit=500):
 
 class _FakeSearchResult:
     """Minimal stand-in for FileOperations.search return value."""
+
     def __init__(self):
         self.matches = []
 
@@ -77,7 +78,7 @@ class TestReadLoopDetection(unittest.TestCase):
         """2nd consecutive read should NOT warn (threshold is 3)."""
         read_file_tool("/tmp/test.py", offset=1, limit=500, task_id="t1")
         result = json.loads(
-            read_file_tool("/tmp/test.py", offset=1, limit=500, task_id="t1")
+            read_file_tool("/tmp/test.py", offset=1, limit=500, task_id="t1"),
         )
         self.assertNotIn("_warning", result)
         self.assertIn("content", result)
@@ -120,7 +121,7 @@ class TestReadLoopDetection(unittest.TestCase):
         read_file_tool("/tmp/test.py", offset=1, limit=500, task_id="t1")
         # Now read a different region — this resets the consecutive counter
         result = json.loads(
-            read_file_tool("/tmp/test.py", offset=501, limit=500, task_id="t1")
+            read_file_tool("/tmp/test.py", offset=501, limit=500, task_id="t1"),
         )
         self.assertNotIn("_warning", result)
 
@@ -137,7 +138,7 @@ class TestReadLoopDetection(unittest.TestCase):
         """Different task_ids have separate consecutive counters."""
         read_file_tool("/tmp/test.py", task_id="task_a")
         result = json.loads(
-            read_file_tool("/tmp/test.py", task_id="task_b")
+            read_file_tool("/tmp/test.py", task_id="task_b"),
         )
         self.assertNotIn("_warning", result)
 
@@ -189,9 +190,6 @@ class TestNotifyOtherToolCall(unittest.TestCase):
     def test_notify_on_unknown_task_is_safe(self, _mock_ops):
         """notify_other_tool_call on a task that hasn't read anything is a no-op."""
         notify_other_tool_call("nonexistent_task")  # Should not raise
-
-
-
 
 
 class TestSearchLoopDetection(unittest.TestCase):

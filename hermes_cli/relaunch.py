@@ -1,5 +1,4 @@
-"""
-Unified self-relaunch for Hermes CLI.
+"""Unified self-relaunch for Hermes CLI.
 
 Preserves critical flags (--tui, --dev, --profile, --model, etc.) across
 process replacement so that ``hermes sessions browse`` or post-setup relaunch
@@ -9,9 +8,10 @@ Also works when ``hermes`` is not on PATH (e.g. ``nix run`` or ``python -m``).
 """
 
 import os
+import pathlib
 import shutil
 import sys
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from hermes_cli._parser import (
     PRE_ARGPARSE_INHERITED_FLAGS,
@@ -77,7 +77,7 @@ def _extract_inherited_flags(argv: Sequence[str]) -> list[str]:
     return flags
 
 
-def resolve_hermes_bin() -> Optional[str]:
+def resolve_hermes_bin() -> str | None:
     """Find the hermes entry point.
 
     Priority:
@@ -102,12 +102,12 @@ def resolve_hermes_bin() -> Optional[str]:
         return p.lower().endswith((".py", ".pyc"))
 
     # Absolute path to an executable (covers nix store, venv wrappers, etc.)
-    if os.path.isabs(argv0) and os.path.isfile(argv0) and os.access(argv0, os.X_OK):
+    if pathlib.Path(argv0).is_absolute() and pathlib.Path(argv0).is_file() and os.access(argv0, os.X_OK):
         if not (_is_windows and _is_python_script(argv0)):
             return argv0
 
     # Relative path — resolve against CWD
-    if not argv0.startswith("-") and os.path.isfile(argv0):
+    if not argv0.startswith("-") and pathlib.Path(argv0).is_file():
         abs_path = os.path.abspath(argv0)
         if os.access(abs_path, os.X_OK):
             if not (_is_windows and _is_python_script(abs_path)):
@@ -125,7 +125,7 @@ def build_relaunch_argv(
     extra_args: Sequence[str],
     *,
     preserve_inherited: bool = True,
-    original_argv: Optional[Sequence[str]] = None,
+    original_argv: Sequence[str] | None = None,
 ) -> list[str]:
     """Construct an argv list for replacing the current process with hermes.
 
@@ -135,6 +135,7 @@ def build_relaunch_argv(
             tagged with ``inherit_on_relaunch`` in the parser.
         original_argv: The original argv to scan for flags (defaults to
             ``sys.argv[1:]``).
+
     """
     bin_path = resolve_hermes_bin()
 
@@ -156,7 +157,7 @@ def relaunch(
     extra_args: Sequence[str],
     *,
     preserve_inherited: bool = True,
-    original_argv: Optional[Sequence[str]] = None,
+    original_argv: Sequence[str] | None = None,
 ) -> None:
     """Replace the current process with a fresh hermes invocation.
 
@@ -179,7 +180,7 @@ def relaunch(
     new hermes started" — just with two PIDs in play instead of one.
     """
     new_argv = build_relaunch_argv(
-        extra_args, preserve_inherited=preserve_inherited, original_argv=original_argv
+        extra_args, preserve_inherited=preserve_inherited, original_argv=original_argv,
     )
     if sys.platform == "win32":
         # Windows: subprocess + exit, because execvp can't swap to .cmd/.exe shims.

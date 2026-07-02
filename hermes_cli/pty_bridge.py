@@ -37,7 +37,7 @@ import struct
 import sys
 import termios
 import time
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 try:
     import ptyprocess  # type: ignore
@@ -97,7 +97,7 @@ class PtyBridge:
     ``os.write`` on the master fd, which is safe.
     """
 
-    def __init__(self, proc: "ptyprocess.PtyProcess"):  # type: ignore[name-defined]
+    def __init__(self, proc: ptyprocess.PtyProcess):  # type: ignore[name-defined]
         self._proc = proc
         self._fd: int = proc.fd
         self._closed = False
@@ -114,11 +114,11 @@ class PtyBridge:
         cls,
         argv: Sequence[str],
         *,
-        cwd: Optional[str] = None,
-        env: Optional[dict] = None,
+        cwd: str | None = None,
+        env: dict | None = None,
         cols: int = 80,
         rows: int = 24,
-    ) -> "PtyBridge":
+    ) -> PtyBridge:
         """Spawn ``argv`` behind a new PTY and return a bridge.
 
         Raises :class:`PtyUnavailableError` if the platform can't host a
@@ -129,13 +129,13 @@ class PtyBridge:
             if sys.platform.startswith("win"):
                 raise PtyUnavailableError(
                     "Pseudo-terminals are unavailable on this platform. "
-                    "Hermes Agent supports Windows only via WSL."
+                    "Hermes Agent supports Windows only via WSL.",
                 )
             if ptyprocess is None:
                 raise PtyUnavailableError(
                     "The `ptyprocess` package is missing. "
                     "Install with: pip install ptyprocess "
-                    "(or pip install -e '.[pty]')."
+                    "(or pip install -e '.[pty]').",
                 )
             raise PtyUnavailableError("Pseudo-terminals are unavailable.")
         # PTY-hosted programs expect TERM to describe the terminal type.
@@ -168,7 +168,7 @@ class PtyBridge:
 
     # -- I/O --------------------------------------------------------------
 
-    def read(self, timeout: float = 0.2) -> Optional[bytes]:
+    def read(self, timeout: float = 0.2) -> bytes | None:
         """Read up to 64 KiB of raw bytes from the PTY master.
 
         Returns:
@@ -178,6 +178,7 @@ class PtyBridge:
 
         Never blocks longer than ``timeout`` seconds.  Safe to call after
         :meth:`close`; returns ``None`` in that case.
+
         """
         if self._closed:
             return None
@@ -279,7 +280,7 @@ class PtyBridge:
             pass
 
     # Context-manager sugar — handy in tests and ad-hoc scripts.
-    def __enter__(self) -> "PtyBridge":
+    def __enter__(self) -> PtyBridge:
         return self
 
     def __exit__(self, *_exc) -> None:

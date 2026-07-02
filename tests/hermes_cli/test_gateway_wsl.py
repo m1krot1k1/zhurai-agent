@@ -2,17 +2,17 @@
 
 import subprocess
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-import hermes_cli.gateway as gateway
 import hermes_constants
-
+from hermes_cli import gateway
 
 # =============================================================================
 # is_wsl() in hermes_constants
 # =============================================================================
+
 
 class TestIsWsl:
     """Test the shared is_wsl() utility."""
@@ -68,7 +68,7 @@ class TestWslSystemdOperational:
         monkeypatch.setattr(
             gateway.subprocess, "run",
             lambda *a, **kw: SimpleNamespace(
-                returncode=0, stdout="running\n", stderr=""
+                returncode=0, stdout="running\n", stderr="",
             ),
         )
         assert gateway._wsl_systemd_operational() is True
@@ -77,7 +77,7 @@ class TestWslSystemdOperational:
         monkeypatch.setattr(
             gateway.subprocess, "run",
             lambda *a, **kw: SimpleNamespace(
-                returncode=1, stdout="degraded\n", stderr=""
+                returncode=1, stdout="degraded\n", stderr="",
             ),
         )
         assert gateway._wsl_systemd_operational() is True
@@ -86,7 +86,7 @@ class TestWslSystemdOperational:
         monkeypatch.setattr(
             gateway.subprocess, "run",
             lambda *a, **kw: SimpleNamespace(
-                returncode=1, stdout="starting\n", stderr=""
+                returncode=1, stdout="starting\n", stderr="",
             ),
         )
         assert gateway._wsl_systemd_operational() is True
@@ -95,7 +95,7 @@ class TestWslSystemdOperational:
         monkeypatch.setattr(
             gateway.subprocess, "run",
             lambda *a, **kw: SimpleNamespace(
-                returncode=1, stdout="offline\n", stderr=""
+                returncode=1, stdout="offline\n", stderr="",
             ),
         )
         assert gateway._wsl_systemd_operational() is False
@@ -160,7 +160,7 @@ class TestGatewayCommandWSLMessages:
     """Test that WSL users see appropriate guidance."""
 
     def test_install_wsl_no_systemd(self, monkeypatch, capsys):
-        """hermes gateway install on WSL without systemd shows guidance."""
+        """Hermes gateway install on WSL without systemd shows guidance."""
         monkeypatch.setattr(gateway, "is_linux", lambda: True)
         monkeypatch.setattr(gateway, "is_termux", lambda: False)
         monkeypatch.setattr(gateway, "is_wsl", lambda: True)
@@ -191,7 +191,7 @@ class TestGatewayCommandWSLMessages:
         assert "tmux" in out
 
     def test_start_wsl_no_systemd(self, monkeypatch, capsys):
-        """hermes gateway start on WSL without systemd shows guidance."""
+        """Hermes gateway start on WSL without systemd shows guidance."""
         monkeypatch.setattr(gateway, "is_linux", lambda: True)
         monkeypatch.setattr(gateway, "is_termux", lambda: False)
         monkeypatch.setattr(gateway, "is_wsl", lambda: True)
@@ -213,7 +213,7 @@ class TestGatewayCommandWSLMessages:
         assert "wsl.conf" in out
 
     def test_status_wsl_running_manual(self, monkeypatch, capsys):
-        """hermes gateway status on WSL with manual process shows WSL note."""
+        """Hermes gateway status on WSL with manual process shows WSL note."""
         monkeypatch.setattr(gateway, "supports_systemd_services", lambda: False)
         monkeypatch.setattr(gateway, "is_macos", lambda: False)
         monkeypatch.setattr(gateway, "is_termux", lambda: False)
@@ -222,7 +222,7 @@ class TestGatewayCommandWSLMessages:
         # the Windows status branch (which reads gateway_windows.is_installed()).
         monkeypatch.setattr(gateway, "is_windows", lambda: False)
         monkeypatch.setattr(gateway, "find_gateway_pids", lambda: [12345])
-        monkeypatch.setattr(gateway, "_runtime_health_lines", lambda: [])
+        monkeypatch.setattr(gateway, "_runtime_health_lines", list)
         # Stub out the systemd unit path check
         monkeypatch.setattr(
             gateway, "get_systemd_unit_path",
@@ -241,15 +241,15 @@ class TestGatewayCommandWSLMessages:
         assert "tmux or screen" in out
 
     def test_status_wsl_not_running(self, monkeypatch, capsys):
-        """hermes gateway status on WSL with no process shows WSL start advice."""
+        """Hermes gateway status on WSL with no process shows WSL start advice."""
         monkeypatch.setattr(gateway, "supports_systemd_services", lambda: False)
         monkeypatch.setattr(gateway, "is_macos", lambda: False)
         monkeypatch.setattr(gateway, "is_termux", lambda: False)
         monkeypatch.setattr(gateway, "is_wsl", lambda: True)
         # See test_status_wsl_running_manual.
         monkeypatch.setattr(gateway, "is_windows", lambda: False)
-        monkeypatch.setattr(gateway, "find_gateway_pids", lambda: [])
-        monkeypatch.setattr(gateway, "_runtime_health_lines", lambda: [])
+        monkeypatch.setattr(gateway, "find_gateway_pids", list)
+        monkeypatch.setattr(gateway, "_runtime_health_lines", list)
         monkeypatch.setattr(
             gateway, "get_systemd_unit_path",
             lambda system=False: SimpleNamespace(exists=lambda: False),

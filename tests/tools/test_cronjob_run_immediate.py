@@ -9,8 +9,7 @@ blocking a concurrent tick) and fires it inline via the shared run_one_job body.
 import json
 from unittest.mock import patch
 
-from tools.cronjob_tools import cronjob, _execute_job_now
-
+from tools.cronjob_tools import _execute_job_now, cronjob
 
 _JOB = {"id": "job-run-1", "name": "manual run", "prompt": "hi",
         "schedule": {"kind": "cron", "expr": "0 9 * * *"}}

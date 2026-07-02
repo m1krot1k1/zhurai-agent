@@ -26,7 +26,6 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
 
 logger = logging.getLogger("hermes.security_audit")
 
@@ -46,7 +45,7 @@ def _is_root() -> bool:
         return False
 
 
-def _running_as_root() -> Optional[str]:
+def _running_as_root() -> str | None:
     if not _is_root():
         return None
     return (
@@ -84,7 +83,7 @@ def _iter_sshd_config_lines() -> list[str]:
     return lines
 
 
-def _ssh_password_auth_enabled() -> Optional[str]:
+def _ssh_password_auth_enabled() -> str | None:
     """Warn when an SSH daemon has password authentication enabled.
 
     Password auth on a public SSH daemon is the classic brute-force surface
@@ -114,7 +113,7 @@ def _ssh_password_auth_enabled() -> Optional[str]:
 
 def _in_container() -> bool:
     """Best-effort container detection (Docker / Podman / generic OCI)."""
-    if os.path.exists("/.dockerenv"):
+    if Path("/.dockerenv").exists():
         return True
     if os.environ.get("HERMES_DESKTOP_CHILD_PID"):
         return False  # desktop child, not a server container
@@ -165,11 +164,11 @@ def _path_is_mounted(path: Path) -> bool:
     return best_fstype not in ("overlay", "tmpfs", "aufs")
 
 
-def _container_no_volume_mount(hermes_home: Optional[Path]) -> Optional[str]:
+def _container_no_volume_mount(hermes_home: Path | None) -> str | None:
     if not _in_container():
         return None
     home = hermes_home or Path(
-        os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes"))
+        os.environ.get("HERMES_HOME", os.path.expanduser("~/.hermes")),
     )
     try:
         if _path_is_mounted(home):
@@ -184,7 +183,7 @@ def _container_no_volume_mount(hermes_home: Optional[Path]) -> Optional[str]:
     )
 
 
-def _network_listener_without_auth(config: Optional[dict]) -> list[str]:
+def _network_listener_without_auth(config: dict | None) -> list[str]:
     """Warn about network-accessible gateway listeners with no auth.
 
     Covers the API server (no API_SERVER_KEY) and the dashboard (non-loopback
@@ -212,7 +211,7 @@ def _network_listener_without_auth(config: Optional[dict]) -> list[str]:
                     f"OpenAI-compatible API server is network-accessible ({host}) "
                     "with NO API_SERVER_KEY. It dispatches terminal-capable agent "
                     "work — an unauthenticated network endpoint is remote code "
-                    "execution. Set a strong API_SERVER_KEY."
+                    "execution. Set a strong API_SERVER_KEY.",
                 )
     except Exception:
         pass
@@ -221,7 +220,7 @@ def _network_listener_without_auth(config: Optional[dict]) -> list[str]:
 
 
 def run_security_audit(
-    *, hermes_home: Optional[Path] = None, config: Optional[dict] = None
+    *, hermes_home: Path | None = None, config: dict | None = None,
 ) -> list[str]:
     """Run all checks and return a list of human-readable warning strings.
 
@@ -255,8 +254,8 @@ def run_security_audit(
 
 def log_startup_security_warnings(
     *,
-    hermes_home: Optional[Path] = None,
-    config: Optional[dict] = None,
+    hermes_home: Path | None = None,
+    config: dict | None = None,
     force: bool = False,
 ) -> list[str]:
     """Run the audit once per process and emit each finding via logger.warning.

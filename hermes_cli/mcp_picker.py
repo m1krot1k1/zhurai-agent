@@ -20,24 +20,22 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import List, Optional
 
-from hermes_cli.colors import Colors, color
 from hermes_cli.cli_output import prompt_yes_no
+from hermes_cli.colors import Colors, color
+from hermes_cli.config import load_config, save_config
 from hermes_cli.curses_ui import curses_single_select
 from hermes_cli.mcp_catalog import (
     CatalogEntry,
     CatalogError,
     catalog_diagnostics,
     install_entry,
+    installed_servers,
     is_enabled,
     is_installed,
     list_catalog,
-    installed_servers,
     uninstall_entry,
 )
-from hermes_cli.config import load_config, save_config
-
 
 # ─── Status badges ────────────────────────────────────────────────────────────
 
@@ -54,24 +52,25 @@ _STATUS_CUSTOM_DISABLED = "custom — disabled"
 @dataclass
 class _Row:
     """A row in the picker. ``entry`` is set for catalog rows; for custom
-    user-added MCPs only ``name`` + ``description`` + status are populated."""
+    user-added MCPs only ``name`` + ``description`` + status are populated.
+    """
 
     name: str
     description: str
     status: str
-    entry: Optional[CatalogEntry] = None  # None for non-catalog (custom) rows
+    entry: CatalogEntry | None = None  # None for non-catalog (custom) rows
 
     @property
     def is_custom(self) -> bool:
         return self.entry is None
 
 
-def _build_rows() -> List[_Row]:
+def _build_rows() -> list[_Row]:
     """Return catalog rows + any custom (non-catalog) MCPs found in config."""
     catalog_entries = list_catalog()
     catalog_names = {e.name for e in catalog_entries}
 
-    rows: List[_Row] = []
+    rows: list[_Row] = []
     for entry in catalog_entries:
         if not is_installed(entry.name):
             status = _STATUS_NOT_INSTALLED
@@ -85,7 +84,7 @@ def _build_rows() -> List[_Row]:
                 description=entry.description,
                 status=status,
                 entry=entry,
-            )
+            ),
         )
 
     # Custom MCPs the user added directly (not in the catalog)
@@ -134,6 +133,7 @@ def _configure_tools(name: str) -> None:
     server, displays a checklist, and writes ``tools.include``.
     """
     import argparse
+
     from hermes_cli.mcp_config import cmd_mcp_configure
 
     cmd_mcp_configure(argparse.Namespace(name=name))
@@ -228,9 +228,10 @@ def _handle_row(row: _Row) -> None:
 # ─── Output / entry points ────────────────────────────────────────────────────
 
 
-def _print_rows_text(rows: List[_Row]) -> None:
+def _print_rows_text(rows: list[_Row]) -> None:
     """Plain-text catalog dump used as a fallback when curses can't run, and
-    as the default output of `hermes mcp catalog`."""
+    as the default output of `hermes mcp catalog`.
+    """
     if not rows:
         print()
         print(color("  No MCPs in the catalog or configured.", Colors.DIM))

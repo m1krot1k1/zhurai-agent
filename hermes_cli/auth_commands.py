@@ -5,9 +5,10 @@ from __future__ import annotations
 import math
 import sys
 import time
-from types import SimpleNamespace
 import uuid
+from types import SimpleNamespace
 
+import hermes_cli.auth as auth_mod
 from agent.credential_pool import (
     AUTH_TYPE_API_KEY,
     AUTH_TYPE_OAUTH,
@@ -16,9 +17,9 @@ from agent.credential_pool import (
     SOURCE_MANUAL_DEVICE_CODE,
     STATUS_EXHAUSTED,
     STRATEGY_FILL_FIRST,
-    STRATEGY_ROUND_ROBIN,
-    STRATEGY_RANDOM,
     STRATEGY_LEAST_USED,
+    STRATEGY_RANDOM,
+    STRATEGY_ROUND_ROBIN,
     PooledCredential,
     _exhausted_until,
     _normalize_custom_pool_name,
@@ -27,11 +28,9 @@ from agent.credential_pool import (
     list_custom_pool_providers,
     load_pool,
 )
-import hermes_cli.auth as auth_mod
 from hermes_cli.auth import PROVIDER_REGISTRY
-from hermes_constants import OPENROUTER_BASE_URL
 from hermes_cli.secret_prompt import masked_secret_prompt
-
+from hermes_constants import OPENROUTER_BASE_URL
 
 # Providers that support OAuth login in addition to API keys.
 _OAUTH_CAPABLE_PROVIDERS = {"anthropic", "nous", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth"}
@@ -129,7 +128,6 @@ def _classify_exhausted_status(entry) -> tuple[str, bool]:
         return "auth failed", False
 
     return "exhausted", True
-
 
 
 def _format_exhausted_status(entry) -> str:
@@ -359,7 +357,7 @@ def auth_add_command(args) -> None:
         pool = load_pool(provider)
         entry = next((e for e in pool.entries() if getattr(e, "source", "") == "loopback_pkce"), None)
         shown_label = entry.label if entry is not None else label_from_token(
-            creds["tokens"]["access_token"], _oauth_default_label(provider, 1)
+            creds["tokens"]["access_token"], _oauth_default_label(provider, 1),
         )
         print(f'Saved {provider} OAuth credentials: "{shown_label}"')
         return
@@ -532,11 +530,15 @@ def _interactive_auth() -> None:
 
     # Show AWS Bedrock credential status (not in the pool — uses boto3 chain)
     try:
-        from agent.bedrock_adapter import has_aws_credentials, resolve_aws_auth_env_var, resolve_bedrock_region
+        from agent.bedrock_adapter import (
+            has_aws_credentials,
+            resolve_aws_auth_env_var,
+            resolve_bedrock_region,
+        )
         if has_aws_credentials():
             auth_source = resolve_aws_auth_env_var() or "unknown"
             region = resolve_bedrock_region()
-            print(f"bedrock (AWS SDK credential chain):")
+            print("bedrock (AWS SDK credential chain):")
             print(f"  Auth: {auth_source}")
             print(f"  Region: {region}")
             try:
@@ -546,7 +548,7 @@ def _interactive_auth() -> None:
                 arn = identity.get("Arn", "unknown")
                 print(f"  Identity: {arn}")
             except Exception:
-                print(f"  Identity: (could not resolve — boto3 STS call failed)")
+                print("  Identity: (could not resolve — boto3 STS call failed)")
             print()
     except ImportError:
         pass  # boto3 or bedrock_adapter not available
@@ -561,8 +563,8 @@ def _interactive_auth() -> None:
             _cfg_auth_mode = str(_model_cfg.get("auth_mode") or "").strip().lower()
             if _cfg_provider == "azure-foundry" and _cfg_auth_mode == "entra_id":
                 from agent.azure_identity_adapter import (
-                    EntraIdentityConfig,
                     SCOPE_AI_AZURE_DEFAULT,
+                    EntraIdentityConfig,
                     describe_active_credential,
                     has_azure_identity_installed,
                 )
@@ -574,7 +576,7 @@ def _interactive_auth() -> None:
                     str(_entra.get("scope") or "").strip()
                     or SCOPE_AI_AZURE_DEFAULT
                 )
-                print(f"azure-foundry (Microsoft Entra ID):")
+                print("azure-foundry (Microsoft Entra ID):")
                 print(f"  Endpoint: {_base_url or '(not configured)'}")
                 print(f"  Scope: {_scope}")
                 if not has_azure_identity_installed():
@@ -643,7 +645,7 @@ def _pick_provider(prompt: str = "Provider") -> str:
     try:
         raw = input(f"{prompt}: ").strip()
     except (EOFError, KeyboardInterrupt):
-        raise SystemExit()
+        raise SystemExit
     return _normalize_provider(raw)
 
 

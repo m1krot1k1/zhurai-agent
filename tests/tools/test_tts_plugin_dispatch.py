@@ -28,8 +28,6 @@ helpers.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import pytest
 
 from agent import tts_registry
@@ -42,15 +40,15 @@ class _FakeTTSProvider(TTSProvider):
         self,
         name: str,
         voice_compat: bool = False,
-        raise_exc: Optional[BaseException] = None,
-        return_path: Optional[str] = None,
+        raise_exc: BaseException | None = None,
+        return_path: str | None = None,
     ):
         self._name = name
         self._voice_compat = voice_compat
         self._raise_exc = raise_exc
         self._return_path = return_path
         # Recorded for assertions
-        self.last_call: Optional[dict] = None
+        self.last_call: dict | None = None
 
     @property
     def name(self) -> str:
@@ -200,7 +198,8 @@ class TestPluginDispatch:
 
     def test_empty_string_voice_passed_as_none(self):
         """Empty-string config values are normalized to None so providers can
-        fall back to their own defaults (matches the ABC contract)."""
+        fall back to their own defaults (matches the ABC contract).
+        """
         provider = _FakeTTSProvider(name="cartesia")
         tts_registry.register_provider(provider)
 
@@ -216,7 +215,8 @@ class TestPluginDispatch:
 
     def test_provider_returning_different_path_honored(self):
         """If a provider rewrites the output path (e.g. format-driven extension
-        change), the dispatcher returns the new path."""
+        change), the dispatcher returns the new path.
+        """
         provider = _FakeTTSProvider(name="cartesia", return_path="/tmp/rewritten.opus")
         tts_registry.register_provider(provider)
 
@@ -231,7 +231,8 @@ class TestPluginDispatch:
     def test_provider_returning_none_falls_back_to_output_path(self):
         """Defensive: a provider returning None means the dispatcher should
         report the caller-supplied output_path (matches the ABC contract — the
-        provider is supposed to write to output_path)."""
+        provider is supposed to write to output_path).
+        """
         provider = _FakeTTSProvider(name="cartesia", return_path=None)
         # Override the default-output-path behavior to return None explicitly
         provider._return_path = None
@@ -255,7 +256,8 @@ class TestPluginDispatch:
         """Plugin exceptions are NOT swallowed by the dispatcher — they bubble
         up so the outer ``text_to_speech_tool`` try/except converts them to
         the standard error envelope. Matches command-provider failure
-        behavior."""
+        behavior.
+        """
         provider = _FakeTTSProvider(
             name="cartesia",
             raise_exc=RuntimeError("network down"),
@@ -279,7 +281,7 @@ class TestPluginDispatch:
 class TestVoiceCompatibleHelper:
     def test_voice_compatible_true(self):
         tts_registry.register_provider(
-            _FakeTTSProvider(name="cartesia", voice_compat=True)
+            _FakeTTSProvider(name="cartesia", voice_compat=True),
         )
         assert tts_tool._plugin_provider_is_voice_compatible("cartesia") is True
 
@@ -300,19 +302,21 @@ class TestVoiceCompatibleHelper:
     )
     def test_builtin_names_return_false(self, builtin):
         """voice_compatible helper short-circuits built-ins so they go
-        through the legacy code path that handles their format quirks."""
+        through the legacy code path that handles their format quirks.
+        """
         assert tts_tool._plugin_provider_is_voice_compatible(builtin) is False
 
     def test_voice_compatible_case_insensitive(self):
         tts_registry.register_provider(
-            _FakeTTSProvider(name="cartesia", voice_compat=True)
+            _FakeTTSProvider(name="cartesia", voice_compat=True),
         )
         assert tts_tool._plugin_provider_is_voice_compatible("CARTESIA") is True
         assert tts_tool._plugin_provider_is_voice_compatible("  cartesia  ") is True
 
     def test_provider_property_exception_returns_false(self):
         """A buggy ``voice_compatible`` property raising must not crash the
-        TTS pipeline."""
+        TTS pipeline.
+        """
 
         class _ExplodingProvider(_FakeTTSProvider):
             @property

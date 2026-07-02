@@ -1,5 +1,4 @@
-"""
-Cron job storage and management.
+"""Cron job storage and management.
 
 Jobs are stored in ~/.hermes/cron/jobs.json
 Output is saved to ~/.hermes/cron/output/{job_id}/{timestamp}.md
@@ -9,12 +8,12 @@ import contextlib
 import copy
 import json
 import logging
+import os
+import re
 import shutil
 import tempfile
 import threading
 import time
-import os
-import re
 import uuid
 
 # Cross-process advisory file locking for jobs.json critical sections.
@@ -31,8 +30,9 @@ except ImportError:  # pragma: no cover - non-Windows
     msvcrt = None
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
+
 from hermes_constants import get_hermes_home
-from typing import Optional, Dict, List, Any, Union
 
 logger = logging.getLogger(__name__)
 
@@ -116,13 +116,13 @@ def _jobs_lock():
         try:
             try:
                 ensure_dirs()
-                lock_fd = open(_jobs_lock_file(), "a+", encoding="utf-8")
+                lock_fd = Path(_jobs_lock_file()).open("a+", encoding="utf-8")
                 lock_fd.seek(0)
                 if fcntl is not None:
                     fcntl.flock(lock_fd, fcntl.LOCK_EX)
                 elif msvcrt is not None:
-                    getattr(msvcrt, "locking")(lock_fd.fileno(), getattr(msvcrt, "LK_LOCK"), 1)
-            except (OSError, IOError) as e:
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_LOCK, 1)
+            except OSError as e:
                 # Never let a locking failure take down cron writes — fall back to
                 # in-process-only protection (still held via _jobs_file_lock).
                 logger.warning("jobs.json cross-process lock unavailable (%s); "
@@ -135,13 +135,14 @@ def _jobs_lock():
                         if fcntl is not None:
                             fcntl.flock(lock_fd, fcntl.LOCK_UN)
                         elif msvcrt is not None:
-                            getattr(msvcrt, "locking")(lock_fd.fileno(), getattr(msvcrt, "LK_UNLCK"), 1)
-                    except (OSError, IOError):
+                            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
                         pass
                     finally:
                         lock_fd.close()
         finally:
             _jobs_lock_state.depth = 0
+
 
 # Fields on a cron job that must never change after creation. ``id`` is used
 # as a filesystem path component under ``OUTPUT_DIR``; allowing it to be
@@ -166,7 +167,7 @@ def _job_output_dir(job_id: str) -> Path:
     return OUTPUT_DIR / text
 
 
-def _normalize_skill_list(skill: Optional[str] = None, skills: Optional[Any] = None) -> List[str]:
+def _normalize_skill_list(skill: str | None = None, skills: Any | None = None) -> list[str]:
     """Normalize legacy/single-skill and multi-skill inputs into a unique ordered list."""
     if skills is None:
         raw_items = [skill] if skill else []
@@ -175,7 +176,7 @@ def _normalize_skill_list(skill: Optional[str] = None, skills: Optional[Any] = N
     else:
         raw_items = list(skills)
 
-    normalized: List[str] = []
+    normalized: list[str] = []
     for item in raw_items:
         text = str(item or "").strip()
         if text and text not in normalized:
@@ -183,7 +184,7 @@ def _normalize_skill_list(skill: Optional[str] = None, skills: Optional[Any] = N
     return normalized
 
 
-def _apply_skill_fields(job: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_skill_fields(job: dict[str, Any]) -> dict[str, Any]:
     """Return a job dict with canonical `skills` and legacy `skill` fields aligned."""
     normalized = dict(job)
     skills = _normalize_skill_list(normalized.get("skill"), normalized.get("skills"))
@@ -199,7 +200,7 @@ def _coerce_job_text(value: Any, fallback: str = "") -> str:
     return str(value)
 
 
-def _schedule_display_for_job(job: Dict[str, Any]) -> str:
+def _schedule_display_for_job(job: dict[str, Any]) -> str:
     display = _coerce_job_text(job.get("schedule_display")).strip()
     if display:
         return display
@@ -216,7 +217,7 @@ def _schedule_display_for_job(job: Dict[str, Any]) -> str:
     return "?"
 
 
-def _normalize_job_record(job: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_job_record(job: dict[str, Any]) -> dict[str, Any]:
     """Return a read-safe cron job shape for UI/API/tool/scheduler consumers.
 
     Older or hand-edited jobs can have nullable fields like ``prompt``,
@@ -254,7 +255,7 @@ def _normalize_job_record(job: Dict[str, Any]) -> Dict[str, Any]:
 def _secure_dir(path: Path):
     """Set directory to owner-only access (0700). No-op on Windows."""
     try:
-        os.chmod(path, 0o700)
+        Path(path).chmod(0o700)
     except (OSError, NotImplementedError):
         pass  # Windows or other platforms where chmod is not supported
 
@@ -263,7 +264,7 @@ def _secure_file(path: Path):
     """Set file to owner-only read/write (0600). No-op on Windows."""
     try:
         if path.exists():
-            os.chmod(path, 0o600)
+            Path(path).chmod(0o600)
     except (OSError, NotImplementedError):
         pass
 
@@ -281,29 +282,28 @@ def ensure_dirs():
 # =============================================================================
 
 def parse_duration(s: str) -> int:
-    """
-    Parse duration string into minutes.
+    """Parse duration string into minutes.
     
     Examples:
         "30m" → 30
         "2h" → 120
         "1d" → 1440
+
     """
     s = s.strip().lower()
-    match = re.match(r'^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$', s)
+    match = re.match(r"^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$", s)
     if not match:
         raise ValueError(f"Invalid duration: '{s}'. Use format like '30m', '2h', or '1d'")
-    
+
     value = int(match.group(1))
     unit = match.group(2)[0]  # First char: m, h, or d
-    
-    multipliers = {'m': 1, 'h': 60, 'd': 1440}
+
+    multipliers = {"m": 1, "h": 60, "d": 1440}
     return value * multipliers[unit]
 
 
-def parse_schedule(schedule: str) -> Dict[str, Any]:
-    """
-    Parse schedule string into structured format.
+def parse_schedule(schedule: str) -> dict[str, Any]:
+    """Parse schedule string into structured format.
     
     Returns dict with:
         - kind: "once" | "interval" | "cron"
@@ -318,11 +318,12 @@ def parse_schedule(schedule: str) -> Dict[str, Any]:
         "every 2h"         → recurring every 2 hours
         "0 9 * * *"        → cron expression
         "2026-02-03T14:00" → once at timestamp
+
     """
     schedule = schedule.strip()
     original = schedule
     schedule_lower = schedule.lower()
-    
+
     # "every X" pattern → recurring interval
     if schedule_lower.startswith("every "):
         duration_str = schedule[6:].strip()
@@ -330,14 +331,14 @@ def parse_schedule(schedule: str) -> Dict[str, Any]:
         return {
             "kind": "interval",
             "minutes": minutes,
-            "display": f"every {minutes}m"
+            "display": f"every {minutes}m",
         }
-    
+
     # Check for cron expression (5 or 6 space-separated fields)
     # Cron fields: minute hour day month weekday [year]
     parts = schedule.split()
     if len(parts) >= 5 and all(
-        re.match(r'^[\d\*\-,/]+$', p) for p in parts[:5]
+        re.match(r"^[\d\*\-,/]+$", p) for p in parts[:5]
     ):
         if not HAS_CRONITER:
             raise ValueError("Cron expressions require 'croniter' package. Install with: pip install croniter")
@@ -349,14 +350,14 @@ def parse_schedule(schedule: str) -> Dict[str, Any]:
         return {
             "kind": "cron",
             "expr": schedule,
-            "display": schedule
+            "display": schedule,
         }
-    
+
     # ISO timestamp (contains T or looks like date)
-    if 'T' in schedule or re.match(r'^\d{4}-\d{2}-\d{2}', schedule):
+    if "T" in schedule or re.match(r"^\d{4}-\d{2}-\d{2}", schedule):
         try:
             # Parse and validate
-            dt = datetime.fromisoformat(schedule.replace('Z', '+00:00'))
+            dt = datetime.fromisoformat(schedule.replace("Z", "+00:00"))
             # Make naive timestamps timezone-aware at parse time so the stored
             # value doesn't depend on the system timezone matching at check time.
             if dt.tzinfo is None:
@@ -364,11 +365,11 @@ def parse_schedule(schedule: str) -> Dict[str, Any]:
             return {
                 "kind": "once",
                 "run_at": dt.isoformat(),
-                "display": f"once at {dt.strftime('%Y-%m-%d %H:%M')}"
+                "display": f"once at {dt.strftime('%Y-%m-%d %H:%M')}",
             }
         except ValueError as e:
             raise ValueError(f"Invalid timestamp '{schedule}': {e}")
-    
+
     # Duration like "30m", "2h", "1d" → one-shot from now
     try:
         minutes = parse_duration(schedule)
@@ -376,17 +377,17 @@ def parse_schedule(schedule: str) -> Dict[str, Any]:
         return {
             "kind": "once",
             "run_at": run_at.isoformat(),
-            "display": f"once in {original}"
+            "display": f"once in {original}",
         }
     except ValueError:
         pass
-    
+
     raise ValueError(
         f"Invalid schedule '{original}'. Use:\n"
         f"  - Duration: '30m', '2h', '1d' (one-shot)\n"
         f"  - Interval: 'every 30m', 'every 2h' (recurring)\n"
         f"  - Cron: '0 9 * * *' (cron expression)\n"
-        f"  - Timestamp: '2026-02-03T14:00:00' (one-shot at time)"
+        f"  - Timestamp: '2026-02-03T14:00:00' (one-shot at time)",
     )
 
 
@@ -435,11 +436,11 @@ def _stored_wall_clock_is_future(stored: datetime, current: datetime) -> bool:
 
 
 def _recoverable_oneshot_run_at(
-    schedule: Dict[str, Any],
+    schedule: dict[str, Any],
     now: datetime,
     *,
-    last_run_at: Optional[str] = None,
-) -> Optional[str]:
+    last_run_at: str | None = None,
+) -> str | None:
     """Return a one-shot run time if it is still eligible to fire.
 
     One-shot jobs get a small grace window so jobs created a few seconds after
@@ -493,9 +494,8 @@ def _compute_grace_seconds(schedule: dict) -> int:
     return MIN_GRACE
 
 
-def compute_next_run(schedule: Dict[str, Any], last_run_at: Optional[str] = None) -> Optional[str]:
-    """
-    Compute the next run time for a schedule.
+def compute_next_run(schedule: dict[str, Any], last_run_at: str | None = None) -> str | None:
+    """Compute the next run time for a schedule.
 
     Returns ISO timestamp string, or None if no more runs.
     """
@@ -504,7 +504,7 @@ def compute_next_run(schedule: Dict[str, Any], last_run_at: Optional[str] = None
     if schedule["kind"] == "once":
         return _recoverable_oneshot_run_at(schedule, now, last_run_at=last_run_at)
 
-    elif schedule["kind"] == "interval":
+    if schedule["kind"] == "interval":
         minutes = schedule["minutes"]
         if last_run_at:
             # Next run is last_run + interval
@@ -515,7 +515,7 @@ def compute_next_run(schedule: Dict[str, Any], last_run_at: Optional[str] = None
             next_run = now + timedelta(minutes=minutes)
         return next_run.isoformat()
 
-    elif schedule["kind"] == "cron":
+    if schedule["kind"] == "cron":
         if not HAS_CRONITER:
             logger.warning(
                 "Cannot compute next run for cron schedule %r: 'croniter' is "
@@ -560,7 +560,7 @@ def _atomic_write_epoch(path: Path) -> None:
         atomic_replace(tmp_path, path)
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
@@ -589,7 +589,7 @@ def record_ticker_heartbeat(success: bool = False) -> None:
             pass
 
 
-def _epoch_file_age(path: Path) -> Optional[float]:
+def _epoch_file_age(path: Path) -> float | None:
     try:
         raw = path.read_text(encoding="utf-8").strip()
         return max(0.0, time.time() - float(raw))
@@ -597,7 +597,7 @@ def _epoch_file_age(path: Path) -> Optional[float]:
         return None
 
 
-def get_ticker_heartbeat_age() -> Optional[float]:
+def get_ticker_heartbeat_age() -> float | None:
     """Seconds since the ticker loop last iterated, or None if unknown.
 
     None = heartbeat file missing/unreadable (older build, never ran, or a
@@ -606,7 +606,7 @@ def get_ticker_heartbeat_age() -> Optional[float]:
     return _epoch_file_age(TICKER_HEARTBEAT_FILE)
 
 
-def get_ticker_success_age() -> Optional[float]:
+def get_ticker_success_age() -> float | None:
     """Seconds since the ticker last completed a tick WITHOUT raising, or None."""
     return _epoch_file_age(TICKER_SUCCESS_FILE)
 
@@ -615,7 +615,7 @@ def get_ticker_success_age() -> Optional[float]:
 # Job CRUD Operations
 # =============================================================================
 
-def load_jobs() -> List[Dict[str, Any]]:
+def load_jobs() -> list[dict[str, Any]]:
     """Load all jobs from storage."""
     ensure_dirs()
     if not JOBS_FILE.exists():
@@ -624,18 +624,18 @@ def load_jobs() -> List[Dict[str, Any]]:
     _strict_retry = False  # track whether we used the strict=False fallback
 
     try:
-        with open(JOBS_FILE, 'r', encoding='utf-8') as f:
+        with Path(JOBS_FILE).open(encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError:
         # Retry with strict=False to handle bare control chars in string values
         _strict_retry = True
         try:
-            with open(JOBS_FILE, 'r', encoding='utf-8') as f:
+            with Path(JOBS_FILE).open(encoding="utf-8") as f:
                 data = json.loads(f.read(), strict=False)
         except Exception as e:
             logger.error("Failed to auto-repair jobs.json: %s", e)
             raise RuntimeError(f"Cron database corrupted and unrepairable: {e}") from e
-    except IOError as e:
+    except OSError as e:
         logger.error("IOError reading jobs.json: %s", e)
         raise RuntimeError(f"Failed to read cron database: {e}") from e
 
@@ -659,16 +659,16 @@ def load_jobs() -> List[Dict[str, Any]]:
         return data
 
     raise RuntimeError(
-        f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}"
+        f"Cron database corrupted: expected {{'jobs': [...]}}, got {type(data).__name__}",
     )
 
 
-def _save_jobs_unlocked(jobs: List[Dict[str, Any]]):
+def _save_jobs_unlocked(jobs: list[dict[str, Any]]):
     """Save all jobs to storage. Caller must hold _jobs_lock()."""
     ensure_dirs()
-    fd, tmp_path = tempfile.mkstemp(dir=str(JOBS_FILE.parent), suffix='.tmp', prefix='.jobs_')
+    fd, tmp_path = tempfile.mkstemp(dir=str(JOBS_FILE.parent), suffix=".tmp", prefix=".jobs_")
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"jobs": jobs, "updated_at": _hermes_now().isoformat()}, f, indent=2)
             f.flush()
             os.fsync(f.fileno())
@@ -676,19 +676,19 @@ def _save_jobs_unlocked(jobs: List[Dict[str, Any]]):
         _secure_file(JOBS_FILE)
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
 
 
-def save_jobs(jobs: List[Dict[str, Any]]):
+def save_jobs(jobs: list[dict[str, Any]]):
     """Save all jobs to storage."""
     with _jobs_lock():
         _save_jobs_unlocked(jobs)
 
 
-def _normalize_workdir(workdir: Optional[str]) -> Optional[str]:
+def _normalize_workdir(workdir: str | None) -> str | None:
     """Normalize and validate a cron job workdir.
 
     Rules:
@@ -711,7 +711,7 @@ def _normalize_workdir(workdir: Optional[str]) -> Optional[str]:
     if not expanded.is_absolute():
         raise ValueError(
             f"Cron workdir must be an absolute path (got {raw!r}). "
-            f"Cron jobs run detached from any shell cwd, so relative paths are ambiguous."
+            f"Cron jobs run detached from any shell cwd, so relative paths are ambiguous.",
         )
     resolved = expanded.resolve()
     if not resolved.exists():
@@ -722,25 +722,24 @@ def _normalize_workdir(workdir: Optional[str]) -> Optional[str]:
 
 
 def create_job(
-    prompt: Optional[str],
+    prompt: str | None,
     schedule: str,
-    name: Optional[str] = None,
-    repeat: Optional[int] = None,
-    deliver: Optional[str] = None,
-    origin: Optional[Dict[str, Any]] = None,
-    skill: Optional[str] = None,
-    skills: Optional[List[str]] = None,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    script: Optional[str] = None,
-    context_from: Optional[Union[str, List[str]]] = None,
-    enabled_toolsets: Optional[List[str]] = None,
-    workdir: Optional[str] = None,
+    name: str | None = None,
+    repeat: int | None = None,
+    deliver: str | None = None,
+    origin: dict[str, Any] | None = None,
+    skill: str | None = None,
+    skills: list[str] | None = None,
+    model: str | None = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    script: str | None = None,
+    context_from: str | list[str] | None = None,
+    enabled_toolsets: list[str] | None = None,
+    workdir: str | None = None,
     no_agent: bool = False,
-) -> Dict[str, Any]:
-    """
-    Create a new cron job.
+) -> dict[str, Any]:
+    """Create a new cron job.
 
     Args:
         prompt: The prompt to run (must be self-contained, or a task instruction when skill is set).
@@ -785,6 +784,7 @@ def create_job(
 
     Returns:
         The created job dict
+
     """
     parsed_schedule = parse_schedule(schedule)
 
@@ -823,7 +823,7 @@ def create_job(
     if normalized_no_agent and not normalized_script:
         raise ValueError(
             "no_agent=True requires a script — with no agent and no script "
-            "there is nothing for the job to run."
+            "there is nothing for the job to run.",
         )
 
     # Normalize context_from: accept str or list of str, store as list or None
@@ -852,7 +852,7 @@ def create_job(
         "schedule_display": parsed_schedule.get("display", schedule),
         "repeat": {
             "times": repeat,  # None = forever
-            "completed": 0
+            "completed": 0,
         },
         "enabled": True,
         "state": "scheduled",
@@ -879,7 +879,7 @@ def create_job(
     return job
 
 
-def get_job(job_id: str) -> Optional[Dict[str, Any]]:
+def get_job(job_id: str) -> dict[str, Any] | None:
     """Get a job by ID."""
     jobs = load_jobs()
     for job in jobs:
@@ -891,17 +891,17 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
 class AmbiguousJobReference(LookupError):
     """Raised when a job name matches more than one job."""
 
-    def __init__(self, ref: str, matches: List[Dict[str, Any]]):
+    def __init__(self, ref: str, matches: list[dict[str, Any]]):
         self.ref = ref
         self.matches = matches
         ids = ", ".join(m["id"] for m in matches)
         super().__init__(
             f"Job name '{ref}' is ambiguous — matches {len(matches)} jobs: {ids}. "
-            f"Use the job ID instead."
+            f"Use the job ID instead.",
         )
 
 
-def resolve_job_ref(ref: str) -> Optional[Dict[str, Any]]:
+def resolve_job_ref(ref: str) -> dict[str, Any] | None:
     """Resolve a job reference (ID or name) to a job record.
 
     - Exact ID match wins (works even if a different job's name equals this ID).
@@ -921,12 +921,12 @@ def resolve_job_ref(ref: str) -> Optional[Dict[str, Any]]:
         return None
     if len(name_matches) > 1:
         raise AmbiguousJobReference(
-            ref, [_normalize_job_record(j) for j in name_matches]
+            ref, [_normalize_job_record(j) for j in name_matches],
         )
     return _normalize_job_record(name_matches[0])
 
 
-def list_jobs(include_disabled: bool = False) -> List[Dict[str, Any]]:
+def list_jobs(include_disabled: bool = False) -> list[dict[str, Any]]:
     """List all jobs, optionally including disabled ones."""
     jobs = [_normalize_job_record(j) for j in load_jobs()]
     if not include_disabled:
@@ -934,7 +934,7 @@ def list_jobs(include_disabled: bool = False) -> List[Dict[str, Any]]:
     return jobs
 
 
-def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def update_job(job_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
     """Update a job by ID, refreshing derived schedule fields when needed."""
     # Block mutation of immutable fields. ``id`` in particular is a filesystem
     # path component under OUTPUT_DIR — letting an update change it leaks
@@ -942,7 +942,7 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
     bad_fields = _IMMUTABLE_JOB_FIELDS.intersection(updates or {})
     if bad_fields:
         raise ValueError(
-            f"Cron job field(s) cannot be updated: {', '.join(sorted(bad_fields))}"
+            f"Cron job field(s) cannot be updated: {', '.join(sorted(bad_fields))}",
         )
 
     with _jobs_lock():
@@ -992,7 +992,7 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
     return None
 
 
-def pause_job(job_id: str, reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def pause_job(job_id: str, reason: str | None = None) -> dict[str, Any] | None:
     """Pause a job without deleting it. Accepts a job ID or name."""
     job = resolve_job_ref(job_id)
     if not job:
@@ -1008,7 +1008,7 @@ def pause_job(job_id: str, reason: Optional[str] = None) -> Optional[Dict[str, A
     )
 
 
-def resume_job(job_id: str) -> Optional[Dict[str, Any]]:
+def resume_job(job_id: str) -> dict[str, Any] | None:
     """Resume a paused job and compute the next future run from now. Accepts a job ID or name."""
     job = resolve_job_ref(job_id)
     if not job:
@@ -1027,7 +1027,7 @@ def resume_job(job_id: str) -> Optional[Dict[str, Any]]:
     )
 
 
-def trigger_job(job_id: str) -> Optional[Dict[str, Any]]:
+def trigger_job(job_id: str) -> dict[str, Any] | None:
     """Schedule a job to run on the next scheduler tick. Accepts a job ID or name."""
     job = resolve_job_ref(job_id)
     if not job:
@@ -1067,10 +1067,9 @@ def remove_job(job_id: str) -> bool:
     return False
 
 
-def mark_job_run(job_id: str, success: bool, error: Optional[str] = None,
-                 delivery_error: Optional[str] = None):
-    """
-    Mark a job as having been run.
+def mark_job_run(job_id: str, success: bool, error: str | None = None,
+                 delivery_error: str | None = None):
+    """Mark a job as having been run.
     
     Updates last_run_at, last_status, increments completed count,
     computes next_run_at, and auto-deletes if repeat limit reached.
@@ -1091,11 +1090,11 @@ def mark_job_run(job_id: str, success: bool, error: Optional[str] = None,
                 # Clear any external-fire claim so a re-armed recurring job can
                 # be claimed again on its next fire (Phase 4C CAS).
                 job["fire_claim"] = None
-                
+
                 # Increment completed count
                 if job.get("repeat"):
                     job["repeat"]["completed"] = job["repeat"].get("completed", 0) + 1
-                    
+
                     # Check if we've hit the repeat limit
                     times = job["repeat"].get("times")
                     completed = job["repeat"]["completed"]
@@ -1104,7 +1103,7 @@ def mark_job_run(job_id: str, success: bool, error: Optional[str] = None,
                         jobs.pop(i)
                         save_jobs(jobs)
                         return
-                
+
                 # Compute next run
                 job["next_run_at"] = compute_next_run(job["schedule"], now)
 
@@ -1237,7 +1236,7 @@ def claim_job_for_fire(job_id: str, *, claim_ttl_seconds: int = 300) -> bool:
         return False
 
 
-def get_due_jobs() -> List[Dict[str, Any]]:
+def get_due_jobs() -> list[dict[str, Any]]:
     """Get all jobs that are due to run now.
 
     For recurring jobs (cron/interval), if the scheduled time is stale (more
@@ -1255,7 +1254,7 @@ def get_due_jobs() -> List[Dict[str, Any]]:
         return _get_due_jobs_locked()
 
 
-def _get_due_jobs_locked() -> List[Dict[str, Any]]:
+def _get_due_jobs_locked() -> list[dict[str, Any]]:
     """Inner implementation of get_due_jobs(); must be called with _jobs_lock held."""
     now = _hermes_now()
     raw_jobs = load_jobs()
@@ -1400,13 +1399,13 @@ def save_job_output(job_id: str, output: str):
     job_output_dir = _job_output_dir(job_id)
     job_output_dir.mkdir(parents=True, exist_ok=True)
     _secure_dir(job_output_dir)
-    
+
     timestamp = _hermes_now().strftime("%Y-%m-%d_%H-%M-%S")
     output_file = job_output_dir / f"{timestamp}.md"
-    
-    fd, tmp_path = tempfile.mkstemp(dir=str(job_output_dir), suffix='.tmp', prefix='.output_')
+
+    fd, tmp_path = tempfile.mkstemp(dir=str(job_output_dir), suffix=".tmp", prefix=".output_")
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(output)
             f.flush()
             os.fsync(f.fileno())
@@ -1414,11 +1413,11 @@ def save_job_output(job_id: str, output: str):
         _secure_file(output_file)
     except BaseException:
         try:
-            os.unlink(tmp_path)
+            Path(tmp_path).unlink()
         except OSError:
             pass
         raise
-    
+
     return output_file
 
 
@@ -1427,9 +1426,9 @@ def save_job_output(job_id: str, output: str):
 # =============================================================================
 
 def rewrite_skill_refs(
-    consolidated: Optional[Dict[str, str]] = None,
-    pruned: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    consolidated: dict[str, str] | None = None,
+    pruned: list[str] | None = None,
+) -> dict[str, Any]:
     """Rewrite cron job skill references after a curator consolidation pass.
 
     When the curator consolidates a skill X into umbrella Y (or archives X
@@ -1475,6 +1474,7 @@ def rewrite_skill_refs(
     Best-effort: exceptions from loading/saving propagate to the caller so
     tests can assert behaviour; the curator invocation site wraps this
     call in a try/except so a failure here never breaks the curator.
+
     """
     consolidated = dict(consolidated or {})
     pruned_set = set(pruned or [])
@@ -1487,7 +1487,7 @@ def rewrite_skill_refs(
 
     with _jobs_lock():
         jobs = load_jobs()
-        rewrites: List[Dict[str, Any]] = []
+        rewrites: list[dict[str, Any]] = []
         changed = False
 
         for job in jobs:
@@ -1495,9 +1495,9 @@ def rewrite_skill_refs(
             if not skills_before:
                 continue
 
-            mapped: Dict[str, str] = {}
-            dropped: List[str] = []
-            new_skills: List[str] = []
+            mapped: dict[str, str] = {}
+            dropped: list[str] = []
+            new_skills: list[str] = []
 
             for name in skills_before:
                 if name in consolidated:
@@ -1529,7 +1529,7 @@ def rewrite_skill_refs(
         if changed:
             save_jobs(jobs)
             logger.info(
-                "Curator rewrote skill references in %d cron job(s)", len(rewrites)
+                "Curator rewrote skill references in %d cron job(s)", len(rewrites),
             )
 
         return {

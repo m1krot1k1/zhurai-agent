@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 
-def _fmt_ts(ts: Optional[str]) -> str:
+def _fmt_ts(ts: str | None) -> str:
     if not ts:
         return "never"
     try:
@@ -24,8 +23,8 @@ def _fmt_ts(ts: Optional[str]) -> str:
     except (TypeError, ValueError):
         return str(ts)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    delta = datetime.now(timezone.utc) - dt
+        dt = dt.replace(tzinfo=UTC)
+    delta = datetime.now(UTC) - dt
     secs = int(delta.total_seconds())
     if secs < 60:
         return f"{secs}s ago"
@@ -79,7 +78,7 @@ def _cmd_status(args) -> int:
     print(f"  archive after:  {curator.get_archive_after_days()}d unused")
     print(
         f"  consolidate:    {'on' if curator.get_consolidate() else 'off'}"
-        f"{'' if curator.get_consolidate() else ' (prune-only; LLM merge pass opt-in)'}"
+        f"{'' if curator.get_consolidate() else ' (prune-only; LLM merge pass opt-in)'}",
     )
 
     rows = skill_usage.agent_created_report()
@@ -120,7 +119,7 @@ def _cmd_status(args) -> int:
                 f"use={r.get('use_count', 0):3d}  "
                 f"view={r.get('view_count', 0):3d}  "
                 f"patches={r.get('patch_count', 0):3d}  "
-                f"last_activity={last}"
+                f"last_activity={last}",
             )
 
     # Show top 5 most-active and least-active skills by activity_count
@@ -146,7 +145,7 @@ def _cmd_status(args) -> int:
                     f"use={r.get('use_count', 0):3d}  "
                     f"view={r.get('view_count', 0):3d}  "
                     f"patches={r.get('patch_count', 0):3d}  "
-                    f"last_activity={last}"
+                    f"last_activity={last}",
                 )
 
         least_active = sorted(
@@ -163,7 +162,7 @@ def _cmd_status(args) -> int:
                     f"use={r.get('use_count', 0):3d}  "
                     f"view={r.get('view_count', 0):3d}  "
                     f"patches={r.get('patch_count', 0):3d}  "
-                    f"last_activity={last}"
+                    f"last_activity={last}",
                 )
 
     return 0
@@ -190,7 +189,7 @@ def _cmd_run(args) -> int:
         print(
             "curator: consolidation is off — running prune-only "
             "(deterministic stale/archive). Pass --consolidate or set "
-            "`curator.consolidate: true` to enable the LLM merge pass."
+            "`curator.consolidate: true` to enable the LLM merge pass.",
         )
 
     def _on_summary(msg: str) -> None:
@@ -207,14 +206,14 @@ def _cmd_run(args) -> int:
         if dry:
             print(
                 f"auto (preview): {auto.get('checked', 0)} candidate skill(s) "
-                "— no transitions applied in dry-run"
+                "— no transitions applied in dry-run",
             )
         else:
             print(
                 f"auto: checked={auto.get('checked', 0)} "
                 f"stale={auto.get('marked_stale', 0)} "
                 f"archived={auto.get('archived', 0)} "
-                f"reactivated={auto.get('reactivated', 0)}"
+                f"reactivated={auto.get('reactivated', 0)}",
             )
     if not synchronous:
         print("llm pass running in background — check `hermes curator status` later")
@@ -222,12 +221,12 @@ def _cmd_run(args) -> int:
         if synchronous:
             print(
                 "dry-run: no changes applied. Read the report with "
-                "`hermes curator status` and run `hermes curator run` (no flag) to apply."
+                "`hermes curator status` and run `hermes curator run` (no flag) to apply.",
             )
         else:
             print(
                 "dry-run: no changes applied. When the report lands, read it with "
-                "`hermes curator status` and run `hermes curator run` (no flag) to apply."
+                "`hermes curator status` and run `hermes curator run` (no flag) to apply.",
             )
     return 0
 
@@ -251,7 +250,7 @@ def _cmd_pin(args) -> int:
     if not skill_usage.is_agent_created(args.skill):
         print(
             f"curator: '{args.skill}' is bundled or hub-installed — cannot pin "
-            "(only agent-created skills participate in curation)"
+            "(only agent-created skills participate in curation)",
         )
         return 1
     skill_usage.set_pinned(args.skill, True)
@@ -264,7 +263,7 @@ def _cmd_unpin(args) -> int:
     if not skill_usage.is_agent_created(args.skill):
         print(
             f"curator: '{args.skill}' is bundled or hub-installed — "
-            "there's nothing to unpin (curator only tracks agent-created skills)"
+            "there's nothing to unpin (curator only tracks agent-created skills)",
         )
         return 1
     skill_usage.set_pinned(args.skill, False)
@@ -289,7 +288,7 @@ def _cmd_archive(args) -> int:
     if skill_usage.get_record(args.skill).get("pinned"):
         print(
             f"curator: '{args.skill}' is pinned — unpin first with "
-            f"`hermes curator unpin {args.skill}`"
+            f"`hermes curator unpin {args.skill}`",
         )
         return 1
     ok, msg = skill_usage.archive_skill(args.skill)
@@ -297,7 +296,7 @@ def _cmd_archive(args) -> int:
     return 0 if ok else 1
 
 
-def _idle_days(record: dict) -> Optional[int]:
+def _idle_days(record: dict) -> int | None:
     """Days since the skill's last activity (view / use / patch).
 
     Falls back to ``created_at`` so a skill that was authored but never used
@@ -312,8 +311,8 @@ def _idle_days(record: dict) -> Optional[int]:
     except (TypeError, ValueError):
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return max(0, (datetime.now(timezone.utc) - dt).days)
+        dt = dt.replace(tzinfo=UTC)
+    return max(0, (datetime.now(UTC) - dt).days)
 
 
 def _cmd_prune(args) -> int:
@@ -386,12 +385,13 @@ def _cmd_prune(args) -> int:
 
 def _cmd_backup(args) -> int:
     """Take a manual snapshot of the skills tree. Same mechanism as the
-    automatic pre-run snapshot, just user-initiated."""
+    automatic pre-run snapshot, just user-initiated.
+    """
     from agent import curator_backup
     if not curator_backup.is_enabled():
         print(
             "curator: backups are disabled via config "
-            "(`curator.backup.enabled: false`); re-enable to snapshot"
+            "(`curator.backup.enabled: false`); re-enable to snapshot",
         )
         return 1
     reason = getattr(args, "reason", None) or "manual"
@@ -424,12 +424,12 @@ def _cmd_rollback(args) -> int:
         if not rows:
             print(
                 "curator: no snapshots exist yet. Take one with "
-                "`hermes curator backup` or wait for the next curator run."
+                "`hermes curator backup` or wait for the next curator run.",
             )
         else:
             print(
                 f"curator: no snapshot matching "
-                f"{'id ' + repr(backup_id) if backup_id else 'your query'}."
+                f"{'id ' + repr(backup_id) if backup_id else 'your query'}.",
             )
             print("Available:")
             print(curator_backup.summarize_backups())
@@ -446,7 +446,7 @@ def _cmd_rollback(args) -> int:
             if cron.get("backed_up"):
                 print(
                     f"  cron jobs:   {cron.get('jobs_count', 0)} "
-                    f"(will be restored for skill-link fields only)"
+                    f"(will be restored for skill-link fields only)",
                 )
             else:
                 reason = cron.get("reason", "not captured")
@@ -455,7 +455,7 @@ def _cmd_rollback(args) -> int:
         "\nThis will replace the current ~/.hermes/skills/ tree (a safety "
         "snapshot of the current state is taken first so this is undoable). "
         "Cron jobs that still exist will have their skills/skill fields "
-        "restored from the snapshot; all other cron fields are left alone."
+        "restored from the snapshot; all other cron fields are left alone.",
     )
 
     if not getattr(args, "yes", False):

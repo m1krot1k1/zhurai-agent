@@ -17,7 +17,6 @@ from typing import Any
 
 import pytest
 
-
 LIVE = os.environ.get("HERMES_LIVE_TESTS") == "1"
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 LIVE_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
@@ -47,7 +46,7 @@ TOOLS = [
                 "additionalProperties": False,
             },
         },
-    }
+    },
 ]
 
 
@@ -71,7 +70,7 @@ def _jsonable(value: Any) -> Any:
 def _print_trace(label: str, value: Any) -> None:
     sys.__stdout__.write(f"\n--- {label} ---\n")
     sys.__stdout__.write(
-        json.dumps(_jsonable(value), ensure_ascii=False, indent=2, sort_keys=True)
+        json.dumps(_jsonable(value), ensure_ascii=False, indent=2, sort_keys=True),
     )
     sys.__stdout__.write("\n")
     sys.__stdout__.flush()
@@ -126,7 +125,6 @@ def test_deepseek_v4_thinking_tool_call_replay_round_trip(live_model: str):
     and tool_calls, then appends the tool result. DeepSeek accepting the
     second request is the live guardrail for the V4 thinking replay contract.
     """
-
     client = _make_live_client()
     agent = _make_agent_for_message_building(live_model)
 
@@ -140,7 +138,7 @@ def test_deepseek_v4_thinking_tool_call_replay_round_trip(live_model: str):
                     "exactly once with ticket_id 'DS-4242'. Do not answer "
                     "directly."
                 ),
-            }
+            },
         ],
         "tools": TOOLS,
         "max_tokens": 1024,

@@ -22,8 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -41,7 +40,7 @@ def _make_runner() -> GatewayRunner:
     """
     runner = object.__new__(GatewayRunner)
     runner.config = GatewayConfig(
-        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="test")}
+        platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="test")},
     )
     runner._running = True
     runner._shutdown_event = asyncio.Event()

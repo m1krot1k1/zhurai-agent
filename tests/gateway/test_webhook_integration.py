@@ -23,12 +23,12 @@ from gateway.config import (
     PlatformConfig,
 )
 from gateway.platforms.base import MessageEvent, SendResult
-from gateway.platforms.webhook import WebhookAdapter, _INSECURE_NO_AUTH
-
+from gateway.platforms.webhook import _INSECURE_NO_AUTH, WebhookAdapter
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_adapter(routes, **extra_kw) -> WebhookAdapter:
     """Create a WebhookAdapter with the given routes."""
@@ -49,7 +49,7 @@ def _create_app(adapter: WebhookAdapter) -> web.Application:
 def _github_signature(body: bytes, secret: str) -> str:
     """Compute X-Hub-Signature-256 for *body* using *secret*."""
     return "sha256=" + hmac.new(
-        secret.encode(), body, hashlib.sha256
+        secret.encode(), body, hashlib.sha256,
     ).hexdigest()
 
 
@@ -97,7 +97,7 @@ class TestGitHubPRWebhook:
                     "{pull_request.title}\n\n{pull_request.body}"
                 ),
                 "deliver": "log",
-            }
+            },
         }
         adapter = _make_adapter(routes)
 
@@ -153,14 +153,15 @@ class TestSkillsInjection:
     async def test_skills_injected_into_prompt(self):
         """When a route has skills: [code-review], the adapter should
         call build_skill_invocation_message() and use its output as the
-        prompt instead of the raw template render."""
+        prompt instead of the raw template render.
+        """
         routes = {
             "pr-review": {
                 "secret": _INSECURE_NO_AUTH,
                 "events": ["pull_request"],
                 "prompt": "Review this PR: {pull_request.title}",
                 "skills": ["code-review"],
-            }
+            },
         }
         adapter = _make_adapter(routes)
 
@@ -214,14 +215,15 @@ class TestCrossPlatformDelivery:
     @pytest.mark.asyncio
     async def test_cross_platform_delivery(self):
         """When deliver='telegram', the response is routed to the
-        Telegram adapter via gateway_runner.adapters."""
+        Telegram adapter via gateway_runner.adapters.
+        """
         routes = {
             "alerts": {
                 "secret": _INSECURE_NO_AUTH,
                 "prompt": "Alert: {message}",
                 "deliver": "telegram",
                 "deliver_extra": {"chat_id": "12345"},
-            }
+            },
         }
         adapter = _make_adapter(routes)
         adapter.handle_message = AsyncMock()
@@ -233,7 +235,7 @@ class TestCrossPlatformDelivery:
         mock_runner = MagicMock()
         mock_runner.adapters = {Platform.TELEGRAM: mock_tg_adapter}
         mock_runner.config = GatewayConfig(
-            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake")}
+            platforms={Platform.TELEGRAM: PlatformConfig(enabled=True, token="fake")},
         )
         adapter.gateway_runner = mock_runner
 
@@ -256,7 +258,7 @@ class TestCrossPlatformDelivery:
 
         assert result.success is True
         mock_tg_adapter.send.assert_awaited_once_with(
-            "12345", "I've acknowledged the alert.", metadata=None
+            "12345", "I've acknowledged the alert.", metadata=None,
         )
         # Delivery info is retained after send() so interim status messages
         # don't strand the final response (TTL-based cleanup happens on POST).
@@ -272,7 +274,8 @@ class TestGitHubCommentDelivery:
     @pytest.mark.asyncio
     async def test_github_comment_delivery(self):
         """When deliver='github_comment', the adapter invokes
-        ``gh pr comment`` via subprocess.run (mocked)."""
+        ``gh pr comment`` via subprocess.run (mocked).
+        """
         routes = {
             "pr-bot": {
                 "secret": _INSECURE_NO_AUTH,
@@ -282,7 +285,7 @@ class TestGitHubCommentDelivery:
                     "repo": "{repository.full_name}",
                     "pr_number": "{number}",
                 },
-            }
+            },
         }
         adapter = _make_adapter(routes)
         adapter.handle_message = AsyncMock()
@@ -319,7 +322,7 @@ class TestGitHubCommentDelivery:
             return_value=mock_result,
         ) as mock_run:
             result = await adapter.send(
-                chat_id, "LGTM! The code looks great."
+                chat_id, "LGTM! The code looks great.",
             )
 
         assert result.success is True

@@ -36,7 +36,8 @@ def _make_fake_repo(tmp_path: Path, version: str) -> Path:
     """Build a minimal mirror of the four files the script touches, rooted
     at ``tmp_path``. The script computes paths as ``$ROOT/apps/desktop/...``
     etc., so it operates on whatever tree we point it at — as long as the
-    four files exist with the shape it expects."""
+    four files exist with the shape it expects.
+    """
     root = tmp_path
 
     # apps/desktop/package.json — version field, JSON-shaped.
@@ -81,7 +82,7 @@ def _make_fake_repo(tmp_path: Path, version: str) -> Path:
                     "uvx": {
                         "package": f"hermes-agent[acp]=={version}",
                         "args": ["hermes-acp"],
-                    }
+                    },
                 },
             },
             indent=2,
@@ -149,7 +150,8 @@ def _assert_all_at(root: Path, version: str) -> None:
 
 def test_minor_bump(tmp_path):
     """minor: 0.37.0 → 0.38.0 across all 4 files; agent.json stays valid JSON
-    and the uvx pin matches the new version."""
+    and the uvx pin matches the new version.
+    """
     if shutil.which("bash") is None:
         pytest.skip("bash not available")
 
@@ -205,7 +207,8 @@ def test_lockstep_across_minor_then_major(tmp_path):
     """Idempotency-ish: bump minor then major and assert the final state is
     consistent. Catches a regression where the second invocation picks up
     a stale version from one of the four files (e.g. the script forgets
-    to re-read agent.json)."""
+    to re-read agent.json).
+    """
     if shutil.which("bash") is None:
         pytest.skip("bash not available")
 

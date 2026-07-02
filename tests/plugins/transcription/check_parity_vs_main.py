@@ -38,7 +38,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -346,7 +345,7 @@ def main() -> int:
         print(
             "WARN: MAIN_DIR == PR_DIR — diffs will be trivially identical.\n"
             "      Set up a sibling 'hermes-agent-main' checkout pinned to "
-            "origin/main to get real parity coverage."
+            "origin/main to get real parity coverage.",
         )
         print()
 
@@ -419,7 +418,7 @@ def main() -> int:
     if intentional_diffs:
         print(
             f"INTENTIONAL DIFFS ({len(intentional_diffs)}): "
-            f"no_provider_error → plugin dispatch when a plugin is registered."
+            f"no_provider_error → plugin dispatch when a plugin is registered.",
         )
     if failures or errors:
         return 1

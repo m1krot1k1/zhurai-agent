@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Fetch a YouTube video transcript and output it as structured JSON.
+"""Fetch a YouTube video transcript and output it as structured JSON.
 
 Usage:
     uv run python3 fetch_transcript.py <url_or_video_id> [--language en,tr] [--timestamps]
@@ -27,8 +26,8 @@ def extract_video_id(url_or_id: str) -> str:
     """Extract the 11-character video ID from various YouTube URL formats."""
     url_or_id = url_or_id.strip()
     patterns = [
-        r'(?:v=|youtu\.be/|shorts/|embed/|live/)([a-zA-Z0-9_-]{11})',
-        r'^([a-zA-Z0-9_-]{11})$',
+        r"(?:v=|youtu\.be/|shorts/|embed/|live/)([a-zA-Z0-9_-]{11})",
+        r"^([a-zA-Z0-9_-]{11})$",
     ]
     for pattern in patterns:
         match = re.search(pattern, url_or_id)
@@ -94,7 +93,7 @@ def main():
         if "disabled" in error_msg.lower():
             print(json.dumps({"error": "Transcripts are disabled for this video."}))
         elif "no transcript" in error_msg.lower():
-            print(json.dumps({"error": f"No transcript found. Try specifying a language with --language."}))
+            print(json.dumps({"error": "No transcript found. Try specifying a language with --language."}))
         else:
             print(json.dumps({"error": error_msg}))
         sys.exit(1)

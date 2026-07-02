@@ -34,7 +34,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 
@@ -65,7 +65,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
     # Config resolution
     # ------------------------------------------------------------------
 
-    def _get_config_or_none(self) -> Optional[Dict[str, Any]]:
+    def _get_config_or_none(self) -> dict[str, Any] | None:
         api_key = os.environ.get("BROWSERBASE_API_KEY")
         project_id = os.environ.get("BROWSERBASE_PROJECT_ID")
         if api_key and project_id:
@@ -73,17 +73,17 @@ class BrowserbaseBrowserProvider(BrowserProvider):
                 "api_key": api_key,
                 "project_id": project_id,
                 "base_url": os.environ.get(
-                    "BROWSERBASE_BASE_URL", "https://api.browserbase.com"
+                    "BROWSERBASE_BASE_URL", "https://api.browserbase.com",
                 ).rstrip("/"),
             }
         return None
 
-    def _get_config(self) -> Dict[str, Any]:
+    def _get_config(self) -> dict[str, Any]:
         config = self._get_config_or_none()
         if config is None:
             raise ValueError(
                 "Browserbase requires BROWSERBASE_API_KEY and BROWSERBASE_PROJECT_ID "
-                "environment variables."
+                "environment variables.",
             )
         return config
 
@@ -91,7 +91,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
     # Session lifecycle
     # ------------------------------------------------------------------
 
-    def create_session(self, task_id: str) -> Dict[str, object]:
+    def create_session(self, task_id: str) -> dict[str, object]:
         config = self._get_config()
 
         # Optional env-var knobs
@@ -112,7 +112,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
             "custom_timeout": False,
         }
 
-        session_config: Dict[str, object] = {"projectId": config["project_id"]}
+        session_config: dict[str, object] = {"projectId": config["project_id"]}
 
         if enable_keep_alive:
             session_config["keepAlive"] = True
@@ -124,7 +124,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
                     session_config["timeout"] = timeout_val
             except ValueError:
                 logger.warning(
-                    "Invalid BROWSERBASE_SESSION_TIMEOUT value: %s", custom_timeout_ms
+                    "Invalid BROWSERBASE_SESSION_TIMEOUT value: %s", custom_timeout_ms,
                 )
 
         if enable_proxies:
@@ -156,7 +156,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
                     keepalive_fallback = True
                     logger.warning(
                         "keepAlive may require paid plan (402), retrying without it. "
-                        "Sessions may timeout during long operations."
+                        "Sessions may timeout during long operations.",
                     )
                     session_config.pop("keepAlive", None)
                     response = requests.post(
@@ -170,7 +170,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
                     proxies_fallback = True
                     logger.warning(
                         "Proxies unavailable (402), retrying without proxies. "
-                        "Bot detection may be less effective."
+                        "Bot detection may be less effective.",
                     )
                     session_config.pop("proxies", None)
                     response = requests.post(
@@ -181,13 +181,13 @@ class BrowserbaseBrowserProvider(BrowserProvider):
                     )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"Browserbase API connection failed: {exc}"
+                f"Browserbase API connection failed: {exc}",
             ) from exc
 
         if not response.ok:
             raise RuntimeError(
                 f"Failed to create Browserbase session: "
-                f"{response.status_code} {response.text}"
+                f"{response.status_code} {response.text}",
             )
 
         session_data = response.json()
@@ -204,7 +204,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
 
         feature_str = ", ".join(k for k, v in features_enabled.items() if v)
         logger.info(
-            "Created Browserbase session %s with features: %s", session_name, feature_str
+            "Created Browserbase session %s with features: %s", session_name, feature_str,
         )
 
         return {
@@ -219,7 +219,7 @@ class BrowserbaseBrowserProvider(BrowserProvider):
             config = self._get_config()
         except ValueError:
             logger.warning(
-                "Cannot close Browserbase session %s — missing credentials", session_id
+                "Cannot close Browserbase session %s — missing credentials", session_id,
             )
             return False
 
@@ -239,14 +239,13 @@ class BrowserbaseBrowserProvider(BrowserProvider):
             if response.status_code in {200, 201, 204}:
                 logger.debug("Successfully closed Browserbase session %s", session_id)
                 return True
-            else:
-                logger.warning(
-                    "Failed to close session %s: HTTP %s - %s",
-                    session_id,
-                    response.status_code,
-                    response.text[:200],
-                )
-                return False
+            logger.warning(
+                "Failed to close session %s: HTTP %s - %s",
+                session_id,
+                response.status_code,
+                response.text[:200],
+            )
+            return False
         except Exception as e:
             logger.error("Exception closing Browserbase session %s: %s", session_id, e)
             return False
@@ -274,10 +273,10 @@ class BrowserbaseBrowserProvider(BrowserProvider):
             )
         except Exception as e:
             logger.debug(
-                "Emergency cleanup failed for Browserbase session %s: %s", session_id, e
+                "Emergency cleanup failed for Browserbase session %s: %s", session_id, e,
             )
 
-    def get_setup_schema(self) -> Dict[str, Any]:
+    def get_setup_schema(self) -> dict[str, Any]:
         return {
             "name": "Browserbase",
             "badge": "paid",

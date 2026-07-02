@@ -5,10 +5,7 @@ Regression coverage for #49561: in the Docker image the install tree
 with EACCES. The resolver must detect the read-only install dir and mirror the
 bridge source into a writable HERMES_HOME location instead.
 """
-import importlib
 from pathlib import Path
-
-import pytest
 
 from gateway.platforms import whatsapp_common
 
@@ -35,7 +32,7 @@ def test_writable_install_returns_install_dir(tmp_path, monkeypatch):
         str(install_root / "gateway" / "platforms" / "whatsapp_common.py"),
     )
     monkeypatch.setattr(
-        "hermes_constants.get_hermes_home", lambda: hermes_home
+        "hermes_constants.get_hermes_home", lambda: hermes_home,
     )
 
     resolved = whatsapp_common.resolve_whatsapp_bridge_dir()
@@ -58,7 +55,7 @@ def test_readonly_install_mirrors_to_hermes_home(tmp_path, monkeypatch):
         str(install_root / "gateway" / "platforms" / "whatsapp_common.py"),
     )
     monkeypatch.setattr(
-        "hermes_constants.get_hermes_home", lambda: hermes_home
+        "hermes_constants.get_hermes_home", lambda: hermes_home,
     )
 
     # Simulate a read-only install tree. chmod(0o555) is unreliable under
@@ -101,7 +98,7 @@ def test_readonly_install_reuses_existing_mirror(tmp_path, monkeypatch):
         str(install_root / "gateway" / "platforms" / "whatsapp_common.py"),
     )
     monkeypatch.setattr(
-        "hermes_constants.get_hermes_home", lambda: hermes_home
+        "hermes_constants.get_hermes_home", lambda: hermes_home,
     )
 
     _real_touch = Path.touch

@@ -8,8 +8,8 @@ import httpx
 import pytest
 
 from tools.microsoft_graph_auth import (
-    CachedAccessToken,
     DEFAULT_GRAPH_SCOPE,
+    CachedAccessToken,
     GraphCredentials,
     MicrosoftGraphConfigError,
     MicrosoftGraphTokenError,
@@ -34,7 +34,7 @@ class TestGraphCredentials:
                 "MSGRAPH_TENANT_ID": "tenant-123",
                 "MSGRAPH_CLIENT_ID": "client-456",
                 "MSGRAPH_CLIENT_SECRET": "secret-789",
-            }
+            },
         )
         assert creds is not None
         assert creds.scope == DEFAULT_GRAPH_SCOPE

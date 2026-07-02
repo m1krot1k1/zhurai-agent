@@ -49,7 +49,7 @@ def test_format_diagnostic_omits_missing_optional_fields():
             },
             "severity": 1,
             "message": "bare",
-        }
+        },
     )
     assert "[" not in line.split("]", 1)[1]  # no extra brackets after the position
     assert "(" not in line
@@ -64,7 +64,7 @@ def test_report_for_file_returns_empty_when_only_warnings():
 def test_report_for_file_emits_block_with_errors():
     diag = _diag(msg="real error")
     report = report_for_file("/x.py", [diag])
-    assert "<diagnostics file=\"/x.py\">" in report
+    assert '<diagnostics file="/x.py">' in report
     assert "real error" in report
     assert "</diagnostics>" in report
 

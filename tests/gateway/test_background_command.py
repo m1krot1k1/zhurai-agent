@@ -5,6 +5,7 @@ background session) across gateway messenger platforms.
 """
 
 import asyncio
+import pathlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -278,7 +279,7 @@ class TestRunBackgroundTask:
 
         runner = _make_runner()
         runner._resolve_session_agent_runtime = MagicMock(
-            return_value=("test-model", {"api_key": "test-key"})
+            return_value=("test-model", {"api_key": "test-key"}),
         )
         runner._resolve_session_reasoning_config = MagicMock(return_value=None)
         runner._load_service_tier = MagicMock(return_value=None)
@@ -287,12 +288,12 @@ class TestRunBackgroundTask:
                 "model": "test-model",
                 "runtime": {"api_key": "test-key"},
                 "request_overrides": None,
-            }
+            },
         )
         runner._run_in_executor_with_context = AsyncMock(
-            return_value={"final_response": "see attached", "messages": []}
+            return_value={"final_response": "see attached", "messages": []},
         )
-        monkeypatch.setattr(gateway_run, "_load_gateway_config", lambda: {})
+        monkeypatch.setattr(gateway_run, "_load_gateway_config", dict)
 
         # Four real files so the media-delivery path validator accepts them
         # (default mode requires the file to exist as a regular file).
@@ -304,8 +305,7 @@ class TestRunBackgroundTask:
         _png = _os.path.join(_tmpdir, "chart.png")
         _pdf = _os.path.join(_tmpdir, "report.pdf")
         for _p in (_ogg, _mp4, _png, _pdf):
-            with open(_p, "wb") as _fh:
-                _fh.write(b"x")
+            pathlib.Path(_p).write_bytes(b"x")
         # ogg flagged as voice, mp4 video, png image, pdf doc.
         media = [
             (_ogg, True),
@@ -356,7 +356,7 @@ class TestRunBackgroundTask:
 
         runner = _make_runner()
         runner._resolve_session_agent_runtime = MagicMock(
-            return_value=("test-model", {"api_key": "test-key"})
+            return_value=("test-model", {"api_key": "test-key"}),
         )
         runner._resolve_session_reasoning_config = MagicMock(return_value=None)
         runner._load_service_tier = MagicMock(return_value=None)
@@ -365,12 +365,12 @@ class TestRunBackgroundTask:
                 "model": "test-model",
                 "runtime": {"api_key": "test-key"},
                 "request_overrides": None,
-            }
+            },
         )
         runner._run_in_executor_with_context = AsyncMock(
-            return_value={"final_response": "done", "messages": []}
+            return_value={"final_response": "done", "messages": []},
         )
-        monkeypatch.setattr(gateway_run, "_load_gateway_config", lambda: {})
+        monkeypatch.setattr(gateway_run, "_load_gateway_config", dict)
 
         mock_adapter = AsyncMock()
         mock_adapter.send = AsyncMock()
@@ -507,8 +507,9 @@ class TestBackgroundInCLICommands:
     def test_background_autocompletes(self):
         """The /background command appears in autocomplete results."""
         pytest.importorskip("prompt_toolkit")
-        from hermes_cli.commands import SlashCommandCompleter
         from prompt_toolkit.document import Document
+
+        from hermes_cli.commands import SlashCommandCompleter
 
         completer = SlashCommandCompleter()
         doc = Document("backgro")  # Partial match

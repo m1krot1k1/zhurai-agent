@@ -48,10 +48,11 @@ from unittest.mock import patch
 import pytest
 
 
-@pytest.fixture()
+@pytest.fixture
 def compressor():
     """ContextCompressor with mocked deps and a tight tail budget so
-    the helpers' anchor behaviour is observable."""
+    the helpers' anchor behaviour is observable.
+    """
     from agent.context_compressor import ContextCompressor
     with patch(
         "agent.context_compressor.get_model_context_length",
@@ -84,13 +85,14 @@ class TestFindLastAssistantMessageIdx:
         assert idx == 2
 
     def test_skips_tool_call_only_stub_when_text_reply_exists_earlier(
-        self, compressor
+        self, compressor,
     ):
         """An assistant message that only carries ``tool_calls`` (no
         text content) is not the user-visible reply — the WebUI
         renders those as small "calling tool X" indicators. The helper
         must prefer the earlier text reply, which is what the user
-        actually read."""
+        actually read.
+        """
         messages = [
             {"role": "user", "content": "q1"},
             {"role": "assistant", "content": "VISIBLE REPLY"},
@@ -109,7 +111,8 @@ class TestFindLastAssistantMessageIdx:
     def test_empty_string_content_does_not_count_as_visible(self, compressor):
         """An assistant message with ``content=""`` (only whitespace)
         is not a visible reply either — common pre-flight stub before
-        the model streams the real answer."""
+        the model streams the real answer.
+        """
         messages = [
             {"role": "user", "content": "q1"},
             {"role": "assistant", "content": "earlier reply"},
@@ -124,7 +127,8 @@ class TestFindLastAssistantMessageIdx:
     def test_multimodal_text_block_counts(self, compressor):
         """An assistant with multimodal list-content carrying a text
         block (Anthropic / GPT-style ``[{type:text,text:...}]``)
-        counts as content-bearing."""
+        counts as content-bearing.
+        """
         messages = [
             {"role": "user", "content": "q"},
             {"role": "assistant",
@@ -134,11 +138,12 @@ class TestFindLastAssistantMessageIdx:
         assert idx == 1
 
     def test_fallback_to_any_assistant_when_no_content_bearing(
-        self, compressor
+        self, compressor,
     ):
         """When there's no text-bearing assistant in the compressible
         region (fresh multi-step tool sequence), fall back to the
-        most recent assistant of any kind so the anchor still works."""
+        most recent assistant of any kind so the anchor still works.
+        """
         messages = [
             {"role": "user", "content": "q"},
             {"role": "assistant", "content": None,
@@ -159,7 +164,8 @@ class TestFindLastAssistantMessageIdx:
 
     def test_respects_head_end_lower_bound(self, compressor):
         """An assistant message at or before ``head_end`` must be
-        ignored — it's already in the protected head region."""
+        ignored — it's already in the protected head region.
+        """
         messages = [
             {"role": "system", "content": "sys"},
             {"role": "assistant", "content": "in-head reply"},  # idx 1
@@ -185,7 +191,7 @@ class TestEnsureLastAssistantMessageInTail:
         ]
         # cut_idx=1 means tail starts at index 1 — the reply is already in tail.
         new_cut = compressor._ensure_last_assistant_message_in_tail(
-            messages, cut_idx=1, head_end=0
+            messages, cut_idx=1, head_end=0,
         )
         assert new_cut == 1
 
@@ -199,7 +205,7 @@ class TestEnsureLastAssistantMessageInTail:
         # cut_idx=2 leaves the reply outside the tail; anchor must pull
         # cut_idx back to 1 so messages[1:] contains the reply.
         new_cut = compressor._ensure_last_assistant_message_in_tail(
-            messages, cut_idx=2, head_end=0
+            messages, cut_idx=2, head_end=0,
         )
         assert new_cut == 1
         assert any(
@@ -216,7 +222,7 @@ class TestEnsureLastAssistantMessageInTail:
         # head_end=2 ⇒ assistant at idx 1 is in the head; the anchor
         # finds nothing in the compressible region and is a no-op.
         new_cut = compressor._ensure_last_assistant_message_in_tail(
-            messages, cut_idx=3, head_end=2
+            messages, cut_idx=3, head_end=2,
         )
         assert new_cut == 3
 
@@ -224,7 +230,8 @@ class TestEnsureLastAssistantMessageInTail:
         """When the anchored assistant is preceded by a
         tool_call/result group, ``_align_boundary_backward`` must pull
         ``cut_idx`` even further back so the group isn't split — same
-        guarantee as ``_ensure_last_user_message_in_tail``."""
+        guarantee as ``_ensure_last_user_message_in_tail``.
+        """
         messages = [
             {"role": "user", "content": "q1"},
             {"role": "assistant", "content": None,
@@ -240,7 +247,7 @@ class TestEnsureLastAssistantMessageInTail:
         # tool group and pulls further back to 1 (before the assistant
         # with tool_calls).
         new_cut = compressor._ensure_last_assistant_message_in_tail(
-            messages, cut_idx=4, head_end=0
+            messages, cut_idx=4, head_end=0,
         )
         assert new_cut <= 3
         # The tool_call assistant (1) and its tool_result (2) must NOT
@@ -260,13 +267,14 @@ class TestEnsureLastAssistantMessageInTail:
 
 class TestFindTailCutByTokensAnchorsAssistant:
     def test_reporter_repro_long_tool_run_after_visible_reply(
-        self, compressor
+        self, compressor,
     ):
         """The exact #29824 scenario: a tight token budget combined
         with a long tail of tool-call/result messages after the
         visible reply. Pre-fix, the token-budget walk hit its ceiling
         on the tool output and parked ``cut_idx`` past the reply.
-        Post-fix, the assistant anchor pulls it back."""
+        Post-fix, the assistant anchor pulls it back.
+        """
         c = compressor
         c.tail_token_budget = 10  # force min-tail behaviour
         messages = [
@@ -298,7 +306,8 @@ class TestFindTailCutByTokensAnchorsAssistant:
     def test_user_and_assistant_anchors_compose(self, compressor):
         """Both anchors run in sequence; the tail must contain both
         the latest user message AND the latest visible assistant
-        reply."""
+        reply.
+        """
         c = compressor
         c.tail_token_budget = 10
         messages = [
@@ -318,7 +327,8 @@ class TestFindTailCutByTokensAnchorsAssistant:
     def test_oversized_tool_output_does_not_strand_reply(self, compressor):
         """The soft-ceiling logic in ``_find_tail_cut_by_tokens``
         permits a single oversized tail message; the assistant anchor
-        must still recover the reply on the other side of it."""
+        must still recover the reply on the other side of it.
+        """
         c = compressor
         c.tail_token_budget = 100  # soft ceiling 150
         messages = [
@@ -354,7 +364,8 @@ class TestCompactionRollupReproduction:
     summary-handoff tail message (the compressor's double-collision
     fallback path; the WebUI re-splits these on the END marker so the
     reply renders as a separate bubble — see ``splitCompactionContent``
-    in ``web/src/pages/SessionsPage.tsx``)."""
+    in ``web/src/pages/SessionsPage.tsx``).
+    """
 
     def test_compress_keeps_visible_reply_text(self, compressor):
         from agent.context_compressor import SUMMARY_PREFIX
@@ -412,13 +423,14 @@ class TestCompactionRollupReproduction:
         )
 
     def test_standalone_summary_case_keeps_reply_as_own_message(
-        self, compressor
+        self, compressor,
     ):
         """When the head and tail roles allow a standalone summary
         message (no double-collision), the visible reply must remain
         as its OWN assistant message — not merged with anything.
         This is the common case; the merge-into-tail path is the
-        edge case for double-collision."""
+        edge case for double-collision.
+        """
         from agent.context_compressor import SUMMARY_PREFIX
         c = compressor
         c.tail_token_budget = 10
@@ -491,12 +503,14 @@ class TestSourceGuardrail:
 
     def test_anchor_called_from_find_tail_cut(self, source):
         """Without the call site the helper is dead code and the bug
-        regresses silently — pin both the definition AND the wiring."""
+        regresses silently — pin both the definition AND the wiring.
+        """
         assert "self._ensure_last_assistant_message_in_tail(" in source
 
     def test_anchor_called_after_user_anchor(self, source):
         """The two anchors must run in sequence; reversing or skipping
-        one drops the corresponding side of the guarantee."""
+        one drops the corresponding side of the guarantee.
+        """
         user_call = "self._ensure_last_user_message_in_tail(messages, cut_idx, head_end)"
         asst_call = "self._ensure_last_assistant_message_in_tail(messages, cut_idx, head_end)"
         user_idx = source.find(user_call)
@@ -511,7 +525,8 @@ class TestSourceGuardrail:
     def test_helper_prefers_content_bearing_reply(self, source):
         """The helper must skip tool-call-only stubs — that's the
         whole user-experience difference between #29824 (no visible
-        reply) and an in-progress turn (small 'calling tool X' chip)."""
+        reply) and an in-progress turn (small 'calling tool X' chip).
+        """
         assert "content.strip()" in source
 
     def test_issue_number_referenced(self, source):

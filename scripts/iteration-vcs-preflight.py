@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-iteration-vcs-preflight.py — cross-platform VCS pre-flight check.
+"""iteration-vcs-preflight.py — cross-platform VCS pre-flight check.
 Python equivalent of iteration-vcs-preflight.sh
 
 Usage:
@@ -12,15 +11,15 @@ Exit codes:
     3 — branch is behind origin (run with --sync)
 """
 
-import subprocess
-import sys
 import argparse
 import re
+import subprocess
+import sys
 
 
 def validate_branch_name(name: str) -> bool:
     """Validate branch name matches safe pattern: alphanumeric, hyphens, underscores."""
-    return bool(re.match(r'^[a-zA-Z0-9_-]+$', name))
+    return bool(re.match(r"^[a-zA-Z0-9_-]+$", name))
 
 
 def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -39,12 +38,12 @@ def main() -> int:
     # Validate base_branch name
     if not validate_branch_name(base_branch):
         print(f"vcs-preflight: ERROR: invalid base branch name '{base_branch}'")
-        print(f"vcs-preflight: branch name must match: ^[a-zA-Z0-9_-]+$")
+        print("vcs-preflight: branch name must match: ^[a-zA-Z0-9_-]+$")
         return 1
 
     do_sync = args.sync
 
-    print(f"vcs-preflight: fetch --all --prune")
+    print("vcs-preflight: fetch --all --prune")
     run(["git", "fetch", "--all", "--prune"])
 
     result = run(["git", "rev-list", "--left-right", "--count",
@@ -77,7 +76,7 @@ def main() -> int:
 
     # Sync mode
     if behind == 0 and ahead == 0:
-        print(f"vcs-preflight: up-to-date, pull --rebase")
+        print("vcs-preflight: up-to-date, pull --rebase")
         result = run(["git", "pull", "--rebase", "origin", base_branch], check=False)
         if result.returncode != 0:
             print(f"vcs-preflight: pull --rebase failed, fallback to git rebase origin/{base_branch}")
@@ -85,12 +84,12 @@ def main() -> int:
         return 0
 
     if behind != 0 and ahead == 0:
-        print(f"vcs-preflight: behind origin, rebase required")
+        print("vcs-preflight: behind origin, rebase required")
         run(["git", "rebase", f"origin/{base_branch}"])
         return 0
 
     if behind == 0 and ahead != 0:
-        print(f"vcs-preflight: local branch ahead, sync not required")
+        print("vcs-preflight: local branch ahead, sync not required")
         return 0
 
     return 0

@@ -44,7 +44,7 @@ def test_overlay_preserves_user_siblings(managed):
 
     _write(managed, "display:\n  skin: charizard\n")
     out = managed_scope.apply_managed_overlay(
-        {"display": {"skin": "user", "show_reasoning": True}}
+        {"display": {"skin": "user", "show_reasoning": True}},
     )
     assert out["display"]["skin"] == "charizard"
     assert out["display"]["show_reasoning"] is True

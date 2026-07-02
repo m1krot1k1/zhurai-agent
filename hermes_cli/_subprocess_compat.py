@@ -29,15 +29,15 @@ from __future__ import annotations
 
 import shutil
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 __all__ = [
     "IS_WINDOWS",
     "resolve_node_command",
     "windows_detach_flags",
     "windows_detach_flags_without_breakaway",
-    "windows_hide_flags",
     "windows_detach_popen_kwargs",
+    "windows_hide_flags",
 ]
 
 
@@ -80,6 +80,7 @@ def resolve_node_command(name: str, argv: Sequence[str]) -> list[str]:
 
     Returns:
         A list suitable for passing to subprocess.Popen/run/call.
+
     """
     resolved = shutil.which(name)
     if resolved:

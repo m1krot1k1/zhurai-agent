@@ -50,7 +50,7 @@ class TestMaybeApplyCodexAppServerRuntime:
     def test_default_off_for_openai(self, model_cfg) -> None:
         """Default behavior is preserved when the flag is unset/auto."""
         got = _maybe_apply_codex_app_server_runtime(
-            provider="openai", api_mode="chat_completions", model_cfg=model_cfg
+            provider="openai", api_mode="chat_completions", model_cfg=model_cfg,
         )
         assert got == "chat_completions"
 
@@ -92,7 +92,8 @@ class TestMaybeApplyCodexAppServerRuntime:
     )
     def test_other_providers_never_rerouted(self, provider) -> None:
         """Non-OpenAI providers MUST NOT be rerouted even with the flag set —
-        codex's app-server can only run OpenAI/Codex auth flows."""
+        codex's app-server can only run OpenAI/Codex auth flows.
+        """
         got = _maybe_apply_codex_app_server_runtime(
             provider=provider,
             api_mode="anthropic_messages",
@@ -158,8 +159,10 @@ class TestSpawnEnvIsolation:
 
     def test_spawn_env_preserves_HOME(self, monkeypatch):
         """The spawn env must contain the parent process's HOME unchanged.
-        Verifies via a subprocess-monkey-patch."""
+        Verifies via a subprocess-monkey-patch.
+        """
         import subprocess
+
         from agent.transports import codex_app_server as cas
 
         captured = {}
@@ -202,8 +205,10 @@ class TestSpawnEnvIsolation:
 
     def test_spawn_env_sets_CODEX_HOME_when_provided(self, monkeypatch):
         """CODEX_HOME isolation must still work — that's the whole point
-        of the codex_home arg."""
+        of the codex_home arg.
+        """
         import subprocess
+
         from agent.transports import codex_app_server as cas
 
         captured = {}
@@ -233,7 +238,7 @@ class TestSpawnEnvIsolation:
         monkeypatch.setenv("HOME", "/users/alice")
 
         client = cas.CodexAppServerClient(
-            codex_bin="codex", codex_home="/tmp/profile/codex"
+            codex_bin="codex", codex_home="/tmp/profile/codex",
         )
         client._closed = True
 
@@ -248,6 +253,7 @@ class TestSpawnEnvIsolation:
         for the Kanban root only.
         """
         import subprocess
+
         from agent.transports import codex_app_server as cas
 
         captured = {}

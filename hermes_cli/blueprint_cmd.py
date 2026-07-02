@@ -35,7 +35,7 @@ import difflib
 import logging
 import shlex
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +53,10 @@ class BlueprintCommandResult:
     """
 
     text: str
-    agent_seed: Optional[str] = None
+    agent_seed: str | None = None
 
 
-def _resolve_origin(explicit: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def _resolve_origin(explicit: dict[str, Any] | None) -> dict[str, Any] | None:
     if explicit is not None:
         return explicit
     try:
@@ -76,9 +76,9 @@ def _resolve_origin(explicit: Optional[Dict[str, Any]]) -> Optional[Dict[str, An
     return None
 
 
-def _parse_kv(tokens) -> Tuple[Dict[str, str], list]:
+def _parse_kv(tokens) -> tuple[dict[str, str], list]:
     """Split ``slot=value`` tokens from bare tokens. Returns (values, leftovers)."""
-    values: Dict[str, str] = {}
+    values: dict[str, str] = {}
     leftovers = []
     for tok in tokens:
         if "=" in tok:
@@ -91,7 +91,7 @@ def _parse_kv(tokens) -> Tuple[Dict[str, str], list]:
     return values, leftovers
 
 
-def match_blueprint(query: str) -> Tuple[Optional[Any], List[Any]]:
+def match_blueprint(query: str) -> tuple[Any | None, list[Any]]:
     """Resolve a free-typed blueprint name to a blueprint.
 
     Returns ``(blueprint, candidates)``:
@@ -164,15 +164,15 @@ def build_blueprint_seed(blueprint) -> str:
     """
     from cron.blueprint_catalog import WEEKDAY_PRESETS
 
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append(
         f"Set up the '{blueprint.title}' automation for me (automation blueprint "
-        f"'{blueprint.key}'). {blueprint.description}"
+        f"'{blueprint.key}'). {blueprint.description}",
     )
     lines.append("")
     lines.append(
         "Ask me for each of these, one at a time, offering the default in "
-        "brackets if I don't have a preference:"
+        "brackets if I don't have a preference:",
     )
     for s in blueprint.slots:
         bits = [f"- {s.label} ({s.name})"]
@@ -194,8 +194,8 @@ def build_blueprint_seed(blueprint) -> str:
         "(fill {minute}/{hour} from the chosen time, {dow} from the weekday "
         f"choice using {dict(WEEKDAY_PRESETS)}, {{interval_min}} from any "
         "interval). Use this exact prompt for the job (substituting my "
-        f"answers into any {{slot}} placeholders): \"{blueprint.prompt_template}\". "
-        "Confirm the schedule and what it will do before you create it."
+        f'answers into any {{slot}} placeholders): "{blueprint.prompt_template}". '
+        "Confirm the schedule and what it will do before you create it.",
     )
     return "\n".join(lines)
 
@@ -209,12 +209,12 @@ def _fmt_catalog() -> str:
         lines.append(f"    {r.description}")
     lines.append(
         "\nTip: `/blueprint <name>` walks you through it. Power users can "
-        "pass values inline, e.g. `/blueprint morning-brief time=08:00`."
+        "pass values inline, e.g. `/blueprint morning-brief time=08:00`.",
     )
     return "\n".join(lines)
 
 
-def _fmt_candidates(query: str, candidates: List[Any]) -> str:
+def _fmt_candidates(query: str, candidates: list[Any]) -> str:
     lines = [f"'{query}' matches several blueprints — which one?\n"]
     for r in candidates:
         lines.append(f"  • {r.key} — {r.title}")
@@ -237,7 +237,8 @@ def _fmt_no_match(query: str) -> str:
 def _manage_hint(surface: str) -> str:
     """Post-create management hint. /cron is a CLI-only slash command; on
     gateway platforms the user manages jobs by asking the agent (cronjob tool)
-    or from the dashboard."""
+    or from the dashboard.
+    """
     if surface == "cli":
         return "Manage it with /cron."
     return "Ask me to list, pause, or remove it any time."
@@ -246,7 +247,7 @@ def _manage_hint(surface: str) -> str:
 def handle_blueprint_command(
     args: str,
     *,
-    origin: Optional[Dict[str, Any]] = None,
+    origin: dict[str, Any] | None = None,
     surface: str = "cli",
 ) -> BlueprintCommandResult:
     """Dispatch a ``/blueprint`` invocation.
@@ -261,7 +262,7 @@ def handle_blueprint_command(
     ``/cron`` only exists on the CLI.
     """
     try:
-        from cron.blueprint_catalog import fill_blueprint, BlueprintFillError
+        from cron.blueprint_catalog import BlueprintFillError, fill_blueprint
     except Exception as e:  # pragma: no cover - import guard
         logger.debug("blueprint catalog import failed: %s", e)
         return BlueprintCommandResult("Automation Blueprints are unavailable in this build.")
@@ -299,7 +300,7 @@ def handle_blueprint_command(
     except BlueprintFillError as e:
         return BlueprintCommandResult(
             f"Can't set up '{blueprint.title}': {e}\n"
-            f"Or just run /blueprint {blueprint.key} and I'll ask you for the values."
+            f"Or just run /blueprint {blueprint.key} and I'll ask you for the values.",
         )
 
     try:
@@ -314,5 +315,5 @@ def handle_blueprint_command(
     return BlueprintCommandResult(
         f"Scheduled '{blueprint.title}'"
         + (f" ({sched})" if sched else "")
-        + f", delivering to {spec.get('deliver', 'origin')}. {_manage_hint(surface)}"
+        + f", delivering to {spec.get('deliver', 'origin')}. {_manage_hint(surface)}",
     )

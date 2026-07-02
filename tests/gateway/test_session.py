@@ -1,9 +1,11 @@
 """Tests for gateway session management."""
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-from gateway.config import Platform, HomeChannel, GatewayConfig, PlatformConfig
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from gateway.config import GatewayConfig, HomeChannel, Platform, PlatformConfig
 from gateway.platforms.base import MessageEvent
 from gateway.session import (
     SessionSource,
@@ -438,7 +440,7 @@ class TestSenderPrefixWithBackfill:
     message, not the channel_context backfill block.
     """
 
-    @pytest.fixture()
+    @pytest.fixture
     def runner(self):
         from gateway.run import GatewayRunner
 
@@ -450,7 +452,7 @@ class TestSenderPrefixWithBackfill:
         r._has_setup_skill = lambda: False
         return r
 
-    @pytest.fixture()
+    @pytest.fixture
     def source(self):
         return SessionSource(
             platform=Platform.DISCORD,
@@ -503,7 +505,7 @@ class TestSenderPrefixWithBackfill:
 class TestSessionStoreRewriteTranscript:
     """Regression: /retry and /undo must persist truncated history to DB."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def store(self, tmp_path, monkeypatch):
         import hermes_state
         monkeypatch.setattr(hermes_state, "DEFAULT_DB_PATH", tmp_path / "state.db")
@@ -612,7 +614,7 @@ class TestSessionStoreSwitchSession:
 
 
 class TestSessionStoreLookupBySessionId:
-    @pytest.fixture()
+    @pytest.fixture
     def store(self, tmp_path):
         config = GatewayConfig()
         with patch("gateway.session.SessionStore._ensure_loaded"):
@@ -637,9 +639,10 @@ class TestSessionStoreLookupBySessionId:
 
 class TestWhatsAppSessionKeyConsistency:
     """Regression: WhatsApp session keys must collapse JID/LID aliases to a
-    single stable identity for both DM chat_ids and group participant_ids."""
+    single stable identity for both DM chat_ids and group participant_ids.
+    """
 
-    @pytest.fixture()
+    @pytest.fixture
     def store(self, tmp_path):
         config = GatewayConfig()
         with patch("gateway.session.SessionStore._ensure_loaded"):
@@ -687,7 +690,8 @@ class TestWhatsAppSessionKeyConsistency:
     def test_whatsapp_group_participant_aliases_share_session_key(self, tmp_path, monkeypatch):
         """With group_sessions_per_user, the same human flipping between
         phone-JID and LID inside a group must not produce two isolated
-        per-user sessions."""
+        per-user sessions.
+        """
         tmp_home = tmp_path / "hermes-home"
         mapping_dir = tmp_home / "whatsapp" / "session"
         mapping_dir.mkdir(parents=True, exist_ok=True)
@@ -718,7 +722,8 @@ class TestWhatsAppSessionKeyConsistency:
 
     def test_whatsapp_group_shared_sessions_untouched_by_canonicalisation(self):
         """When group_sessions_per_user is False, participant_id is not in the
-        key at all, so canonicalisation is a no-op for this mode."""
+        key at all, so canonicalisation is a no-op for this mode.
+        """
         source = SessionSource(
             platform=Platform.WHATSAPP,
             chat_id="120363000000000000@g.us",
@@ -810,7 +815,8 @@ class TestWhatsAppSessionKeyConsistency:
 
     def test_dm_without_chat_id_falls_back_to_user_id(self):
         """A DM source missing chat_id must isolate on the sender's user_id
-        rather than collapsing into the shared per-platform sink."""
+        rather than collapsing into the shared per-platform sink.
+        """
         source = SessionSource(
             platform=Platform.TELEGRAM,
             chat_id="",
@@ -821,12 +827,13 @@ class TestWhatsAppSessionKeyConsistency:
 
     def test_dm_without_chat_id_distinct_users_do_not_collide(self):
         """Two different DM senders without chat_id must not share one
-        session (the cross-user history-bleed footgun)."""
+        session (the cross-user history-bleed footgun).
+        """
         first = SessionSource(
-            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", user_id="jordan"
+            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", user_id="jordan",
         )
         second = SessionSource(
-            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", user_id="dima"
+            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", user_id="dima",
         )
         assert build_session_key(first) != build_session_key(second)
         assert build_session_key(first) == "agent:main:telegram:dm:jordan"
@@ -834,7 +841,8 @@ class TestWhatsAppSessionKeyConsistency:
 
     def test_dm_without_chat_id_prefers_user_id_alt(self):
         """user_id_alt wins over user_id for the DM fallback, matching the
-        group-path participant precedence."""
+        group-path participant precedence.
+        """
         source = SessionSource(
             platform=Platform.TELEGRAM,
             chat_id="",
@@ -846,9 +854,10 @@ class TestWhatsAppSessionKeyConsistency:
 
     def test_dm_without_chat_id_or_user_id_falls_back_to_thread_then_sink(self):
         """With neither chat_id nor user identifiers, thread_id is the next
-        discriminator; only a completely identifier-less DM hits the sink."""
+        discriminator; only a completely identifier-less DM hits the sink.
+        """
         threaded = SessionSource(
-            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", thread_id="7"
+            platform=Platform.TELEGRAM, chat_id="", chat_type="dm", thread_id="7",
         )
         assert build_session_key(threaded) == "agent:main:telegram:dm:7"
 
@@ -1057,7 +1066,6 @@ class TestSessionEntryFromDictTraversalValidation:
     }
 
     def _entry(self, **overrides):
-        from gateway.session import SessionEntry
         return {**self.BASE, **overrides}
 
     def test_valid_entry_loads(self):
@@ -1097,7 +1105,8 @@ class TestSessionEntryFromDictTraversalValidation:
 
     def test_session_id_non_leading_separator_raises(self):
         """A path separator anywhere — not just leading — must be rejected,
-        since a non-leading backslash is still a Windows traversal vector."""
+        since a non-leading backslash is still a Windows traversal vector.
+        """
         from gateway.session import SessionEntry
         with pytest.raises(ValueError, match="session_id"):
             SessionEntry.from_dict(self._entry(session_id="good\\..\\bad"))
@@ -1110,8 +1119,9 @@ class TestEnsureLoadedSkipsInvalidEntries:
 
     def test_invalid_entry_skipped_valid_entry_loads(self, tmp_path):
         import json
-        from gateway.session import SessionStore
+
         from gateway.config import GatewayConfig
+        from gateway.session import SessionStore
 
         sessions_file = tmp_path / "sessions.json"
         sessions_file.write_text(json.dumps({
@@ -1204,8 +1214,9 @@ class TestLastPromptTokens:
 
     def test_session_entry_default(self):
         """New sessions should have last_prompt_tokens=0."""
-        from gateway.session import SessionEntry
         from datetime import datetime
+
+        from gateway.session import SessionEntry
         entry = SessionEntry(
             session_key="test",
             session_id="s1",
@@ -1216,8 +1227,9 @@ class TestLastPromptTokens:
 
     def test_session_entry_roundtrip(self):
         """last_prompt_tokens should survive serialization/deserialization."""
-        from gateway.session import SessionEntry
         from datetime import datetime
+
+        from gateway.session import SessionEntry
         entry = SessionEntry(
             session_key="test",
             session_id="s1",
@@ -1255,8 +1267,9 @@ class TestLastPromptTokens:
         store._db = None
         store._save = MagicMock()
 
-        from gateway.session import SessionEntry
         from datetime import datetime
+
+        from gateway.session import SessionEntry
         entry = SessionEntry(
             session_key="k1",
             session_id="s1",
@@ -1277,8 +1290,9 @@ class TestLastPromptTokens:
         store._db = None
         store._save = MagicMock()
 
-        from gateway.session import SessionEntry
         from datetime import datetime
+
+        from gateway.session import SessionEntry
         entry = SessionEntry(
             session_key="k1",
             session_id="s1",
@@ -1300,8 +1314,9 @@ class TestLastPromptTokens:
         store._db = None
         store._save = MagicMock()
 
-        from gateway.session import SessionEntry
         from datetime import datetime
+
+        from gateway.session import SessionEntry
         entry = SessionEntry(
             session_key="k1",
             session_id="s1",
@@ -1313,6 +1328,7 @@ class TestLastPromptTokens:
 
         store.update_session("k1", last_prompt_tokens=0)
         assert entry.last_prompt_tokens == 0
+
 
 class TestRewriteTranscriptPreservesReasoning:
     """rewrite_transcript must not drop reasoning fields from SQLite."""

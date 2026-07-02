@@ -49,7 +49,7 @@ _ACCOUNTS_AUTH_TYPES: frozenset[str] = frozenset(
         "oauth_minimax",
         "external_process",  # copilot-acp: spawns `copilot --acp --stdio`
         "copilot",           # GitHub Copilot token / gh auth
-    }
+    },
 )
 
 
@@ -160,7 +160,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
                 base_url_env_var=base_url_var,
                 signup_url=signup_url,
                 order=order,
-            )
+            ),
         )
     return out
 

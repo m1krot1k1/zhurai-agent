@@ -45,13 +45,14 @@ def adapter():
 def _redirect_cache(tmp_path, monkeypatch):
     """Point document cache to tmp_path so tests don't touch ~/.hermes."""
     monkeypatch.setattr(
-        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache"
+        "gateway.platforms.base.DOCUMENT_CACHE_DIR", tmp_path / "doc_cache",
     )
 
 
 def _channel_event(text: str, ts: str, thread_ts: str = None) -> dict:
     """Build a minimal ``message`` event for the Slack Events API
-    resembling what ``handle_message_event`` would pass through."""
+    resembling what ``handle_message_event`` would pass through.
+    """
     event = {
         "channel": "C_CHAN",
         "channel_type": "channel",
@@ -68,7 +69,8 @@ class TestChannelSessionScopeDefault:
     """``reply_in_thread: true`` is the historical default.  Top-level
     channel messages still map ``thread_id = ts`` so each new message
     becomes its own threaded session — unchanged from the pre-#15421
-    behaviour."""
+    behaviour.
+    """
 
     @pytest.mark.asyncio
     async def test_top_level_maps_to_ts_when_reply_in_thread_true(self, adapter):
@@ -80,7 +82,7 @@ class TestChannelSessionScopeDefault:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",
@@ -102,7 +104,8 @@ class TestChannelSessionScopeDefault:
     @pytest.mark.asyncio
     async def test_top_level_default_behaves_like_true(self, adapter):
         """Operators who never set ``reply_in_thread`` must see the
-        historical behaviour (true).  Pin the default explicitly."""
+        historical behaviour (true).  Pin the default explicitly.
+        """
         # Note: no adapter.config.extra["reply_in_thread"] set here.
         event = _channel_event(
             "<@U_BOT> hello",
@@ -111,7 +114,7 @@ class TestChannelSessionScopeDefault:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",
@@ -127,7 +130,8 @@ class TestChannelSessionScopeShared:
     """``reply_in_thread: false`` is the #15421 fix: top-level channel
     messages get ``thread_id = None`` so all of them share one
     channel-scoped session.  Genuine thread replies still get their
-    real ``thread_ts``."""
+    real ``thread_ts``.
+    """
 
     @pytest.mark.asyncio
     async def test_top_level_maps_to_none_when_reply_in_thread_false(self, adapter):
@@ -139,7 +143,7 @@ class TestChannelSessionScopeShared:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",
@@ -179,7 +183,7 @@ class TestChannelSessionScopeShared:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",
@@ -197,7 +201,8 @@ class TestChannelSessionScopeShared:
         """Bug 1's fix targets ONLY top-level channel messages.  Genuine
         thread replies (``thread_ts != ts``) must still scope per-thread
         sessions so multi-person threaded conversations don't collide
-        with unrelated channel chatter."""
+        with unrelated channel chatter.
+        """
         adapter.config.extra["reply_in_thread"] = False
         # Reply to an earlier thread root at ts=1700000000.000000
         event = _channel_event(
@@ -208,7 +213,7 @@ class TestChannelSessionScopeShared:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",
@@ -231,7 +236,8 @@ class TestChannelSessionScopeShared:
 class TestThreadReplyAlwaysScopesByThread:
     """Cross-cutting invariant: genuine thread replies always scope by
     ``thread_ts`` regardless of ``reply_in_thread``.  If this ever
-    regresses, every thread-scoped conversation leaks across threads."""
+    regresses, every thread-scoped conversation leaks across threads.
+    """
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("reply_in_thread", [True, False])
@@ -245,7 +251,7 @@ class TestThreadReplyAlwaysScopesByThread:
 
         captured = []
         adapter.handle_message = AsyncMock(
-            side_effect=lambda e: captured.append(e)
+            side_effect=lambda e: captured.append(e),
         )
         with patch.object(
             adapter, "_resolve_user_name",

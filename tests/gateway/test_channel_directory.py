@@ -6,19 +6,18 @@ import os
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from gateway.channel_directory import (
-    build_channel_directory,
-    lookup_channel_type,
-    resolve_channel_name,
-    format_directory_for_display,
-    load_directory,
     _apply_channel_aliases,
     _build_from_sessions,
     _build_slack,
+    build_channel_directory,
+    format_directory_for_display,
+    load_directory,
+    lookup_channel_type,
+    resolve_channel_name,
 )
-
-
-import pytest
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +25,8 @@ def _isolate_channel_aliases(tmp_path_factory):
     """Point the alias overlay at a nonexistent path by default so a real
     ~/.hermes/channel_aliases.json never leaks into directory tests. Tests
     that exercise aliases patch CHANNEL_ALIASES_PATH themselves inside the
-    test body, which takes precedence over this outer patch."""
+    test body, which takes precedence over this outer patch.
+    """
     missing = tmp_path_factory.mktemp("aliases") / "none.json"
     with patch("gateway.channel_directory.CHANNEL_ALIASES_PATH", missing):
         yield
@@ -49,7 +49,7 @@ class TestLoadDirectory:
 
     def test_valid_file(self, tmp_path):
         cache_file = _write_directory(tmp_path, {
-            "telegram": [{"id": "123", "name": "John", "type": "dm"}]
+            "telegram": [{"id": "123", "name": "John", "type": "dm"}],
         })
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
             result = load_directory()
@@ -66,7 +66,7 @@ class TestLoadDirectory:
 class TestBuildChannelDirectoryWrites:
     def test_failed_write_preserves_previous_cache(self, tmp_path, monkeypatch):
         cache_file = _write_directory(tmp_path, {
-            "telegram": [{"id": "123", "name": "Alice", "type": "dm"}]
+            "telegram": [{"id": "123", "name": "Alice", "type": "dm"}],
         })
         previous = json.loads(cache_file.read_text())
 
@@ -94,7 +94,7 @@ class TestResolveChannelName:
             "discord": [
                 {"id": "111", "name": "bot-home", "guild": "MyServer", "type": "channel"},
                 {"id": "222", "name": "general", "guild": "MyServer", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("discord", "bot-home") == "111"
@@ -102,7 +102,7 @@ class TestResolveChannelName:
 
     def test_case_insensitive(self, tmp_path):
         platforms = {
-            "slack": [{"id": "C01", "name": "Engineering", "type": "channel"}]
+            "slack": [{"id": "C01", "name": "Engineering", "type": "channel"}],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("slack", "engineering") == "C01"
@@ -113,7 +113,7 @@ class TestResolveChannelName:
             "discord": [
                 {"id": "111", "name": "general", "guild": "ServerA", "type": "channel"},
                 {"id": "222", "name": "general", "guild": "ServerB", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("discord", "ServerA/general") == "111"
@@ -124,7 +124,7 @@ class TestResolveChannelName:
             "slack": [
                 {"id": "C01", "name": "engineering-backend", "type": "channel"},
                 {"id": "C02", "name": "design-team", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             # "engineering" prefix matches only one channel
@@ -135,7 +135,7 @@ class TestResolveChannelName:
             "slack": [
                 {"id": "C01", "name": "eng-backend", "type": "channel"},
                 {"id": "C02", "name": "eng-frontend", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("slack", "eng") is None
@@ -146,14 +146,14 @@ class TestResolveChannelName:
 
     def test_no_match_returns_none(self, tmp_path):
         platforms = {
-            "telegram": [{"id": "123", "name": "John", "type": "dm"}]
+            "telegram": [{"id": "123", "name": "John", "type": "dm"}],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("telegram", "nonexistent") is None
 
     def test_topic_name_resolves_to_composite_id(self, tmp_path):
         platforms = {
-            "telegram": [{"id": "-1001:17585", "name": "Coaching Chat / topic 17585", "type": "group"}]
+            "telegram": [{"id": "-1001:17585", "name": "Coaching Chat / topic 17585", "type": "group"}],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("telegram", "Coaching Chat / topic 17585") == "-1001:17585"
@@ -161,12 +161,13 @@ class TestResolveChannelName:
     def test_id_match_takes_precedence_over_name(self, tmp_path):
         """A raw channel ID resolves to itself, even when a different
         channel happens to be named the same string. Case-sensitive: Slack
-        IDs are uppercase and must not be normalized away."""
+        IDs are uppercase and must not be normalized away.
+        """
         platforms = {
             "slack": [
                 {"id": "C0B0QV5434G", "name": "engineering", "type": "channel"},
                 {"id": "C99", "name": "c0b0qv5434g", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("slack", "C0B0QV5434G") == "C0B0QV5434G"
@@ -179,7 +180,7 @@ class TestResolveChannelName:
                 {"id": "123", "name": "Alice", "type": "dm"},
                 {"id": "456", "name": "Dev Group", "type": "group"},
                 {"id": "-1001:17585", "name": "Coaching Chat / topic 17585", "type": "group"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert resolve_channel_name("telegram", "Alice (dm)") == "123"
@@ -293,7 +294,7 @@ class TestFormatDirectoryForDisplay:
                 {"id": "123", "name": "Alice", "type": "dm"},
                 {"id": "456", "name": "Dev Group", "type": "group"},
                 {"id": "-1001:17585", "name": "Coaching Chat / topic 17585", "type": "group"},
-            ]
+            ],
         })
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
             result = format_directory_for_display()
@@ -309,7 +310,7 @@ class TestFormatDirectoryForDisplay:
                 {"id": "1", "name": "general", "guild": "Server1", "type": "channel"},
                 {"id": "2", "name": "bot-home", "guild": "Server1", "type": "channel"},
                 {"id": "3", "name": "chat", "guild": "Server2", "type": "channel"},
-            ]
+            ],
         })
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file):
             result = format_directory_for_display()
@@ -328,7 +329,7 @@ class TestLookupChannelType:
         platforms = {
             "discord": [
                 {"id": "100", "name": "ideas", "guild": "Server1", "type": "forum"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert lookup_channel_type("discord", "100") == "forum"
@@ -337,7 +338,7 @@ class TestLookupChannelType:
         platforms = {
             "discord": [
                 {"id": "200", "name": "general", "guild": "Server1", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert lookup_channel_type("discord", "200") == "channel"
@@ -346,7 +347,7 @@ class TestLookupChannelType:
         platforms = {
             "discord": [
                 {"id": "200", "name": "general", "guild": "Server1", "type": "channel"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert lookup_channel_type("discord", "999") is None
@@ -359,7 +360,7 @@ class TestLookupChannelType:
         platforms = {
             "discord": [
                 {"id": "300", "name": "general", "guild": "Server1"},
-            ]
+            ],
         }
         with self._setup(tmp_path, platforms):
             assert lookup_channel_type("discord", "300") is None
@@ -499,7 +500,8 @@ class TestBuildSlack:
 
 class TestChannelAliases:
     """The user-maintained alias overlay (channel_aliases.json) gives durable
-    friendly names that survive the timed directory rebuild."""
+    friendly names that survive the timed directory rebuild.
+    """
 
     def _setup_aliases(self, tmp_path, aliases):
         alias_file = tmp_path / "channel_aliases.json"
@@ -508,7 +510,7 @@ class TestChannelAliases:
 
     def test_alias_renames_existing_entry_on_load(self, tmp_path):
         cache_file = _write_directory(tmp_path, {
-            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}]
+            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}],
         })
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file), \
              self._setup_aliases(tmp_path, {"whatsapp": {"120363@g.us": "general"}}):
@@ -520,7 +522,8 @@ class TestChannelAliases:
 
     def test_alias_injects_undiscovered_group(self, tmp_path):
         """A group named in the alias file but not yet seen in any session is
-        still addressable by name (pre-naming before first traffic)."""
+        still addressable by name (pre-naming before first traffic).
+        """
         cache_file = _write_directory(tmp_path, {"whatsapp": []})
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file), \
              self._setup_aliases(tmp_path, {"whatsapp": {"999@g.us": "marketing"}}):
@@ -531,7 +534,7 @@ class TestChannelAliases:
 
     def test_no_alias_file_is_noop(self, tmp_path):
         cache_file = _write_directory(tmp_path, {
-            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}]
+            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}],
         })
         with patch("gateway.channel_directory.DIRECTORY_PATH", cache_file), \
              patch("gateway.channel_directory.CHANNEL_ALIASES_PATH", tmp_path / "nope.json"):
@@ -540,7 +543,7 @@ class TestChannelAliases:
 
     def test_corrupt_alias_file_is_ignored(self, tmp_path):
         cache_file = _write_directory(tmp_path, {
-            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}]
+            "whatsapp": [{"id": "120363@g.us", "name": "120363", "type": "group"}],
         })
         bad = tmp_path / "channel_aliases.json"
         bad.write_text("{not json")
@@ -551,7 +554,8 @@ class TestChannelAliases:
 
     def test_alias_persists_through_rebuild(self, tmp_path, monkeypatch):
         """build_channel_directory must bake aliases into the written file so
-        they survive the periodic regeneration, not just live reads."""
+        they survive the periodic regeneration, not just live reads.
+        """
         cache_file = tmp_path / "channel_directory.json"
         monkeypatch.setattr("gateway.channel_directory._build_from_sessions",
                             lambda plat: [{"id": "120363@g.us", "name": "120363",

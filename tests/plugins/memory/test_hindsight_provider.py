@@ -17,18 +17,17 @@ import pytest
 
 from hermes_cli.memory_setup import _CANCELLED
 from plugins.memory.hindsight import (
-    HindsightMemoryProvider,
     RECALL_SCHEMA,
     REFLECT_SCHEMA,
     RETAIN_SCHEMA,
-    _load_config,
+    HindsightMemoryProvider,
     _build_embedded_profile_env,
+    _load_config,
     _normalize_observation_scopes,
     _normalize_retain_tags,
     _resolve_bank_id_template,
     _sanitize_bank_segment,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -72,11 +71,11 @@ def _make_mock_client():
             results=[
                 SimpleNamespace(text="Memory 1"),
                 SimpleNamespace(text="Memory 2"),
-            ]
-        )
+            ],
+        ),
     )
     client.areflect = AsyncMock(
-        return_value=SimpleNamespace(text="Synthesized answer")
+        return_value=SimpleNamespace(text="Synthesized answer"),
     )
     client.aretain_batch = AsyncMock()
     client.aclose = AsyncMock()
@@ -98,7 +97,7 @@ def _provider_for_mode(tmp_path, monkeypatch, mode: str):
     config_path.write_text(json.dumps(config))
 
     monkeypatch.setattr(
-        "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path
+        "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path,
     )
 
     provider = HindsightMemoryProvider()
@@ -151,7 +150,7 @@ class _FakeSessionDB:
         return list(self._messages)
 
 
-@pytest.fixture()
+@pytest.fixture
 def provider(tmp_path, monkeypatch):
     """Create an initialized HindsightMemoryProvider with a mock client."""
     config = {
@@ -167,7 +166,7 @@ def provider(tmp_path, monkeypatch):
     config_path.write_text(json.dumps(config))
 
     monkeypatch.setattr(
-        "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path
+        "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path,
     )
 
     p = HindsightMemoryProvider()
@@ -176,7 +175,7 @@ def provider(tmp_path, monkeypatch):
     return p
 
 
-@pytest.fixture()
+@pytest.fixture
 def provider_with_config(tmp_path, monkeypatch):
     """Create a provider factory that accepts custom config overrides."""
     def _make(**overrides):
@@ -194,7 +193,7 @@ def provider_with_config(tmp_path, monkeypatch):
         config_path.write_text(json.dumps(config))
 
         monkeypatch.setattr(
-            "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path
+            "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path,
         )
 
         p = HindsightMemoryProvider()
@@ -243,7 +242,7 @@ def test_normalize_observation_scopes_json_list_of_lists():
 
 def test_normalize_observation_scopes_flat_list_is_single_scope():
     assert _normalize_observation_scopes(["user:alice", "team:eng"]) == [
-        ["user:alice", "team:eng"]
+        ["user:alice", "team:eng"],
     ]
 
 
@@ -297,7 +296,7 @@ class TestConfig:
 
     def test_local_external_client_lazy_installs_dependency_before_import(self, tmp_path, monkeypatch):
         _assert_cloud_client_lazy_installed_before_import(
-            tmp_path, monkeypatch, "local_external"
+            tmp_path, monkeypatch, "local_external",
         )
 
     def test_default_values(self, provider):
@@ -341,7 +340,7 @@ class TestConfig:
 
     def test_observation_scopes_custom_list_config(self, provider_with_config):
         p = provider_with_config(
-            observation_scopes=[["user:alice"], ["team:eng"]]
+            observation_scopes=[["user:alice"], ["team:eng"]],
         )
         assert p._observation_scopes == [["user:alice"], ["team:eng"]]
 
@@ -582,7 +581,6 @@ class TestPostSetup:
         assert profile_env.exists()
         assert "HINDSIGHT_API_LLM_API_KEY=existing-key\n" in profile_env.read_text()
 
-
     def test_local_embedded_setup_blank_inputs_preserve_existing_config(self, tmp_path, monkeypatch):
         """Pressing Enter through setup should keep existing Hindsight values."""
         hermes_home = tmp_path / "hermes-home"
@@ -631,7 +629,6 @@ class TestPostSetup:
         assert saved["timeout"] == 120
 
 
-
 # ---------------------------------------------------------------------------
 # Tool handler tests
 # ---------------------------------------------------------------------------
@@ -640,7 +637,7 @@ class TestPostSetup:
 class TestToolHandlers:
     def test_retain_success(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_retain", {"content": "user likes dark mode"}
+            "hindsight_retain", {"content": "user likes dark mode"},
         ))
         assert result["result"] == "Memory stored successfully."
         provider._client.aretain_batch.assert_called_once()
@@ -685,13 +682,13 @@ class TestToolHandlers:
 
     def test_retain_missing_content(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_retain", {}
+            "hindsight_retain", {},
         ))
         assert "error" in result
 
     def test_recall_success(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_recall", {"query": "dark mode"}
+            "hindsight_recall", {"query": "dark mode"},
         ))
         assert "Memory 1" in result["result"]
         assert "Memory 2" in result["result"]
@@ -718,38 +715,38 @@ class TestToolHandlers:
     def test_recall_no_results(self, provider):
         provider._client.arecall.return_value = SimpleNamespace(results=[])
         result = json.loads(provider.handle_tool_call(
-            "hindsight_recall", {"query": "test"}
+            "hindsight_recall", {"query": "test"},
         ))
         assert result["result"] == "No relevant memories found."
 
     def test_recall_missing_query(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_recall", {}
+            "hindsight_recall", {},
         ))
         assert "error" in result
 
     def test_reflect_success(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_reflect", {"query": "summarize"}
+            "hindsight_reflect", {"query": "summarize"},
         ))
         assert result["result"] == "Synthesized answer"
 
     def test_reflect_missing_query(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_reflect", {}
+            "hindsight_reflect", {},
         ))
         assert "error" in result
 
     def test_unknown_tool(self, provider):
         result = json.loads(provider.handle_tool_call(
-            "hindsight_unknown", {}
+            "hindsight_unknown", {},
         ))
         assert "error" in result
 
     def test_retain_error_handling(self, provider):
         provider._client.aretain_batch.side_effect = RuntimeError("connection failed")
         result = json.loads(provider.handle_tool_call(
-            "hindsight_retain", {"content": "test"}
+            "hindsight_retain", {"content": "test"},
         ))
         assert "error" in result
         assert "connection failed" in result["error"]
@@ -757,7 +754,7 @@ class TestToolHandlers:
     def test_recall_error_handling(self, provider):
         provider._client.arecall.side_effect = RuntimeError("timeout")
         result = json.loads(provider.handle_tool_call(
-            "hindsight_recall", {"query": "test"}
+            "hindsight_recall", {"query": "test"},
         ))
         assert "error" in result
 
@@ -766,7 +763,7 @@ class TestToolHandlers:
         first_client.arecall.side_effect = RuntimeError("Cannot connect to host 127.0.0.1:8888")
         second_client = _make_mock_client()
         second_client.arecall.return_value = SimpleNamespace(
-            results=[SimpleNamespace(text="Recovered memory")]
+            results=[SimpleNamespace(text="Recovered memory")],
         )
         clients = iter([first_client, second_client])
 
@@ -775,7 +772,7 @@ class TestToolHandlers:
         monkeypatch.setattr(provider, "_get_client", lambda: next(clients))
 
         result = json.loads(provider.handle_tool_call(
-            "hindsight_recall", {"query": "test"}
+            "hindsight_recall", {"query": "test"},
         ))
 
         assert result["result"] == "1. Recovered memory"
@@ -998,7 +995,10 @@ class TestSyncTurn:
             "plugins.memory.hindsight._fetch_hindsight_api_version",
             lambda *a, **kw: "0.5.6",
         )
-        from plugins.memory.hindsight import _append_capability_cache, _append_capability_lock
+        from plugins.memory.hindsight import (
+            _append_capability_cache,
+            _append_capability_lock,
+        )
         # Clear before AND after: the capability cache is module-global and keyed
         # per api_url, so a stale entry would leak into other tests.
         with _append_capability_lock:
@@ -1049,7 +1049,8 @@ class TestSyncTurn:
 
     def test_resume_creates_new_document(self, tmp_path, monkeypatch):
         """Resuming a session (re-initializing) gets a new document_id
-        so previously stored content is not overwritten."""
+        so previously stored content is not overwritten.
+        """
         config = {"mode": "cloud", "apiKey": "k", "api_url": "http://x", "bank_id": "b"}
         config_path = tmp_path / "hindsight" / "config.json"
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1197,7 +1198,8 @@ class TestSessionSwitchBufferFlush:
     def test_buffered_turns_flushed_before_clear(self, provider_with_config):
         """retain_every_n_turns > 1 must not silently drop partial buffers
         on session switch. Whatever's in _session_turns at switch time
-        should land in the OLD document under the OLD session id."""
+        should land in the OLD document under the OLD session id.
+        """
         p = provider_with_config(retain_every_n_turns=3, retain_async=False)
         old_doc = p._document_id
 
@@ -1243,7 +1245,8 @@ class TestSessionSwitchBufferFlush:
 
     def test_prefetch_result_cleared_on_switch(self, provider):
         """Stale recall text from the old session must not leak into the
-        next session's first prefetch read."""
+        next session's first prefetch read.
+        """
         provider._prefetch_result = "old-session recall: User likes Rust"
         provider.on_session_switch("new-sid")
         assert provider._prefetch_result == ""
@@ -1253,7 +1256,8 @@ class TestSessionSwitchBufferFlush:
     def test_in_flight_prefetch_thread_drained_on_switch(self, provider, monkeypatch):
         """on_session_switch must wait for an in-flight prefetch from the
         old session to settle before clearing _prefetch_result, otherwise
-        the thread can race and re-populate the field after the clear."""
+        the thread can race and re-populate the field after the clear.
+        """
         import threading
 
         gate = threading.Event()
@@ -1277,7 +1281,7 @@ class TestSessionSwitchBufferFlush:
         assert provider._prefetch_result == ""
 
     def test_flush_serializes_behind_pending_retains_via_writer_queue(
-        self, provider_with_config
+        self, provider_with_config,
     ):
         """The flush closure must ride the same _retain_queue sync_turn
         uses, so it lands FIFO behind any still-queued old-session
@@ -1339,13 +1343,17 @@ class TestSessionSwitchBufferFlush:
 
 class TestUpdateModeAppendCapability:
     def _clear_capability_cache(self):
-        from plugins.memory.hindsight import _append_capability_cache, _append_capability_lock
+        from plugins.memory.hindsight import (
+            _append_capability_cache,
+            _append_capability_lock,
+        )
         with _append_capability_lock:
             _append_capability_cache.clear()
 
     def test_legacy_api_falls_back_to_per_process_doc_id(self, provider, monkeypatch):
         """API returns no /version (or pre-0.5.0) — sync_turn must use the
-        per-process unique doc_id and NOT pass update_mode."""
+        per-process unique doc_id and NOT pass update_mode.
+        """
         self._clear_capability_cache()
         monkeypatch.setattr(
             "plugins.memory.hindsight._fetch_hindsight_api_version",
@@ -1387,7 +1395,7 @@ class TestUpdateModeAppendCapability:
             return "0.5.6"
 
         monkeypatch.setattr(
-            "plugins.memory.hindsight._fetch_hindsight_api_version", _spy
+            "plugins.memory.hindsight._fetch_hindsight_api_version", _spy,
         )
         provider.sync_turn("a", "b")
         provider._retain_queue.join()
@@ -1415,10 +1423,11 @@ class TestUpdateModeAppendCapability:
         assert len(warns) == 1
 
     def test_session_switch_flush_picks_capability_against_old_session(
-        self, provider_with_config, monkeypatch
+        self, provider_with_config, monkeypatch,
     ):
         """When the API supports append, the flush on /reset must land
-        in the OLD session's stable document, not a per-process id."""
+        in the OLD session's stable document, not a per-process id.
+        """
         self._clear_capability_cache()
         monkeypatch.setattr(
             "plugins.memory.hindsight._fetch_hindsight_api_version",
@@ -1506,7 +1515,7 @@ class TestBankIdTemplate:
 
     def test_resolve_empty_template_uses_fallback(self):
         result = _resolve_bank_id_template(
-            "", fallback="hermes", profile="coder"
+            "", fallback="hermes", profile="coder",
         )
         assert result == "hermes"
 
@@ -1690,7 +1699,7 @@ class TestAvailability:
 
         def _raise(_name):
             raise RuntimeError(
-                "NumPy was built with baseline optimizations: (x86_64-v2)"
+                "NumPy was built with baseline optimizations: (x86_64-v2)",
             )
 
         monkeypatch.setattr(
@@ -1706,7 +1715,7 @@ class TestAvailability:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(json.dumps(config))
         monkeypatch.setattr(
-            "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path
+            "plugins.memory.hindsight.get_hermes_home", lambda: tmp_path,
         )
 
         def _raise(_name):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-maps_client.py - CLI tool for maps, geocoding, routing, POI search, and more.
+"""maps_client.py - CLI tool for maps, geocoding, routing, POI search, and more.
 Uses only Python stdlib. Data from OpenStreetMap/Nominatim, Overpass API, OSRM,
 and TimeAPI.io.
 
@@ -31,7 +30,7 @@ import urllib.request
 USER_AGENT = "HermesAgent/1.0 (contact: hermes@agent.ai)"
 DATA_SOURCE = "OpenStreetMap/Nominatim"
 
-NOMINATIM_SEARCH  = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse"
 # Public Overpass endpoints. We try them in order so a single server
 # outage doesn't break the skill — kumi.systems is a well-known mirror.
@@ -40,9 +39,9 @@ OVERPASS_URLS = [
     "https://overpass.kumi.systems/api/interpreter",
 ]
 # Backward-compat alias for any caller that imports OVERPASS_API directly.
-OVERPASS_API      = OVERPASS_URLS[0]
-OSRM_BASE         = "https://router.project-osrm.org/route/v1"
-TIMEAPI_BASE      = "https://timeapi.io/api/timezone/coordinate"
+OVERPASS_API = OVERPASS_URLS[0]
+OSRM_BASE = "https://router.project-osrm.org/route/v1"
+TIMEAPI_BASE = "https://timeapi.io/api/timezone/coordinate"
 
 # Seconds to sleep between Nominatim requests (ToS requirement)
 NOMINATIM_RATE_LIMIT = 1.0
@@ -60,7 +59,7 @@ CATEGORY_TAGS = {
     # bakery is tagged as shop=bakery in the OSM wiki, but some mappers use
     # amenity=bakery. Search both so small indie bakeries aren't missed.
     "bakery":            [("shop", "bakery"), ("amenity", "bakery")],
-    "convenience_store": ("shop",    "convenience"),
+    "convenience_store": ("shop", "convenience"),
     # Health
     "hospital":          ("amenity", "hospital"),
     "pharmacy":          ("amenity", "pharmacy"),
@@ -72,9 +71,9 @@ CATEGORY_TAGS = {
     "guest_house":       ("tourism", "guest_house"),
     "camp_site":         ("tourism", "camp_site"),
     # Shopping & Services
-    "supermarket":       ("shop",    "supermarket"),
-    "bookshop":          ("shop",    "books"),
-    "laundry":           ("shop",    "laundry"),
+    "supermarket":       ("shop", "supermarket"),
+    "bookshop":          ("shop", "books"),
+    "laundry":           ("shop", "laundry"),
     # Finance
     "atm":               ("amenity", "atm"),
     "bank":              ("amenity", "bank"),
@@ -136,6 +135,7 @@ def _tags_for(category):
         return list(entry)
     return [entry]
 
+
 OSRM_PROFILES = {
     "driving": "driving",
     "walking": "foot",
@@ -145,6 +145,7 @@ OSRM_PROFILES = {
 # ---------------------------------------------------------------------------
 # Output helpers
 # ---------------------------------------------------------------------------
+
 
 def print_json(data):
     """Print data as pretty-printed JSON to stdout."""
@@ -162,8 +163,7 @@ def error_exit(message, code=1):
 # ---------------------------------------------------------------------------
 
 def http_get(url, params=None, retries=MAX_RETRIES, silent=False):
-    """
-    Perform an HTTP GET request, returning parsed JSON.
+    """Perform an HTTP GET request, returning parsed JSON.
     Adds the required User-Agent header. Retries on transient errors.
     If silent=True, raises RuntimeError instead of calling error_exit.
     """
@@ -200,8 +200,7 @@ def http_get(url, params=None, retries=MAX_RETRIES, silent=False):
 
 
 def http_get_text(url, params=None, retries=MAX_RETRIES, silent=False):
-    """
-    Like http_get but returns raw text instead of parsed JSON.
+    """Like http_get but returns raw text instead of parsed JSON.
     Useful for APIs that may return non-JSON responses.
     """
     if params:
@@ -233,8 +232,7 @@ def http_get_text(url, params=None, retries=MAX_RETRIES, silent=False):
 
 
 def http_post(url, data_str, retries=MAX_RETRIES):
-    """
-    Perform an HTTP POST with a plain-text body (for Overpass QL).
+    """Perform an HTTP POST with a plain-text body (for Overpass QL).
     Returns parsed JSON.
     """
     encoded = data_str.encode("utf-8")
@@ -289,7 +287,7 @@ def overpass_query(query):
             last_error = f"{url}: {exc}"
             continue
     error_exit(
-        f"All Overpass mirrors failed. Last error: {last_error or 'unknown'}"
+        f"All Overpass mirrors failed. Last error: {last_error or 'unknown'}",
     )
 
 
@@ -338,8 +336,7 @@ def nominatim_reverse(lat, lon):
 
 
 def geocode_single(query):
-    """
-    Geocode a query and return (lat, lon, display_name).
+    """Geocode a query and return (lat, lon, display_name).
     Exits with error if nothing found.
     """
     results = nominatim_search(query, limit=1)
@@ -362,7 +359,7 @@ def build_overpass_nearby(tag_key, tag_val, lat, lon, radius, limit,
     tagged under more than one OSM key). Otherwise falls back to the
     single ``tag_key``/``tag_val`` pair for back-compat.
     """
-    pairs = tag_pairs if tag_pairs else [(tag_key, tag_val)]
+    pairs = tag_pairs or [(tag_key, tag_val)]
     religion_filter = ""
     if religion:
         religion_filter = f'["religion"="{religion}"]'
@@ -370,19 +367,19 @@ def build_overpass_nearby(tag_key, tag_val, lat, lon, radius, limit,
     for k, v in pairs:
         body_lines.append(
             f'  node["{k}"="{v}"]{religion_filter}'
-            f'(around:{radius},{lat},{lon});'
+            f'(around:{radius},{lat},{lon});',
         )
         body_lines.append(
             f'  way["{k}"="{v}"]{religion_filter}'
-            f'(around:{radius},{lat},{lon});'
+            f'(around:{radius},{lat},{lon});',
         )
     body = "\n".join(body_lines)
     return (
-        f'[out:json][timeout:25];\n'
-        f'(\n'
-        f'{body}\n'
-        f');\n'
-        f'out center {limit};\n'
+        f"[out:json][timeout:25];\n"
+        f"(\n"
+        f"{body}\n"
+        f");\n"
+        f"out center {limit};\n"
     )
 
 
@@ -392,7 +389,7 @@ def build_overpass_bbox(tag_key, tag_val, south, west, north, east, limit,
 
     See ``build_overpass_nearby`` for ``tag_pairs`` semantics.
     """
-    pairs = tag_pairs if tag_pairs else [(tag_key, tag_val)]
+    pairs = tag_pairs or [(tag_key, tag_val)]
     religion_filter = ""
     if religion:
         religion_filter = f'["religion"="{religion}"]'
@@ -400,25 +397,24 @@ def build_overpass_bbox(tag_key, tag_val, south, west, north, east, limit,
     for k, v in pairs:
         body_lines.append(
             f'  node["{k}"="{v}"]{religion_filter}'
-            f'({south},{west},{north},{east});'
+            f'({south},{west},{north},{east});',
         )
         body_lines.append(
             f'  way["{k}"="{v}"]{religion_filter}'
-            f'({south},{west},{north},{east});'
+            f'({south},{west},{north},{east});',
         )
     body = "\n".join(body_lines)
     return (
-        f'[out:json][timeout:25];\n'
-        f'(\n'
-        f'{body}\n'
-        f');\n'
-        f'out center {limit};\n'
+        f"[out:json][timeout:25];\n"
+        f"(\n"
+        f"{body}\n"
+        f");\n"
+        f"out center {limit};\n"
     )
 
 
 def parse_overpass_elements(elements, ref_lat=None, ref_lon=None):
-    """
-    Parse Overpass elements into a clean list of POI dicts.
+    """Parse Overpass elements into a clean list of POI dicts.
     If ref_lat/ref_lon are provided, computes distance and sorts by it.
     """
     places = []
@@ -466,10 +462,10 @@ def parse_overpass_elements(elements, ref_lat=None, ref_lon=None):
         # Promote commonly-useful tags to top-level fields so agents can
         # reference them without digging into the raw ``tags`` dict.
         for src_key, dst_key in (
-            ("cuisine",        "cuisine"),
-            ("opening_hours",  "hours"),
-            ("phone",          "phone"),
-            ("website",        "website"),
+            ("cuisine", "cuisine"),
+            ("opening_hours", "hours"),
+            ("phone", "phone"),
+            ("website", "website"),
         ):
             val = tags.get(src_key)
             if val:
@@ -501,7 +497,7 @@ def parse_overpass_elements(elements, ref_lat=None, ref_lon=None):
 def cmd_search(args):
     """Geocode a place name and return top results."""
     query = " ".join(args.query)
-    raw   = nominatim_search(query, limit=5)
+    raw = nominatim_search(query, limit=5)
 
     if not raw:
         print_json({
@@ -614,7 +610,7 @@ def cmd_nearby(args):
             lat = float(args.lat)
             lon = float(args.lon)
         except (TypeError, ValueError):
-            error_exit("Provide numeric LAT and LON, or use --near \"<address>\".")
+            error_exit('Provide numeric LAT and LON, or use --near "<address>".')
 
     # Categories: support both legacy single positional ``category`` and the
     # new repeatable ``--category`` flag. Users can ask for multiple place
@@ -633,11 +629,11 @@ def cmd_nearby(args):
         error_exit(
             f"Unknown categor{'ies' if len(unknown) > 1 else 'y'} "
             f"{', '.join(repr(c) for c in unknown)}. "
-            f"Valid categories: {', '.join(VALID_CATEGORIES)}"
+            f"Valid categories: {', '.join(VALID_CATEGORIES)}",
         )
 
     radius = int(args.radius)
-    limit  = int(args.limit)
+    limit = int(args.limit)
     if radius <= 0:
         error_exit("Radius must be a positive integer (metres).")
     if limit <= 0:
@@ -685,9 +681,9 @@ def cmd_nearby(args):
 
 def cmd_distance(args):
     """Calculate road distance and travel time between two places."""
-    origin_query      = " ".join(args.origin)
+    origin_query = " ".join(args.origin)
     destination_query = " ".join(args.to)
-    mode              = args.mode.lower()
+    mode = args.mode.lower()
 
     if mode not in OSRM_PROFILES:
         error_exit(f"Invalid mode '{mode}'. Choose from: {', '.join(OSRM_PROFILES)}")
@@ -708,17 +704,17 @@ def cmd_distance(args):
     if osrm_data.get("code") != "Ok":
         error_exit(
             f"OSRM routing failed: "
-            f"{osrm_data.get('message', osrm_data.get('code', 'unknown error'))}"
+            f"{osrm_data.get('message', osrm_data.get('code', 'unknown error'))}",
         )
 
     routes = osrm_data.get("routes", [])
     if not routes:
         error_exit("No route found between the two locations.")
 
-    route        = routes[0]
-    distance_m   = route.get("distance", 0)
-    duration_s   = route.get("duration", 0)
-    distance_km  = round(distance_m / 1000, 3)
+    route = routes[0]
+    distance_m = route.get("distance", 0)
+    duration_s = route.get("duration", 0)
+    distance_km = round(distance_m / 1000, 3)
     duration_min = round(duration_s / 60, 2)
 
     # Straight-line distance for reference
@@ -772,9 +768,9 @@ def _format_distance(metres):
 
 def cmd_directions(args):
     """Get turn-by-turn directions between two places via OSRM."""
-    origin_query      = " ".join(args.origin)
+    origin_query = " ".join(args.origin)
     destination_query = " ".join(args.to)
-    mode              = args.mode.lower()
+    mode = args.mode.lower()
 
     if mode not in OSRM_PROFILES:
         error_exit(f"Invalid mode '{mode}'. Choose from: {', '.join(OSRM_PROFILES)}")
@@ -795,16 +791,16 @@ def cmd_directions(args):
     if osrm_data.get("code") != "Ok":
         error_exit(
             f"OSRM routing failed: "
-            f"{osrm_data.get('message', osrm_data.get('code', 'unknown error'))}"
+            f"{osrm_data.get('message', osrm_data.get('code', 'unknown error'))}",
         )
 
     routes = osrm_data.get("routes", [])
     if not routes:
         error_exit("No route found between the two locations.")
 
-    route        = routes[0]
-    distance_m   = route.get("distance", 0)
-    duration_s   = route.get("duration", 0)
+    route = routes[0]
+    distance_m = route.get("distance", 0)
+    duration_s = route.get("duration", 0)
 
     # Extract steps from all legs
     steps = []
@@ -813,10 +809,10 @@ def cmd_directions(args):
         for step in leg.get("steps", []):
             maneuver = step.get("maneuver", {})
             step_dist = step.get("distance", 0)
-            step_dur  = step.get("duration", 0)
+            step_dur = step.get("duration", 0)
             step_name = step.get("name", "")
-            modifier  = maneuver.get("modifier", "")
-            m_type    = maneuver.get("type", "")
+            modifier = maneuver.get("modifier", "")
+            m_type = maneuver.get("type", "")
 
             # Build instruction text
             if m_type == "depart":
@@ -887,8 +883,7 @@ def cmd_directions(args):
 # ---------------------------------------------------------------------------
 
 def cmd_timezone(args):
-    """
-    Get timezone information for a lat/lon coordinate.
+    """Get timezone information for a lat/lon coordinate.
 
     Strategy:
       1. Try TimeAPI.io (free, no key, supports coordinate-based lookup).
@@ -908,7 +903,7 @@ def cmd_timezone(args):
     timezone_str = None
     timezone_src = None
     current_time = None
-    utc_offset   = None
+    utc_offset = None
 
     # --- Strategy 1: TimeAPI.io coordinate lookup ---
     try:
@@ -979,14 +974,14 @@ def cmd_bbox(args):
     # Normalize: south/west < north/east
     south = min(lat1, lat2)
     north = max(lat1, lat2)
-    west  = min(lon1, lon2)
-    east  = max(lon1, lon2)
+    west = min(lon1, lon2)
+    east = max(lon1, lon2)
 
     category = args.category.lower()
     if category not in CATEGORY_TAGS:
         error_exit(
             f"Unknown category '{category}'. "
-            f"Valid categories: {', '.join(VALID_CATEGORIES)}"
+            f"Valid categories: {', '.join(VALID_CATEGORIES)}",
         )
 
     limit = int(args.limit)
@@ -1052,7 +1047,7 @@ def cmd_area(args):
     # Width in km at the average latitude
     avg_lat = (min_lat + max_lat) / 2
     height_km = haversine_m(min_lat, min_lon, max_lat, min_lon) / 1000
-    width_km  = haversine_m(avg_lat, min_lon, avg_lat, max_lon) / 1000
+    width_km = haversine_m(avg_lat, min_lon, avg_lat, max_lon) / 1000
     approx_area_km2 = round(height_km * width_km, 3)
 
     print_json({
@@ -1134,7 +1129,7 @@ def build_parser():
         help="Find nearby places of a given category.",
         description=(
             "Find points of interest near a location using the Overpass API.\n"
-            "Provide either LAT/LON, or use --near \"<address>\" to auto-geocode.\n"
+            'Provide either LAT/LON, or use --near "<address>" to auto-geocode.\n'
             "Categories can be specified positionally OR repeated via --category\n"
             "to merge multiple types in one query (e.g. --category bar --category cafe).\n"
             f"Categories: {', '.join(VALID_CATEGORIES)}"
@@ -1273,7 +1268,7 @@ def build_parser():
 
 def main():
     parser = build_parser()
-    args   = parser.parse_args()
+    args = parser.parse_args()
 
     dispatch = {
         "search":     cmd_search,

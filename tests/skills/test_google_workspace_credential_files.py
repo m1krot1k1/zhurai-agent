@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-
 SKILL_MD = (
     Path(__file__).resolve().parents[2]
     / "skills/productivity/google-workspace/SKILL.md"
@@ -38,7 +37,7 @@ class TestGoogleWorkspaceCredentialFiles:
             (e["path"] if isinstance(e, dict) else e)
             for e in entries
         }
-        assert _EXPECTED_PATHS <= paths, (
+        assert paths >= _EXPECTED_PATHS, (
             f"Missing entries in required_credential_files: {_EXPECTED_PATHS - paths}"
         )
 

@@ -9,20 +9,20 @@ import pytest
 
 import tools.skills_tool as skills_tool_module
 from tools.skills_tool import (
+    MAX_DESCRIPTION_LENGTH,
+    _find_all_skills,
+    _get_category_from_path,
     _get_required_environment_variables,
     _parse_frontmatter,
     _parse_tags,
-    _get_category_from_path,
-    _find_all_skills,
     skill_matches_platform,
-    skills_list,
     skill_view,
-    MAX_DESCRIPTION_LENGTH,
+    skills_list,
 )
 
 
 def _make_skill(
-    skills_dir, name, frontmatter_extra="", body="Step 1: Do the thing.", category=None
+    skills_dir, name, frontmatter_extra="", body="Step 1: Do the thing.", category=None,
 ):
     """Helper to create a minimal skill directory."""
     if category:
@@ -133,8 +133,8 @@ class TestRequiredEnvironmentVariablesNormalization:
                     "prompt": "Tenor API key",
                     "help": "Get a key from https://developers.google.com/tenor",
                     "required_for": "full functionality",
-                }
-            ]
+                },
+            ],
         }
 
         result = _get_required_environment_variables(frontmatter)
@@ -145,7 +145,7 @@ class TestRequiredEnvironmentVariablesNormalization:
                 "prompt": "Tenor API key",
                 "help": "Get a key from https://developers.google.com/tenor",
                 "required_for": "full functionality",
-            }
+            },
         ]
 
     def test_normalizes_legacy_prerequisites_env_vars(self):
@@ -157,7 +157,7 @@ class TestRequiredEnvironmentVariablesNormalization:
             {
                 "name": "TENOR_API_KEY",
                 "prompt": "Enter value for TENOR_API_KEY",
-            }
+            },
         ]
 
     def test_empty_env_file_value_is_treated_as_missing(self, monkeypatch):
@@ -238,7 +238,7 @@ class TestFindAllSkills:
         skill_dir = tmp_path / "no-desc"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: no-desc\n---\n\n# Heading\n\nFirst paragraph.\n"
+            "---\nname: no-desc\n---\n\n# Heading\n\nFirst paragraph.\n",
         )
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
             skills = _find_all_skills()
@@ -249,7 +249,7 @@ class TestFindAllSkills:
         skill_dir = tmp_path / "long-desc"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
-            f"---\nname: long\ndescription: {long_desc}\n---\n\nBody.\n"
+            f"---\nname: long\ndescription: {long_desc}\n---\n\nBody.\n",
         )
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
             skills = _find_all_skills()
@@ -261,7 +261,7 @@ class TestFindAllSkills:
             git_dir = tmp_path / ".git" / "fake-skill"
             git_dir.mkdir(parents=True)
             (git_dir / "SKILL.md").write_text(
-                "---\nname: fake\ndescription: x\n---\n\nBody.\n"
+                "---\nname: fake\ndescription: x\n---\n\nBody.\n",
             )
             skills = _find_all_skills()
         assert len(skills) == 1
@@ -385,7 +385,7 @@ class TestSkillView:
             "description: A skill whose directory name differs from its name.\n"
             "---\n\n"
             "# real-skill-name\n\n"
-            "Step 1: Do the thing.\n"
+            "Step 1: Do the thing.\n",
         )
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
             raw = skill_view("real-skill-name")
@@ -583,7 +583,7 @@ class TestSkillViewSecureSetupOnLoad:
                     "var_name": var_name,
                     "prompt": prompt,
                     "metadata": metadata,
-                }
+                },
             )
             os.environ[var_name] = "stored-in-test"
             return {
@@ -626,7 +626,7 @@ class TestSkillViewSecureSetupOnLoad:
                     "help": "Get a key from https://developers.google.com/tenor",
                     "required_for": "full functionality",
                 },
-            }
+            },
         ]
         assert result["required_environment_variables"][0]["name"] == "TENOR_API_KEY"
         assert result["setup_skipped"] is False
@@ -794,7 +794,7 @@ class TestFindAllSkillsPlatformFiltering:
             patch("agent.skill_utils.sys") as mock_sys,
         ):
             _make_skill(
-                tmp_path, "cross-plat", frontmatter_extra="platforms: [macos, linux]\n"
+                tmp_path, "cross-plat", frontmatter_extra="platforms: [macos, linux]\n",
             )
             mock_sys.platform = "darwin"
             skills_darwin = _find_all_skills()
@@ -828,7 +828,7 @@ class TestFindAllSkillsSecureSetup:
         assert "missing_prerequisites" not in skills[0]
 
     def test_skills_with_met_prereqs_have_same_listing_shape(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("MY_PRESENT_KEY", "val")
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -851,7 +851,7 @@ class TestFindAllSkillsSecureSetup:
         assert "readiness_status" not in skills[0]
 
     def test_skill_listing_does_not_probe_backend_for_env_vars(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("TERMINAL_ENV", "docker")
 
@@ -874,7 +874,7 @@ class TestFindAllSkillsSecureSetup:
 
 class TestSkillViewPrerequisites:
     def test_legacy_prerequisites_expose_required_env_setup_metadata(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.delenv("MISSING_KEY_XYZ", raising=False)
         with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
@@ -892,7 +892,7 @@ class TestSkillViewPrerequisites:
             {
                 "name": "MISSING_KEY_XYZ",
                 "prompt": "Enter value for MISSING_KEY_XYZ",
-            }
+            },
         ]
 
     def test_no_setup_needed_when_legacy_prereqs_are_met(self, tmp_path, monkeypatch):
@@ -910,7 +910,7 @@ class TestSkillViewPrerequisites:
         assert result["missing_required_environment_variables"] == []
 
     def test_remote_backend_treats_persisted_env_as_available(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("TERMINAL_ENV", "docker")
 
@@ -942,7 +942,7 @@ class TestSkillViewPrerequisites:
         assert result["required_environment_variables"] == []
 
     def test_skill_view_treats_backend_only_env_as_setup_needed(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("TERMINAL_ENV", "docker")
 
@@ -981,7 +981,7 @@ class TestSkillViewPrerequisites:
         ["ssh", "daytona", "docker", "singularity", "modal"],
     )
     def test_remote_backend_becomes_available_after_local_secret_capture(
-        self, tmp_path, monkeypatch, backend
+        self, tmp_path, monkeypatch, backend,
     ):
         monkeypatch.setenv("TERMINAL_ENV", backend)
         monkeypatch.delenv("TENOR_API_KEY", raising=False)
@@ -1033,7 +1033,7 @@ class TestSkillViewPrerequisites:
             def fake_read_text(path_obj, *args, **kwargs):
                 if path_obj == skill_md:
                     raise UnicodeDecodeError(
-                        "utf-8", b"\xff", 0, 1, "invalid start byte"
+                        "utf-8", b"\xff", 0, 1, "invalid start byte",
                     )
                 return original_read_text(path_obj, *args, **kwargs)
 
@@ -1075,11 +1075,11 @@ Do the legacy thing.
         assert result["description"] == "Legacy flat skill."
         assert result["tags"] == ["legacy", "flat"]
         assert result["required_environment_variables"] == [
-            {"name": "LEGACY_KEY", "prompt": "Legacy key"}
+            {"name": "LEGACY_KEY", "prompt": "Legacy key"},
         ]
 
     def test_successful_secret_capture_reloads_empty_env_placeholder(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch,
     ):
         monkeypatch.setenv("TERMINAL_ENV", "local")
         monkeypatch.delenv("TENOR_API_KEY", raising=False)
@@ -1153,7 +1153,8 @@ class TestSkillViewCollisionDetection:
 
     def test_nested_local_collides_with_top_level_external(self, tmp_path):
         """The original bug scenario: nested local + top-level external,
-        same name. Now refuses with both paths surfaced."""
+        same name. Now refuses with both paths surfaced.
+        """
         local_dir = tmp_path / "local"
         external_dir = tmp_path / "external"
         local_dir.mkdir()
@@ -1183,7 +1184,8 @@ class TestSkillViewCollisionDetection:
 
     def test_top_level_local_collides_with_external(self, tmp_path):
         """Top-level local + top-level external with the same name also
-        refuses — same-name shadowing is ambiguous regardless of nesting."""
+        refuses — same-name shadowing is ambiguous regardless of nesting.
+        """
         local_dir = tmp_path / "local"
         external_dir = tmp_path / "external"
         local_dir.mkdir()
@@ -1203,7 +1205,8 @@ class TestSkillViewCollisionDetection:
 
     def test_collision_resolvable_via_categorized_path(self, tmp_path):
         """User can recover from a collision by passing the full
-        categorized path — the bare name is ambiguous, the path is not."""
+        categorized path — the bare name is ambiguous, the path is not.
+        """
         local_dir = tmp_path / "local"
         external_dir = tmp_path / "external"
         local_dir.mkdir()
@@ -1284,7 +1287,7 @@ class TestSkillViewCollisionDetection:
         )
         package.mkdir(parents=True, exist_ok=True)
         (package / "SKILL.md").write_text(
-            "---\nname: old-skill\ndescription: Preserved old skill.\n---\n\nOLD BODY\n"
+            "---\nname: old-skill\ndescription: Preserved old skill.\n---\n\nOLD BODY\n",
         )
 
         p1, p2 = self._patch_dirs(local_dir, [external_dir])
@@ -1293,7 +1296,7 @@ class TestSkillViewCollisionDetection:
             old_raw = skill_view("old-skill")
             direct_package_raw = skill_view("creative/umbrella/references/old-skill-package")
             package_raw = skill_view(
-                "umbrella", file_path="references/old-skill-package/SKILL.md"
+                "umbrella", file_path="references/old-skill-package/SKILL.md",
             )
 
         assert "umbrella" in names
@@ -1310,7 +1313,8 @@ class TestSkillViewCollisionDetection:
 
     def test_external_skill_resolves_when_no_collision(self, tmp_path):
         """External-only skills still resolve normally when there's no
-        local skill of the same name."""
+        local skill of the same name.
+        """
         local_dir = tmp_path / "local"
         external_dir = tmp_path / "external"
         local_dir.mkdir()
@@ -1328,7 +1332,8 @@ class TestSkillViewCollisionDetection:
 
     def test_two_externals_same_name_also_refuse(self, tmp_path):
         """Collision detection is symmetric — two external dirs with
-        same-name skills also trigger the refusal."""
+        same-name skills also trigger the refusal.
+        """
         local_dir = tmp_path / "local"
         ext_a = tmp_path / "ext_a"
         ext_b = tmp_path / "ext_b"
@@ -1350,7 +1355,8 @@ class TestSkillViewCollisionDetection:
 
     def test_local_only_skill_loads_normally(self, tmp_path):
         """Sanity: a single local skill (no external collision) loads
-        without any error."""
+        without any error.
+        """
         local_dir = tmp_path / "local"
         external_dir = tmp_path / "external"
         local_dir.mkdir()

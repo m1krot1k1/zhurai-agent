@@ -39,7 +39,8 @@ def test_descriptor_is_frozen():
 
 def test_from_json_ignores_unknown_keys():
     """A newer connector may send fields this gateway doesn't know — those are
-    dropped, not fatal (forward-compat during the experimental phase)."""
+    dropped, not fatal (forward-compat during the experimental phase).
+    """
     d = _telegram_descriptor()
     raw = d.to_json()[:-1] + ', "future_field": "ignored"}'
     restored = CapabilityDescriptor.from_json(raw)
