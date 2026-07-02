@@ -234,6 +234,12 @@ def build_turn_context(
             should_review_memory = True
             agent._turns_since_memory = 0
 
+    # Initialise messages from conversation_history (or empty if fresh).
+    if conversation_history:
+        messages = list(conversation_history)
+    else:
+        messages = []
+
     # Add user message.
     _emit_prologue_progress(agent, "Processing your request…")
     user_msg = {"role": "user", "content": user_message}
