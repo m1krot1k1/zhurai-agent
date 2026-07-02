@@ -125,8 +125,8 @@ def build_turn_context(
     ``conversation_loop`` module are passed in explicitly to keep this module
     free of an import cycle with ``agent.conversation_loop``.
     """
-    # Capture the original user message before any in-place transformation.
-    original_user_message = user_message
+    # Capture the original user message: prefer the clean persist override.
+    original_user_message = persist_user_message if isinstance(persist_user_message, str) else user_message
 
     # Guard stdio against OSError from broken pipes (systemd/headless/daemon).
     install_safe_stdio()
@@ -207,6 +207,7 @@ def build_turn_context(
     agent._tool_guardrails.reset_for_turn()
     agent._tool_guardrail_halt_decision = None
     agent._vision_supported = True
+    agent._user_turn_count += 1
 
     # Pre-turn connection health check: clean up dead TCP connections.
     if agent.api_mode != "anthropic_messages":
@@ -259,13 +260,6 @@ def build_turn_context(
     messages.append(user_msg)
     current_turn_user_idx = len(messages) - 1
     agent._persist_user_message_idx = current_turn_user_idx
-
-    if not agent.quiet_mode:
-        _print_preview = summarize_user_message_for_log(user_message)
-        agent._safe_print(
-            f"💬 Starting conversation: '{_print_preview[:60]}"
-            f"{'...' if len(_print_preview) > 60 else ''}'"
-        )
 
     # ── System prompt (cached per session for prefix caching) ──
     if agent._cached_system_prompt is None:
