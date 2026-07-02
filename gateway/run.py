@@ -17277,10 +17277,22 @@ def _start_gateway_housekeeping(stop_event: threading.Event, adapters=None, loop
         if tick_count % CURATOR_EVERY == 0:
             try:
                 from agent.curator import maybe_run_curator
+                curator_summary = []
+                def _capture_summary(msg: str) -> None:
+                    curator_summary.append(msg)
+                    logger.info("curator: %s", msg)
                 maybe_run_curator(
                     idle_for_seconds=float("inf"),
-                    on_summary=lambda msg: logger.info("curator: %s", msg),
+                    on_summary=_capture_summary,
                 )
+                if curator_summary and loop is not None and adapters:
+                    summary_text = "\n".join(curator_summary)
+                    asyncio.run_coroutine_threadsafe(
+                        _send_home_channel_startup_notifications(
+                            adapters, f"🧹 Curator: {summary_text}"
+                        ),
+                        loop,
+                    )
             except Exception as e:
                 logger.debug("Curator tick error: %s", e)
 
