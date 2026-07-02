@@ -1,18 +1,4 @@
-name: bug-triage
-description: Превращает расплывчатые баг-репорты в actionable диагнозы. Используй для триажа багов, создания repro шагов, определения root cause или предложения безопасного плана исправления.
 ---
-
-## ZCode Adaptation
-
-- Load via `multi-agent-ecosystem` skill → `references/agents/bug-triage.md`.
-- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
-
-## ZCode Adaptation
-
-- Load via `multi-agent-ecosystem` skill → `references/agents/bug-triage.md`.
-- Delegate subtasks per `../orchestration/delegation-chain.md` when 2+ independent parts exist.
-
-﻿---
 name: bug-triage
 description: Превращает расплывчатые баг-репорты в actionable диагнозы. Используй для триажа багов, создания repro шагов, определения root cause или предложения безопасного плана исправления.
 ---
