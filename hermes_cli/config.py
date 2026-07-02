@@ -1329,7 +1329,7 @@ DEFAULT_CONFIG = {
         # Proxy base URL (scheme + host + port, no path). Dialog/UI integrations
         # poll {dashboard_url}/stats and {dashboard_url}/stats-history; MCP is
         # at {dashboard_url}/mcp. Override when the proxy binds a non-default port.
-        "dashboard_url": "http://127.0.0.1:8787",
+        "dashboard_url": "http://127.0.0.1:9119",
     },
 
     # Kanban subsystem (orchestrator workers + dispatcher-driven child tasks).
@@ -1633,7 +1633,7 @@ DEFAULT_CONFIG = {
         # dashboard. Set false to suppress the hint.
         "tui_agents_nudge": True,
         "bell_on_complete": False,
-        "show_reasoning": False,
+        "show_reasoning": True,
         # When reasoning display is on, the post-response "Reasoning" recap box
         # collapses long thinking to the first 10 lines. Set true to print the
         # complete thinking text uncollapsed (live streaming is always full).
@@ -1644,7 +1644,7 @@ DEFAULT_CONFIG = {
         #   "verbose" — include a compact content preview of what changed
         # Per-platform overrides via display.platforms.<platform>.memory_notifications.
         "memory_notifications": "on",
-        "streaming": False,
+        "streaming": True,
         "timestamps": False,      # Show [HH:MM] on user and assistant labels
         "final_response_markdown": "strip",  # render | strip | raw
         # Preserve recent classic CLI output across Ctrl+L, /redraw, and

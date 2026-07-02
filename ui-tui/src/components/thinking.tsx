@@ -296,6 +296,7 @@ function SubagentAccordion({
   const [open, setOpen] = useState(expanded)
   const [deep, setDeep] = useState(expanded)
   const [openThinking, setOpenThinking] = useState(expanded)
+  const [openInstruction, setOpenInstruction] = useState(expanded)
   const [openTools, setOpenTools] = useState(expanded)
   const [openNotes, setOpenNotes] = useState(expanded)
   const [openKids, setOpenKids] = useState(expanded)
@@ -395,6 +396,7 @@ function SubagentAccordion({
 
   const thinkingText = item.thinking.join('\n')
   const hasThinking = Boolean(thinkingText)
+  const hasInstruction = Boolean(item.instruction)
   const hasTools = item.tools.length > 0
   const noteRows = [...(summary ? [summary] : []), ...item.notes]
   const hasNotes = noteRows.length > 0
@@ -406,6 +408,37 @@ function SubagentAccordion({
     open: boolean
     render: (rails: boolean[]) => ReactNode
   }[] = []
+
+  if (hasInstruction) {
+    sections.push({
+      header: (
+        <Chevron
+          onClick={shift => {
+            if (shift) {
+              expandAll()
+            } else {
+              setOpenInstruction(v => !v)
+            }
+          }}
+          open={openInstruction}
+          t={t}
+          title="Instruction"
+        />
+      ),
+      key: 'instruction',
+      open: openInstruction,
+      render: childRails => (
+        <TreeTextRow
+          branch="last"
+          color={t.color.muted}
+          content={item.instruction!}
+          rails={childRails}
+          t={t}
+          wrap="wrap"
+        />
+      )
+    })
+  }
 
   if (hasThinking) {
     sections.push({

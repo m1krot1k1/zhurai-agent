@@ -31,6 +31,7 @@ export interface SubagentProgress {
   id: string
   index: number
   inputTokens?: number
+  instruction?: string
   iteration?: number
   model?: string
   notes: string[]

@@ -962,27 +962,35 @@ def run_conversation(
                 pass
             break
         
-        # Thinking spinner for quiet mode (animated during API call)
+        # Thinking spinner — animated during API call in every mode
         thinking_spinner = None
         
-        if not agent.quiet_mode:
-            agent._vprint(f"\n{agent.log_prefix}🔄 Making API call #{api_call_count}/{agent.max_iterations}...")
-            agent._vprint(f"{agent.log_prefix}   📊 Request size: {len(api_messages)} messages, ~{approx_tokens:,} tokens (~{total_chars:,} chars)")
-            agent._vprint(f"{agent.log_prefix}   🔧 Available tools: {len(agent.tools) if agent.tools else 0}")
-        else:
-            # Animated thinking spinner in quiet mode
+        if agent.quiet_mode:
             face = random.choice(KawaiiSpinner.get_thinking_faces())
             verb = random.choice(KawaiiSpinner.get_thinking_verbs())
             if agent.thinking_callback:
-                # CLI TUI mode: use prompt_toolkit widget instead of raw spinner
-                # (works in both streaming and non-streaming modes)
                 agent.thinking_callback(f"{face} {verb}...")
             elif not agent._has_stream_consumers() and agent._should_start_quiet_spinner():
-                # Raw KawaiiSpinner only when no streaming consumers and the
-                # spinner output has a safe sink.
                 spinner_type = random.choice(['brain', 'sparkle', 'pulse', 'moon', 'star'])
                 thinking_spinner = KawaiiSpinner(f"{face} {verb}...", spinner_type=spinner_type, print_fn=agent._print_fn)
                 thinking_spinner.start()
+        
+        # Non-quiet mode: show structured progress (streaming + request info)
+        agent._vprint(f"\n{agent.log_prefix}🔄 Making API call #{api_call_count}/{agent.max_iterations}...")
+        agent._vprint(f"{agent.log_prefix}   📊 Request size: {len(api_messages)} messages, ~{approx_tokens:,} tokens (~{total_chars:,} chars)")
+        agent._vprint(f"{agent.log_prefix}   🔧 Available tools: {len(agent.tools) if agent.tools else 0}")
+        
+        # In non-quiet mode, also try to start a subtle spinner if possible
+        if not agent.quiet_mode and agent.thinking_callback:
+            face = random.choice(KawaiiSpinner.get_thinking_faces())
+            verb = random.choice(KawaiiSpinner.get_thinking_verbs())
+            agent.thinking_callback(f"{face} {verb}...")
+        elif not agent.quiet_mode and not agent._has_stream_consumers() and agent._should_start_quiet_spinner():
+            face = random.choice(KawaiiSpinner.get_thinking_faces())
+            verb = random.choice(KawaiiSpinner.get_thinking_verbs())
+            spinner_type = random.choice(['brain', 'sparkle', 'pulse', 'moon', 'star'])
+            thinking_spinner = KawaiiSpinner(f"{face} {verb}...", spinner_type=spinner_type, print_fn=agent._print_fn)
+            thinking_spinner.start()
         
         # Log request details if verbose
         if agent.verbose_logging:

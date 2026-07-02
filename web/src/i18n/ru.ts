@@ -43,6 +43,9 @@ export const ru: Translations = {
     expand: "Развернуть",
     general: "Общие",
     messaging: "Мессенджеры",
+    gateway: "Шлюз",
+    gatewayHint:
+      "Платформы обмена сообщениями, API-сервер и вебхуки настраиваются на странице «Каналы». Это общешлюзовые настройки (режим прокси/ретрансляции и глобальный белый список).",
     pluginLoadFailed:
       "Не удалось загрузить скрипт этого плагина. Проверьте вкладку «Сеть» (dashboard-plugins/…) и путь к плагинам на сервере.",
     pluginNotRegistered:
@@ -75,7 +78,7 @@ export const ru: Translations = {
       keys: "Ключи",
       logs: "Журналы",
       models: "Модели",
-      profiles: "профили: мульти-агенты",
+      profiles: "Профили: мульти-агенты",
       plugins: "Плагины",
       sessions: "Сессии",
       skills: "Навыки",
@@ -90,6 +93,10 @@ export const ru: Translations = {
     statusOverview: "Обзор статуса",
     system: "Система",
     webUi: "Web UI",
+    managingProfile: "Управление профилем",
+    currentProfileOption: "эта панель ({name})",
+    managingProfileBanner:
+      "Управление профилем «{name}» — конфигурация, ключи, навыки, MCP, модель и новые чаты применяются к этому профилю.",
   },
 
   status: {
@@ -287,7 +294,8 @@ export const ru: Translations = {
     nameRequired: "Имя обязательно",
     nameRule:
       "Только строчные буквы, цифры, _ и -; должно начинаться с буквы или цифры; до 64 символов.",
-    invalidName: "Недопустимое имя профиля",    cloneFrom: "Клонировать конфигурацию из профиля",
+    invalidName: "Недопустимое имя профиля",
+    cloneFrom: "Клонировать конфигурацию из профиля",
     cloneFromNone: "Нет (пусто)",
     allProfiles: "Профили",
     noProfiles: "Профили не найдены.",

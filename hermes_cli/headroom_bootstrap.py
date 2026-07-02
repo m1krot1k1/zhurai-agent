@@ -5,6 +5,8 @@ This module intentionally keeps bootstrap logic small and idempotent:
 - A healthy running proxy short-circuits immediately.
 - Missing installation is handled via ``python -m pip install ...`` when enabled.
 - Proxy start is backgrounded and health-checked with a bounded wait.
+- A lightweight reverse proxy relays ``/dashboard`` from the old Headroom port
+  (8787) to the real Hermes dashboard (9119) so legacy cross-references still work.
 """
 
 from __future__ import annotations
@@ -20,11 +22,12 @@ import subprocess
 import sys
 import threading
 import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Dict
 from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 
 from hermes_cli.config import load_config
 from hermes_constants import get_hermes_home
@@ -35,6 +38,12 @@ _BOOTSTRAP_LOCK = threading.Lock()
 _LAST_SUCCESS = False
 _LAST_ATTEMPT_MONO = 0.0
 _MIN_RETRY_SECONDS = 20.0
+
+# The default port Headroom uses for its own proxy dashboard/stats/MCP UI.
+_HEADROOM_PROXY_PORT = 8787
+# The port where the real Hermes dashboard serves its web UI.
+_HERMES_DASHBOARD_PORT = 9119
+_HEADROOM_PROXY_URL = f"http://127.0.0.1:{_HEADROOM_PROXY_PORT}"
 
 
 def _bool(cfg: Dict[str, Any], key: str, default: bool) -> bool:
@@ -267,6 +276,201 @@ def _start_proxy(log_path: Path, backend: str = "") -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# Lightweight reverse proxy: /dashboard from port 8787 to real Hermes dashboard
+# ---------------------------------------------------------------------------
+
+_DASHBOARD_PROXY_SERVER: HTTPServer | None = None
+_DASHBOARD_PROXY_THREAD: threading.Thread | None = None
+
+
+class _DashboardForwardHandler(BaseHTTPRequestHandler):
+    """HTTP request handler that forwards /dashboard/* requests to the real
+    Hermes dashboard at 127.0.0.1:9119 and returns 404 for everything else."""
+
+    def do_GET(self) -> None:
+        self._forward()
+
+    def do_POST(self) -> None:
+        self._forward()
+
+    def do_PUT(self) -> None:
+        self._forward()
+
+    def do_DELETE(self) -> None:
+        self._forward()
+
+    def do_HEAD(self) -> None:
+        self._forward_no_body()
+
+    def _target_url(self) -> str | None:
+        """Build the target URL on the real Hermes dashboard, or None for
+        non-dashboard paths that this proxy does not serve."""
+        path = self.path
+        if path.startswith("/dashboard"):
+            return f"http://127.0.0.1:{_HERMES_DASHBOARD_PORT}{path}"
+        # Also forward /api, /ws, /health — these are dashboard paths too
+        # that the SPA and backend rely on.
+        if path.startswith("/api/") or path.startswith("/ws") or path in ("/health", "/"):
+            return f"http://127.0.0.1:{_HERMES_DASHBOARD_PORT}{path}"
+        return None
+
+    def _forward(self) -> None:
+        target = self._target_url()
+        if target is None:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Not found")
+            return
+
+        body_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(body_length) if body_length > 0 else b""
+
+        try:
+            req = Request(
+                target,
+                data=body if body else None,
+                headers={k: v for k, v in self.headers.items()
+                         if k.lower() not in ("host", "content-length", "connection",
+                                               "transfer-encoding")},
+                method=self.command,
+            )
+            with urlopen(req, timeout=10.0) as upstream:
+                self.send_response(int(upstream.status))
+                for key, value in upstream.headers.items():
+                    if key.lower() not in ("transfer-encoding", "content-encoding",
+                                           "content-length", "connection"):
+                        self.send_header(key, value)
+                # Recompute content-length from the body we actually read
+                upstream_body = upstream.read()
+                self.send_header("Content-Length", str(len(upstream_body)))
+                self.end_headers()
+                self.wfile.write(upstream_body)
+        except URLError as exc:
+            logger.warning("Dashboard reverse proxy: upstream error for %s: %s", target, exc)
+            self.send_response(502)
+            self.end_headers()
+            self.wfile.write(f"Proxy error: {exc}".encode())
+        except Exception as exc:
+            logger.warning("Dashboard reverse proxy: unexpected error for %s: %s", target, exc)
+            self.send_response(502)
+            self.end_headers()
+            self.wfile.write(f"Proxy error: {exc}".encode())
+
+    def _forward_no_body(self) -> None:
+        target = self._target_url()
+        if target is None:
+            self.send_response(404)
+            self.end_headers()
+            return
+        try:
+            req = Request(target, method="HEAD")
+            with urlopen(req, timeout=5.0) as upstream:
+                self.send_response(int(upstream.status))
+                for key, value in upstream.headers.items():
+                    if key.lower() not in ("transfer-encoding", "content-encoding",
+                                           "content-length", "connection"):
+                        self.send_header(key, value)
+                self.end_headers()
+        except URLError:
+            self.send_response(502)
+            self.end_headers()
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        logger.debug("Dashboard reverse proxy: %s", fmt % args)
+
+
+def _start_dashboard_reverse_proxy() -> bool:
+    """Start a lightweight HTTP reverse proxy on port 8787 that forwards
+    `/dashboard`, `/api/`, `/ws`, and `/health` requests to the real Hermes
+    dashboard at 127.0.0.1:9119.
+
+    This ensures that any code, tool, or integration that still hits the old
+    Headroom dashboard URL (http://127.0.0.1:8787/dashboard) gets seamlessly
+    forwarded to the actual dashboard.
+    """
+    global _DASHBOARD_PROXY_SERVER, _DASHBOARD_PROXY_THREAD
+
+    if _DASHBOARD_PROXY_THREAD is not None and _DASHBOARD_PROXY_THREAD.is_alive():
+        return True
+
+    try:
+        with socket.create_connection(("127.0.0.1", _HEADROOM_PROXY_PORT), timeout=0.3):
+            logger.debug(
+                "Dashboard reverse proxy: port %d already in use — skipping",
+                _HEADROOM_PROXY_PORT,
+            )
+            return True
+    except OSError:
+        pass
+
+    try:
+        server = HTTPServer(("127.0.0.1", _HEADROOM_PROXY_PORT), _DashboardForwardHandler)
+        _DASHBOARD_PROXY_SERVER = server
+        thread = threading.Thread(
+            target=server.serve_forever,
+            daemon=True,
+            name="dashboard-reverse-proxy",
+        )
+        thread.start()
+        _DASHBOARD_PROXY_THREAD = thread
+        logger.info(
+            "Dashboard reverse proxy: forwarding http://127.0.0.1:%d/dashboard -> "
+            "http://127.0.0.1:%d/dashboard",
+            _HEADROOM_PROXY_PORT,
+            _HERMES_DASHBOARD_PORT,
+        )
+        return True
+    except OSError as exc:
+        logger.warning(
+            "Dashboard reverse proxy: failed to bind port %d: %s",
+            _HEADROOM_PROXY_PORT,
+            exc,
+        )
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Config auto-fix: detect dashboard_url pointing to Headroom's own port
+# ---------------------------------------------------------------------------
+
+def _fix_dashboard_url_if_wrong(hcfg: Dict[str, Any]) -> str:
+    """Detect if dashboard_url points to Headroom's own proxy port and
+    auto-correct it to the real Hermes dashboard port with a warning.
+
+    Returns the corrected (or original) dashboard URL.
+    """
+    url = _dashboard_url(hcfg)
+    if not url:
+        return url
+
+    parsed = urlparse(url)
+    if parsed.port == _HEADROOM_PROXY_PORT:
+        corrected = f"http://127.0.0.1:{_HERMES_DASHBOARD_PORT}"
+        logger.warning(
+            "headroom.dashboard_url is set to Headroom's own proxy port "
+            "(%s). Auto-correcting to Hermes dashboard (%s). "
+            "Persisting fix to config.yaml.",
+            url,
+            corrected,
+        )
+        try:
+            from hermes_cli.config import load_config, save_config
+            cfg = load_config()
+            if isinstance(cfg.get("headroom"), dict):
+                cfg["headroom"]["dashboard_url"] = corrected
+                save_config(cfg)
+                logger.info("Persisted dashboard_url fix to config.yaml: %s", corrected)
+        except Exception as exc:
+            logger.warning("Could not persist dashboard_url fix to config: %s", exc)
+        return corrected
+
+    if parsed.port == _HERMES_DASHBOARD_PORT:
+        return url
+
+    return url
+
+
 def ensure_headroom_proxy_started() -> Dict[str, Any]:
     """Ensure local Headroom proxy is up (best effort, no hard failures)."""
     global _LAST_ATTEMPT_MONO, _LAST_SUCCESS
@@ -277,7 +481,18 @@ def ensure_headroom_proxy_started() -> Dict[str, Any]:
         if not _bool(hcfg, "enabled", True):
             return {"status": "disabled"}
 
-        base_url = _dashboard_url(hcfg)
+        # Auto-fix dashboard_url if it points to Headroom's own proxy port (8787).
+        base_url = _fix_dashboard_url_if_wrong(hcfg)
+        # If the auto-fix persisted a config change, reload hcfg.
+        if base_url != _dashboard_url(hcfg):
+            config = load_config()
+            hcfg = config.get("headroom") if isinstance(config.get("headroom"), dict) else {}
+
+        # Start a lightweight reverse proxy on port 8787 so any code still
+        # hitting the old Headroom dashboard URL gets forwarded to the real
+        # Hermes dashboard on port 9119.
+        _start_dashboard_reverse_proxy()
+
         desired_backend = _desired_backend(_model_provider(config))
         parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not _is_loopback(parsed.hostname or ""):

@@ -539,6 +539,7 @@ export interface SubagentEventPayload {
   files_written?: string[]
   goal: string
   input_tokens?: number
+  instruction?: string
   iteration?: number
   model?: string
   output_tail?: { is_error?: boolean; preview?: string; tool?: string }[]

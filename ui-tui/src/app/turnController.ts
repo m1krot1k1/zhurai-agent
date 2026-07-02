@@ -131,6 +131,7 @@ class TurnController {
   private reasoningTimer: Timer = null
   private streamTimer: Timer = null
   private streamDelay = STREAM_IDLE_BATCH_MS
+  private liveSnapshotTimer: Timer = null
   private toolProgressTimer: Timer = null
 
   // ── Credits notice machinery (Strategy B) ───────────────────────────
@@ -948,6 +949,7 @@ class TurnController {
         goal: p.goal,
         id,
         index: p.task_index,
+        instruction: p.instruction,
         model: p.model,
         notes: [],
         parentId: p.parent_id ?? null,
@@ -980,6 +982,7 @@ class TurnController {
         filesWritten: p.files_written ?? base.filesWritten,
         goal: p.goal || base.goal,
         inputTokens: p.input_tokens ?? base.inputTokens,
+        instruction: p.instruction ?? base.instruction,
         iteration: p.iteration ?? base.iteration,
         model: p.model ?? base.model,
         outputTail,
@@ -1001,6 +1004,20 @@ class TurnController {
 
       return { ...state, subagents }
     })
+
+    // Debounced live snapshot: push the current spawn tree to history so the
+    // /agents overlay sees real-time progress, not only snapshots at turn end.
+    // Without this, the overlay shows stale data until the next
+    // message.complete fires recordMessageComplete() with the final snapshot.
+    this.liveSnapshotTimer = clear(this.liveSnapshotTimer)
+    this.liveSnapshotTimer = setTimeout(() => {
+      this.liveSnapshotTimer = null
+      const subagents = getTurnState().subagents
+      const sessionId = getUiState().sid
+      if (subagents.length > 0) {
+        pushSnapshot(subagents, { sessionId, startedAt: null })
+      }
+    }, 600)
   }
 }
 
