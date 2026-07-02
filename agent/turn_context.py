@@ -237,6 +237,16 @@ def build_turn_context(
             should_review_memory = True
             agent._turns_since_memory = 0
 
+    # Hydrate per-session nudge counters from persisted history.
+    if conversation_history and agent._user_turn_count == 0:
+        prior_user_turns = sum(
+            1 for m in conversation_history if m.get("role") == "user"
+        )
+        if prior_user_turns > 0:
+            agent._user_turn_count = prior_user_turns
+            if agent._memory_nudge_interval > 0 and agent._turns_since_memory == 0:
+                agent._turns_since_memory = prior_user_turns % agent._memory_nudge_interval
+
     # Initialise messages from conversation_history (or empty if fresh).
     if conversation_history:
         messages = list(conversation_history)
@@ -438,7 +448,7 @@ def build_turn_context(
                     )
             else:
                 orchestration_user_context = build_orchestration_injection(
-                    agent, original_user_message, task_id=effective_task_id,
+                    original_user_message,
                 )
                 if orchestration_user_context:
                     if "[SYNTHESIS]" in orchestration_user_context:
