@@ -66,6 +66,7 @@
 | [obsidian](skills/note-taking/obsidian/SKILL.md) | note-taking | Read, search, create, and edit notes in the Obsidian vault. |
 | [orchestrator](skills/orchestrator/SKILL.md) | orchestrator | "Координация сложных задач: delegate_task для параллельных веток, синтез с evidence." |
 | [airtable](skills/productivity/airtable/SKILL.md) | productivity | Airtable REST API via curl. Records CRUD, filters, upserts. |
+| [caveman-style](skills/productivity/caveman-style/SKILL.md) | productivity | Makes agent responses extremely terse to save tokens. Up to 75% token reduction. |
 | [google-workspace](skills/productivity/google-workspace/SKILL.md) | productivity | "Gmail, Calendar, Drive, Docs, Sheets via gws CLI or Python." |
 | [maps](skills/productivity/maps/SKILL.md) | productivity | "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM." |
 | [nano-pdf](skills/productivity/nano-pdf/SKILL.md) | productivity | "Edit PDF text/typos/titles via nano-pdf CLI (NL prompts)." |
