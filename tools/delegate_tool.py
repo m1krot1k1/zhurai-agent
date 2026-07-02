@@ -2438,6 +2438,16 @@ def delegate_task(
     # Normalise the top-level role once; per-task overrides re-normalise.
     top_role = _normalize_role(role)
 
+    # Auto-propagate orchestrator role: if the parent agent itself is an
+    # orchestrator, children default to orchestrator too (unless the caller
+    # explicitly passes role="leaf").  This ensures nested delegation works
+    # without requiring every model call to remember "role='orchestrator'".
+    # The system prompt already tells orchestrators about this capability,
+    # but auto-propagation is the safety net — see _build_child_system_prompt.
+    parent_role = getattr(parent_agent, "_delegate_role", None)
+    if parent_role == "orchestrator" and top_role == "leaf":
+        top_role = "orchestrator"
+
     # Background (async) delegation now applies to BOTH single tasks and
     # batches. A batch simply becomes N independent async dispatches: each
     # child runs on the daemon executor and re-enters the conversation via
