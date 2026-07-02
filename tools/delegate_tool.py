@@ -1834,7 +1834,10 @@ def _run_single_child(
                     instruction=_instruction,
                     branch_context=str(_kwargs.get("context") or ""),
                 )
-                child_progress_cb("_thinking", "Thinking…")
+                child_progress_cb(
+                    "_thinking",
+                    (_instruction[:80] + "…") if _instruction and len(_instruction) > 80 else (_instruction or "Thinking…"),
+                )
             except Exception as e:
                 logger.debug("Progress callback start failed: %s", e)
 
@@ -2589,18 +2592,20 @@ def delegate_task(
     except Exception:
         logger.debug("delegate_task: task enrichment skipped", exc_info=True)
 
-    # Orchestrator-role parents fanning out 2+ branches should run in the
-    # background so specialists execute concurrently without blocking the
-    # orchestrator turn on each sequential delegate_task call.
+    # Orchestrator-role parents should run in the background so specialists
+    # execute concurrently without blocking the orchestrator turn on each
+    # sequential delegate_task call. Applies to single-task delegations too
+    # — the orchestrator must not wait for one specialist to finish before
+    # fanning out the next.
     if (
         background is False
-        and len(task_list) >= 2
+        and len(task_list) >= 1
         and getattr(parent_agent, "_delegate_role", None) == "orchestrator"
     ):
         background = True
         logger.info(
             "delegate_task: auto-enabling background=true for orchestrator "
-            "batch of %d tasks",
+            "%d task(s)",
             len(task_list),
         )
 

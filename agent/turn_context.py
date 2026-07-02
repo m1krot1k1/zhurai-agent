@@ -47,10 +47,6 @@ def _compression_made_progress(
     context window.  See issue #39548 for an observed case: 220 → 220
     messages, ~288k → ~183k tokens on a 1M-context model still triggered
     auto-reset.
-
-    The token reduction must be *material* (>5%) to count as progress — the
-    same floor the overflow-handler retry path uses (conversation_loop.py,
-    #39550) — so a sub-5% wobble doesn't keep the multi-pass loop spinning.
     """
     if new_len < orig_len:
         return True
@@ -84,6 +80,25 @@ class TurnContext:
     ext_prefetch_cache: str = ""
     # Multi-agent orchestration hint (API-call-time only, not persisted).
     orchestration_user_context: str = ""
+
+
+def _emit_prologue_progress(agent, text: str) -> None:
+    """Emit a ``_thinking`` progress event during the turn prologue.
+
+    The prologue runs before the tool loop starts, so ``_thinking`` is the
+    only event type that makes sense — there is no tool to report progress
+    for.  Gateway platforms (desktop app, TUI) relay ``_thinking`` as brief
+    reasoning / spinner states, so this keeps the user informed during setup
+    steps that can take 1-10 s (compression, memory prefetch, plugin hooks).
+    """
+    if not agent:
+        return
+    try:
+        cb = getattr(agent, "tool_progress_callback", None)
+        if cb:
+            cb("_thinking", text)
+    except Exception:
+        pass
 
 
 def build_turn_context(
@@ -151,6 +166,7 @@ def build_turn_context(
         if not getattr(agent, "_skip_mcp_refresh", False):
             from tools.mcp_tool import has_registered_mcp_tools, refresh_agent_mcp_tools
             if has_registered_mcp_tools():
+                _emit_prologue_progress(agent, "Refreshing MCP tool connections…")
                 refresh_agent_mcp_tools(agent, quiet_mode=True)
     except Exception:
         logger.debug("between-turns MCP tool refresh skipped", exc_info=True)
@@ -208,49 +224,6 @@ def build_turn_context(
     # NOTE: _turns_since_memory and _iters_since_skill are NOT reset here.
     agent.iteration_budget = IterationBudget(agent.max_iterations)
 
-    # Log conversation turn start for debugging/observability.
-    _preview_text = summarize_user_message_for_log(user_message)
-    _msg_preview = (_preview_text[:80] + "...") if len(_preview_text) > 80 else _preview_text
-    _msg_preview = _msg_preview.replace("\n", " ")
-    logger.info(
-        "conversation turn: session=%s model=%s provider=%s platform=%s history=%d msg=%r",
-        agent.session_id or "none", agent.model, agent.provider or "unknown",
-        agent.platform or "unknown", len(conversation_history or []),
-        _msg_preview,
-    )
-
-    # Initialize conversation (copy to avoid mutating the caller's list).
-    messages = list(conversation_history) if conversation_history else []
-
-    # Hydrate todo store from conversation history.
-    if conversation_history and not agent._todo_store.has_items():
-        agent._hydrate_todo_store(conversation_history)
-
-    # Hydrate per-session nudge counters from persisted history (issue #22357).
-    if conversation_history and agent._user_turn_count == 0:
-        prior_user_turns = sum(
-            1 for m in conversation_history if m.get("role") == "user"
-        )
-        if prior_user_turns > 0:
-            agent._user_turn_count = prior_user_turns
-            if agent._memory_nudge_interval > 0 and agent._turns_since_memory == 0:
-                agent._turns_since_memory = prior_user_turns % agent._memory_nudge_interval
-
-    # Track user turns for memory flush and periodic nudge logic.
-    agent._user_turn_count += 1
-
-    # Reset the streaming context scrubber at the top of each turn.
-    scrubber = getattr(agent, "_stream_context_scrubber", None)
-    if scrubber is not None:
-        scrubber.reset()
-    # Reset the think scrubber for the same reason.
-    think_scrubber = getattr(agent, "_stream_think_scrubber", None)
-    if think_scrubber is not None:
-        think_scrubber.reset()
-
-    # Preserve the original user message (no nudge injection).
-    original_user_message = persist_user_message if persist_user_message is not None else user_message
-
     # Track memory nudge trigger (turn-based, checked here).
     should_review_memory = False
     if (agent._memory_nudge_interval > 0
@@ -262,6 +235,7 @@ def build_turn_context(
             agent._turns_since_memory = 0
 
     # Add user message.
+    _emit_prologue_progress(agent, "Processing your request…")
     user_msg = {"role": "user", "content": user_message}
     messages.append(user_msg)
     current_turn_user_idx = len(messages) - 1
@@ -331,6 +305,10 @@ def build_turn_context(
                 agent.model,
                 f"{_compressor.context_length:,}",
             )
+            _emit_prologue_progress(
+                agent,
+                f"📦 Compressing context (~{_preflight_tokens:,} tokens)…",
+            )
             agent._emit_status(
                 f"📦 Preflight compression: ~{_preflight_tokens:,} tokens "
                 f">= {_compressor.threshold_tokens:,} threshold. "
@@ -368,6 +346,7 @@ def build_turn_context(
     # Plugin hook: pre_llm_call (context injected into user message, not system prompt).
     plugin_user_context = ""
     try:
+        _emit_prologue_progress(agent, "Running pre-processing plugins…")
         from hermes_cli.plugins import invoke_hook as _invoke_hook
         _pre_results = _invoke_hook(
             "pre_llm_call",
@@ -420,6 +399,7 @@ def build_turn_context(
     ext_prefetch_cache = ""
     if agent._memory_manager:
         try:
+            _emit_prologue_progress(agent, "Loading context from memory…")
             _query = original_user_message if isinstance(original_user_message, str) else ""
             ext_prefetch_cache = agent._memory_manager.prefetch_all(_query) or ""
         except Exception:
@@ -438,25 +418,43 @@ def build_turn_context(
         if isinstance(original_user_message, str) and not is_async_delegation_notification_text(
             original_user_message
         ):
-            agent._orchestrator_wave_number = 1
-
-        if isinstance(original_user_message, str) and is_async_delegation_notification_text(
-            original_user_message
-        ):
-            orchestration_user_context = (
-                build_root_synthesis_injection(original_user_message) or ""
-            )
-        elif is_ecosystem_orchestrator_subagent(agent) and not getattr(
-            agent, "_orchestrator_fanout_done", False
-        ):
-            if isinstance(original_user_message, str):
-                orchestration_user_context = (
-                    build_orchestrator_recon_injection(agent, original_user_message) or ""
+            if is_ecosystem_orchestrator_subagent(agent):
+                orchestration_user_context = build_orchestrator_recon_injection(
+                    agent, original_user_message
                 )
-        elif isinstance(original_user_message, str):
-            orchestration_user_context = build_orchestration_injection(original_user_message) or ""
+                if orchestration_user_context:
+                    logger.info(
+                        "Orchestrator recon injection: %d chars",
+                        len(orchestration_user_context),
+                    )
+            else:
+                orchestration_user_context = build_orchestration_injection(
+                    agent, original_user_message, task_id=effective_task_id,
+                )
+                if orchestration_user_context:
+                    if "[SYNTHESIS]" in orchestration_user_context:
+                        logger.info(
+                            "Root synthesis injection: %d chars",
+                            len(orchestration_user_context),
+                        )
+                    else:
+                        logger.info(
+                            "Orchestration injection: %d chars",
+                            len(orchestration_user_context),
+                        )
+        else:
+            # Reconsume a per-turn check also needed for async notifications — the
+            # "recon" passes a full list of running children. Guard here so a
+            # synthetic /branch or /resume prompt doesn't silently lap it.
+            if is_ecosystem_orchestrator_subagent(agent):
+                orchestration_user_context = build_orchestrator_recon_injection(
+                    agent, original_user_message
+                )
     except Exception as exc:
-        logger.debug("orchestration router skipped: %s", exc)
+        logger.warning("orchestration injection failed: %s", exc)
+
+    # Let the gateway know we're ready to make the first API call.
+    _emit_prologue_progress(agent, "Thinking…")
 
     return TurnContext(
         user_message=user_message,

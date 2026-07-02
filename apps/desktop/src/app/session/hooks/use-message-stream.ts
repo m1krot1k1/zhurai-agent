@@ -879,10 +879,15 @@ export function useMessageStream({
           appendAssistantDelta(sessionId, coerceGatewayText(payload?.text))
         }
       } else if (event.type === 'thinking.delta') {
-        // thinking.delta carries the kawaii spinner status (face + verb from
-        // KawaiiSpinner), not real reasoning. The bottom-of-thread loading
-        // indicator already covers that UX, so we ignore these events to
-        // avoid a duplicative "Thinking" disclosure showing spinner text.
+        // thinking.delta may carry a subagent instruction (from
+        // _thinking progress events in delegate_tool). Show it as brief
+        // reasoning so the user sees what a spawned child is working on.
+        // Pure-KawaiiSpinner timing pings (face+verb only) are short
+        // and get rate-limited by the compose bar itself, so they are
+        // harmless to include.
+        if (sessionId) {
+          appendReasoningDelta(sessionId, coerceThinkingText(payload?.text || ''))
+        }
       } else if (event.type === 'reasoning.delta') {
         if (sessionId) {
           appendReasoningDelta(sessionId, coerceThinkingText(payload?.text))
