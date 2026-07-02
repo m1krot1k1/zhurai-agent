@@ -1,0 +1,8 @@
+{
+  "messages": [
+    {
+      "speaker": "code",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Implement API slice\nSCOPE: src/auth/api/login.ts\nOUT_OF_SCOPE: tests\nOWNERSHIP: src/auth/api/login.ts\nDEPENDENCIES: shared validation helpers\nSTEPS: implement endpoint logic\nDELIVERABLES: updated API file\nACCEPTANCE_CRITERIA: endpoint returns JWT on valid credentials\nNON-NEGOTIABLE: no test edits\nCOMPLETION_CONTRACT: stop after backend slice\")\n\nTask(subagent_type=\"code\", prompt=\"OBJECTIVE: Implement regression tests\nSCOPE: tests/auth/api/login.test.ts\nOUT_OF_SCOPE: production code\nOWNERSHIP: tests/auth/api/login.test.ts\nDEPENDENCIES: src/auth/api/login.ts\nSTEPS: add success and failure coverage\nDELIVERABLES: updated API tests\nACCEPTANCE_CRITERIA: endpoint is covered by regression tests\nNON-NEGOTIABLE: keep source files untouched\nCOMPLETION_CONTRACT: stop after tests are prepared\")"
+    }
+  ]
+}

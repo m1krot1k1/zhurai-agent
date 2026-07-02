@@ -1,0 +1,8 @@
+{
+  "messages": [
+    {
+      "speaker": "code",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Slice A\nSCOPE: src/auth/a.ts\nOUT_OF_SCOPE: other files\nOWNERSHIP: src/auth/a.ts\nDEPENDENCIES: none\nSTEPS: implement slice A\nDELIVERABLES: code changes\nACCEPTANCE_CRITERIA: slice A done\nNON-NEGOTIABLE: stay in file\nCOMPLETION_CONTRACT: stop after A\")\n\nTask(subagent_type=\"code\", prompt=\"OBJECTIVE: Slice B\nSCOPE: src/auth/b.ts\nOUT_OF_SCOPE: other files\nOWNERSHIP: src/auth/b.ts\nDEPENDENCIES: none\nSTEPS: implement slice B\nDELIVERABLES: code changes\nACCEPTANCE_CRITERIA: slice B done\nNON-NEGOTIABLE: stay in file\nCOMPLETION_CONTRACT: stop after B\")\n\nTask(subagent_type=\"code\", prompt=\"OBJECTIVE: Slice C\nSCOPE: src/auth/c.ts\nOUT_OF_SCOPE: other files\nOWNERSHIP: src/auth/c.ts\nDEPENDENCIES: none\nSTEPS: implement slice C\nDELIVERABLES: code changes\nACCEPTANCE_CRITERIA: slice C done\nNON-NEGOTIABLE: stay in file\nCOMPLETION_CONTRACT: stop after C\")"
+    }
+  ]
+}

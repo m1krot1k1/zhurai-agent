@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "speaker": "orchestrator",
+      "text": "Task tool unavailable in this runtime."
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Executing the orchestration plan ourselves and running validators."
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "Parallel branches completed successfully."
+    }
+  ]
+}

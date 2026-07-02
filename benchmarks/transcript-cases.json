@@ -1,0 +1,242 @@
+{
+  "cases": [
+    {
+      "id": "root_start_safe",
+      "path": "transcript-fixtures/pass/root-start-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "root_start_direct_orchestrator",
+        "root_start_missing_orchestrator",
+        "start_direct_specialist_without_orchestrator",
+        "parallel_write_overlapping_ownership"
+      ]
+    },
+    {
+      "id": "root_start_direct_orchestrator",
+      "path": "transcript-fixtures/fail/root-start-direct-orchestrator.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "root_start_direct_orchestrator"
+      ]
+    },
+    {
+      "id": "root_start_relay_safe",
+      "path": "transcript-fixtures/pass/root-start-relay-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "root_start_direct_orchestrator",
+        "root_start_missing_orchestrator",
+        "start_direct_specialist_without_orchestrator"
+      ]
+    },
+    {
+      "id": "root_start_orchestrator_child_relay_safe",
+      "path": "transcript-fixtures/pass/root-start-orchestrator-child-relay-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "root_start_direct_orchestrator",
+        "root_start_missing_orchestrator",
+        "start_direct_specialist_without_orchestrator",
+        "task_unavailable_fake_orchestration"
+      ]
+    },
+    {
+      "id": "same_type_safe_two_children",
+      "path": "transcript-fixtures/pass/code-self-delegation-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "same_type_fanout_needs_orchestrator",
+        "same_type_missing_ownership",
+        "parallel_write_overlapping_ownership"
+      ]
+    },
+    {
+      "id": "start_analyzer_allowed",
+      "path": "transcript-fixtures/pass/start-analyzer-allowed.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "illegal_start_delegate"
+      ]
+    },
+    {
+      "id": "swarm_supervisor_allowed",
+      "path": "transcript-fixtures/pass/swarm-supervisor-allowed.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "root_start_direct_orchestrator",
+        "illegal_start_delegate",
+        "illegal_orchestrator_recursion",
+        "start_direct_specialist_without_orchestrator",
+        "same_type_fanout_needs_orchestrator",
+        "parallel_write_overlapping_ownership"
+      ]
+    },
+    {
+      "id": "continuous_auto_resume_safe",
+      "path": "transcript-fixtures/pass/continuous-auto-resume-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "continuous_missing_auto_resume",
+        "continuous_missing_backoff_policy",
+        "continuous_missing_no_progress_guard",
+        "continuous_missing_blocker_taxonomy"
+      ]
+    },
+    {
+      "id": "resume_after_approval_safe",
+      "path": "transcript-fixtures/pass/resume-after-approval-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "resume_without_prior_pause",
+        "resume_without_explicit_event",
+        "legacy_runtime_status_used"
+      ]
+    },
+    {
+      "id": "open_ended_until_stop_steady_state_safe",
+      "path": "transcript-fixtures/pass/open-ended-until-stop-steady-state-safe.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "open_ended_until_stop_premature_stop",
+        "open_ended_continue_without_next_packet",
+        "root_start_direct_orchestrator"
+      ]
+    },
+    {
+      "id": "start_local_work_before_handoff",
+      "path": "transcript-fixtures/fail/start-local-work-before-handoff.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "start_local_work_before_orchestrator"
+      ]
+    },
+    {
+      "id": "task_unavailable_fake_orchestration",
+      "path": "transcript-fixtures/fail/task-unavailable-fake-orchestration.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "task_unavailable_fake_orchestration"
+      ]
+    },
+    {
+      "id": "task_unavailable_blocked_fake_orchestration",
+      "path": "transcript-fixtures/fail/task-unavailable-blocked-fake-orchestration.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "task_unavailable_fake_orchestration"
+      ]
+    },
+    {
+      "id": "open_ended_until_stop_premature_stop",
+      "path": "transcript-fixtures/fail/open-ended-until-stop-premature-stop.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "open_ended_until_stop_premature_stop"
+      ]
+    },
+    {
+      "id": "continuous_missing_auto_resume",
+      "path": "transcript-fixtures/fail/continuous-missing-auto-resume.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "continuous_missing_auto_resume"
+      ]
+    },
+    {
+      "id": "resume_without_prior_pause",
+      "path": "transcript-fixtures/fail/resume-without-prior-pause.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "resume_without_prior_pause"
+      ]
+    },
+    {
+      "id": "resume_without_explicit_event",
+      "path": "transcript-fixtures/fail/resume-without-explicit-event.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "resume_without_explicit_event"
+      ]
+    },
+    {
+      "id": "legacy_runtime_status_used",
+      "path": "transcript-fixtures/fail/legacy-runtime-status-used.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "legacy_runtime_status_used"
+      ]
+    },
+    {
+      "id": "start_open_ended_degraded_forbidden",
+      "path": "transcript-fixtures/fail/start-open-ended-degraded.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "degraded_mode_forbidden_for_start_swarm"
+      ]
+    },
+    {
+      "id": "task_unavailable_hard_fail",
+      "path": "transcript-fixtures/pass/task-unavailable-hard-fail.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "task_unavailable_fake_orchestration"
+      ]
+    },
+    {
+      "id": "start_direct_specialist",
+      "path": "transcript-fixtures/fail/start-direct-specialist.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "start_direct_specialist_without_orchestrator"
+      ]
+    },
+    {
+      "id": "parallel_overlap",
+      "path": "transcript-fixtures/fail/parallel-overlap.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "parallel_write_overlapping_ownership"
+      ]
+    },
+    {
+      "id": "illegal_start_recursion",
+      "path": "transcript-fixtures/fail/start-recursion.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "illegal_orchestrator_recursion"
+      ]
+    },
+    {
+      "id": "same_type_fanout_overflow",
+      "path": "transcript-fixtures/fail/code-fanout-overflow.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "same_type_fanout_needs_orchestrator"
+      ]
+    },
+    {
+      "id": "flat_fanout_overflow",
+      "path": "transcript-fixtures/fail/flat-fanout-overflow.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "flat_fanout_overflow"
+      ]
+    },
+    {
+      "id": "completion_claim_without_evidence",
+      "path": "transcript-fixtures/fail/completion-claim-without-evidence.json",
+      "expected_status": "fail",
+      "required_findings": [
+        "completion_claim_without_evidence"
+      ]
+    },
+    {
+      "id": "completion_claim_with_evidence",
+      "path": "transcript-fixtures/pass/completion-claim-with-evidence.json",
+      "expected_status": "pass",
+      "forbidden_findings": [
+        "completion_claim_without_evidence"
+      ]
+    }
+  ]
+}

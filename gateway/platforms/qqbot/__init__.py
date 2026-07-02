@@ -1,0 +1,90 @@
+"""QQBot platform package.
+
+Re-exports the main adapter symbols from ``adapter.py`` (the original
+``qqbot.py``) so that **all existing import paths remain unchanged**::
+
+    from gateway.platforms.qqbot import QQAdapter          # works
+    from gateway.platforms.qqbot import check_qq_requirements  # works
+
+New modules:
+    - ``constants`` — shared constants (API URLs, timeouts, message types)
+    - ``utils`` — User-Agent builder, config helpers
+    - ``crypto`` — AES-256-GCM key generation and decryption
+    - ``onboard`` — QR-code scan-to-configure flow
+"""
+
+# -- Adapter (original qqbot.py) ------------------------------------------
+from .adapter import (
+    QQAdapter,
+    QQCloseError,
+    _coerce_list,
+    _ssrf_redirect_guard,
+    check_qq_requirements,
+)
+
+# -- Chunked upload --------------------------------------------------------
+from .chunked_upload import (
+    ChunkedUploader,
+    UploadDailyLimitExceededError,
+    UploadFileTooLargeError,
+)
+from .crypto import decrypt_secret, generate_bind_key
+
+# -- Inline keyboards ------------------------------------------------------
+from .keyboards import (
+    ApprovalRequest,
+    ApprovalSender,
+    InlineKeyboard,
+    InteractionEvent,
+    build_approval_keyboard,
+    build_approval_text,
+    build_update_prompt_keyboard,
+    parse_approval_button_data,
+    parse_interaction_event,
+    parse_update_prompt_button_data,
+)
+
+# -- Onboard (QR-code scan-to-configure) -----------------------------------
+from .onboard import (
+    BindStatus,
+    build_connect_url,
+    qr_register,
+)
+
+# -- Utils -----------------------------------------------------------------
+from .utils import build_user_agent, coerce_list, get_api_headers
+
+__all__ = [
+    # adapter
+    "QQAdapter",
+    "QQCloseError",
+    "check_qq_requirements",
+    "_coerce_list",
+    "_ssrf_redirect_guard",
+    # onboard
+    "BindStatus",
+    "build_connect_url",
+    "qr_register",
+    # crypto
+    "decrypt_secret",
+    "generate_bind_key",
+    # utils
+    "build_user_agent",
+    "get_api_headers",
+    "coerce_list",
+    # chunked upload
+    "ChunkedUploader",
+    "UploadDailyLimitExceededError",
+    "UploadFileTooLargeError",
+    # keyboards
+    "ApprovalRequest",
+    "ApprovalSender",
+    "InlineKeyboard",
+    "InteractionEvent",
+    "build_approval_keyboard",
+    "build_approval_text",
+    "build_update_prompt_keyboard",
+    "parse_approval_button_data",
+    "parse_interaction_event",
+    "parse_update_prompt_button_data",
+]

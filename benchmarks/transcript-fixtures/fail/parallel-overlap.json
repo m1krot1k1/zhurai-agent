@@ -1,0 +1,8 @@
+{
+  "messages": [
+    {
+      "speaker": "orchestrator",
+      "text": "Task(subagent_type=\"code\", prompt=\"OBJECTIVE: Rework auth backend\nSCOPE: src/auth\nOUT_OF_SCOPE: frontend\nOWNERSHIP: src/auth/**\nDEPENDENCIES: shared auth contract\nSTEPS: refactor backend\nDELIVERABLES: backend changes\nACCEPTANCE_CRITERIA: auth stays green\nNON-NEGOTIABLE: keep public API stable\nCOMPLETION_CONTRACT: stop after backend refactor\")\n\nTask(subagent_type=\"frontend-specialist\", prompt=\"OBJECTIVE: Refresh login screen\nSCOPE: src/auth/login.tsx\nOUT_OF_SCOPE: backend\nOWNERSHIP: src/auth/login.tsx\nDEPENDENCIES: current auth API\nSTEPS: update login form\nDELIVERABLES: login UI changes\nACCEPTANCE_CRITERIA: UI builds\nNON-NEGOTIABLE: no backend edits\nCOMPLETION_CONTRACT: stop after UI refresh\")"
+    }
+  ]
+}

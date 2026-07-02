@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Deploy the prepared release after approval"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Prepare release deployment and pause for approval\nORIGINAL_REQUEST: /start Deploy the prepared release after approval\nCONTINUOUS_MODE: single_wave\nWAVE_NUMBER: 1\nRESPONSE_LANGUAGE: en\")"
+    },
+    {
+      "speaker": "orchestrator",
+      "text": "WAVE_RESULT:\nstatus: pause\npause_reason: AWAITING_APPROVAL\napproval_state: requested\nexecution_state: paused\nresume_packet: deploy packet RC-1\norchestrator_summary: External side effect is ready, but approval is required before deployment."
+    },
+    {
+      "speaker": "user",
+      "text": "approval_granted"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: resume\nresume_event: approval_granted\napproval_state: approved\nexecution_state: in_progress\nresume_packet: deploy packet RC-1"
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"ENTRY_MODE: relay_resume\nORIGINAL_REQUEST: /start Deploy the prepared release after approval\nCONTINUATION_PACKET: deploy packet RC-1\nRESUME_REASON: approval_granted\nWAVE_NUMBER: 2\")"
+    }
+  ]
+}

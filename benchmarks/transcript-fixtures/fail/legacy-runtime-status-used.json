@@ -1,0 +1,12 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Continue the autonomous loop"
+    },
+    {
+      "speaker": "start",
+      "text": "START_REPORT:\nstatus: continue\nruntime_boundary: turn_boundary\npause_reason: PAUSED_FOR_RUNTIME_BUDGET\nresume_packet: packet-legacy"
+    }
+  ]
+}

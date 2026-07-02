@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "speaker": "user",
+      "text": "/start Analyze and improve the repository"
+    },
+    {
+      "speaker": "start",
+      "text": "Reading orchestrator.md and running validators before routing."
+    },
+    {
+      "speaker": "start",
+      "text": "Task(subagent_type=\"orchestrator\", prompt=\"OBJECTIVE: Analyze and improve the repository\nORIGINAL_REQUEST: /start Analyze and improve the repository\nWAVE_NUMBER: 1\")"
+    }
+  ]
+}

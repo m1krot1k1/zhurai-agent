@@ -1,0 +1,152 @@
+name: Release Desktop macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Тип версии (minor для dev, major для main)'
+        required: true
+        type: choice
+        options:
+          - minor
+          - major
+  push:
+    branches:
+      - dev
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/shared/**'
+      - 'agents/**'
+      - 'skills/**'
+      - 'rules/**'
+      - 'commands/**'
+      - 'agent/**'
+      - 'scripts/build-desktop-macos.sh'
+      - 'scripts/bump-desktop-version.sh'
+      - 'scripts/desktop-signing-env.sh'
+      - 'scripts/ensure-node.sh'
+      - '.github/workflows/release-desktop-macos.yml'
+      - 'acp_registry/**'
+      - 'package.json'
+      - 'pyproject.toml'
+      - 'hermes_cli/**'
+      - 'package-lock.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]'))
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - name: Runner diagnostics
+        run: |
+          sw_vers
+          uname -m
+          node --version 2>/dev/null || true
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Определить тип bump
+        id: bump
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            KIND="${{ inputs.bump }}"
+          else
+            KIND="minor"
+          fi
+          case "$KIND" in
+            minor|major) ;;
+            *) echo "ERROR: invalid bump kind: $KIND" >&2; exit 1 ;;
+          esac
+          echo "kind=${KIND}" >> "$GITHUB_OUTPUT"
+
+      # Bump only in the workspace until build succeeds; nothing is pushed on failure.
+      - name: Поднять версию (локально)
+        id: version
+        run: |
+          KIND="${{ steps.bump.outputs.kind }}"
+          case "$KIND" in
+            minor|major) ;;
+            *) echo "ERROR: invalid bump kind: $KIND" >&2; exit 1 ;;
+          esac
+          NEW="$(bash scripts/bump-desktop-version.sh "$KIND")"
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${NEW}" >> "$GITHUB_OUTPUT"
+          echo "Новая версия: v${NEW}"
+
+      - name: Собрать .dmg и .zip
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_NOTARY_PROFILE: ${{ secrets.APPLE_NOTARY_PROFILE }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          CI: true
+        run: |
+          source scripts/desktop-signing-env.sh
+          bash scripts/build-desktop-macos.sh
+          ls -lh apps/desktop/release/
+
+      - name: Sync uv.lock after version bump
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Regenerate uv.lock
+        run: uv lock
+
+      - name: Закоммитить версию
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/desktop/package.json pyproject.toml hermes_cli/__init__.py acp_registry/agent.json uv.lock
+          git commit -m "chore(release): v${{ steps.version.outputs.version }} [skip ci]"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Создать git tag
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "ZhurAI Agent ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Опубликовать GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          NAME="ZhurAI Agent ${TAG}"
+          PRERELEASE="${{ github.ref == 'refs/heads/dev' }}"
+
+          # Create release (with small retry for rate limits)
+          for i in 1 2 3; do
+            if gh release create "$TAG" \
+                --title "$NAME" \
+                --notes-from-tag \
+                --prerelease="$PRERELEASE" \
+                apps/desktop/release/*.dmg \
+                apps/desktop/release/*.zip 2>&1; then
+              echo "Release $TAG created successfully"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Failed to create release after 3 attempts"
+          exit 1
